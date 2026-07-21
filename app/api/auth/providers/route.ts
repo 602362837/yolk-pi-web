@@ -1,5 +1,5 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { isSupportedOAuthAccountProvider, listOAuthAccounts, syncActiveOAuthAccountCredential } from "@/lib/oauth-accounts";
+import { bootstrapOAuthActiveAccountCredential, isSupportedOAuthAccountProvider, listOAuthAccounts } from "@/lib/oauth-accounts";
 import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export async function GET() {
         let activeAccountDisplayName: string | null = null;
 
         if (isSupportedOAuthAccountProvider(p.id)) {
-          await syncActiveOAuthAccountCredential(p.id).catch(() => {});
+          await bootstrapOAuthActiveAccountCredential(p.id).catch(() => {});
           try {
             const accounts = await listOAuthAccounts(p.id);
             accountCount = accounts.accounts.length;

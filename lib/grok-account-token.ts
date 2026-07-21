@@ -22,7 +22,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { Credential } from "@earendil-works/pi-ai";
 import { getOAuthApiKey } from "@/lib/pi-ai-oauth-compat";
 import { GROK_CLI_PROVIDER_ID, isSupportedOAuthAccountProvider } from "./oauth-account-providers";
-import { listOAuthAccounts } from "./oauth-accounts";
+import { readOAuthActiveAccountId } from "./oauth-accounts";
 import { getWebCredentialStore } from "./web-credential-store";
 import { withGrokProviderLock } from "./grok-account-lock";
 
@@ -105,34 +105,32 @@ async function atomicWriteJson(dir: string, filename: string, data: unknown): Pr
 // ─── Active-mirror compare-and-set ───────────────────────────────────────────
 
 /**
- * Update auth.json for grok-cli only when `storageId` is still the active
- * account, using a compare-and-set re-read before CredentialStore.modify.
+ * Project a saved credential to auth.json only when `storageId` is still the
+ * Active account. The caller holds the Grok provider lock; the metadata
+ * re-read is the CAS check against a preceding Activate/reauth.
+ *
+ * Mirror persistence is deliberately not best-effort. Once a rotating refresh
+ * token has been saved in its slot, reporting success before its Active mirror
+ * is written would leave an externally observable inconsistent state.
  */
-async function mirrorActiveCredentialIfActive(storageId: string, credential: Record<string, unknown>): Promise<void> {
+async function mirrorActiveCredentialIfActive(storageId: string, credential: Record<string, unknown>): Promise<boolean> {
+  const currentActiveStorageId = await readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);
+  if (currentActiveStorageId !== storageId) return false;
+
+  // CredentialStore expects type:"oauth". grok-cli credentials from
+  // pi-grok-cli lack the sentinel but are otherwise compatible.
+  const authCredential = credential.type
+    ? credential
+    : { ...credential, type: "oauth" as const };
   try {
-    // Determine the current active storage id from the accounts list
-    let currentActiveStorageId: string | null = null;
-    try {
-      const accounts = await listOAuthAccounts(GROK_CLI_PROVIDER_ID);
-      currentActiveStorageId = accounts.activeAccountId;
-    } catch {
-      // If we can't read the account list, skip the mirror update.
-      return;
-    }
-
-    // Only mirror if the refreshed account is still the active one.
-    if (currentActiveStorageId !== storageId) return;
-
-    // CredentialStore expects type:"oauth". grok-cli credentials from
-    // pi-grok-cli lack the sentinel but are otherwise compatible.
-    const authCredential = (credential as Record<string, unknown>).type
-      ? credential
-      : { ...credential, type: "oauth" as const };
     const store = await getWebCredentialStore();
     await store.modify(GROK_CLI_PROVIDER_ID, async () => authCredential as Credential);
   } catch {
-    // Mirror update is best-effort; never let it break the token resolution.
+    // Do not roll back the slot: its refresh token may have been rotated and
+    // invalidated upstream. The next valid-token resolution retries this projection.
+    throw new Error("Failed to persist active Grok OAuth credential");
   }
+  return true;
 }
 
 // ─── Refresh logic ───────────────────────────────────────────────────────────
@@ -170,11 +168,18 @@ async function refreshGrokCredential(
     throw new Error("Grok OAuth token refresh returned no API key");
   }
 
-  // Persist the refreshed credential atomically
+  // Persist the rotating credential before its derived Active mirror. Never
+  // restore the old slot on a subsequent mirror failure: its refresh token may
+  // already have been invalidated by the provider.
   const newCredential = result.newCredentials ?? currentCredential;
-  await atomicWriteJson(grokAccountDir(), `${encodeURIComponent(storageId)}.json`, newCredential);
+  try {
+    await atomicWriteJson(grokAccountDir(), `${encodeURIComponent(storageId)}.json`, newCredential);
+  } catch {
+    throw new Error("Failed to persist Grok OAuth credential");
+  }
 
-  // Mirror to auth.json if still the active account
+  // Lock-held Active CAS + mirror commit. A failure is intentionally surfaced;
+  // a future valid-token resolution retries convergence from the saved slot.
   await mirrorActiveCredentialIfActive(storageId, newCredential as Record<string, unknown>);
 
   const expires = typeof newCredential.expires === "number" ? newCredential.expires : epochNow() + 3600_000;
@@ -232,6 +237,11 @@ export async function getGrokAccessToken(
           throw new Error(`Grok saved account credential is invalid: ${storageId}`);
         }
 
+        // Read metadata before consuming a potentially one-time refresh token.
+        // This helper is metadata-only: unlike the historical list path it
+        // cannot project an old auth.json mirror back into the saved slot.
+        await readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);
+
         const access = typeof raw.access === "string" ? raw.access.trim() : "";
         const expires = typeof raw.expires === "number" ? raw.expires : 0;
         // forceRefresh must refresh even when the token is still far from expiry.
@@ -239,6 +249,9 @@ export async function getGrokAccessToken(
         const needsRefresh = forceRefresh || !access || epochNow() >= expires - minValidityMs;
 
         if (!needsRefresh) {
+          // Retry a prior partial commit (slot saved, Active mirror write failed)
+          // before reporting the credential as usable.
+          await mirrorActiveCredentialIfActive(storageId, raw);
           return { accessToken: access, refreshed: false, expiresAt: expires };
         }
 

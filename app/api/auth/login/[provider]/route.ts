@@ -5,8 +5,8 @@ import {
   ANTIGRAVITY_PROVIDER_ID,
   GROK_CLI_PROVIDER_ID,
   isSupportedOAuthAccountProvider,
+  adoptOAuthActiveAccountCredential,
   saveOAuthAccountCredential,
-  syncActiveOAuthAccountCredential,
   listOAuthAccounts,
   reauthenticateOAuthAccount,
 } from "@/lib/oauth-accounts";
@@ -298,7 +298,7 @@ export async function GET(
           send(controller, { type: "success", account, message: "Account saved successfully." });
         } else {
           if (isSupportedOAuthAccountProvider(provider)) {
-            await syncActiveOAuthAccountCredential(provider).catch(() => {});
+            await adoptOAuthActiveAccountCredential(provider);
           }
           await Promise.resolve(reloadRpcAuthState());
           send(controller, { type: "success" });

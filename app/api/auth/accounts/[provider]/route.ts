@@ -1,5 +1,5 @@
 import { isOAuthAccountImportMode } from "@/lib/oauth-account-converters";
-import { deleteOAuthAccount, importOAuthAccountCredential, listOAuthAccounts, OAuthAccountStoreError, updateOAuthAccountMetadata } from "@/lib/oauth-accounts";
+import { bootstrapOAuthActiveAccountCredential, deleteOAuthAccount, importOAuthAccountCredential, listOAuthAccounts, OAuthAccountStoreError, updateOAuthAccountMetadata } from "@/lib/oauth-accounts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,6 +17,7 @@ export async function GET(
   const { provider } = await params;
 
   try {
+    await bootstrapOAuthActiveAccountCredential(provider);
     return Response.json(await listOAuthAccounts(provider));
   } catch (error) {
     return errorResponse(error);

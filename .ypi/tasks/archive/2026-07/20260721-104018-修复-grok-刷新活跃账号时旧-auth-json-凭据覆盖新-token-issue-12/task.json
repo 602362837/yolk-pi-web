@@ -1,0 +1,1309 @@
+{
+  "schemaVersion": 1,
+  "id": "20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+  "title": "修复 Grok 刷新活跃账号时旧 auth.json 凭据覆盖新 token（Issue #12）",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260721-103727",
+  "createdAt": "2026-07-21T02:40:18.862Z",
+  "updatedAt": "2026-07-21T03:18:09.558Z",
+  "completedAt": "2026-07-21T03:18:09.528Z",
+  "contextIds": [
+    "pi_019f828b-22fc-779c-a47d-a4ab4e74bda5"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-4ef98b8c3c6cf60cd9207fd6",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-21T02:41:43.747Z",
+      "finishedAt": "2026-07-21T02:44:07.652Z",
+      "runner": "sdk",
+      "childSessionId": "019f828c-f556-7209-b53e-8e211dc21f73",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T02-41-43-766Z_019f828c-f556-7209-b53e-8e211dc21f73.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "childSessionId": "019f828c-f556-7209-b53e-8e211dc21f73",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "继续处理当前 Issue #12 任务。请先阅读项目相关文档和源码，完成 intake 阶段的需求理解，产出有实质内容的 brief.md；分析问题范围、复现路径、约束、验收标准，并判断是否涉及 UI 变更。若涉及 UI，按流程派发 ui-designer 原型；完成本阶段后汇报。不要直接实现代码。",
+      "summary": "## Intake 交接 - 已产出：`.ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/brief.md` - 已明确根因、复现路径、并发风险、范围约束及 9 项验收标准。 - UI 判断：**不涉及 UI 变更**，无需派发 `ui-designer` 或制作 HTML 原型。 - 验证：`git diff --check` 通过；未运行代码测试，未修改生产代码。 - 未执行 commit / push / merge。 主要待设计决策： 1. 提供共享的只读 Active 元数据 helper，还是仅在 Grok resolver 内处理。 2. 如何封住并发 `listOAuthAccounts()` 使用旧 `auth.json` 回写账号文件的窗口。 3. metadata 异常时建议 fail closed，避免旧凭据恢复。 需求与根因已足够明确，可由主会话推进至 PRD/Design 阶段。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-21T02:41:43.747Z",
+        "updatedAt": "2026-07-21T02:44:07.651Z",
+        "eventCount": 3897,
+        "lastTextPreview": "## Intake 交接\n\n- 已产出：`.ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/brief.md`\n- 已明确根因、复现路径、并发风险、范围约束及 9 项验收标准。\n- UI 判断：**不涉及 UI 变更**，无需派发 `ui-designer` 或制作 HTML 原型。\n- 验证：`git diff --check` 通过；未运行代码测试，未修改生产代码。\n- 未执行 commit / push / merge。\n\n主要待设计决策：\n1. 提供共享的只读 Active 元数据 helper，还是仅在 Grok resolver 内处理。\n2. 如何封住并发 `listOAuthAccounts()` 使用旧 `auth.json` 回写账号文件的窗口。\n3. metadata 异常时建议 fail closed，避免旧凭据恢复。\n\n需求与根因已足够明确，可由主会话推进至 PRD/Design 阶段。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T02:43:52.266Z",
+            "toolCallId": "call_7Ut7VeTh012rPedR9gZMn2vG|fc_01c7b1f6e72eb0c5016a5edce80b4c8194a271f9843b664db6",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260721-104018-\\344\\277\\256\\345\\244\\215-grok-\\345\\210\\267\\346\\226\\260\\346\\264\\273\\350\\267\\203\\350\\264\\246\\345\\217\\267\\346\\227\\266\\346\\227\\247-auth-json-\\345\\207\\255\\346\\215\\256\\350\\246\\206\\347\\233\\226\\346\\226\\260-token-issue-12/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-21T02:43:58.517Z",
+            "toolCallId": "call_XryHM07EPvReuogXXN6N46cr|fc_01c7b1f6e72eb0c5016a5edcecf4c88194b745dc43ae0a9d24",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/brief.md\",\n  \"edits\": [\n    {\n      \"oldText\": \"Grok 多账号凭据存在两个层次：\",\n      \"newText\": \"Grok 多账号状态分布在三个持久化位置：\"\n    }\n  ]\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T02:43:58.560Z",
+            "toolCallId": "call_XryHM07EPvReuogXXN6N46cr|fc_01c7b1f6e72eb0c5016a5edcecf4c88194b745dc43ae0a9d24",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/brief.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-21T02:44:07.646Z",
+            "text": "## Intake 交接\n\n- 已产出：`.ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/brief.md`\n- 已明确根因、复现路径、并发风险、范围约束及 9 项验收标准。\n- UI 判断：**不涉及 UI 变更**，无需派发 `ui-designer` 或制作 HTML 原型。\n- 验证：`git diff --check` 通过；未运行代码测试，未修改生产代码。\n- 未执行 commit / push / merge。\n\n主要待设计决策：\n1. 提供共享的只读 Active 元数据 helper，还是仅在 Grok resolver 内处理。\n2. 如何封住并发 `listOAuthAccounts()` 使用旧 `auth.json` 回写账号文件的窗口。\n3. metadata 异常时建议 fail closed，避免旧凭据恢复。\n\n需求与根因已足够明确，可由主会话推进至 PRD/Design 阶段。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-21T02:44:07.647Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 462,
+        "tokens": 343,
+        "tokenSource": "usage",
+        "tps": 202.36,
+        "firstTokenAt": "2026-07-21T02:44:05.935Z",
+        "lastTokenAt": "2026-07-21T02:44:07.630Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-4ef98b8c3c6cf60cd9207fd6",
+        "taskId": "20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260721-104018-_-grok-_-auth-json-_-token-issue-12/architect-4ef98b8c3c6cf60cd9207fd6.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-21T02:41:43.747Z",
+        "finishedAt": "2026-07-21T02:44:07.647Z",
+        "updatedAt": "2026-07-21T02:44:07.647Z",
+        "itemCount": 77,
+        "messageCount": 1,
+        "toolCallCount": 36,
+        "stderrBytes": 0,
+        "bytes": 313544,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f828c-f556-7209-b53e-8e211dc21f73",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T02-41-43-766Z_019f828c-f556-7209-b53e-8e211dc21f73.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "architect-c7b9ec17047b744452262324",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-21T02:44:20.924Z",
+      "finishedAt": "2026-07-21T02:52:40.768Z",
+      "runner": "sdk",
+      "childSessionId": "019f828f-5b48-71bd-980b-06a676247021",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T02-44-20-936Z_019f828f-5b48-71bd-980b-06a676247021.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "childSessionId": "019f828f-5b48-71bd-980b-06a676247021",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "继续当前任务的 planning 阶段。基于 brief.md 和源码/项目文档，产出 prd.md 与 design.md，必要时同步 checks.md/implement.md 的初稿。明确推荐方案、数据一致性与并发处理、兼容性、测试策略和验收标准。该任务无 UI 变更，不要制作 UI 原型。完成后不要实现代码，汇报产物与建议的后续状态。",
+      "summary": "## 规划交接 已完成任务目录中的： - `prd.md` - `design.md` - `implement.md`（含 schemaVersion 2 实施计划） - `checks.md` - `plan-review.md` - `ui.md`（确认无需 UI 原型） - `handoff.md` 核心决策：saved-account 为 Grok 凭据真相，`auth.json` 仅作 Active 单向镜像；普通列表不再隐式回写 secret；镜像失败保留新轮换 token 并支持后续收敛。 验证完成： - Implementation Plan JSON 解析及依赖检查通过 - 规划文件无 TBD - whitespace 检查通过 - 未运行代码测试，未修改生产代码 建议主会话保存 implementationPlan，并切换至 `awaiting_approval` 请求用户审批。剩余主要风险是共享列表契约的跨 Provider 回归，以及 Grok 非重入锁的内部调用边界。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-21T02:44:20.924Z",
+        "updatedAt": "2026-07-21T02:52:40.767Z",
+        "eventCount": 10757,
+        "lastTextPreview": "## 规划交接\n\n已完成任务目录中的：\n\n- `prd.md`\n- `design.md`\n- `implement.md`（含 schemaVersion 2 实施计划）\n- `checks.md`\n- `plan-review.md`\n- `ui.md`（确认无需 UI 原型）\n- `handoff.md`\n\n核心决策：saved-account 为 Grok 凭据真相，`auth.json` 仅作 Active 单向镜像；普通列表不再隐式回写 secret；镜像失败保留新轮换 token 并支持后续收敛。\n\n验证完成：\n\n- Implementation Plan JSON 解析及依赖检查通过\n- 规划文件无 TBD\n- whitespace 检查通过\n- 未运行代码测试，未修改生产代码\n\n建议主会话保存 implementationPlan，并切换至 `awaiting_approval` 请求用户审批。剩余主要风险是共享列表契约的跨 Provider 回归，以及 Grok 非重入锁的内部调用边界。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T02:52:28.370Z",
+            "toolCallId": "call_7kUkmqTlyxWlsQ6z2idFbvD8|fc_0efcd6b5f3a53057016a5edee366fc8193ac3cd194e2d34fc5",
+            "toolName": "write",
+            "text": "Successfully wrote 1098 bytes to .ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-21T02:52:34.626Z",
+            "toolCallId": "call_wU6bNwMMLDQPeOwF7ElorR4V|fc_0efcd6b5f3a53057016a5edeef67048193be17b607a3790f64",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"TASK='.ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12'; git diff --no-index --check /dev/null \\\"$TASK/handoff.md\\\" || test $? -eq 1; python3 - <<'PY'\\nfrom pathlib import Path\\np=Path('.ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12')\\nfor name in ['plan-review.md','prd.md','ui.md','design.md','implement.md','checks.md','handoff.md']:\\n    s=(p/name).read_text()\\n    assert '_TBD' not in s and 'TBD by' not in s, name\\nprint('planning artifacts validated')\\nPY\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T02:52:34.687Z",
+            "toolCallId": "call_wU6bNwMMLDQPeOwF7ElorR4V|fc_0efcd6b5f3a53057016a5edeef67048193be17b607a3790f64",
+            "toolName": "bash",
+            "text": "planning artifacts validated",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-21T02:52:40.762Z",
+            "text": "## 规划交接\n\n已完成任务目录中的：\n\n- `prd.md`\n- `design.md`\n- `implement.md`（含 schemaVersion 2 实施计划）\n- `checks.md`\n- `plan-review.md`\n- `ui.md`（确认无需 UI 原型）\n- `handoff.md`\n\n核心决策：saved-account 为 Grok 凭据真相，`auth.json` 仅作 Active 单向镜像；普通列表不再隐式回写 secret；镜像失败保留新轮换 token 并支持后续收敛。\n\n验证完成：\n\n- Implementation Plan JSON 解析及依赖检查通过\n- 规划文件无 TBD\n- whitespace 检查通过\n- 未运行代码测试，未修改生产代码\n\n建议主会话保存 implementationPlan，并切换至 `awaiting_approval` 请求用户审批。剩余主要风险是共享列表契约的跨 Provider 回归，以及 Grok 非重入锁的内部调用边界。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-21T02:52:40.763Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 460,
+        "tokens": 214,
+        "tokenSource": "usage",
+        "tps": 56.85,
+        "firstTokenAt": "2026-07-21T02:52:36.888Z",
+        "lastTokenAt": "2026-07-21T02:52:40.652Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-c7b9ec17047b744452262324",
+        "taskId": "20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260721-104018-_-grok-_-auth-json-_-token-issue-12/architect-c7b9ec17047b744452262324.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-21T02:44:20.924Z",
+        "finishedAt": "2026-07-21T02:52:40.763Z",
+        "updatedAt": "2026-07-21T02:52:40.763Z",
+        "itemCount": 109,
+        "messageCount": 1,
+        "toolCallCount": 52,
+        "stderrBytes": 0,
+        "bytes": 438261,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f828f-5b48-71bd-980b-06a676247021",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T02-44-20-936Z_019f828f-5b48-71bd-980b-06a676247021.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-e6ab3d3a01075528e1ef23f7",
+      "subtaskId": "AUTH-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-21T02:56:26.787Z",
+      "finishedAt": "2026-07-21T03:00:34.014Z",
+      "runner": "sdk",
+      "childSessionId": "019f829a-6ebc-71a5-971e-56b8e1f3185a",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T02-56-26-812Z_019f829a-6ebc-71a5-971e-56b8e1f3185a.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "childSessionId": "019f829a-6ebc-71a5-971e-56b8e1f3185a",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — AUTH-01\n\n#### Files Changed\n- `lib/oauth-accounts.ts` — list 改为无 secret 回写投影；新增 Active metadata 读取、显式 bootstrap/adopt/logout 清理边界与 provider lock 协调。\n- `app/api/auth/{providers,accounts,login,logout}/...` — 接入 legacy bootstrap、显式 login adopt、logout Active 清理。\n- `lib/subscription-quota.ts` — OpenAI runtime refresh 显式 adopt。\n- `scripts/test-grok-accounts.mjs`, `scripts/test-grok-reauth.mjs` — 更新回归断言。\n- `.ypi/tasks/.../handoff.md` — 记录 AUTH-01 交接与验证阻塞。\n\n#### Verification\n- `git diff --check` — passed\n- `npm run test:oauth-accounts` — blocked：未安装 `jiti`\n- `node_modules/.bin/tsc --noEmit` — blocked：未安装依赖\n\n#### Notes / Risks\n- 未实现 GROK-01；resolver 仍需采用新 metadata helper 并实现 slot-first/mirror-second 提交与失败收敛。\n- 安装依赖后需运行 OAuth/Grok/Kiro/Antigravity accounts 回归、lint、typecheck。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-21T02:56:26.787Z",
+        "updatedAt": "2026-07-21T03:00:34.014Z",
+        "eventCount": 5701,
+        "lastTextPreview": "### Implementation Complete — AUTH-01\n\n#### Files Changed\n- `lib/oauth-accounts.ts` — list 改为无 secret 回写投影；新增 Active metadata 读取、显式 bootstrap/adopt/logout 清理边界与 provider lock 协调。\n- `app/api/auth/{providers,accounts,login,logout}/...` — 接入 legacy bootstrap、显式 login adopt、logout Active 清理。\n- `lib/subscription-quota.ts` — OpenAI runtime refresh 显式 adopt。\n- `scripts/test-grok-accounts.mjs`, `scripts/test-grok-reauth.mjs` — 更新回归断言。\n- `.ypi/tasks/.../handoff.md` — 记录 AUTH-01 交接与验证阻塞。\n\n#### Verification\n- `git diff --check` — passed\n- `npm run test:oauth-accounts` — blocked：未安装 `jiti`\n- `node_modules/.bin/tsc --noEmit` — blocked：未安装依赖\n\n#### Notes / Risks\n- 未实现 GROK-01；resolver 仍需采用新 metadata helper 并实现 slot-first/mirror-second 提交与失败收敛。\n- 安装依赖后需运行 OAuth/Grok/Kiro/Antigravity accounts 回归、lint、typecheck。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T03:00:14.842Z",
+            "toolCallId": "call_y40YVNFxhIelBCIUw7daw54N|fc_05e710f7bb1f1a60016a5ee0bd860081908a73efa48daf614c",
+            "toolName": "bash",
+            "text": "M app/api/auth/accounts/[provider]/route.ts\n M app/api/auth/login/[provider]/route.ts\n M app/api/auth/logout/[provider]/route.ts\n M app/api/auth/providers/route.ts\n M lib/oauth-accounts.ts\n M lib/subscription-quota.ts\n M scripts/test-grok-accounts.mjs\n M scripts/test-grok-reauth.mjs\n?? \".ypi/tasks/20260721-104018-\\344\\277\\256\\345\\244\\215-grok-\\345\\210\\267\\346\\226\\260\\346\\264\\273\\350\\267\\203\\350\\264\\246\\345\\217\\267\\346\\227\\266\\346\\227\\247-auth-json-\\345\\207\\255\\346\\215\\256\\350\\246\\206\\347\\233\\226\\346\\226\\260-token-issue-12/\"\nscripts/test-grok-accounts.mjs:209:  assertIncludes(oaSource, \"bootstrapOAuthActiveAccountCredential\", \"legacy auth-only bootstrap is explicit\");\nscripts/test-grok-accounts.mjs:210:  assertIncludes(oaSource, \"adoptOAuthActiveAccountCredential\", \"canonical login/runtime adoption is explicit\");\nscripts/test-grok-accounts.mjs:211:  assertIncludes(oaSource, \"readOAuthActiveAccountId\", \"active metadata can be read without auth mirror sync\");\nscripts/test-grok-reauth.mjs:232:  assertIncludes(routeSource, \"adoptOAuthActiveAccountCredential\", \"provider-wide credential adoption preserved\");\napp/api/auth/login/[provider]/route.ts:8:  adoptOAuthActiveAccountCredential,\napp/api/auth/login/[provider]/route.ts:301:            await adoptOAuthActiveAccountCredential(provider);\napp/api/auth/accounts/[provider]/route.ts:2:import { bootstrapOAuthActiveAccountCredential, deleteOAuthAccount, importOAuthAccountCredential, listOAuthAccounts, OAuthAccountStoreError, updateOAuthAccountMetadata } from \"@/lib/oauth-accounts\";\napp/api/auth/accounts/[provider]/route.ts:20:    await bootstrapOAuthActiveAccountCredential(provider);\napp/api/auth/logout/[provider]/route.ts:2:import { clearOAuthActiveAccount, isSupportedOAuthAccountProvider } from \"@/lib/oauth-accounts\";\napp/api/auth/logout/[provider]/route.ts:24:    await clearOAuthActiveAccount(provider);\napp/api/auth/providers/route.ts:2:import { bootstrapOAuthActiveAccountCredential, isSupportedOAuthAccountProvider, listOAuthAccounts } from \"@/lib/oauth-accounts\";\napp/api/auth/providers/route.ts:33:          await bootstrapOAuthActiveAccountCredential(p.id).catch(() => {});\nlib/oauth-accounts.ts:575:export async function readOAuthActiveAccountId(provider: string): Promise<string | null> {\nlib/oauth-accounts.ts:597:export async function bootstrapOAuthActiveAccountCredential(\nlib/oauth-accounts.ts:602:    const activeStorageId = await readOAuthActiveAccountId(provider);\nlib/oauth-accounts.ts:620:export async function adoptOAuthActiveAccountCredential(\nlib/oauth-accounts.ts:627:    const activeStorageId = await readOAuthActiveAccountId(provider) ?? undefined;\nlib/oauth-accounts.ts:633:export async function clearOAuthActiveAccount(provider: string): Promise<void> {\nlib/subscription-quota.ts:2:import { adoptOAuthActiveAccountCredential, extractOpenAICodexAccountId, getOAuthAccountAccessToken, readOAuthAccountCredential, readOAuthActiveAccountId, updateOAuthAccountQuotaCache } from \"@/lib/oauth-accounts\";\nlib/subscription-quota.ts:406:  await adoptOAuthActiveAccountCredential(provider, store).catch(() => {});\nlib/subscription-quota.ts:410:  const activeStorageId = await readOAuthActiveAccountId(provider);",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-21T03:00:19.917Z",
+            "toolCallId": "call_n6GBZVs5XsjKsqyJe5bvBPe5|fc_05e710f7bb1f1a60016a5ee0c1941881908600d73b0dc0a067",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- app/api/auth/accounts/[provider]/route.ts app/api/auth/login/[provider]/route.ts app/api/auth/logout/[provider]/route.ts app/api/auth/providers/route.ts lib/oauth-accounts.ts lib/subscription-quota.ts scripts/test-grok-accounts.mjs scripts/test-grok-reauth.mjs\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T03:00:19.938Z",
+            "toolCallId": "call_n6GBZVs5XsjKsqyJe5bvBPe5|fc_05e710f7bb1f1a60016a5ee0c1941881908600d73b0dc0a067",
+            "toolName": "bash",
+            "text": "diff --git a/app/api/auth/accounts/[provider]/route.ts b/app/api/auth/accounts/[provider]/route.ts\nindex 58b7c85..872750c 100644\n--- a/app/api/auth/accounts/[provider]/route.ts\n+++ b/app/api/auth/accounts/[provider]/route.ts\n@@ -1,5 +1,5 @@\n import { isOAuthAccountImportMode } from \"@/lib/oauth-account-converters\";\n-import { deleteOAuthAccount, importOAuthAccountCredential, listOAuthAccounts, OAuthAccountStoreError, updateOAuthAccountMetadata } from \"@/lib/oauth-accounts\";\n+import { bootstrapOAuthActiveAccountCredential, deleteOAuthAccount, importOAuthAccountCredential, listOAuthAccounts, OAuthAccountStoreError, updateOAuthAccountMetadata } from \"@/lib/oauth-accounts\";\n \n export const dynamic = \"force-dynamic\";\n export const runtime = \"nodejs\";\n@@ -17,6 +17,7 @@ export async function GET(\n   const { provider } = await params;\n \n   try {\n+    await bootstrapOAuthActiveAccountCredential(provider);\n     return Response.json(await listOAuthAccounts(provider));\n   } catch (error) {\n     return errorResponse(error);\ndiff --git a/app/api/auth/login/[provider]/route.ts b/app/api/auth/login/[provider]/route.ts\nindex 3d41a58..715f8ac 100644\n--- a/app/api/auth/login/[provider]/route.ts\n+++ b/app/api/auth/login/[provider]/route.ts\n@@ -5,8 +5,8 @@ import {\n   ANTIGRAVITY_PROVIDER_ID,\n   GROK_CLI_PROVIDER_ID,\n   isSupportedOAuthAccountProvider,\n+  adoptOAuthActiveAccountCredential,\n   saveOAuthAccountCredential,\n-  syncActiveOAuthAccountCredential,\n   listOAuthAccounts,\n   reauthenticateOAuthAccount,\n } from \"@/lib/oauth-accounts\";\n@@ -298,7 +298,7 @@ export async function GET(\n           send(controller, { type: \"success\", account, message: \"Account saved successfully.\" });\n         } else {\n           if (isSupportedOAuthAccountProvider(provider)) {\n-            await syncActiveOAuthAccountCredential(provider).catch(() => {});\n+            await adoptOAuthActiveAccountCredential(provider);\n           }\n           await Promise.resolve(reloadRpcAuthState());\n           send(controller, { type: \"success\" });\ndiff --git a/app/api/auth/logout/[provider]/route.ts b/app/api/auth/logout/[provider]/route.ts\nindex e9e8f6f..be651b4 100644\n--- a/app/api/auth/logout/[provider]/route.ts\n+++ b/app/api/auth/logout/[provider]/route.ts\n@@ -1,4 +1,5 @@\n import { getAgentDir } from \"@earendil-works/pi-coding-agent\";\n+import { clearOAuthActiveAccount, isSupportedOAuthAccountProvider } from \"@/lib/oauth-accounts\";\n import { reloadRpcAuthState } from \"@/lib/rpc-manager\";\n import { getWebModelRuntime } from \"@/lib/web-model-runtime\";\n \n@@ -19,6 +20,9 @@ export async function POST(\n     return Response.json({ error: `Unknown provider: ${provider}` }, { status: 400 });\n   }\n   await runtime.logout(provider);\n+  if (isSupportedOAuthAccountProvider(provider)) {\n+    await clearOAuthActiveAccount(provider);\n+  }\n   await Promise.resolve(reloadRpcAuthState());\n   return Response.json({ ok: true });\n }\ndiff --git a/app/api/auth/providers/route.ts b/app/api/auth/providers/route.ts\nindex 3438ce2..b8a32ba 100644\n--- a/app/api/auth/providers/route.ts\n+++ b/app/api/auth/providers/route.ts\n@@ -1,5 +1,5 @@\n import { getAgentDir } from \"@earendil-works/pi-coding-agent\";\n-import { isSupportedOAuthAccountProvider, listOAuthAccounts, syncActiveOAuthAccountCredential } from \"@/lib/oauth-accounts\";\n+import { bootstrapOAuthActiveAccountCredential, isSupportedOAuthAccountProvider, listOAuthAccounts } from \"@/lib/oauth-accounts\";\n import { getWebModelRuntime } from \"@/lib/web-model-runtime\";\n \n export const dynamic = \"force-dynamic\";\n@@ -30,7 +30,7 @@ export async function GET() {\n         let activeAccountDisplayName: string | null = null;\n \n         if (isSupportedOAuthAccountProvider(p.id)) {\n-          await syncActiveOAuthAccountCredential(p.id).catch(() => {});\n+          await bootstrapOAuthActiveAccountCredential(p.id).catch(() => {});\n           try {\n             const accounts = await listOAuthAccounts(p.id);\n             accountCount = accounts.accounts.length;\ndiff --git a/lib/oauth-accounts.ts b/lib/oauth-accounts.ts\nindex 20e20f8..d77cf8e 100644\n--- a/lib/oauth-accounts.ts\n+++ b/lib/oauth-accounts.ts\n@@ -443,7 +443,7 @@ async function backfillMissingAccountLabels(\n   return { accounts: nextAccounts, changed };\n }\n \n-async function clearActiveAccount(provider: string): Promise<void> {\n+async function clearActiveAccountUnlocked(provider: string): Promise<void> {\n   const path = metadataPath(provider);\n   if (!(await pathExists(path))) return;\n \n@@ -453,6 +453,13 @@ async function clearActiveAccount(provider: string): Promise<void> {\n   await writeMetadata(provider, { ...metadata, activeAccountId: undefined });\n }\n \n+async function withProviderAccountLock<T>(provider: string, run: () => Promise<T>): Promise<T> {\n+  if (provider === GROK_CLI_PROVIDER_ID) return withGrokProviderLock(run);\n+  if (provider === KIRO_PROVIDER_ID) return withKiroProviderLock(run);\n+  if (provider === ANTIGRAVITY_PROVIDER_ID) return withAntigravityProviderLock(run);\n+  return run();\n+}\n+\n // ─── Public API ──────────────────────────────────────────────────────────────\n \n /**\n@@ -564,30 +571,68 @@ export async function saveOAuthAccountCredential(\n   return accountSummary(metadata, entry);\n }\n \n+/** Read the managed Active pointer without reading auth.json or writing account state. */\n+export async function readOAuthActiveAccountId(provider: string): Promise<string | null> {\n+  getAdapter(provider);\n+  const metadata = await readMetadata(provider);\n+  const activeStorageId = metadata.activeAccountId;\n+  if (!activeStorageId || !metadata.accounts.some((entry) => entry.accountId === activeStorageId)) return null;\n+  return await pathExists(credentialPath(provider, activeStorageId)) ? activeStorageId : null;\n+}\n+\n+async function readActiveCredentialFromStore(\n+  provider: string,\n+  credentials?: WebCredentialStore | { read(providerId: string): Promise<Credential | undefined> },\n+): Promise<{ adapter: OAuthAccountProviderAdapter; credential: Credential | undefined }> {\n+  const adapter = getAdapter(provider);\n+  const store = credentials ?? await getWebCredentialStore();\n+  return { adapter, credential: await store.read(provider) };\n+}\n+\n /**\n- * Sync the active credential from auth.json (via CredentialStore) into the\n- * saved-account store.  Returns the active account summary, or null if\n- * no valid credential exists.\n+ * Bootstrap a managed Active slot from legacy auth.json only when no valid\n+ * managed Active slot exists. This is intentionally an explicit compatibility\n+ * boundary: normal reads must never overwrite a saved credential with a mirror.\n  */\n-export async function syncActiveOAuthAccountCredential(\n+export async function bootstrapOAuthActiveAccountCredential(\n   provider: string,\n   credentials?: WebCredentialStore | { read(providerId: string): Promise<Credential | undefined> },\n ): Promise<OAuthAccountSummary | null> {\n-  const adapter = getAdapter(provider);\n-  const store = credentials ?? await getWebCredentialStore();\n-  const credential = await store.read(provider);\n-  if (!adapter.isCredential(credential)) {\n-    await clearActiveAccount(provider);\n-    return null;\n-  }\n+  return withProviderAccountLock(provider, async () => {\n+    const activeStorageId = await readOAuthActiveAccountId(provider);\n+    if (activeStorageId) {\n+      const metadata = await readMetadata(provider);\n+      const entry = metadata.accounts.find((account) => account.accountId === activeStorageId);\n+      return entry ? accountSummary(metadata, entry) : null;\n+    }\n \n-  // Active auth.json holds a plain Pi credential without a storage id.\n-  // The active metadata pointer is authoritative for an existing managed account.\n-  const metadata = await readMetadata(provider);\n-  const activeStorageId = metadata.activeAccountId && await pathExists(credentialPath(provider, metadata.activeAccountId))\n-    ? metadata.activeAccountId\n-    : undefined;\n-  return saveOAuthAccountCredential(provider, credential, { markActive: true, storageId: activeStorageId });\n+    const { adapter, credential } = await readActiveCredentialFromStore(provider, credentials);\n+    if (!adapter.isCredential(credential)) return null;\n+    return saveOAuthAccountCredential(provider, credential, { markActive: true });\n+  });\n+}\n+\n+/**\n+ * Explicitly adopt a canonical Active credential (successful login or runtime\n+ * refresh) into the managed store. Existing Active slots are replaced only on\n+ * this named mutation path, never by account listing.\n+ */\n+export async function adoptOAuthActiveAccountCredential(\n+  provider: string,\n+  credentials?: WebCredentialStore | { read(providerId: string): Promise<Credential | undefined> },\n+): Promise<OAuthAccountSummary | null> {\n+  return withProviderAccountLock(provider, async () => {\n+    const { adapter, credential } = await readActiveCredentialFromStore(provider, credentials);\n+    if (!adapter.isCredential(credential)) return null;\n+    const activeStorageId = await readOAuthActiveAccountId(provider) ?? undefined;\n+    return saveOAuthAccountCredential(provider, credential, { markActive: true, storageId: activeStorageId });\n+  });\n+}\n+\n+/** Clear the managed Active pointer after an explicit provider logout. */\n+export async function clearOAuthActiveAccount(provider: string): Promise<void> {\n+  getAdapter(provider);\n+  await withProviderAccountLock(provider, () => clearActiveAccountUnlocked(provider));\n }\n \n /**\n@@ -653,10 +698,8 @@ export async function importOAuthAccountCredential(\n  * List all saved OAuth accounts for a provider, sorted active-first then by\n  * last-activated / updated-at descending.\n  */\n-export async function listOAuthAccounts(provider: string): Promise<OAuthAccountsList> {\n+async function projectOAuthAccounts(provider: string): Promise<OAuthAccountsList> {\n   const adapter = getAdapter(provider);\n-  await syncActiveOAuthAccountCredential(provider);\n-\n   const metadata = await readMetadata(provider);\n   const existingAccounts: OAuthAccountMetadataEntry[] = [];\n   let changed = false;\n@@ -687,6 +730,13 @@ export async function listOAuthAccounts(provider: string): Promise<OAuthAccounts\n   };\n }\n \n+/**\n+ * List account summaries without reading auth.json or writing credential secrets.\n+ */\n+export async function listOAuthAccounts(provider: string): Promise<OAuthAccountsList> {\n+  return projectOAuthAccounts(provider);\n+}\n+\n /**\n  * Update mutable metadata (label, extraInfo) for a saved account.\n  */\n@@ -772,7 +822,6 @@ export async function deleteOAuthAccount(provider: string, accountId: string): P\n   if (!normalizedAccountId) throw new OAuthAccountStoreError(\"accountId is required\", 400);\n \n   const run = async (): Promise<OAuthAccountsList> => {\n-    await syncActiveOAuthAccountCredential(provider);\n     const metadata = await readMetadata(provider);\n     if (metadata.activeAccountId === normalizedAccountId) {\n       throw new OAuthAccountStoreError(\"Active OAuth account cannot be deleted\", 409);\n@@ -786,7 +835,7 @@ export async function deleteOAuthAccount(provider: string, accountId: string): P\n \n     const accounts = metadata.accounts.filter((entry) => entry.accountId !== normalizedAccountId);\n     await writeMetadata(provider, { ...metadata, accounts });\n-    return listOAuthAccounts(provider);\n+    return projectOAuthAccounts(provider);\n   };\n \n   // Grok delete must coordinate with reauth so a concurrent reauth cannot\n@@ -812,8 +861,6 @@ export async function activateOAuthAccount(provider: string, accountId: string):\n \n   const run = async (): Promise<OAuthAccountsList> => {\n     const store = await getWebCredentialStore();\n-    await syncActiveOAuthAccountCredential(provider, store);\n-\n     const credential = await readOAuthAccountCredential(provider, normalizedAccountId);\n     // CredentialStore expects type:\"oauth\" for OAuth entries. grok-cli / kiro /\n     // antigravity credentials from their providers lack this sentinel but are\n@@ -832,7 +879,7 @@ export async function activateOAuthAccount(provider: string, accountId: string):\n       storageId: normalizedAccountId,\n     });\n \n-    return listOAuthAccounts(provider);\n+    return projectOAuthAccounts(provider);\n   };\n \n   if (provider === GROK_CLI_PROVIDER_ID) {\ndiff --git a/lib/subscription-quota.ts b/lib/subscription-quota.ts\nindex a3dd923..a0369da 100644\n--- a/lib/subscription-quota.ts\n+++ b/lib/subscription-quota.ts\n@@ -1,5 +1,5 @@\n import { randomUUID } from \"node:crypto\";\n-import { extractOpenAICodexAccountId, getOAuthAccountAccessToken, listOAuthAccounts, readOAuthAccountCredential, syncActiveOAuthAccountCredential, updateOAuthAccountQuotaCache } from \"@/lib/oauth-accounts\";\n+import { adoptOAuthActiveAccountCredential, extractOpenAICodexAccountId, getOAuthAccountAccessToken, readOAuthAccountCredential, readOAuthActiveAccountId, updateOAuthAccountQuotaCache } from \"@/lib/oauth-accounts\";\n import { getWebCredentialStore } from \"@/lib/web-credential-store\";\n import { getWebModelRuntime } from \"@/lib/web-model-runtime\";\n \n@@ -403,11 +403,11 @@ async function resolveActiveOpenAICodexCredential(provider: string): Promise<Res\n \n   if (!accessToken) return quotaError(provider, \"expired\", \"OAuth token unavailable. Please re-login.\");\n \n-  await syncActiveOAuthAccountCredential(provider, store).catch(() => {});\n+  await adoptOAuthActiveAccountCredential(provider, store).catch(() => {});\n   const refreshedCredential = await store.read(provider) as StoredOAuthCredential | undefined;\n   // The active entry is the saved-account identity. The credential account id remains\n   // the real ChatGPT id and must never be used as a metadata/cache key.\n-  const activeStorageId = (await listOAuthAccounts(provider)).activeAccountId;\n+  const activeStorageId = await readOAuthActiveAccountId(provider);\n   const chatgptAccountId = refreshedCredential?.accountId ?? storedCredential.accountId ?? extractOpenAICodexAccountId(accessToken);\n \n   return { accessToken, storageId: activeStorageId, chatgptAccountId };\ndiff --git a/scripts/test-grok-accounts.mjs b/scripts/test-grok-accounts.mjs\nindex f082d37..e056251 100644\n--- a/scripts/test-grok-accounts.mjs\n+++ b/scripts/test-grok-accounts.mjs\n@@ -203,8 +203,12 @@ test(\"Metadata accounts array only contains opaque accountId, not credential\", (\n   assertNotIncludes(normalizeFn, '\"refresh\"', \"metadata does not store refresh token\");\n });\n \n-test(\"syncActiveOAuthAccountCredential clears active when credential missing\", () => {\n-  assertIncludes(oaSource, \"clearActiveAccount(provider)\", \"clears active when missing\");\n+test(\"list projects saved accounts without auth.json credential writeback\", () => {\n+  assertIncludes(oaSource, \"async function projectOAuthAccounts\", \"has an unlocked list projector\");\n+  assertIncludes(oaSource, \"return projectOAuthAccounts(provider)\", \"public list delegates to projector\");\n+  assertIncludes(oaSource, \"bootstrapOAuthActiveAccountCredential\", \"legacy auth-only bootstrap is explicit\");\n+  assertIncludes(oaSource, \"adoptOAuthActiveAccountCredential\", \"canonical login/runtime adoption is explicit\");\n+  assertIncludes(oaSource, \"readOAuthActiveAccountId\", \"active metadata can be read without auth mirror sync\");\n });\n \n // ============================================================================\ndiff --git a/scripts/test-grok-reauth.mjs b/scripts/test-grok-reauth.mjs\nindex 18b5b38..9116069 100644\n--- a/scripts/test-grok-reauth.mjs\n+++ b/scripts/test-grok-reauth.mjs\n@@ -228,8 +228,8 @@ test(\"Route still accepts accountMode=add\", () => {\n   assertIncludes(routeSource, 'Account saved successfully', \"add success message unchanged\");\n });\n \n-test(\"Route still syncs active for provider-wide login\", () => {\n-  assertIncludes(routeSource, \"syncActiveOAuthAccountCredential\", \"provider-wide sync preserved\");\n+test(\"Route explicitly adopts active credential for provider-wide login\", () => {\n+  assertIncludes(routeSource, \"adoptOAuthActiveAccountCredential\", \"provider-wide credential adoption preserved\");\n });\n \n test(\"Route POST callback unchanged\", () => {",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-21T03:00:34.005Z",
+            "text": "### Implementation Complete — AUTH-01\n\n#### Files Changed\n- `lib/oauth-accounts.ts` — list 改为无 secret 回写投影；新增 Active metadata 读取、显式 bootstrap/adopt/logout 清理边界与 provider lock 协调。\n- `app/api/auth/{providers,accounts,login,logout}/...` — 接入 legacy bootstrap、显式 login adopt、logout Active 清理。\n- `lib/subscription-quota.ts` — OpenAI runtime refresh 显式 adopt。\n- `scripts/test-grok-accounts.mjs`, `scripts/test-grok-reauth.mjs` — 更新回归断言。\n- `.ypi/tasks/.../handoff.md` — 记录 AUTH-01 交接与验证阻塞。\n\n#### Verification\n- `git diff --check` — passed\n- `npm run test:oauth-accounts` — blocked：未安装 `jiti`\n- `node_modules/.bin/tsc --noEmit` — blocked：未安装依赖\n\n#### Notes / Risks\n- 未实现 GROK-01；resolver 仍需采用新 metadata helper 并实现 slot-first/mirror-second 提交与失败收敛。\n- 安装依赖后需运行 OAuth/Grok/Kiro/Antigravity accounts 回归、lint、typecheck。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-21T03:00:34.005Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 805,
+        "tokens": 579,
+        "tokenSource": "usage",
+        "tps": 98.35,
+        "firstTokenAt": "2026-07-21T03:00:28.092Z",
+        "lastTokenAt": "2026-07-21T03:00:33.979Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-e6ab3d3a01075528e1ef23f7",
+        "taskId": "20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260721-104018-_-grok-_-auth-json-_-token-issue-12/implementer-e6ab3d3a01075528e1ef23f7.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-21T02:56:26.787Z",
+        "finishedAt": "2026-07-21T03:00:34.010Z",
+        "updatedAt": "2026-07-21T03:00:34.010Z",
+        "itemCount": 77,
+        "messageCount": 1,
+        "toolCallCount": 36,
+        "stderrBytes": 0,
+        "bytes": 217131,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f829a-6ebc-71a5-971e-56b8e1f3185a",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T02-56-26-812Z_019f829a-6ebc-71a5-971e-56b8e1f3185a.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-667fe09196fb70e7d753a927",
+      "subtaskId": "GROK-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-21T03:00:48.289Z",
+      "finishedAt": "2026-07-21T03:03:04.865Z",
+      "runner": "sdk",
+      "childSessionId": "019f829e-6c31-7162-ab7a-33eab60ed63e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T03-00-48-305Z_019f829e-6c31-7162-ab7a-33eab60ed63e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "childSessionId": "019f829e-6c31-7162-ab7a-33eab60ed63e",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/grok-account-token.ts` — 使用只读 Active metadata；slot-first/mirror-second 提交；mirror 失败安全报错并后续收敛。\n- `.ypi/tasks/.../handoff.md` — 记录 GROK-01 实现与验证结果。\n\n#### Verification\n- `npm run test:grok-accounts` — 通过（96）\n- `npm run test:grok-global-auth` — 通过（7）\n- `git diff --check` — 通过\n- `npm run lint` — 阻塞：未安装 `eslint`\n- `node_modules/.bin/tsc --noEmit` — 阻塞：未安装 TypeScript\n\n#### Notes / Risks\n- 未新增生产路径并发/轮换 token fixture，属后续 `TEST-01` 范围。\n- 无需主会话额外产品决策；可推进 TEST-01。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-21T03:00:48.289Z",
+        "updatedAt": "2026-07-21T03:03:04.864Z",
+        "eventCount": 2687,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/grok-account-token.ts` — 使用只读 Active metadata；slot-first/mirror-second 提交；mirror 失败安全报错并后续收敛。\n- `.ypi/tasks/.../handoff.md` — 记录 GROK-01 实现与验证结果。\n\n#### Verification\n- `npm run test:grok-accounts` — 通过（96）\n- `npm run test:grok-global-auth` — 通过（7）\n- `git diff --check` — 通过\n- `npm run lint` — 阻塞：未安装 `eslint`\n- `node_modules/.bin/tsc --noEmit` — 阻塞：未安装 TypeScript\n\n#### Notes / Risks\n- 未新增生产路径并发/轮换 token fixture，属后续 `TEST-01` 范围。\n- 无需主会话额外产品决策；可推进 TEST-01。",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-21T03:02:55.986Z",
+            "toolCallId": "call_BXdFoa0duadrOXsLFmT88fX7|fc_043a54993d5ca706016a5ee15fde2c8195b89e0fd2ce24bd0a",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg -n \\\"listOAuthAccounts\\\" lib/grok-account-token.ts || true; rg -n \\\"readOAuthActiveAccountId|Failed to persist active Grok OAuth credential\\\" lib/grok-account-token.ts\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T03:02:56.010Z",
+            "toolCallId": "call_BXdFoa0duadrOXsLFmT88fX7|fc_043a54993d5ca706016a5ee15fde2c8195b89e0fd2ce24bd0a",
+            "toolName": "bash",
+            "text": "25:import { readOAuthActiveAccountId } from \"./oauth-accounts\";\n117:  const currentActiveStorageId = await readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);\n131:    throw new Error(\"Failed to persist active Grok OAuth credential\");\n243:        await readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T03:02:56.079Z",
+            "toolCallId": "call_JzhBnGbRl6RFnq5yWBxr8Mhf|fc_043a54993d5ca706016a5ee15fde1c8195a8b809bf444decd1",
+            "toolName": "bash",
+            "text": "app/api/auth/accounts/[provider]/route.ts |   3 +-\n app/api/auth/login/[provider]/route.ts    |   4 +-\n app/api/auth/logout/[provider]/route.ts   |   4 ++\n app/api/auth/providers/route.ts           |   4 +-\n lib/grok-account-token.ts                 |  65 +++++++++++--------\n lib/oauth-accounts.ts                     | 101 ++++++++++++++++++++++--------\n lib/subscription-quota.ts                 |   6 +-\n scripts/test-grok-accounts.mjs            |   8 ++-\n scripts/test-grok-reauth.mjs              |   4 +-\n 9 files changed, 134 insertions(+), 65 deletions(-)\ndiff --git a/lib/grok-account-token.ts b/lib/grok-account-token.ts\nindex 6b20f3e..ee7c26f 100644\n--- a/lib/grok-account-token.ts\n+++ b/lib/grok-account-token.ts\n@@ -22,7 +22,7 @@ import { getAgentDir } from \"@earendil-works/pi-coding-agent\";\n import type { Credential } from \"@earendil-works/pi-ai\";\n import { getOAuthApiKey } from \"@/lib/pi-ai-oauth-compat\";\n import { GROK_CLI_PROVIDER_ID, isSupportedOAuthAccountProvider } from \"./oauth-account-providers\";\n-import { listOAuthAccounts } from \"./oauth-accounts\";\n+import { readOAuthActiveAccountId } from \"./oauth-accounts\";\n import { getWebCredentialStore } from \"./web-credential-store\";\n import { withGrokProviderLock } from \"./grok-account-lock\";\n \n@@ -105,34 +105,32 @@ async function atomicWriteJson(dir: string, filename: string, data: unknown): Pr\n // ─── Active-mirror compare-and-set ───────────────────────────────────────────\n \n /**\n- * Update auth.json for grok-cli only when `storageId` is still the active\n- * account, using a compare-and-set re-read before CredentialStore.modify.\n+ * Project a saved credential to auth.json only when `storageId` is still the\n+ * Active account. The caller holds the Grok provider lock; the metadata\n+ * re-read is the CAS check against a preceding Activate/reauth.\n+ *\n+ * Mirror persistence is deliberately not best-effort. Once a rotating refresh\n+ * token has been saved in its slot, reporting success before its Active mirror\n+ * is written would leave an externally observable inconsistent state.\n  */\n-async function mirrorActiveCredentialIfActive(storageId: string, credential: Record<string, unknown>): Promise<void> {\n+async function mirrorActiveCredentialIfActive(storageId: string, credential: Record<string, unknown>): Promise<boolean> {\n+  const currentActiveStorageId = await readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);\n+  if (currentActiveStorageId !== storageId) return false;\n+\n+  // CredentialStore expects type:\"oauth\". grok-cli credentials from\n+  // pi-grok-cli lack the sentinel but are otherwise compatible.\n+  const authCredential = credential.type\n+    ? credential\n+    : { ...credential, type: \"oauth\" as const };\n   try {\n-    // Determine the current active storage id from the accounts list\n-    let currentActiveStorageId: string | null = null;\n-    try {\n-      const accounts = await listOAuthAccounts(GROK_CLI_PROVIDER_ID);\n-      currentActiveStorageId = accounts.activeAccountId;\n-    } catch {\n-      // If we can't read the account list, skip the mirror update.\n-      return;\n-    }\n-\n-    // Only mirror if the refreshed account is still the active one.\n-    if (currentActiveStorageId !== storageId) return;\n-\n-    // CredentialStore expects type:\"oauth\". grok-cli credentials from\n-    // pi-grok-cli lack the sentinel but are otherwise compatible.\n-    const authCredential = (credential as Record<string, unknown>).type\n-      ? credential\n-      : { ...credential, type: \"oauth\" as const };\n     const store = await getWebCredentialStore();\n     await store.modify(GROK_CLI_PROVIDER_ID, async () => authCredential as Credential);\n   } catch {\n-    // Mirror update is best-effort; never let it break the token resolution.\n+    // Do not roll back the slot: its refresh token may have been rotated and\n+    // invalidated upstream. The next valid-token resolution retries this projection.\n+    throw new Error(\"Failed to persist active Grok OAuth credential\");\n   }\n+  return true;\n }\n \n // ─── Refresh logic ───────────────────────────────────────────────────────────\n@@ -170,11 +168,18 @@ async function refreshGrokCredential(\n     throw new Error(\"Grok OAuth token refresh returned no API key\");\n   }\n \n-  // Persist the refreshed credential atomically\n+  // Persist the rotating credential before its derived Active mirror. Never\n+  // restore the old slot on a subsequent mirror failure: its refresh token may\n+  // already have been invalidated by the provider.\n   const newCredential = result.newCredentials ?? currentCredential;\n-  await atomicWriteJson(grokAccountDir(), `${encodeURIComponent(storageId)}.json`, newCredential);\n+  try {\n+    await atomicWriteJson(grokAccountDir(), `${encodeURIComponent(storageId)}.json`, newCredential);\n+  } catch {\n+    throw new Error(\"Failed to persist Grok OAuth credential\");\n+  }\n \n-  // Mirror to auth.json if still the active account\n+  // Lock-held Active CAS + mirror commit. A failure is intentionally surfaced;\n+  // a future valid-token resolution retries convergence from the saved slot.\n   await mirrorActiveCredentialIfActive(storageId, newCredential as Record<string, unknown>);\n \n   const expires = typeof newCredential.expires === \"number\" ? newCredential.expires : epochNow() + 3600_000;\n@@ -232,6 +237,11 @@ export async function getGrokAccessToken(\n           throw new Error(`Grok saved account credential is invalid: ${storageId}`);\n         }\n \n+        // Read metadata before consuming a potentially one-time refresh token.\n+        // This helper is metadata-only: unlike the historical list path it\n+        // cannot project an old auth.json mirror back into the saved slot.\n+        await readOAuthActiveAccountId(GROK_CLI_PROVIDER_ID);\n+\n         const access = typeof raw.access === \"string\" ? raw.access.trim() : \"\";\n         const expires = typeof raw.expires === \"number\" ? raw.expires : 0;\n         // forceRefresh must refresh even when the token is still far from expiry.\n@@ -239,6 +249,9 @@ export async function getGrokAccessToken(\n         const needsRefresh = forceRefresh || !access || epochNow() >= expires - minValidityMs;\n \n         if (!needsRefresh) {\n+          // Retry a prior partial commit (slot saved, Active mirror write failed)\n+          // before reporting the credential as usable.\n+          await mirrorActiveCredentialIfActive(storageId, raw);\n           return { accessToken: access, refreshed: false, expiresAt: expires };\n         }",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-21T03:03:04.858Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/grok-account-token.ts` — 使用只读 Active metadata；slot-first/mirror-second 提交；mirror 失败安全报错并后续收敛。\n- `.ypi/tasks/.../handoff.md` — 记录 GROK-01 实现与验证结果。\n\n#### Verification\n- `npm run test:grok-accounts` — 通过（96）\n- `npm run test:grok-global-auth` — 通过（7）\n- `git diff --check` — 通过\n- `npm run lint` — 阻塞：未安装 `eslint`\n- `node_modules/.bin/tsc --noEmit` — 阻塞：未安装 TypeScript\n\n#### Notes / Risks\n- 未新增生产路径并发/轮换 token fixture，属后续 `TEST-01` 范围。\n- 无需主会话额外产品决策；可推进 TEST-01。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-21T03:03:04.858Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 511,
+        "tokens": 350,
+        "tokenSource": "usage",
+        "tps": 88.45,
+        "firstTokenAt": "2026-07-21T03:03:00.881Z",
+        "lastTokenAt": "2026-07-21T03:03:04.838Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-667fe09196fb70e7d753a927",
+        "taskId": "20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260721-104018-_-grok-_-auth-json-_-token-issue-12/implementer-667fe09196fb70e7d753a927.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-21T03:00:48.289Z",
+        "finishedAt": "2026-07-21T03:03:04.863Z",
+        "updatedAt": "2026-07-21T03:03:04.863Z",
+        "itemCount": 45,
+        "messageCount": 1,
+        "toolCallCount": 20,
+        "stderrBytes": 0,
+        "bytes": 130057,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f829e-6c31-7162-ab7a-33eab60ed63e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T03-00-48-305Z_019f829e-6c31-7162-ab7a-33eab60ed63e.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-2dc6557f6f6fa79c6d6c08bb",
+      "subtaskId": "TEST-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-21T03:03:23.174Z",
+      "finishedAt": "2026-07-21T03:09:00.828Z",
+      "runner": "sdk",
+      "childSessionId": "019f82a0-c939-787d-84b1-7dcf33d1353f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T03-03-23-193Z_019f82a0-c939-787d-84b1-7dcf33d1353f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "childSessionId": "019f82a0-c939-787d-84b1-7dcf33d1353f",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-grok-refresh-consistency.mjs` — 新增真实生产路径一致性回归测试。\n- `package.json` — 注册 `test:grok-refresh-consistency`。\n- `.ypi/tasks/.../handoff.md`、`checks.md` — 记录 TEST-01 验证结果。\n\n#### Verification\n- `npm run test:grok-refresh-consistency` — passed\n- `npm run test:grok-accounts` — 96 passed\n- `npm run test:grok-global-auth` — 7 passed\n- `npm run test:oauth-accounts` — passed\n- `npm run test:kiro-refresh-activate-race` — 4 passed\n- `npm run test:antigravity-refresh-activate-race` — 4 passed\n- `npm run lint` — 0 errors，既有 7 warnings\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n- TEST-01 已完成；DOC-01 尚未处理。\n- 测试依赖临时链接相邻工作树的 `node_modules`，已移除。\n- 无需主会话额外产品决策。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-21T03:03:23.174Z",
+        "updatedAt": "2026-07-21T03:09:00.828Z",
+        "eventCount": 5481,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-grok-refresh-consistency.mjs` — 新增真实生产路径一致性回归测试。\n- `package.json` — 注册 `test:grok-refresh-consistency`。\n- `.ypi/tasks/.../handoff.md`、`checks.md` — 记录 TEST-01 验证结果。\n\n#### Verification\n- `npm run test:grok-refresh-consistency` — passed\n- `npm run test:grok-accounts` — 96 passed\n- `npm run test:grok-global-auth` — 7 passed\n- `npm run test:oauth-accounts` — passed\n- `npm run test:kiro-refresh-activate-race` — 4 passed\n- `npm run test:antigravity-refresh-activate-race` — 4 passed\n- `npm run lint` — 0 errors，既有 7 warnings\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n- TEST-01 已完成；DOC-01 尚未处理。\n- 测试依赖临时链接相邻工作树的 `node_modules`，已移除。\n- 无需主会话额外产品决策。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T03:08:42.545Z",
+            "toolCallId": "call_q0QxK0emtevXUm51bIluzRtm|fc_0ffea72e9cfa3e9e016a5ee2b788d881908712e1796a196186",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in scripts/test-grok-refresh-consistency.mjs.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-21T03:08:49.444Z",
+            "toolCallId": "call_QZcSPd9UFarTNs9SO9fTk5XB|fc_0ffea72e9cfa3e9e016a5ee2bdce848190938095fe183b8d5d",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"ln -s /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260721-093646/node_modules node_modules\\nnpm run test:grok-refresh-consistency && node --check scripts/test-grok-refresh-consistency.mjs && git diff --check\\nrm node_modules\",\n  \"timeout\": 120000\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T03:08:50.582Z",
+            "toolCallId": "call_QZcSPd9UFarTNs9SO9fTk5XB|fc_0ffea72e9cfa3e9e016a5ee2bdce848190938095fe183b8d5d",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.23 test:grok-refresh-consistency\n> node scripts/test-grok-refresh-consistency.mjs\n\nGrok refresh consistency tests passed",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-21T03:09:00.820Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-grok-refresh-consistency.mjs` — 新增真实生产路径一致性回归测试。\n- `package.json` — 注册 `test:grok-refresh-consistency`。\n- `.ypi/tasks/.../handoff.md`、`checks.md` — 记录 TEST-01 验证结果。\n\n#### Verification\n- `npm run test:grok-refresh-consistency` — passed\n- `npm run test:grok-accounts` — 96 passed\n- `npm run test:grok-global-auth` — 7 passed\n- `npm run test:oauth-accounts` — passed\n- `npm run test:kiro-refresh-activate-race` — 4 passed\n- `npm run test:antigravity-refresh-activate-race` — 4 passed\n- `npm run lint` — 0 errors，既有 7 warnings\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n- TEST-01 已完成；DOC-01 尚未处理。\n- 测试依赖临时链接相邻工作树的 `node_modules`，已移除。\n- 无需主会话额外产品决策。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-21T03:09:00.821Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 759,
+        "tokens": 386,
+        "tokenSource": "usage",
+        "tps": 187.47,
+        "firstTokenAt": "2026-07-21T03:08:58.136Z",
+        "lastTokenAt": "2026-07-21T03:09:00.195Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-2dc6557f6f6fa79c6d6c08bb",
+        "taskId": "20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260721-104018-_-grok-_-auth-json-_-token-issue-12/implementer-2dc6557f6f6fa79c6d6c08bb.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-21T03:03:23.174Z",
+        "finishedAt": "2026-07-21T03:09:00.825Z",
+        "updatedAt": "2026-07-21T03:09:00.825Z",
+        "itemCount": 81,
+        "messageCount": 1,
+        "toolCallCount": 38,
+        "stderrBytes": 0,
+        "bytes": 233190,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f82a0-c939-787d-84b1-7dcf33d1353f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T03-03-23-193Z_019f82a0-c939-787d-84b1-7dcf33d1353f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-e05aef60875ffb5d764e2453",
+      "subtaskId": "DOC-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-21T03:09:17.477Z",
+      "finishedAt": "2026-07-21T03:13:40.996Z",
+      "runner": "sdk",
+      "childSessionId": "019f82a6-3144-7e3a-acd2-2247681c925e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T03-09-17-508Z_019f82a6-3144-7e3a-acd2-2247681c925e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "childSessionId": "019f82a6-3144-7e3a-acd2-2247681c925e",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### DOC-01 Handoff\n\n#### Files Changed\n- `docs/architecture/overview.md` — Grok slot authority, one-way mirror, refresh convergence.\n- `docs/integrations/README.md` — explicit bootstrap/adopt and lock semantics.\n- `docs/modules/library.md` — OAuth helper/list and resolver contracts.\n- `.ypi/tasks/.../checks.md` — final validation record.\n- `.ypi/tasks/.../handoff.md` — DOC-01 handoff.\n\n#### Verification\nPassed:\n- Grok consistency/accounts/global-auth/OAuth tests\n- Kiro/Antigravity account and race regressions\n- `npm run lint` — 0 errors, 7 existing warnings\n- `git diff --check`\n\nBlocked:\n- `node_modules/.bin/tsc --noEmit`: worktree has no dependencies. Temporary fixture used pi SDK `0.80.6`, incompatible with required `0.80.10`; its type errors are not valid task results. Re-run after installing exact locked dependencies.\n\n#### Risks / Decisions\n- No product decision needed.\n- Main session must rerun typecheck with project-pinned `0.80.10` dependencies before closing the quality gate.",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-21T03:09:17.477Z",
+        "updatedAt": "2026-07-21T03:13:40.996Z",
+        "eventCount": 6546,
+        "lastTextPreview": "### DOC-01 Handoff\n\n#### Files Changed\n- `docs/architecture/overview.md` — Grok slot authority, one-way mirror, refresh convergence.\n- `docs/integrations/README.md` — explicit bootstrap/adopt and lock semantics.\n- `docs/modules/library.md` — OAuth helper/list and resolver contracts.\n- `.ypi/tasks/.../checks.md` — final validation record.\n- `.ypi/tasks/.../handoff.md` — DOC-01 handoff.\n\n#### Verification\nPassed:\n- Grok consistency/accounts/global-auth/OAuth tests\n- Kiro/Antigravity account and race regressions\n- `npm run lint` — 0 errors, 7 existing warnings\n- `git diff --check`\n\nBlocked:\n- `node_modules/.bin/tsc --noEmit`: worktree has no dependencies. Temporary fixture used pi SDK `0.80.6`, incompatible with required `0.80.10`; its type errors are not valid task results. Re-run after installing exact locked dependencies.\n\n#### Risks / Decisions\n- No product decision needed.\n- Main session must rerun typecheck with project-pinned `0.80.10` dependencies before closing the quality gate.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-21T03:13:31.170Z",
+            "toolCallId": "call_RaDV49lJECdNCOTnXokJiolF|fc_0721579f4666a570016a5ee3db0fbc81959a354295c797c46f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- docs/architecture/overview.md docs/integrations/README.md docs/modules/library.md .ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/checks.md .ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/handoff.md\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T03:13:31.228Z",
+            "toolCallId": "call_RaDV49lJECdNCOTnXokJiolF|fc_0721579f4666a570016a5ee3db0fbc81959a354295c797c46f",
+            "toolName": "bash",
+            "text": "diff --git a/docs/architecture/overview.md b/docs/architecture/overview.md\nindex 7114f4f..a829130 100644\n--- a/docs/architecture/overview.md\n+++ b/docs/architecture/overview.md\n@@ -311,14 +311,14 @@ All token values in Usage, ledger, topbar, and message footers follow these conv\n - Auth changes must `await reloadRpcAuthState()` so live AgentSessions reload auth/model state before the API returns success. Each live wrapper offline-refreshes its own `ModelRuntime`, replaces the same provider/id model descriptor without `setModel()` / `model_change` / settings defaults, and cleans pi-ai session resources (OpenAI Codex reusable WebSockets must reconnect after ChatGPT account activation to pick up new auth headers). Per-wrapper failures are isolated.\n - **Web CredentialStore + ModelRuntime (pi SDK 0.80.10)**: Application code uses `lib/web-credential-store.ts` (file-backed `CredentialStore` over `auth.json`) and `lib/web-model-runtime.ts` (`createWebModelRuntime` / `getWebModelRuntime` / `createWebAgentSessionServices`). Do not import root `AuthStorage`, call `ModelRegistry.create()`, or read `services.authStorage` / `services.modelRegistry` / `inner.modelRegistry`. Main Chat and Studio SDK children each get an isolated `ModelRuntime` so cwd-local extension providers cannot leak across sessions; only fixed-provider administrative runtimes are path-keyed and reused. Temporary `modelsPath` (Models Config test / price write verification) never enters the default runtime cache. Request auth prefers `ModelRuntime.getAuth()` or runtime `completeSimple`/`streamSimple`.\n - **Fixed provider registration (Grok + Kiro + Antigravity)**: Every Web entry point (main sessions, Models API, Auth API, Studio SDK children, Skills/Commands, assistant model resolvers) must register fixed providers on the **target** `ModelRuntime` through `createWebAgentSessionServices` / `getWebModelRuntime` and `webExtensionFactories()` from `lib/pi-provider-extensions.ts`. `pi-grok-cli@0.5.0`, `pi-kiro-provider@0.2.2`, and `@yofriadi/pi-antigravity-oauth@0.3.0` ship TypeScript source and are loaded only via jiti + `serverExternalPackages` (never static Next imports of package `src/**`). Order is always Grok → Kiro → Antigravity before call-site extras. Antigravity’s first jiti import forces `PI_OAUTH_CALLBACK_HOST=127.0.0.1` under single-flight so the OAuth callback cannot bind a non-loopback interface. `ensureWebProvidersBootstrapped()` is a legacy OAuth/cold-path preload only — not a catalog guarantee for another runtime. `createWebProviderAwareModelRegistry()` is removed. Per-provider load failures are isolated. `pi-antigravity-rotator` is not a dependency or runtime.\n-- **Grok global Active auth**: Session Authorization pinning is retired. Models `Activate` only sets the provider-global Active account in OAuth metadata / `auth.json` via the Web `CredentialStore`. `reloadRpcAuthState()` offline-refreshes each live `ModelRuntime`, replaces same-identity live model descriptors without calling `setModel()` / writing `model_change`, and cleans provider session resources. All ordinary live Grok sessions and new sessions use the current Active for **subsequent** provider requests; already in-flight requests keep the token they started with. Historical JSONL `grokAccountStorageId` remains parseable but is ignored at runtime and is never migrated.\n+- **Grok global Active auth**: Session Authorization pinning is retired. For a managed Grok account, `accounts.json.activeAccountId` selects the Active opaque slot and that slot's credential file is the credential truth; `auth.json[\"grok-cli\"]` is only its one-way runtime mirror. Models `Activate` updates that global Active state through the Web `CredentialStore`; ordinary account projection/list reads must not copy mirror secrets back into an existing slot. Legacy auth-only discovery, successful login, and canonical runtime refresh use explicit bootstrap/adopt mutations instead. `reloadRpcAuthState()` offline-refreshes each live `ModelRuntime`, replaces same-identity live model descriptors without calling `setModel()` / writing `model_change`, and cleans provider session resources. All ordinary live Grok sessions and new sessions use the current Active for **subsequent** provider requests; already in-flight requests keep the token they started with. Historical JSONL `grokAccountStorageId` remains parseable but is ignored at runtime and is never migrated.\n - **Kiro global Active auth**: Same opaque OAuth store semantics as Grok under `auth-accounts/kiro/` (`kiroAdapter` in `lib/oauth-account-providers.ts`). Builder ID / Google / GitHub OAuth only (no credential JSON import). Activate sets global Active + live reload; no per-session Kiro pin. Secrets (`access`/`refresh`/`clientSecret`/full `profileArn`) never cross the API/DOM boundary.\n - **Antigravity global Active auth**: Opaque OAuth store under `auth-accounts/google-antigravity/` (`antigravityAdapter`). Google OAuth login only (no credential JSON import). Credential requires non-empty `access`/`refresh`/`projectId` and finite `expires`; `projectId` is server-side secret only. Activate sets global Active + `reloadRpcAuthState()`; no per-session pin. Refresh/Activate share `withAntigravityProviderLock()`; non-Active refresh cannot overwrite `auth.json`. Tokens/refresh/`projectId` never cross API/DOM/SSE/log.\n - **Path B account auto-failover chain**: Independent controllers, outermost first: **Antigravity** (`lib/antigravity-account-failover.ts`, `globalThis.__piAntigravityFailover`) → **Kiro** (`lib/kiro-account-failover.ts`, `__piKiroFailover`) → **Grok** (`lib/grok-account-failover.ts`, `__piGrokFailover`) → **OpenCode Go** → **ChatGPT** → Pi native post-run. Each is default-off and provider-scoped (non-matching providers passthrough). Manual Activate is never a lock. Per turn: max one actual switch and one retry; concurrent sessions reuse a single Active change (no cascade). SSE events (`antigravity_account_failover` / `kiro_account_failover` / `grok_account_failover` / …) project only status/reason/retry/safe message — never account ids, tokens, projectId, or paths.\n - **Grok account auto-failover**: When `grok.autoFailover.enabled` is true, explicit Grok quota/usage/credits/monthly/weekly exhaustion or explicit rate-limit / too-many-requests errors can rotate global Active. Classifier rejects bare HTTP status, fuzzy help text, auth/reauth, network, timeout, 5xx, context, content, and model errors. Fixed env-token bypass returns a display-safe non-retry status.\n - **Kiro account auto-failover**: When `kiro.autoFailover.enabled` is true, only explicit AWS quota reason codes (`MONTHLY_REQUEST_COUNT`, `OVERAGE_REQUEST_LIMIT_EXCEEDED`, `CONVERSATION_LIMIT_EXCEEDED`, `DAILY_REQUEST_COUNT`, `ServiceQuotaExceededError`, `authFailure.reason=quota_or_entitlement` without auth subclass) or explicit quota exhausted / rate-limit text trigger. Hard-negatives include `INSUFFICIENT_MODEL_CAPACITY`, bare 429/403, network/timeout/5xx, auth/reauth, context/content/model. Candidates need readable credential + **fresh/live** primary GetUsageLimits remaining > 0; **stale/unknown/reauth fail-closed**.\n - **Antigravity account auto-failover**: When `antigravity.autoFailover.enabled` is true, only explicit `RESOURCE_EXHAUSTED` / quota exhausted/exceeded / quotaResetDelay|TimeStamp / `rate_limit_exceeded` / too many requests / explicit rate-limit text on provider `google-antigravity` trigger. Hard-negatives include bare 429 / `Cloud Code Assist API error (429)`, 401/403, auth/token/project, network/timeout/abort, 5xx/529/capacity, context/content/safety/model. Candidates need readable credential + **fresh/live** quota entry for the **current public model’s accepted keys** (fixed `0.3.0` mapping in `lib/antigravity-model-quota.ts`) with `remainingFraction > 0`; **stale/unknown/reauth/unmapped/other-model-only/same-group-sibling-only fail-closed**. Failover is **model-aware and not group-aware** — UI group remaining (Flash/Opus conservative aggregates) never opens a candidate. Default project `rising-fact-p41fc` is never health evidence.\n-- **Grok token refresh**: Per-account single-flight refresh through `getOAuthApiKey()` in `pi-ai/oauth`. `getGrokAccessToken(..., { forceRefresh: true })` refreshes even when the token is still valid. Refreshed credentials are atomically written to the account secret file (tmp+rename, 0600). The active-mirror to `auth.json` uses compare-and-set: only when the refreshed account is still the current active account at completion time. Different accounts refresh independently under different flight keys.\n+- **Grok token refresh**: Per-account single-flight refresh through `getOAuthApiKey()` in `pi-ai/oauth`. `getGrokAccessToken(..., { forceRefresh: true })` refreshes even when the token is still valid. Under `withGrokProviderLock()`, resolver paths read Active metadata without reading `auth.json`; a refreshed credential is atomically written to its slot first (tmp+rename, 0600), then Active is rechecked and the same credential is projected to `auth.json`. A non-Active refresh never touches the mirror. Active mirror persistence is part of success: if it fails, the newly rotated slot credential is retained, a fixed safe error is returned, and a later valid-token resolution retries convergence rather than restoring an old refresh token. Different accounts refresh independently under different flight keys.\n - **Kiro token refresh**: Same CAS/single-flight/forceRefresh pattern in `lib/kiro-account-token.ts` for provider id `kiro`, preserving Builder ID / social credential fields server-side.\n - **Antigravity token refresh**: Same CAS/single-flight/forceRefresh pattern in `lib/antigravity-account-token.ts` under Antigravity provider lock; refresh results merge with existing `projectId` so upstream omissions cannot drop it.\n - **Grok quota**: Web-owned billing client in `lib/grok-subscription-quota.ts`. No private `pi-grok-cli` path imports. Reads monthly (`/billing`) and optional weekly (`/billing?format=credits`) with 60s fresh / 24h stale TTL, 10s timeout, single-flight, and one forced refresh+retry on 401/403 (parenthesized status check + `forceRefresh:true`). Only normalized allowlist fields reach the wire (`GrokQuotaResultV1`); all responses carry `Cache-Control: no-store`. POST reset-credit returns 405 for Grok.\ndiff --git a/docs/integrations/README.md b/docs/integrations/README.md\nindex 252d0cb..0b9e7df 100644\n--- a/docs/integrations/README.md\n+++ b/docs/integrations/README.md\n@@ -44,7 +44,7 @@ Do **not** deep-import coding-agent private `core/auth-storage`, construct `Mode\n | `lib/pi-provider-extensions.ts` | jiti factories + `webExtensionFactories(extra)`. `ensureWebProvidersBootstrapped()` is a **legacy OAuth/cold-path preload only** (not a catalog guarantee for another runtime). `createWebProviderAwareModelRegistry()` is removed and throws; use `getWebModelRuntime()` / `createWebAgentSessionServices()`. |\n | `lib/rpc-manager.ts` `reloadRpcAuthState()` | Async: offline-refresh each live wrapper's `ModelRuntime`, replace same provider/id model descriptors without `setModel()` / `model_change` / settings defaults, then clean provider session resources. All Activate/login/logout/API-key mirror callers must `await` it. |\n \n-**Active mirror:** OAuth/API-key multi-account pools stay under `auth-accounts/**` and `auth-api-key-accounts/**`. Each provider has one Active credential mirrored into `auth.json` via `CredentialStore.modify/delete`. Non-Active refresh must not overwrite Active (provider lock + metadata CAS).\n+**Active mirror:** OAuth/API-key multi-account pools stay under `auth-accounts/**` and `auth-api-key-accounts/**`. Each provider has one Active credential mirrored into `auth.json` via `CredentialStore.modify/delete`. For managed Grok accounts, the selected slot is the credential truth and `auth.json[\"grok-cli\"]` is a one-way Active mirror: ordinary account listing must not write mirror secrets into an existing slot. Legacy auth-only bootstrap, successful login, and canonical runtime refresh use explicit credential-adoption paths. Non-Active refresh must not overwrite Active (provider lock + metadata CAS).\n \n **Request auth:** Prefer `ModelRuntime.getAuth(model|provider)` or runtime `completeSimple`/`streamSimple` so model headers/baseUrl/env are assembled once. Token-compatibility paths that still need public pi-ai OAuth helpers for non-Active saved credentials must load fixed providers first and must not use removed `AuthStorage`.\n \n@@ -69,8 +69,8 @@ Auth-related API routes live under `app/api/auth/`. Provider tokens and API-key\n `pi-grok-cli@0.5.0` provides the Grok OAuth provider (OIDC discovery, PKCE browser/device/manual flows, refresh) and the `grok-cli` model catalog. Web layers on top:\n \n - **Provider registration** (`lib/pi-provider-extensions.ts` + `lib/web-model-runtime.ts`): Grok (then Kiro, Antigravity) factories are always injected into the **target** `ModelRuntime` via `createWebAgentSessionServices` / `getWebModelRuntime`. Do not rely on a process-global bootstrap to populate an unrelated runtime's catalog.\n-- **OAuth saved-account store** (`lib/oauth-accounts.ts` + `lib/oauth-account-providers.ts`): Provider-adapter architecture supporting `openai-codex` and `grok-cli`. Each login creates an opaque storage id; credentials are stored in per-account `0600` files under `~/.pi/agent/auth-accounts/<provider>/`. **Reauth:** `reauthenticateOAuthAccount()` under `withGrokProviderLock()` atomically replaces the credential in-place (preserving opaque id, label, extraInfo, createdAt, lastActivatedAt, Active pointer) while invalidating old token flights and quota cache. P0 guard restricts to `grok-cli` only; best-effort rollback on phase failures.\n-- **Global Active + auto-failover** (`lib/grok-account-failover.ts`, `lib/grok-session-account.ts`, `lib/grok-account-token.ts`): Models Activate updates the provider-global Active account and reloads live wrappers. Session Authorization pin is retired; historical `grokAccountStorageId` is parse-only/ignored. Optional `grok.autoFailover` (default off) rotates Active on explicit quota/rate-limit errors with GPT-aligned lock/budget/retry semantics (Path B independent controller). Token resolver supports true `forceRefresh` for billing 401/403 retry. **Provider lock** (`lib/grok-account-lock.ts`) serializes token refresh, Activate, and reauth via process mutex + cross-process mkdir directory lock (independent from Kiro/Antigravity locks; no third-party lock packages). **Login error safety** (`lib/grok-login-errors.ts`) maps all Grok OAuth errors to fixed safe messages — never projects raw upstream response text, callback URLs, device codes, or paths.\n+- **OAuth saved-account store** (`lib/oauth-accounts.ts` + `lib/oauth-account-providers.ts`): Provider-adapter architecture supporting `openai-codex` and `grok-cli`. Each login creates an opaque storage id; credentials are stored in per-account `0600` files under `~/.pi/agent/auth-accounts/<provider>/`. Grok's managed Active slot is authoritative; `listOAuthAccounts()` only projects metadata/labels and never reads `auth.json` or writes credential secrets. `readOAuthActiveAccountId()` is the side-effect-free Active metadata reader; legacy bootstrap and successful login/runtime adoption are named, lock-coordinated mutations. **Reauth:** `reauthenticateOAuthAccount()` under `withGrokProviderLock()` atomically replaces the credential in-place (preserving opaque id, label, extraInfo, createdAt, lastActivatedAt, Active pointer) while invalidating old token flights and quota cache. P0 guard restricts to `grok-cli` only; best-effort rollback on phase failures.\n+- **Global Active + auto-failover** (`lib/grok-account-failover.ts`, `lib/grok-session-account.ts`, `lib/grok-account-token.ts`): Models Activate updates the provider-global Active account and reloads live wrappers. Session Authorization pin is retired; historical `grokAccountStorageId` is parse-only/ignored. Optional `grok.autoFailover` (default off) rotates Active on explicit quota/rate-limit errors with GPT-aligned lock/budget/retry semantics (Path B independent controller). Token resolver supports true `forceRefresh` for billing 401/403 retry: under the provider lock it writes a rotated credential to the authoritative slo…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T03:13:31.270Z",
+            "toolCallId": "call_qJHm9IHt2cpC0hJq2WFmxex1|fc_0721579f4666a570016a5ee3db0fac8195b1edf73d9bb44aee",
+            "toolName": "bash",
+            "text": "M app/api/auth/accounts/[provider]/route.ts\n M app/api/auth/login/[provider]/route.ts\n M app/api/auth/logout/[provider]/route.ts\n M app/api/auth/providers/route.ts\n M docs/architecture/overview.md\n M docs/integrations/README.md\n M docs/modules/library.md\n M lib/grok-account-token.ts\n M lib/oauth-accounts.ts\n M lib/subscription-quota.ts\n M package.json\n M scripts/test-grok-accounts.mjs\n M scripts/test-grok-reauth.mjs\n?? \".ypi/tasks/20260721-104018-\\344\\277\\256\\345\\244\\215-grok-\\345\\210\\267\\346\\226\\260\\346\\264\\273\\350\\267\\203\\350\\264\\246\\345\\217\\267\\346\\227\\266\\346\\227\\247-auth-json-\\345\\207\\255\\346\\215\\256\\350\\246\\206\\347\\233\\226\\346\\226\\260-token-issue-12/\"\n?? scripts/test-grok-refresh-consistency.mjs\n app/api/auth/accounts/[provider]/route.ts |   3 +-\n app/api/auth/login/[provider]/route.ts    |   4 +-\n app/api/auth/logout/[provider]/route.ts   |   4 ++\n app/api/auth/providers/route.ts           |   4 +-\n docs/architecture/overview.md             |   4 +-\n docs/integrations/README.md               |   9 +--\n docs/modules/library.md                   |   5 +-\n lib/grok-account-token.ts                 |  65 +++++++++++--------\n lib/oauth-accounts.ts                     | 101 ++++++++++++++++++++++--------\n lib/subscription-quota.ts                 |   6 +-\n package.json                              |   1 +\n scripts/test-grok-accounts.mjs            |   8 ++-\n scripts/test-grok-reauth.mjs              |   4 +-\n 13 files changed, 145 insertions(+), 73 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-21T03:13:40.985Z",
+            "text": "### DOC-01 Handoff\n\n#### Files Changed\n- `docs/architecture/overview.md` — Grok slot authority, one-way mirror, refresh convergence.\n- `docs/integrations/README.md` — explicit bootstrap/adopt and lock semantics.\n- `docs/modules/library.md` — OAuth helper/list and resolver contracts.\n- `.ypi/tasks/.../checks.md` — final validation record.\n- `.ypi/tasks/.../handoff.md` — DOC-01 handoff.\n\n#### Verification\nPassed:\n- Grok consistency/accounts/global-auth/OAuth tests\n- Kiro/Antigravity account and race regressions\n- `npm run lint` — 0 errors, 7 existing warnings\n- `git diff --check`\n\nBlocked:\n- `node_modules/.bin/tsc --noEmit`: worktree has no dependencies. Temporary fixture used pi SDK `0.80.6`, incompatible with required `0.80.10`; its type errors are not valid task results. Re-run after installing exact locked dependencies.\n\n#### Risks / Decisions\n- No product decision needed.\n- Main session must rerun typecheck with project-pinned `0.80.10` dependencies before closing the quality gate.",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-21T03:13:40.986Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 999,
+        "tokens": 324,
+        "tokenSource": "usage",
+        "tps": 82.11,
+        "firstTokenAt": "2026-07-21T03:13:37.038Z",
+        "lastTokenAt": "2026-07-21T03:13:40.984Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-e05aef60875ffb5d764e2453",
+        "taskId": "20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260721-104018-_-grok-_-auth-json-_-token-issue-12/implementer-e05aef60875ffb5d764e2453.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-21T03:09:17.477Z",
+        "finishedAt": "2026-07-21T03:13:40.990Z",
+        "updatedAt": "2026-07-21T03:13:40.990Z",
+        "itemCount": 67,
+        "messageCount": 1,
+        "toolCallCount": 31,
+        "stderrBytes": 0,
+        "bytes": 300715,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f82a6-3144-7e3a-acd2-2247681c925e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T03-09-17-508Z_019f82a6-3144-7e3a-acd2-2247681c925e.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-3d31b58de2ef1e74138be69a",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-21T03:13:54.862Z",
+      "finishedAt": "2026-07-21T03:17:02.334Z",
+      "runner": "sdk",
+      "childSessionId": "019f82aa-6cc0-76f4-87ff-2f18e8aa1c2c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T03-13-54-880Z_019f82aa-6cc0-76f4-87ff-2f18e8aa1c2c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "childSessionId": "019f82aa-6cc0-76f4-87ff-2f18e8aa1c2c",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- None（未改生产代码）\n\n#### Remaining Findings\n- **非阻塞**：`test:grok-all` 尚未聚合 `test:grok-refresh-consistency`\n- **非阻塞**：Activate-first 竞态依赖锁串行 + non-Active 覆盖，未单独 barrier\n- **非阻塞**：跨文件非事务 / 跨进程 `forceRefresh` 双刷新 / 历史作废 token 不自动修复（设计已知）\n- **阻塞**：None\n\n#### Verification\n- `test:grok-refresh-consistency` / `test:grok-accounts`(96) / `test:grok-global-auth`(7) / `test:oauth-accounts` / Kiro&Antigravity race+accounts / `test:grok-reauth`(58) — 通过\n- `lint` — 0 error（7 既有 warning）\n- `tsc --noEmit` — 通过（临时链接 `0.80.10` `node_modules`，已移除）\n- `git diff --check` — 通过\n\n#### Verdict\n**Pass** — Issue #12 根因已消除：list 无 secret 回写、Grok 锁内 slot-first/mirror-second、mirror 失败保留 C1 并可收敛；测试与文档充分。\n\n### Checker Handoff\n- **Artifacts**：`.ypi/tasks/.../review.md`\n- **Production code**：未修改\n- **Validation**：聚焦 + OAuth/Grok/Kiro/Antigravity 回归 + lint/tsc 全过（0.80.10）\n- **Risks**：聚合脚本遗漏、设计已知跨文件/跨进程残余\n- **Main session**：无需返工；可收尾/用户验收。无产品决策阻塞。",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-21T03:13:54.862Z",
+        "updatedAt": "2026-07-21T03:17:02.334Z",
+        "eventCount": 1098,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None（未改生产代码）\n\n#### Remaining Findings\n- **非阻塞**：`test:grok-all` 尚未聚合 `test:grok-refresh-consistency`\n- **非阻塞**：Activate-first 竞态依赖锁串行 + non-Active 覆盖，未单独 barrier\n- **非阻塞**：跨文件非事务 / 跨进程 `forceRefresh` 双刷新 / 历史作废 token 不自动修复（设计已知）\n- **阻塞**：None\n\n#### Verification\n- `test:grok-refresh-consistency` / `test:grok-accounts`(96) / `test:grok-global-auth`(7) / `test:oauth-accounts` / Kiro&Antigravity race+accounts / `test:grok-reauth`(58) — 通过\n- `lint` — 0 error（7 既有 warning）\n- `tsc --noEmit` — 通过（临时链接 `0.80.10` `node_modules`，已移除）\n- `git diff --check` — 通过\n\n#### Verdict\n**Pass** — Issue #12 根因已消除：list 无 secret 回写、Grok 锁内 slot-first/mirror-second、mirror 失败保留 C1 并可收敛；测试与文档充分。\n\n### Checker Handoff\n- **Artifacts**：`.ypi/tasks/.../review.md`\n- **Production code**：未修改\n- **Validation**：聚焦 + OAuth/Grok/Kiro/Antigravity 回归 + lint/tsc 全过（0.80.10）\n- **Risks**：聚合脚本遗漏、设计已知跨文件/跨进程残余\n- **Main session**：无需返工；可收尾/用户验收。无产品决策阻塞。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-21T03:16:55.102Z",
+            "text": "Writing the final `review.md` with findings and verification results.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-21T03:16:55.120Z",
+            "toolCallId": "call-115e5a17-fa6c-489a-a266-509cfef50939-19|fc_4243e7e7-94a5-9e33-923d-d309f859cfef_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260721-103727/.ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/review.md\",\n  \"content\": \"# Review：Issue #12 Grok Active 刷新凭据回退修复\\n\\n## 检查范围\\n\\n- 任务产物：`brief.md` / `prd.md` / `design.md` / `implement.md` / `checks.md` / `ui.md` / `plan-review.md` / `handoff.md`\\n- 生产改动：\\n  - `lib/oauth-accounts.ts`\\n  - `lib/grok-account-token.ts`\\n  - `lib/subscription-quota.ts`\\n  - `app/api/auth/{accounts,login,logout,providers}/**`\\n  - `scripts/test-grok-refresh-consistency.mjs`（新增）\\n  - `scripts/test-grok-accounts.mjs`、`scripts/test-grok-reauth.mjs`、`package.json`\\n  - `docs/architecture/overview.md`、`docs/integrations/README.md`、`docs/modules/library.md`\\n- 重点：旧 token 回写竞态、锁嵌套死锁、Active/non-Active、mirror 失败收敛、测试真实性、secret 泄漏、UI 门禁、跨 provider 回归\\n\\n检查员未修改生产代码；仅写入本 `review.md`。\\n\\n## 需求 / 设计覆盖结论\\n\\n| 验收项 | 结论 | 证据 |\\n| --- | --- | --- |\\n| AC-01 Active C0→C1 两处一致 | 通过 | `refreshGrokCredential` slot-first + Active CAS mirror；`test-grok-refresh-consistency` Active commit 断言 |\\n| AC-02 第二次刷新提交轮换后的 refresh | 通过 | fixture 记录 `calls` 为 `R0 → rotated-1`；禁止再次提交 `R0` |\\n| AC-03 list 不写回旧 secret | 通过 | `listOAuthAccounts` 仅 `projectOAuthAccounts`；全仓无 `syncActiveOAuthAccountCredential`；barrier 测试中 list 持锁窗口执行后 slot/mirror 仍为新值 |\\n| AC-04 refresh A + Activate B | 通过 | provider lock 串行 + barrier 并发测试：最终 Active/mirror=B，A slot 保留旋转后 credential |\\n| AC-05 non-Active 隔离 | 通过 | non-Active refresh 断言 mirror/Active 不变 |\\n| AC-06 same-account single-flight | 通过 | 同 storage id 并发调用只触发一次 fixture `refreshToken` |\\n| AC-07 失败安全 | 通过 | 上游失败零写入；损坏 metadata 刷新前 0 次 refresh；mirror 失败保留 C1 并在后续 valid-token 路径收敛 |\\n| AC-08 bootstrap/login/logout 兼容 | 通过 | 显式 `bootstrap` / `adopt` / `clearOAuthActiveAccount`；login/providers/accounts/logout 路由已切换；OpenAI runtime refresh 显式 adopt |\\n| AC-09 权限/原子写/secret 边界 | 通过 | 仍为 0600/0700 + tmp+rename；错误/list 序列化不含 sentinel |\\n| AC-10 验证矩阵 | 通过 | 见下方 Verification（含 0.80.10 typecheck） |\\n| UI 门禁 | 通过 | 无页面/交互/文案变更；`ui.md` 判定正确 |\\n\\n## 代码审查重点\\n\\n### 1. 旧 token 回写竞态（Issue 根因）\\n\\n- 根因路径已拆除：`listOAuthAccounts()` 不再调用会把 `auth.json` secret 写回 existing slot 的同步逻辑。\\n- Grok resolver 改用 `readOAuthActiveAccountId()`，该 helper 只读 metadata + slot 存在性，不读 mirror、不写文件。\\n- 即使外部 list 与 refresh 交错，list 也没有 secret 写路径，因此无法再执行 `auth C0 -> slot C0`。\\n\\n### 2. 锁与非重入\\n\\n- Grok refresh / Activate / reauth / bootstrap / adopt / clearActive 均经 provider lock。\\n- 已持锁 mutation（delete/Activate）返回 `projectOAuthAccounts()`，不再回调可能未来重新加锁的 public list。\\n- Grok resolver 锁内只调用无锁 metadata helper 与 CredentialStore，未嵌套 `withGrokProviderLock`。\\n- 未发现 Grok 路径上的非重入死锁模式。\\n\\n### 3. Active / non-Active / mirror 协议\\n\\n- Active refresh：slot 原子写 C1 → 复核 Active → mirror C1；mirror 失败抛固定安全错误且不回滚 slot。\\n- valid-token 路径调用 `mirrorActiveCredentialIfActive`，可修复 `slot=C1 / mirror=C0` 中间态。\\n- non-Active：CAS 返回 false，不写 mirror。\\n- 刷新前读取 Active metadata：metadata JSON 损坏时 `readJsonFile` 抛 store error，fixture 验证不会消费 refresh token。\\n\\n### 4. 显式接纳边界\\n\\n- `bootstrapOAuthActiveAccountCredential`：仅无有效 managed Active 时从 auth 建槽。\\n- `adoptOAuthActiveAccountCredential`：login 与 OpenAI canonical runtime refresh 显式替换/接纳。\\n- `clearOAuthActiveAccount`：logout 后清理 managed Active 指针；mirror 清理仍由 `runtime.logout(provider)` 负责。\\n- 生产路径已无 `syncActiveOAuthAccountCredential` 引用。\\n\\n### 5. 测试真实性\\n\\n- 新增 `scripts/test-grok-refresh-consistency.mjs` 使用临时 `PI_CODING_AGENT_DIR`、jiti、生产 `getGrokAccessToken` / `listOAuthAccounts` / `activateOAuthAccount`，以及注册到兼容 OAuth registry 的 fixture。\\n- 并发用 deferred barrier，无 sleep 竞态。\\n- 覆盖 AC 主路径与 secret 序列化边界，不是纯源码字符串断言。\\n\\n### 6. Secret / 隐私\\n\\n- list 摘要、固定错误文案、测试断言均避免 access/refresh/path/上游正文泄漏。\\n- 未发现新增 token 日志。\\n\\n### 7. 文档\\n\\n- overview / integrations / library 已与“slot 真相 + 单向 mirror + 显式接纳 + slot-first/mirror-second + 部分失败收敛”一致，不再宣称未满足的 list 隐式同步语义。\\n\\n## Findings Fixed\\n\\nNone（检查员未改生产代码）。\\n\\n## Remaining Findings\\n\\n### 非阻塞\\n\\n1. **`test:grok-all` 未纳入 `test:grok-refresh-consistency`**  \\n   聚焦脚本已注册为独立 npm script，但聚合 `test:grok-all` 仍不包含它。建议后续小改把该脚本加入聚合，避免回归被遗漏。不影响本 Issue 正确性。\\n\\n2. **Activate-first 并发顺序未单独 barrier 测试**  \\n   现有测试覆盖 refresh-started-then-Activate 与后续 non-Active refresh；因共享非重入 provider lock，Activate-first 在语义上等价于串行 Activate 后 non-Active refresh。可接受残余。\\n\\n3. **跨文件提交非数据库事务 / 跨进程 `forceRefresh` 仍可能顺序双刷新 / 历史已作废 token 不自动修复**  \\n   与设计与 `checks.md` 残余风险一致，不构成合入阻塞。\\n\\n4. **Kiro/Antigravity resolver 仍可 fallback 到 `listOAuthAccounts`**  \\n   本 Issue 范围外；且 list 已无 secret 回写，风险已降低。不必在本任务扩大重构。\\n\\n### 阻塞\\n\\nNone。\\n\\n## Verification\\n\\n在临时链接相邻工作树 `node_modules`（`@earendil-works/pi-*@0.80.10`，与本项目 pin 一致）后执行；完成后已移除链接，未改锁文件。\\n\\n| 命令 | 结果 |\\n| --- | --- |\\n| `npm run test:grok-refresh-consistency` | 通过 |\\n| `npm run test:grok-accounts` | 通过（96） |\\n| `npm run test:grok-global-auth` | 通过（7） |\\n| `npm run test:oauth-accounts` | 通过 |\\n| `npm run test:kiro-refresh-activate-race` | 通过（4） |\\n| `npm run test:antigravity-refresh-activate-race` | 通过（4） |\\n| `npm run test:kiro-accounts` | 通过（28） |\\n| `npm run test:antigravity-accounts` | 通过（29） |\\n| `npm run test:grok-reauth` | 通过（58） |\\n| `npm run lint` | 通过（0 error；7 条既有 warning，与本改动无关） |\\n| `node_modules/.bin/tsc --noEmit` | 通过（0.80.10） |\\n| `git diff --check` | 通过 |\\n\\n此前 DOC-01 用 `0.80.6` fixture 的 typecheck 失败不复现；在正确 `0.80.10` 依赖下 typecheck 已通过。\\n\\n## Verdict\\n\\n**Pass**\\n\\nIssue #12 根因（Active refresh 后 `listOAuthAccounts` 隐式 `auth.json -> slot` 回写旧 secret）已从 store 与 Grok resolver 双侧消除；锁分层、Active/non-Active、mirror 失败保留轮换 credential 并可后续收敛、生产路径聚焦测试与跨 provider 回归均满足 PRD/Design/Checks。无阻塞问题；主会话可进入用户验收/收尾，无需返工实现。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-21T03:16:55.125Z",
+            "toolCallId": "call-115e5a17-fa6c-489a-a266-509cfef50939-19|fc_4243e7e7-94a5-9e33-923d-d309f859cfef_0",
+            "toolName": "write",
+            "text": "Successfully wrote 5288 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260721-103727/.ypi/tasks/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-21T03:17:02.327Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None（未改生产代码）\n\n#### Remaining Findings\n- **非阻塞**：`test:grok-all` 尚未聚合 `test:grok-refresh-consistency`\n- **非阻塞**：Activate-first 竞态依赖锁串行 + non-Active 覆盖，未单独 barrier\n- **非阻塞**：跨文件非事务 / 跨进程 `forceRefresh` 双刷新 / 历史作废 token 不自动修复（设计已知）\n- **阻塞**：None\n\n#### Verification\n- `test:grok-refresh-consistency` / `test:grok-accounts`(96) / `test:grok-global-auth`(7) / `test:oauth-accounts` / Kiro&Antigravity race+accounts / `test:grok-reauth`(58) — 通过\n- `lint` — 0 error（7 既有 warning）\n- `tsc --noEmit` — 通过（临时链接 `0.80.10` `node_modules`，已移除）\n- `git diff --check` — 通过\n\n#### Verdict\n**Pass** — Issue #12 根因已消除：list 无 secret 回写、Grok 锁内 slot-first/mirror-second、mirror 失败保留 C1 并可收敛；测试与文档充分。\n\n### Checker Handoff\n- **Artifacts**：`.ypi/tasks/.../review.md`\n- **Production code**：未修改\n- **Validation**：聚焦 + OAuth/Grok/Kiro/Antigravity 回归 + lint/tsc 全过（0.80.10）\n- **Risks**：聚合脚本遗漏、设计已知跨文件/跨进程残余\n- **Main session**：无需返工；可收尾/用户验收。无产品决策阻塞。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-21T03:17:02.329Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1322,
+        "tokens": 415,
+        "tokenSource": "usage",
+        "tps": 2.29,
+        "firstTokenAt": "2026-07-21T03:14:01.055Z",
+        "lastTokenAt": "2026-07-21T03:17:02.248Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-3d31b58de2ef1e74138be69a",
+        "taskId": "20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260721-104018-_-grok-_-auth-json-_-token-issue-12/checker-3d31b58de2ef1e74138be69a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-21T03:13:54.862Z",
+        "finishedAt": "2026-07-21T03:17:02.333Z",
+        "updatedAt": "2026-07-21T03:17:02.333Z",
+        "itemCount": 48,
+        "messageCount": 4,
+        "toolCallCount": 20,
+        "stderrBytes": 0,
+        "bytes": 172711,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f82aa-6cc0-76f4-87ff-2f18e8aa1c2c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260721-103727--/2026-07-21T03-13-54-880Z_019f82aa-6cc0-76f4-87ff-2f18e8aa1c2c.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-21T02:52:59.857Z",
+      "contextId": "pi_019f828b-22fc-779c-a47d-a4ab4e74bda5",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-21T02:56:07.411Z",
+      "contextId": "pi_019f828b-22fc-779c-a47d-a4ab4e74bda5",
+      "inputHash": "712ff2b375992aa687f5678b",
+      "source": "user-widget"
+    },
+    "archivedAt": "2026-07-21T03:18:09.558Z",
+    "archiveReason": "Accepted and archived from session widget",
+    "knowledgeEntryId": "20260721-111809-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+    "knowledgePath": ".ypi/knowledge/20260721-111809-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-21T02:52:56.539Z",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "serial",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "AUTH-01",
+          "title": "store",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "AUTH-01"
+          ]
+        },
+        {
+          "id": "GROK-01",
+          "title": "resolver",
+          "relation": "serial",
+          "dependencies": [
+            "AUTH-01"
+          ],
+          "subtaskIds": [
+            "GROK-01"
+          ]
+        },
+        {
+          "id": "TEST-01",
+          "title": "verify",
+          "relation": "serial",
+          "dependencies": [
+            "GROK-01"
+          ],
+          "subtaskIds": [
+            "TEST-01"
+          ]
+        },
+        {
+          "id": "DOC-01",
+          "title": "docs",
+          "relation": "serial",
+          "dependencies": [
+            "TEST-01"
+          ],
+          "subtaskIds": [
+            "DOC-01"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "AUTH-01",
+        "title": "拆分 OAuth 列表、Active metadata 读取与显式凭据接纳",
+        "phase": "store",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/oauth-accounts.ts",
+          "app/api/auth/providers/route.ts",
+          "app/api/auth/accounts/[provider]/route.ts",
+          "app/api/auth/login/[provider]/route.ts",
+          "app/api/auth/logout/[provider]/route.ts",
+          "lib/subscription-quota.ts"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "GROK-01",
+        "title": "实现 Grok refresh 与 Active mirror 的锁内提交协议",
+        "phase": "resolver",
+        "order": 2,
+        "dependsOn": [
+          "AUTH-01"
+        ],
+        "dependencies": [
+          "AUTH-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/grok-account-token.ts",
+          "lib/grok-account-lock.ts",
+          "lib/web-credential-store.ts"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "TEST-01",
+        "title": "覆盖轮换 refresh token、list 与 Activate 并发",
+        "phase": "verify",
+        "order": 3,
+        "dependsOn": [
+          "GROK-01"
+        ],
+        "dependencies": [
+          "GROK-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "scripts/test-grok-refresh-consistency.mjs",
+          "package.json",
+          "lib/oauth-account-grok.test.ts",
+          "scripts/test-grok-accounts.mjs"
+        ],
+        "parallelizable": false
+      },
+      {
+        "id": "DOC-01",
+        "title": "更新 OAuth/Grok 架构文档并完成质量门禁",
+        "phase": "docs",
+        "order": 4,
+        "dependsOn": [
+          "TEST-01"
+        ],
+        "dependencies": [
+          "TEST-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/architecture/overview.md",
+          "docs/integrations/README.md",
+          "docs/modules/library.md"
+        ],
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-21T03:18:09.558Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 4,
+      "skipped": 0
+    },
+    "subtasks": {
+      "AUTH-01": {
+        "id": "AUTH-01",
+        "status": "done",
+        "updatedAt": "2026-07-21T03:00:34.014Z",
+        "startedAt": "2026-07-21T02:56:20.694Z",
+        "finishedAt": "2026-07-21T03:00:34.014Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-e6ab3d3a01075528e1ef23f7"
+        ],
+        "lastRunId": "implementer-e6ab3d3a01075528e1ef23f7",
+        "claimedAt": "2026-07-21T02:56:20.694Z",
+        "claimedByContextId": "pi_019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "summary": "### Implementation Complete — AUTH-01\n\n#### Files Changed\n- `lib/oauth-accounts.ts` — list 改为无 secret 回写投影；新增 Active metadata 读取、显式 bootstrap/adopt/logout 清理边界与 provider lock 协调。\n- `app/api/auth/{providers,accounts,login,logout}/...` — 接入 legacy bootstrap、显式 login adopt、logout Active 清理。\n- `lib/subscription-quota.ts` — OpenAI runtime refresh 显式 adopt。\n- `scripts/test-grok-accounts.mjs`, `scripts/test-grok-reauth.mjs` — 更新回归断言。\n- `.ypi/tasks/.../handoff.md` — 记录 AUTH-01 交接与验证阻塞。\n\n#### Verification\n- `git diff --check` — passed\n- `npm run test:oauth-accounts` — blocked：未安装 `jiti`\n- `node_modules/.bin/tsc --noEmit` — blocked：未安装依赖\n\n#### Notes / Risks\n- 未实现 GROK-01；resolver 仍需采用新 metadata helper 并实现 slot-first/mirror-second 提交与失败收敛。\n- 安装依赖后需运行 OAuth/Grok/Kiro/Antigravity accounts 回归、lint、typecheck。"
+      },
+      "GROK-01": {
+        "id": "GROK-01",
+        "status": "done",
+        "updatedAt": "2026-07-21T03:03:04.865Z",
+        "startedAt": "2026-07-21T03:00:42.907Z",
+        "finishedAt": "2026-07-21T03:03:04.865Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-667fe09196fb70e7d753a927"
+        ],
+        "lastRunId": "implementer-667fe09196fb70e7d753a927",
+        "claimedAt": "2026-07-21T03:00:42.907Z",
+        "claimedByContextId": "pi_019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/grok-account-token.ts` — 使用只读 Active metadata；slot-first/mirror-second 提交；mirror 失败安全报错并后续收敛。\n- `.ypi/tasks/.../handoff.md` — 记录 GROK-01 实现与验证结果。\n\n#### Verification\n- `npm run test:grok-accounts` — 通过（96）\n- `npm run test:grok-global-auth` — 通过（7）\n- `git diff --check` — 通过\n- `npm run lint` — 阻塞：未安装 `eslint`\n- `node_modules/.bin/tsc --noEmit` — 阻塞：未安装 TypeScript\n\n#### Notes / Risks\n- 未新增生产路径并发/轮换 token fixture，属后续 `TEST-01` 范围。\n- 无需主会话额外产品决策；可推进 TEST-01。"
+      },
+      "TEST-01": {
+        "id": "TEST-01",
+        "status": "done",
+        "updatedAt": "2026-07-21T03:09:00.829Z",
+        "startedAt": "2026-07-21T03:03:17.921Z",
+        "finishedAt": "2026-07-21T03:09:00.828Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-2dc6557f6f6fa79c6d6c08bb"
+        ],
+        "lastRunId": "implementer-2dc6557f6f6fa79c6d6c08bb",
+        "claimedAt": "2026-07-21T03:03:17.921Z",
+        "claimedByContextId": "pi_019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-grok-refresh-consistency.mjs` — 新增真实生产路径一致性回归测试。\n- `package.json` — 注册 `test:grok-refresh-consistency`。\n- `.ypi/tasks/.../handoff.md`、`checks.md` — 记录 TEST-01 验证结果。\n\n#### Verification\n- `npm run test:grok-refresh-consistency` — passed\n- `npm run test:grok-accounts` — 96 passed\n- `npm run test:grok-global-auth` — 7 passed\n- `npm run test:oauth-accounts` — passed\n- `npm run test:kiro-refresh-activate-race` — 4 passed\n- `npm run test:antigravity-refresh-activate-race` — 4 passed\n- `npm run lint` — 0 errors，既有 7 warnings\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n\n#### Notes / Risks\n- TEST-01 已完成；DOC-01 尚未处理。\n- 测试依赖临时链接相邻工作树的 `node_modules`，已移除。\n- 无需主会话额外产品决策。"
+      },
+      "DOC-01": {
+        "id": "DOC-01",
+        "status": "done",
+        "updatedAt": "2026-07-21T03:13:40.998Z",
+        "startedAt": "2026-07-21T03:09:12.382Z",
+        "finishedAt": "2026-07-21T03:13:40.996Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-e05aef60875ffb5d764e2453"
+        ],
+        "lastRunId": "implementer-e05aef60875ffb5d764e2453",
+        "claimedAt": "2026-07-21T03:09:12.382Z",
+        "claimedByContextId": "pi_019f828b-22fc-779c-a47d-a4ab4e74bda5",
+        "summary": "### DOC-01 Handoff\n\n#### Files Changed\n- `docs/architecture/overview.md` — Grok slot authority, one-way mirror, refresh convergence.\n- `docs/integrations/README.md` — explicit bootstrap/adopt and lock semantics.\n- `docs/modules/library.md` — OAuth helper/list and resolver contracts.\n- `.ypi/tasks/.../checks.md` — final validation record.\n- `.ypi/tasks/.../handoff.md` — DOC-01 handoff.\n\n#### Verification\nPassed:\n- Grok consistency/accounts/global-auth/OAuth tests\n- Kiro/Antigravity account and race regressions\n- `npm run lint` — 0 errors, 7 existing warnings\n- `git diff --check`\n\nBlocked:\n- `node_modules/.bin/tsc --noEmit`: worktree has no dependencies. Temporary fixture used pi SDK `0.80.6`, incompatible with required `0.80.10`; its type errors are not valid task results. Re-run after installing exact locked dependencies.\n\n#### Risks / Decisions\n- No product decision needed.\n- Main session must rerun typecheck with project-pinned `0.80.10` dependencies before closing the quality gate."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-21T02:56:20.694Z",
+        "subtaskId": "AUTH-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-21T03:00:42.907Z",
+        "subtaskId": "GROK-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-21T03:03:17.921Z",
+        "subtaskId": "TEST-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-21T03:09:12.382Z",
+        "subtaskId": "DOC-01",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

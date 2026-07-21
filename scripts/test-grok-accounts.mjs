@@ -203,8 +203,12 @@ test("Metadata accounts array only contains opaque accountId, not credential", (
   assertNotIncludes(normalizeFn, '"refresh"', "metadata does not store refresh token");
 });
 
-test("syncActiveOAuthAccountCredential clears active when credential missing", () => {
-  assertIncludes(oaSource, "clearActiveAccount(provider)", "clears active when missing");
+test("list projects saved accounts without auth.json credential writeback", () => {
+  assertIncludes(oaSource, "async function projectOAuthAccounts", "has an unlocked list projector");
+  assertIncludes(oaSource, "return projectOAuthAccounts(provider)", "public list delegates to projector");
+  assertIncludes(oaSource, "bootstrapOAuthActiveAccountCredential", "legacy auth-only bootstrap is explicit");
+  assertIncludes(oaSource, "adoptOAuthActiveAccountCredential", "canonical login/runtime adoption is explicit");
+  assertIncludes(oaSource, "readOAuthActiveAccountId", "active metadata can be read without auth mirror sync");
 });
 
 // ============================================================================

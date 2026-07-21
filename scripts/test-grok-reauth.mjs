@@ -228,8 +228,8 @@ test("Route still accepts accountMode=add", () => {
   assertIncludes(routeSource, 'Account saved successfully', "add success message unchanged");
 });
 
-test("Route still syncs active for provider-wide login", () => {
-  assertIncludes(routeSource, "syncActiveOAuthAccountCredential", "provider-wide sync preserved");
+test("Route explicitly adopts active credential for provider-wide login", () => {
+  assertIncludes(routeSource, "adoptOAuthActiveAccountCredential", "provider-wide credential adoption preserved");
 });
 
 test("Route POST callback unchanged", () => {

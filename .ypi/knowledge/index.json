@@ -1,7 +1,33 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-21T00:46:31.156Z",
+  "updatedAt": "2026-07-21T03:18:09.558Z",
   "entries": [
+    {
+      "id": "20260721-111809-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+      "title": "修复 Grok 刷新活跃账号时旧 auth.json 凭据覆盖新 token（Issue #12）",
+      "taskId": "20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+      "taskKey": "archived:2026-07:20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+      "workflowId": "feature-dev",
+      "summary": "## 检查范围 - 任务产物：`brief.md` / `prd.md` / `design.md` / `implement.md` / `checks.md` / `ui.md` / `plan-review.md` / `handoff.md` - 生产改动： - `lib/oauth-accounts.ts` - `lib/grok-account-token.ts` - `lib/subscription-quota.ts` - `app/api/auth/{accounts,login,logout,providers}/**` - `scripts/test-grok-refresh-consistency.mjs`（新增） - `scripts/test-grok-accounts.mjs`、`scripts/test-grok-reauth.mjs`、`package.json` - `docs/architecture/overview.md`、`docs/integrations/README.md`、`docs/modules/library.md` - 重点：旧 token 回写竞态、锁嵌套死锁、Active/non-Active、mirror 失败收敛、测试真实性、secret 泄漏、UI 门禁、跨 provider 回归 检查员未修改生产代码；仅写入本 `review.md`。 ## 需求 / 设计覆盖结论 | 验收项 | 结论 | 证据 | | --- | --- | --- | | AC-01 Active C0→C1 两处一致 | 通过 | `refreshGrokCredential` slot-first + Active CAS mirror；`test-grok-refresh-consistency` Active commit 断言 | | AC-02 第二次刷新提交轮换后的 refresh | 通过 | fixture 记录 `calls` 为 `R0 → rotated-1`；禁止再次提交 `R0` | | AC-0…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260721-104018-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12",
+      "knowledgePath": ".ypi/knowledge/20260721-111809-修复-grok-刷新活跃账号时旧-auth-json-凭据覆盖新-token-issue-12.md",
+      "createdAt": "2026-07-21T03:18:09.558Z",
+      "archivedAt": "2026-07-21T03:18:09.558Z",
+      "sourceArtifacts": [
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260721-084631-设计外观模块-皮肤管理与网页背景适配",
       "title": "设计外观模块：皮肤管理与网页背景适配",
