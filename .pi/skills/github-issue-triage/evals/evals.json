@@ -1,0 +1,23 @@
+{
+  "skill_name": "github-issue-triage",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "请扫描当前项目 602362837/yolk-pi-web 中所有 open 且未认领的 GitHub issue，逐条先认领，再判断是否采纳并发表评论，最后给我 Markdown 表格。不要处理 upstream 仓库。",
+      "expected_output": "只查询目标仓库的 open、无 assignee Issues；按认领→分析→评论顺序处理；输出包含 id、标题、链接、是否采纳的表格及失败汇总。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "帮我处理 yolk-pi-web 的未分配议题。我的 git remote 同时有 origin 和 upstream，请确保只操作 git@github.com:602362837/yolk-pi-web.git 对应仓库；如果某个 issue 认领失败，不要假装成功，但继续处理其他 issue 并汇报。",
+      "expected_output": "显式校验 remote 和 gh 身份；所有 gh 命令固定 --repo 602362837/yolk-pi-web；逐项记录认领失败并继续其他候选项。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "请检查本项目 open 且没有 assignee 的 issue，先把它们认领下来，然后基于项目范围、用户价值、兼容性和风险决定是否采纳，在每个成功认领的 issue 下写中文结论评论。不要关闭 issue 或提交代码。最后严格按 | id | 标题 | 链接 | 是否采纳 | 汇报。",
+      "expected_output": "评论包含处理人、是否采纳、分析依据和后续计划；不关闭 issue、不改代码；最终表格列名和失败状态准确。",
+      "files": []
+    }
+  ]
+}
