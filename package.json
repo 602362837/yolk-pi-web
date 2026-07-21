@@ -39,6 +39,8 @@
     "build": "node scripts/build-next.js",
     "start": "next start -p 30141",
     "lint": "eslint .",
+    "test:appearance": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-appearance.mjs && node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-appearance-video.mjs",
+    "test:appearance-video": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-appearance-video.mjs",
     "test:studio-policy": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-policy.mjs",
     "test:studio-message-display": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-message-display.mjs",
     "test:studio-extension-sci": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-ypi-studio-extension-sci.mjs",
@@ -123,6 +125,7 @@
     "@xterm/xterm": "^6.0.0",
     "@yofriadi/pi-antigravity-oauth": "0.3.0",
     "diff": "^8.0.4",
+    "ffmpeg-static": "5.3.0",
     "jiti": "2.7.0",
     "katex": "^0.16.47",
     "mammoth": "^1.12.0",
@@ -139,7 +142,8 @@
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0"
+    "remark-math": "^6.0.0",
+    "sharp": "0.34.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",

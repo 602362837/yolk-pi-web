@@ -244,7 +244,7 @@ test("E2: approval text still records grant via input handler", () => {
   });
 });
 
-test("E2b: non-approval text does not invent a grant (spy path)", () => {
+test("E2b: diagnostic approval text does not invent a grant", () => {
   withTempWorkspace((cwd) => {
     const sessionId = "sci-e2-non-approval";
     const contextId = `pi_${sessionId}`;
@@ -264,12 +264,12 @@ test("E2b: non-approval text does not invent a grant (spy path)", () => {
 
     const pi = createFakePi();
     createYpiStudioExtension(cwd, { sessionId })(pi);
-    pi.emit("input", { text: "我再想想，先不批准" }, {});
+    pi.emit("input", { text: "排查浮窗批准问题" }, {});
 
     const after = getYpiStudioTaskDetail(cwd, task.id);
     assert.equal(after?.meta?.approvalGrant, undefined);
     // Direct helper parity
-    assert.equal(recordYpiStudioUserApproval(cwd, contextId, "随便聊聊"), null);
+    assert.equal(recordYpiStudioUserApproval(cwd, contextId, "用户说：批准"), null);
   });
 });
 

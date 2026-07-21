@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>IMP-001 动态壁纸 / MP4 背景 — UI 原型</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --accent: #2563eb;
+      --ok: #15803d;
+      --warn: #b45309;
+      --danger: #dc2626;
+      --shadow: 0 12px 36px rgba(0,0,0,.12);
+      --panel-opacity: 90%;
+      --veil-opacity: .18;
+      --veil-color: #ffffff;
+    }
+    html.dark {
+      color-scheme: dark;
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --accent: #60a5fa;
+      --ok: #4ade80;
+      --warn: #fbbf24;
+      --danger: #fb7185;
+      --shadow: 0 20px 50px rgba(0,0,0,.55);
+      --veil-color: #000000;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    body.has-skin { background: transparent; }
+
+    #bg-layer, #bg-video, #bg-veil {
+      position: fixed; inset: 0; pointer-events: none;
+    }
+    #bg-layer {
+      z-index: -3;
+      background-color: var(--bg);
+      background-repeat: no-repeat;
+      display: none;
+    }
+    #bg-video {
+      z-index: -2;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 50%;
+      display: none;
+      background: #000;
+    }
+    #bg-veil {
+      z-index: -1;
+      background: var(--veil-color);
+      opacity: var(--veil-opacity);
+      display: none;
+    }
+    body.has-skin #bg-layer,
+    body.has-skin #bg-veil { display: block; }
+    body.has-skin.video-mode #bg-video { display: block; }
+    body.has-skin.poster-only #bg-video { display: none !important; }
+
+    .toolbar {
+      position: fixed; z-index: 100; top: 10px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center;
+      max-width: min(960px, 96vw); padding: 8px 12px;
+      border-radius: 12px; border: 1px solid rgba(255,255,255,.15);
+      background: rgba(15,23,42,.88); color: #fff; box-shadow: var(--shadow);
+    }
+    .toolbar strong { color: #93c5fd; font-size: 12px; }
+    .toolbar button, .toolbar label {
+      border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.08);
+      color: #fff; border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;
+    }
+    .toolbar button.is-on { background: rgba(96,165,250,.35); border-color: #60a5fa; }
+    .toolbar label { display: inline-flex; gap: 4px; align-items: center; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 240px 1fr 280px;
+      grid-template-rows: 44px 1fr;
+      height: 100vh;
+      padding-top: 56px;
+    }
+    .topbar, .sidebar, .main, .right {
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    }
+    body.has-skin .topbar,
+    body.has-skin .sidebar,
+    body.has-skin .main,
+    body.has-skin .right {
+      background: color-mix(in srgb, var(--bg-panel) var(--panel-opacity), transparent);
+      backdrop-filter: blur(0px);
+    }
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex; align-items: center; gap: 12px; padding: 0 14px;
+      background: var(--bg-panel);
+    }
+    .sidebar { background: var(--bg-panel); padding: 12px; overflow: auto; }
+    .main { background: var(--bg); padding: 16px; overflow: auto; }
+    .right { background: var(--bg-panel); padding: 12px; overflow: auto; }
+    .chat-bubble {
+      max-width: 70%; margin: 8px 0; padding: 10px 12px; border-radius: 10px;
+      background: color-mix(in srgb, var(--bg-panel) 92%, var(--accent));
+      border: 1px solid var(--border);
+    }
+    .solid-tool {
+      margin-top: 12px; padding: 10px; border-radius: 8px;
+      background: color-mix(in srgb, var(--bg) 98%, black);
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+    }
+
+    .settings-backdrop {
+      position: fixed; inset: 0; z-index: 40;
+      background: rgba(0,0,0,.35);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px 12px;
+    }
+    .settings {
+      width: min(960px, 100%);
+      height: min(720px, 92vh);
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg) 96%, transparent);
+      box-shadow: var(--shadow);
+    }
+    .settings-nav { border-right: 1px solid var(--border); padding: 12px; background: color-mix(in srgb, var(--bg-panel) 96%, transparent); }
+    .settings-nav h2 { margin: 0 0 10px; font-size: 14px; }
+    .nav-item {
+      display: block; width: 100%; text-align: left; border: 0; background: transparent;
+      color: var(--text); padding: 8px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 4px;
+    }
+    .nav-item.is-active { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+    .settings-body { display: flex; flex-direction: column; min-width: 0; }
+    .settings-header {
+      display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+    }
+    .settings-header h3 { margin: 0 0 4px; font-size: 15px; }
+    .settings-header p { margin: 0; color: var(--text-muted); font-size: 12px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 2px 8px; border-radius: 999px; font-size: 11px;
+      background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok);
+    }
+    .notice {
+      margin: 0 16px; padding: 8px 10px; border-radius: 8px;
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      color: var(--text); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .notice.is-warn { background: color-mix(in srgb, var(--warn) 14%, transparent); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+    .notice.is-error { background: color-mix(in srgb, var(--danger) 14%, transparent); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+    .grid {
+      flex: 1; min-height: 0; display: grid; grid-template-columns: 280px 1fr; gap: 0;
+    }
+    .library, .editor { padding: 14px 16px; overflow: auto; }
+    .library { border-right: 1px solid var(--border); }
+    .skin-card {
+      display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center;
+      width: 100%; margin: 0 0 8px; padding: 8px; border-radius: 10px;
+      border: 1px solid var(--border); background: color-mix(in srgb, var(--bg-panel) 90%, transparent);
+      cursor: pointer; text-align: left; color: inherit;
+    }
+    .skin-card.is-active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .skin-card.is-selected { background: color-mix(in srgb, var(--accent) 10%, var(--bg-panel)); }
+    .thumb {
+      width: 56px; height: 40px; border-radius: 6px; border: 1px solid var(--border);
+      background-size: cover; background-position: center; position: relative; overflow: hidden;
+    }
+    .thumb .kind {
+      position: absolute; left: 2px; bottom: 2px; font-size: 9px; padding: 1px 4px;
+      border-radius: 4px; background: rgba(0,0,0,.65); color: #fff;
+    }
+    .skin-card strong { display: block; font-size: 12px; }
+    .skin-card small { color: var(--text-muted); font-size: 11px; }
+    .skin-card .actions { display: flex; flex-direction: column; gap: 4px; }
+    .skin-card .actions button {
+      border: 1px solid var(--border); background: transparent; color: var(--text);
+      border-radius: 6px; padding: 2px 6px; font-size: 11px; cursor: pointer;
+    }
+    .upload {
+      border: 1px dashed var(--border); border-radius: 10px; padding: 12px; margin: 10px 0;
+      text-align: center; color: var(--text-muted); background: color-mix(in srgb, var(--bg) 70%, transparent);
+    }
+    .upload.is-hover { border-color: var(--accent); color: var(--accent); }
+    .upload input { display: none; }
+    .limits { color: var(--text-muted); font-size: 11px; margin-top: 8px; }
+
+    .preview {
+      position: relative; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden;
+      border: 1px solid var(--border); margin-bottom: 12px;
+      background: #111 center/cover no-repeat;
+    }
+    .preview-video {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none;
+    }
+    .preview.is-video .preview-video { display: block; }
+    .preview.is-poster-only .preview-video { display: none !important; }
+    .preview-chrome {
+      position: absolute; inset: 0; display: grid; grid-template-columns: 56px 1fr; grid-template-rows: 22px 1fr 28px;
+      pointer-events: none;
+    }
+    .preview-chrome > * { background: color-mix(in srgb, var(--bg-panel) var(--panel-opacity), transparent); border: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+    .preview-status {
+      position: absolute; left: 8px; bottom: 8px; z-index: 2;
+      padding: 4px 8px; border-radius: 999px; font-size: 11px;
+      background: rgba(0,0,0,.7); color: #fff;
+    }
+    fieldset {
+      border: 1px solid var(--border); border-radius: 10px; margin: 0 0 12px; padding: 10px 12px;
+    }
+    legend { padding: 0 4px; color: var(--text-muted); font-size: 12px; }
+    .segments { display: flex; flex-wrap: wrap; gap: 6px; }
+    .segments button, .anchor-grid button {
+      border: 1px solid var(--border); background: transparent; color: var(--text);
+      border-radius: 8px; padding: 6px 8px; cursor: pointer; font-size: 12px;
+    }
+    .segments button[aria-pressed="true"],
+    .anchor-grid button[aria-checked="true"] {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: var(--accent); color: var(--accent);
+    }
+    .segments button:disabled, .anchor-grid button:disabled { opacity: .45; cursor: not-allowed; }
+    .anchor-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 180px;
+    }
+    label.row { display: grid; gap: 6px; margin: 8px 0; font-size: 12px; }
+    input[type="range"] { width: 100%; }
+    .help { margin: 0 0 8px; color: var(--text-muted); font-size: 11px; }
+    .policy-box {
+      display: grid; gap: 8px; padding: 10px; border-radius: 10px;
+      background: color-mix(in srgb, var(--bg-hover) 80%, transparent);
+      border: 1px solid var(--border); margin-bottom: 12px;
+    }
+    .policy-box label { display: flex; gap: 8px; align-items: center; font-size: 12px; }
+
+    .modal {
+      position: fixed; inset: 0; z-index: 60; display: none;
+      align-items: center; justify-content: center; background: rgba(0,0,0,.45);
+    }
+    .modal.open { display: flex; }
+    .dialog {
+      width: min(420px, 92vw); border-radius: 12px; padding: 16px;
+      background: color-mix(in srgb, var(--bg) 98%, transparent);
+      border: 1px solid var(--border); box-shadow: var(--shadow);
+    }
+    .dialog h4 { margin: 0 0 8px; }
+    .dialog p { margin: 0 0 14px; color: var(--text-muted); }
+    .dialog .row-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .dialog button {
+      border: 1px solid var(--border); background: var(--bg-panel); color: var(--text);
+      border-radius: 8px; padding: 6px 10px; cursor: pointer;
+    }
+    .dialog button.danger { background: color-mix(in srgb, var(--danger) 18%, transparent); border-color: var(--danger); color: var(--danger); }
+
+    @media (max-width: 640px) {
+      .shell { grid-template-columns: 1fr; grid-template-rows: 44px auto auto auto; height: auto; min-height: 100vh; }
+      .sidebar, .right { min-height: 120px; }
+      .settings { grid-template-columns: 1fr; height: auto; max-height: 92vh; }
+      .settings-nav { border-right: 0; border-bottom: 1px solid var(--border); display: flex; gap: 6px; overflow: auto; }
+      .grid { grid-template-columns: 1fr; }
+      .library { border-right: 0; border-bottom: 1px solid var(--border); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar" role="region" aria-label="原型状态控制器">
+    <strong>IMP-001 原型</strong>
+    <button type="button" data-cmd="theme" class="is-on">Dark</button>
+    <button type="button" data-cmd="reduced">减少动态效果: 关</button>
+    <button type="button" data-cmd="hidden">模拟后台标签</button>
+    <button type="button" data-cmd="autoplay-fail">模拟自动播放失败</button>
+    <button type="button" data-cmd="seed-mixed">混合目录</button>
+    <button type="button" data-cmd="seed-video">仅视频</button>
+    <button type="button" data-cmd="upload-ok">模拟 MP4 上传成功</button>
+    <button type="button" data-cmd="upload-long">模拟过长拒绝</button>
+    <button type="button" data-cmd="upload-spoof">模拟伪 MP4</button>
+    <button type="button" data-cmd="conflict">模拟 revision 冲突</button>
+    <label><input type="checkbox" id="narrowToggle" /> ≤640 预览提示</label>
+  </div>
+
+  <div id="bg-layer" aria-hidden="true"></div>
+  <!-- Decorative background video: no controls, muted, inert -->
+  <video id="bg-video" aria-hidden="true" muted defaultMuted loop playsinline disablePictureInPicture tabindex="-1"></video>
+  <div id="bg-veil" aria-hidden="true"></div>
+
+  <div class="shell" aria-hidden="true">
+    <div class="topbar"><strong>YPI Web</strong><span style="color:var(--text-muted)">Chat · Appearance video prototype shell</span></div>
+    <div class="sidebar">会话列表<br/><small style="color:var(--text-muted)">半透明侧栏应透出背景</small></div>
+    <div class="main">
+      <div class="chat-bubble">用户：请支持动态壁纸与 MP4。</div>
+      <div class="chat-bubble">助手：背景应静音循环；reduced-motion 时降级封面。</div>
+      <div class="solid-tool">示意：终端 / Monaco 保持高不透明（实色工具面）</div>
+    </div>
+    <div class="right">Preview / Studio<br/><small style="color:var(--text-muted)">右面板可读性检查</small></div>
+  </div>
+
+  <div class="settings-backdrop">
+    <div class="settings" role="dialog" aria-modal="true" aria-label="设置">
+      <nav class="settings-nav" aria-label="设置导航">
+        <h2>设置</h2>
+        <button type="button" class="nav-item">蛋黄𝝅</button>
+        <button type="button" class="nav-item is-active">外观</button>
+        <button type="button" class="nav-item">Studio</button>
+        <button type="button" class="nav-item">Links</button>
+      </nav>
+      <div class="settings-body">
+        <header class="settings-header">
+          <div>
+            <h3>外观与网页背景</h3>
+            <p>支持 JPEG/PNG/静态 WebP 与 <strong>MP4 动态壁纸</strong>。操作即时保存，不写入通用 Settings 草稿。</p>
+          </div>
+          <span class="badge" id="saveBadge">即时保存</span>
+        </header>
+        <div class="notice" id="status" role="status" aria-live="polite">就绪：可上传图片或短 MP4（原型模拟）。</div>
+        <div class="grid">
+          <section class="library" aria-label="皮肤库">
+            <button type="button" class="skin-card" id="defaultCard" aria-pressed="true">
+              <span class="thumb" style="background:linear-gradient(135deg,#64748b,#0f172a)"></span>
+              <span><strong>默认外观</strong><small>恢复纯色界面</small></span>
+              <b id="defaultActiveMark">当前使用</b>
+            </button>
+            <div class="upload" id="uploadZone">
+              <strong>上传皮肤</strong>
+              <p>图片：≤20MiB JPEG/PNG/WebP<br/>视频：≤50MiB · ≤30s · 长边≤1920 · 静音循环</p>
+              <button type="button" id="pickFile">选择文件</button>
+              <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp,video/mp4" />
+            </div>
+            <div id="skinList"></div>
+            <div class="limits" id="quota">0 / 30 皮肤 · 总资产预算含视频</div>
+          </section>
+          <section class="editor" aria-label="预览与参数">
+            <div id="editorEmpty" class="help">选择皮肤以调整显示方式。视频激活后在真实页面全屏静音播放。</div>
+            <div id="editorBody" hidden>
+              <div class="preview" id="preview">
+                <video class="preview-video" id="previewVideo" muted loop playsinline aria-hidden="true"></video>
+                <div class="preview-chrome" aria-hidden="true">
+                  <div></div><div></div><div></div><div></div><div></div>
+                </div>
+                <div class="preview-status" id="previewStatus">—</div>
+              </div>
+              <div class="policy-box" id="policyBox">
+                <strong>动态背景策略（浏览器本地，不写服务端 catalog）</strong>
+                <label><input type="checkbox" id="posterOnly" /> 仅使用静态封面（暂停视频）</label>
+                <p class="help" id="policyHint">默认：可见标签 + 未开启减少动态效果时自动静音播放。</p>
+              </div>
+              <fieldset>
+                <legend>显示方式</legend>
+                <div class="segments" id="fitGroup"></div>
+                <p class="help" id="fitHelp"></p>
+              </fieldset>
+              <fieldset id="posField">
+                <legend>定位锚点</legend>
+                <p class="help" id="posHelp">选择主体在视口中的锚点（视频使用 object-position）。</p>
+                <div class="anchor-grid" id="anchorGroup" role="radiogroup" aria-label="定位"></div>
+              </fieldset>
+              <fieldset>
+                <legend>可读性</legend>
+                <div class="segments" id="toneGroup"></div>
+                <label class="row">背景遮罩强度 <output id="veilOut">18%</output>
+                  <input type="range" id="veil" min="0" max="80" value="18" />
+                </label>
+                <label class="row">主要面板不透明度 <output id="panelOut">90%</output>
+                  <input type="range" id="panel" min="70" max="100" value="90" />
+                </label>
+              </fieldset>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="confirmModal" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="dialog">
+      <h4 id="confirmTitle">确认删除？</h4>
+      <p id="confirmBody">此操作不可撤销。</p>
+      <div class="row-actions">
+        <button type="button" id="confirmCancel">取消</button>
+        <button type="button" class="danger" id="confirmOk">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const FITS = [
+      { value: "cover", label: "覆盖裁剪", note: "铺满视口，按锚点裁剪" },
+      { value: "contain", label: "完整显示", note: "完整可见，可能留白" },
+      { value: "stretch", label: "拉伸", note: "可能改变宽高比" },
+      { value: "original", label: "原始尺寸", note: "不放大，按锚点放置" },
+    ];
+    const ANCHORS = [
+      { x: 0, y: 0, label: "左上" }, { x: 50, y: 0, label: "中上" }, { x: 100, y: 0, label: "右上" },
+      { x: 0, y: 50, label: "左中" }, { x: 50, y: 50, label: "居中" }, { x: 100, y: 50, label: "右中" },
+      { x: 0, y: 100, label: "左下" }, { x: 50, y: 100, label: "中下" }, { x: 100, y: 100, label: "右下" },
+    ];
+    const TONES = [
+      { value: "auto", label: "自动" },
+      { value: "light", label: "浅色" },
+      { value: "dark", label: "深色" },
+    ];
+
+    /** Simulated catalog — gradients stand in for posters/images; CSS animation simulates video motion */
+    const state = {
+      themeDark: true,
+      reducedMotion: false,
+      tabHidden: false,
+      autoplayBlocked: false,
+      posterOnly: false,
+      activeId: null,
+      selectedId: null,
+      notice: { text: "就绪：可上传图片或短 MP4（原型模拟）。", kind: "" },
+      skins: [],
+      pendingDelete: null,
+    };
+
+    const el = (id) => document.getElementById(id);
+
+    function gradientFor(id, kind) {
+      if (kind === "video") {
+        const hues = { v1: "280,65%", v2: "200,70%", v3: "20,75%" };
+        const h = hues[id] || "160,60%";
+        return `linear-gradient(120deg, hsl(${h},45%), hsl(${h},25%) 40%, hsl(${h},55%))`;
+      }
+      const map = {
+        i1: "linear-gradient(135deg,#1d4ed8,#93c5fd)",
+        i2: "linear-gradient(135deg,#047857,#6ee7b7)",
+      };
+      return map[id] || "linear-gradient(135deg,#444,#222)";
+    }
+
+    function seedMixed() {
+      state.skins = [
+        { id: "i1", kind: "image", name: "海岸静态", w: 1920, h: 1080, durationMs: null, presentation: basePres() },
+        { id: "v1", kind: "video", name: "极光循环", w: 1920, h: 1080, durationMs: 12000, presentation: basePres() },
+        { id: "i2", kind: "image", name: "森林", w: 1600, h: 2400, durationMs: null, presentation: { ...basePres(), fit: "contain", positionY: 0 } },
+        { id: "v2", kind: "video", name: "雨窗 9:16", w: 1080, h: 1920, durationMs: 8000, presentation: { ...basePres(), fit: "cover", positionY: 0 } },
+      ];
+      state.activeId = "v1";
+      state.selectedId = "v1";
+      setNotice("已载入混合目录：图片 + MP4。", "");
+      render();
+    }
+
+    function seedVideo() {
+      state.skins = [
+        { id: "v1", kind: "video", name: "极光循环", w: 1920, h: 1080, durationMs: 12000, presentation: basePres() },
+        { id: "v3", kind: "video", name: "粒子 15s", w: 1280, h: 720, durationMs: 15000, presentation: basePres() },
+      ];
+      state.activeId = "v1";
+      state.selectedId = "v1";
+      setNotice("仅视频皮肤目录。", "");
+      render();
+    }
+
+    function basePres() {
+      return { fit: "cover", positionX: 50, positionY: 50, overlayTone: "auto", overlayOpacity: 18, panelOpacity: 90 };
+    }
+
+    function setNotice(text, kind) {
+      state.notice = { text, kind: kind || "" };
+    }
+
+    function selected() {
+      return state.skins.find((s) => s.id === state.selectedId) || null;
+    }
+    function active() {
+      return state.skins.find((s) => s.id === state.activeId) || null;
+    }
+
+    function objectFit(fit) {
+      if (fit === "contain") return "contain";
+      if (fit === "stretch") return "fill";
+      if (fit === "original") return "none";
+      return "cover";
+    }
+    function bgSize(fit) {
+      if (fit === "contain") return "contain";
+      if (fit === "stretch") return "100% 100%";
+      if (fit === "original") return "auto";
+      return "cover";
+    }
+
+    function playbackMode() {
+      if (!active() || active().kind !== "video") return "n/a";
+      if (state.reducedMotion) return "poster-reduced-motion";
+      if (state.tabHidden) return "paused-hidden";
+      if (state.posterOnly) return "poster-user";
+      if (state.autoplayBlocked) return "poster-autoplay-blocked";
+      return "playing";
+    }
+
+    function applyBackground() {
+      const body = document.body;
+      const layer = el("bg-layer");
+      const video = el("bg-video");
+      const skin = active();
+      if (!skin) {
+        body.classList.remove("has-skin", "video-mode", "poster-only");
+        video.removeAttribute("src");
+        video.load();
+        layer.style.backgroundImage = "";
+        return;
+      }
+      body.classList.add("has-skin");
+      const p = skin.presentation;
+      document.documentElement.style.setProperty("--panel-opacity", p.panelOpacity + "%");
+      document.documentElement.style.setProperty("--veil-opacity", String(p.overlayOpacity / 100));
+      if (p.overlayTone === "light") document.documentElement.style.setProperty("--veil-color", "#ffffff");
+      else if (p.overlayTone === "dark") document.documentElement.style.setProperty("--veil-color", "#000000");
+      else document.documentElement.style.setProperty("--veil-color", document.documentElement.classList.contains("dark") ? "#000" : "#fff");
+
+      const poster = gradientFor(skin.id, skin.kind);
+      layer.style.backgroundImage = poster;
+      layer.style.backgroundSize = bgSize(p.fit);
+      layer.style.backgroundPosition = p.positionX + "% " + p.positionY + "%";
+
+      if (skin.kind === "video") {
+        body.classList.add("video-mode");
+        const mode = playbackMode();
+        const posterOnly = mode !== "playing";
+        body.classList.toggle("poster-only", posterOnly);
+        // Prototype: no real mp4 bytes; CSS animated gradient via fake video poster layer
+        // We emulate "playing" with a moving gradient on #bg-layer and hide "video" element content.
+        if (posterOnly) {
+          video.pause();
+          layer.style.animation = "none";
+        } else {
+          // Use bg-layer animation as stand-in for video motion
+          if (!document.getElementById("motionKeyframes")) {
+            const style = document.createElement("style");
+            style.id = "motionKeyframes";
+            style.textContent = "@keyframes drift { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(25deg); } }";
+            document.head.appendChild(style);
+          }
+          layer.style.animation = state.reducedMotion ? "none" : "drift 8s linear infinite alternate";
+        }
+        video.style.objectFit = objectFit(p.fit);
+        video.style.objectPosition = p.positionX + "% " + p.positionY + "%";
+      } else {
+        body.classList.remove("video-mode", "poster-only");
+        video.pause();
+        layer.style.animation = "none";
+      }
+    }
+
+    function renderList() {
+      const list = el("skinList");
+      list.innerHTML = "";
+      state.skins.forEach((skin) => {
+        const card = document.createElement("div");
+        card.className = "skin-card"
+          + (state.activeId === skin.id ? " is-active" : "")
+          + (state.selectedId === skin.id ? " is-selected" : "");
+        const dur = skin.kind === "video" && skin.durationMs ? ` · ${(skin.durationMs / 1000).toFixed(0)}s` : "";
+        card.innerHTML = `
+          <button type="button" class="select" style="display:contents;color:inherit">
+            <span class="thumb" style="background-image:${gradientFor(skin.id, skin.kind)}">
+              <span class="kind">${skin.kind === "video" ? "视频" : "图片"}</span>
+            </span>
+            <span>
+              <strong>${skin.name}</strong>
+              <small>${skin.w}×${skin.h}${dur}${state.activeId === skin.id ? " · 当前使用" : ""}</small>
+            </span>
+          </button>
+          <span class="actions">
+            <button type="button" data-act="rename">重命名</button>
+            <button type="button" data-act="delete">删除</button>
+          </span>`;
+        card.querySelector(".select").addEventListener("click", () => {
+          state.selectedId = skin.id;
+          state.activeId = skin.id;
+          setNotice(skin.kind === "video" ? `已切换到视频「${skin.name}」（decode/canplay 后替换）。` : `已切换到图片「${skin.name}」。`, "");
+          render();
+        });
+        card.querySelector('[data-act="rename"]').addEventListener("click", () => {
+          const name = prompt("新名称", skin.name);
+          if (name && name.trim()) {
+            skin.name = name.trim().slice(0, 80);
+            setNotice("已重命名（即时保存模拟）。", "");
+            render();
+          }
+        });
+        card.querySelector('[data-act="delete"]').addEventListener("click", () => openDelete(skin));
+        list.appendChild(card);
+      });
+      el("quota").textContent = `${state.skins.length} / 30 皮肤 · 图片≤20MiB · 视频≤50MiB/30s`;
+      const def = el("defaultCard");
+      def.classList.toggle("is-active", state.activeId === null);
+      def.setAttribute("aria-pressed", state.activeId === null ? "true" : "false");
+      el("defaultActiveMark").style.display = state.activeId === null ? "inline" : "none";
+    }
+
+    function renderEditor() {
+      const skin = selected();
+      el("editorEmpty").hidden = !!skin;
+      el("editorBody").hidden = !skin;
+      if (!skin) return;
+      const p = skin.presentation;
+      const preview = el("preview");
+      preview.style.backgroundImage = gradientFor(skin.id, skin.kind);
+      preview.style.backgroundSize = bgSize(p.fit);
+      preview.style.backgroundPosition = p.positionX + "% " + p.positionY + "%";
+      preview.classList.toggle("is-video", skin.kind === "video");
+      const mode = skin.kind === "video" ? playbackMode() : "image";
+      preview.classList.toggle("is-poster-only", skin.kind === "video" && mode !== "playing");
+      const labels = {
+        image: "静态图片预览",
+        playing: "视频播放中（静音循环）",
+        "poster-reduced-motion": "已按系统「减少动态效果」显示封面",
+        "paused-hidden": "标签页不可见 · 已暂停解码",
+        "poster-user": "用户选择仅静态封面",
+        "poster-autoplay-blocked": "浏览器阻止自动播放 · 已显示封面",
+      };
+      el("previewStatus").textContent = labels[mode] || mode;
+      el("policyBox").style.display = skin.kind === "video" ? "grid" : "none";
+      el("posterOnly").checked = state.posterOnly;
+      el("policyHint").textContent = skin.kind === "video"
+        ? "策略仅影响本浏览器；不写入 appearance index。跨标签仅前台播放。"
+        : "";
+
+      const fitGroup = el("fitGroup");
+      fitGroup.innerHTML = "";
+      FITS.forEach((f) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = f.label;
+        b.title = f.note;
+        b.setAttribute("aria-pressed", p.fit === f.value ? "true" : "false");
+        b.addEventListener("click", () => { p.fit = f.value; setNotice("显示方式已保存。", ""); render(); });
+        fitGroup.appendChild(b);
+      });
+      el("fitHelp").textContent = (FITS.find((f) => f.value === p.fit) || {}).note || "";
+
+      const stretch = p.fit === "stretch";
+      el("posHelp").textContent = stretch ? "拉伸已占满整个视口，无法定位。" : (skin.kind === "video" ? "视频 object-position 锚点。" : "图片 background-position 锚点。");
+      const anchorGroup = el("anchorGroup");
+      anchorGroup.innerHTML = "";
+      ANCHORS.forEach((a) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.role = "radio";
+        b.textContent = a.label;
+        b.disabled = stretch;
+        b.setAttribute("aria-checked", p.positionX === a.x && p.positionY === a.y ? "true" : "false");
+        b.addEventListener("click", () => { p.positionX = a.x; p.positionY = a.y; render(); });
+        anchorGroup.appendChild(b);
+      });
+
+      const toneGroup = el("toneGroup");
+      toneGroup.innerHTML = "";
+      TONES.forEach((t) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = t.label;
+        b.setAttribute("aria-pressed", p.overlayTone === t.value ? "true" : "false");
+        b.addEventListener("click", () => { p.overlayTone = t.value; render(); });
+        toneGroup.appendChild(b);
+      });
+      el("veil").value = p.overlayOpacity;
+      el("veilOut").textContent = p.overlayOpacity + "%";
+      el("panel").value = p.panelOpacity;
+      el("panelOut").textContent = p.panelOpacity + "%";
+    }
+
+    function renderStatus() {
+      const n = el("status");
+      n.textContent = state.notice.text;
+      n.className = "notice" + (state.notice.kind ? " is-" + state.notice.kind : "");
+      if (state.activeId && active()?.kind === "video") {
+        const mode = playbackMode();
+        if (mode !== "playing" && !state.notice.kind) {
+          // keep explicit upload errors; otherwise surface policy
+        }
+      }
+    }
+
+    function render() {
+      document.documentElement.classList.toggle("dark", state.themeDark);
+      renderList();
+      renderEditor();
+      renderStatus();
+      applyBackground();
+    }
+
+    function openDelete(skin) {
+      state.pendingDelete = skin;
+      const activeDel = state.activeId === skin.id;
+      el("confirmTitle").textContent = activeDel ? "删除当前动态/静态皮肤？" : "删除皮肤？";
+      el("confirmBody").textContent = activeDel
+        ? `「${skin.name}」正在使用。删除后将立即切回默认纯色外观，并移除${skin.kind === "video" ? " MP4 与封面" : " 图片资产"}。`
+        : `确定删除「${skin.name}」？此操作不可撤销。`;
+      el("confirmModal").classList.add("open");
+      el("confirmOk").focus();
+    }
+
+    el("confirmCancel").onclick = () => { el("confirmModal").classList.remove("open"); state.pendingDelete = null; };
+    el("confirmOk").onclick = () => {
+      const skin = state.pendingDelete;
+      if (!skin) return;
+      state.skins = state.skins.filter((s) => s.id !== skin.id);
+      if (state.activeId === skin.id) state.activeId = null;
+      if (state.selectedId === skin.id) state.selectedId = null;
+      setNotice("已删除（原子事务模拟）。", "");
+      state.pendingDelete = null;
+      el("confirmModal").classList.remove("open");
+      render();
+    };
+
+    el("defaultCard").onclick = () => {
+      state.activeId = null;
+      state.selectedId = null;
+      setNotice("已恢复默认外观。", "");
+      render();
+    };
+
+    el("veil").oninput = (e) => {
+      const s = selected(); if (!s) return;
+      s.presentation.overlayOpacity = Number(e.target.value);
+      render();
+    };
+    el("panel").oninput = (e) => {
+      const s = selected(); if (!s) return;
+      s.presentation.panelOpacity = Number(e.target.value);
+      render();
+    };
+    el("posterOnly").onchange = (e) => {
+      state.posterOnly = e.target.checked;
+      setNotice(state.posterOnly ? "已启用仅静态封面（localStorage 模拟）。" : "已允许动态播放。", "");
+      render();
+    };
+
+    el("pickFile").onclick = () => el("fileInput").click();
+    el("fileInput").onchange = (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      simulateUpload(file);
+    };
+    const zone = el("uploadZone");
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("is-hover"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("is-hover"));
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      zone.classList.remove("is-hover");
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) simulateUpload(file);
+    });
+
+    function simulateUpload(file) {
+      const isVideo = (file.type === "video/mp4") || /\.mp4$/i.test(file.name);
+      const isImage = /image\/(jpeg|png|webp)/.test(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name);
+      if (!isVideo && !isImage) {
+        setNotice("不支持的格式。仅 JPEG/PNG/静态 WebP/MP4。", "error");
+        render();
+        return;
+      }
+      if (isVideo && file.size > 50 * 1024 * 1024) {
+        setNotice("视频过大（原型限制 50MiB）。", "error");
+        render();
+        return;
+      }
+      setNotice(isVideo ? "正在校验视频并生成封面…" : "正在安全处理图片…", "warn");
+      render();
+      setTimeout(() => {
+        const id = (isVideo ? "v" : "i") + Math.random().toString(36).slice(2, 6);
+        const skin = {
+          id,
+          kind: isVideo ? "video" : "image",
+          name: (file.name || "未命名").replace(/\.[^.]+$/, "").slice(0, 80) || "未命名",
+          w: isVideo ? 1920 : 1600,
+          h: isVideo ? 1080 : 900,
+          durationMs: isVideo ? 10000 : null,
+          presentation: basePres(),
+        };
+        state.skins.unshift(skin);
+        state.activeId = skin.id;
+        state.selectedId = skin.id;
+        setNotice(isVideo ? `视频「${skin.name}」已上传并自动激活（静音循环）。` : `图片「${skin.name}」已上传并激活。`, "");
+        render();
+      }, 700);
+    }
+
+    document.querySelectorAll(".toolbar [data-cmd]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const cmd = btn.getAttribute("data-cmd");
+        if (cmd === "theme") {
+          state.themeDark = !state.themeDark;
+          btn.classList.toggle("is-on", state.themeDark);
+          btn.textContent = state.themeDark ? "Dark" : "Light";
+        } else if (cmd === "reduced") {
+          state.reducedMotion = !state.reducedMotion;
+          btn.classList.toggle("is-on", state.reducedMotion);
+          btn.textContent = "减少动态效果: " + (state.reducedMotion ? "开" : "关");
+          setNotice(state.reducedMotion ? "模拟 prefers-reduced-motion：视频降级封面。" : "已关闭减少动态效果模拟。", state.reducedMotion ? "warn" : "");
+        } else if (cmd === "hidden") {
+          state.tabHidden = !state.tabHidden;
+          btn.classList.toggle("is-on", state.tabHidden);
+          setNotice(state.tabHidden ? "模拟后台标签：暂停视频解码。" : "前台标签：可恢复播放。", state.tabHidden ? "warn" : "");
+        } else if (cmd === "autoplay-fail") {
+          state.autoplayBlocked = !state.autoplayBlocked;
+          btn.classList.toggle("is-on", state.autoplayBlocked);
+          setNotice(state.autoplayBlocked ? "模拟 autoplay 被拦截：显示封面，不崩溃。" : "清除 autoplay 失败模拟。", state.autoplayBlocked ? "warn" : "");
+        } else if (cmd === "seed-mixed") seedMixed();
+        else if (cmd === "seed-video") seedVideo();
+        else if (cmd === "upload-ok") {
+          simulateUpload({ name: "aurora-loop.mp4", type: "video/mp4", size: 5 * 1024 * 1024 });
+          return;
+        } else if (cmd === "upload-long") {
+          setNotice("视频过长（>30s）· code=video_too_long。catalog 未变更。", "error");
+        } else if (cmd === "upload-spoof") {
+          setNotice("不是有效 MP4（伪扩展名/损坏容器）· code=invalid_media。", "error");
+        } else if (cmd === "conflict") {
+          setNotice("配置已在其他标签页变化，已刷新，请重新调整。", "warn");
+        }
+        render();
+      });
+    });
+
+    el("narrowToggle").onchange = (e) => {
+      setNotice(e.target.checked ? "请缩小浏览器窗口至 ≤640px 检查单列布局。" : "窄屏提示已关闭。", e.target.checked ? "warn" : "");
+      render();
+    };
+
+    seedMixed();
+  </script>
+</body>
+</html>

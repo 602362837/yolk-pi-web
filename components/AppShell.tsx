@@ -37,6 +37,7 @@ import { UsageLedgerFlowIcon } from "./UsageLedgerIcon";
 import { getRelativeFilePath } from "@/lib/file-paths";
 import { formatWorkspaceTitle, sameWorkspacePathForTitle, spaceContextMatchesSession } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
+import { useAppearance } from "@/hooks/useAppearance";
 import type { GitInfo, SessionInfo, StudioChildSessionListItem } from "@/lib/types";
 import type { PiWebConfig } from "@/lib/pi-web-config";
 import type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from "@/lib/trellis-types";
@@ -312,6 +313,11 @@ function AppShellContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isDark, toggleTheme } = useTheme();
+  // Keeps the server bootstrap synchronized with catalog mutations/tabs without
+  // coupling appearance assets to the general pi-web.json config fetch.
+  // The inert #appearance-bg-video host lives in app/layout.tsx (VID-05); this
+  // hook only owns catalog refresh + (VID-04) playback policy / src lifecycle.
+  useAppearance();
   const { confirm } = usePrompt();
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   // When user clicks +, we only store the cwd/project context — no fake session id
@@ -1433,7 +1439,7 @@ function AppShellContent() {
 
   return (
     <>
-    <div className="app-shell-root" style={{ display: "flex", height: "100dvh", overflow: "hidden", background: "var(--bg)" }}>
+    <div className="app-shell-root" style={{ display: "flex", height: "100dvh", overflow: "hidden" }}>
       {/* Mobile overlay backdrop */}
       <div
         className="sidebar-overlay-backdrop"

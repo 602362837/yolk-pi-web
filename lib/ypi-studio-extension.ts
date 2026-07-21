@@ -32,6 +32,7 @@ import {
   transitionYpiStudioTask,
   updateYpiStudioImplementationPlan,
   updateYpiStudioImplementationSubtask,
+  updateYpiStudioImprovementSubtask,
   updateYpiStudioImprovementArtifact,
   updateYpiStudioImprovementPlan,
   updateYpiStudioTaskArtifact,
@@ -2117,8 +2118,11 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);
           const subtaskId = str(input.subtaskId);
           if (!subtaskId || !input.status) throw new Error("subtaskId and status are required for update_implementation_subtask");
-          const task = updateYpiStudioImplementationSubtask(taskId, { cwd: root, action: "update_implementation_subtask", subtaskId, status: input.status, runId: input.runId, message: input.reason, validation: input.validation, blockedBy: input.blockedBy, blockedReason: input.blockedReason, skippedReason: input.skippedReason, terminationReason: input.terminationReason, localReview: input.localReview, contextId: key });
-          return { content: [{ type: "text", text: `Implementation subtask ${subtaskId} -> ${input.status}.` }], details: { task: taskToolPayload(root, task, input), subtaskId } };
+          const improvementId = str(input.improvementId);
+          const task = improvementId
+            ? updateYpiStudioImprovementSubtask(taskId, { cwd: root, action: "update_implementation_subtask", improvementId, subtaskId, status: input.status, runId: input.runId, message: input.reason, validation: input.validation, blockedBy: input.blockedBy, blockedReason: input.blockedReason, skippedReason: input.skippedReason, terminationReason: input.terminationReason, localReview: input.localReview, contextId: key })
+            : updateYpiStudioImplementationSubtask(taskId, { cwd: root, action: "update_implementation_subtask", subtaskId, status: input.status, runId: input.runId, message: input.reason, validation: input.validation, blockedBy: input.blockedBy, blockedReason: input.blockedReason, skippedReason: input.skippedReason, terminationReason: input.terminationReason, localReview: input.localReview, contextId: key });
+          return { content: [{ type: "text", text: `${improvementId ? "Improvement " : ""}subtask ${subtaskId} -> ${input.status}.` }], details: { task: taskToolPayload(root, task, input), subtaskId, improvementId } };
         }
         if (action === "create_improvement") {
           const taskId = currentTaskIdOrThrow(root, key, str(input.taskId) ?? undefined);

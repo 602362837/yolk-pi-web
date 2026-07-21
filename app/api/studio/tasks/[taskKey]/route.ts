@@ -16,6 +16,7 @@ import {
   isYpiStudioImprovementDispositionBody,
   isYpiStudioImprovementPlanUpdateBody,
   isYpiStudioImprovementSubtaskClaimBody,
+  isYpiStudioImprovementSubtaskUpdateBody,
   isYpiStudioImprovementRevisionBody,
   isYpiStudioImprovementTransitionBody,
   isYpiStudioTaskArchiveBody,
@@ -39,6 +40,7 @@ import {
   transitionYpiStudioTask,
   updateYpiStudioImplementationPlan,
   updateYpiStudioImplementationSubtask,
+  updateYpiStudioImprovementSubtask,
   updateYpiStudioImprovementArtifact,
   updateYpiStudioImprovementPlan,
   updateYpiStudioTaskArtifact,
@@ -239,6 +241,10 @@ export async function PATCH(
     }
     if (isYpiStudioImprovementSubtaskClaimBody(body)) {
       const task = claimYpiStudioImprovementSubtask(taskKey, { ...body, cwd: authorizedCwd });
+      return NextResponse.json({ task });
+    }
+    if (isYpiStudioImprovementSubtaskUpdateBody(body)) {
+      const task = updateYpiStudioImprovementSubtask(taskKey, { ...body, cwd: authorizedCwd });
       return NextResponse.json({ task });
     }
     if (isYpiStudioTaskImplementationSubtaskUpdateBody(body)) {

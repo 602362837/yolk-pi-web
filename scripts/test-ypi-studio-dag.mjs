@@ -14,6 +14,7 @@ import {
   getNextYpiStudioImplementationSubtask,
   getYpiStudioTaskDetail,
   implementationCounts,
+  isExplicitYpiStudioApprovalText,
   isYpiStudioWidgetStartUserAcceptanceBody,
   listYpiStudioTaskHtmlPrototypeFileNames,
   normalizeImplementationPlan,
@@ -478,6 +479,63 @@ function progressFor(implementationPlan, statuses = {}) {
     assert.equal(approved?.meta.approvalGrant?.contextId, contextId);
     const transitioned = transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId });
     assert.equal(transitioned.status, "implementing");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  const approved = [
+    "确认",
+    "批准",
+    "同意该方案",
+    "确认，开始实现",
+    "确认开始实现",
+    "批准开始实现",
+    "确认，批准开始实现",
+    "按方案做",
+    "可以开始实现",
+    "ＡＰＰＲＯＶＥ",
+    "I approve this plan",
+    "go ahead",
+    "please proceed",
+    "start implementation",
+  ];
+  const rejected = [
+    "排查浮窗批准问题",
+    "为什么会误触发批准",
+    "用户说：批准",
+    "“批准”",
+    "不批准",
+    "先别实现",
+    "需要修改",
+    "not approved",
+    "wait, do not proceed",
+    "批准\n开始实现",
+    `确认 ${"讨论".repeat(50)}`,
+  ];
+  for (const text of approved) assert.equal(isExplicitYpiStudioApprovalText(text), true, `must approve: ${text}`);
+  for (const text of rejected) assert.equal(isExplicitYpiStudioApprovalText(text), false, `must reject: ${text}`);
+}
+
+{
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-approval-intent-gate-"));
+  try {
+    const contextId = "pi_approval_intent_gate";
+    const task = createYpiStudioTask({ cwd, title: "Approval intent gate", workflowId: "feature-dev", contextId });
+    writePlanReview(cwd, task.id, contextId);
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+
+    assert.equal(recordYpiStudioUserApproval(cwd, contextId, "排查浮窗批准问题"), null);
+    assert.equal(getYpiStudioTaskDetail(cwd, task.id)?.meta.approvalGrant, undefined);
+    assert.throws(
+      () => transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId }),
+      /no approvalGrant is recorded/,
+    );
+
+    const approved = recordYpiStudioUserApproval(cwd, contextId, "I approve this plan");
+    assert.equal(approved?.meta.approvalGrant?.source, "user-input");
+    assert.equal(transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId }).status, "implementing");
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
@@ -1063,6 +1121,13 @@ function progressFor(implementationPlan, statuses = {}) {
       () => transitionYpiStudioImprovement(task.id, { cwd, action: "transition_improvement", improvementId: impId, to: "implementing", contextId }),
       /transition to implementing requires recorded user approval/,
     );
+
+    // Diagnostic prose must not create an improvement approval grant.
+    assert.throws(
+      () => recordYpiStudioImprovementApproval(cwd, task.id, impId, contextId, "排查浮窗批准问题"),
+      /Explicit approval text is required/,
+    );
+    assert.equal(getYpiStudioTaskDetail(cwd, task.id)?.improvements?.instances[0].approval?.approvedAt, undefined);
 
     // Record approval
     const approved = recordYpiStudioImprovementApproval(cwd, task.id, impId, contextId, "确认，批准开始实现");

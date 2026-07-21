@@ -34,6 +34,9 @@
   --assistant-bg: #ffffff;
   --tool-bg: #f9fafb;
   --bg-subtle: rgba(0,0,0,0.03);
+  /* Elevated dialogs and high-density tools never inherit skin translucency. */
+  --bg-elevated: #ffffff;
+  --bg-tool-solid: #ffffff;
 
   /* Shared control radius / action-tag / icon-flow tokens (static borders; motion only on SVG strokes). */
   --control-radius: 8px;
@@ -106,6 +109,8 @@ html.dark {
   --assistant-bg: #1a1a1a;
   --tool-bg: #1f2937;
   --bg-subtle: rgba(255,255,255,0.04);
+  --bg-elevated: #1a1a1a;
+  --bg-tool-solid: #1a1a1a;
   --icon-flow-a: #67e8f9;
   --icon-flow-b: #60a5fa;
   --icon-flow-c: #c4b5fd;
@@ -181,6 +186,145 @@ html, body {
 
 body {
   height: 100dvh;
+}
+
+/*
+ * Appearance background layer contract (image + video).
+ * APP-03 / VID-04 supply only bounded custom properties and data attrs on
+ * html[data-appearance="skin"]; no user-controlled CSS reaches this layer.
+ * Pseudo-elements and the inert video layer stay below every app portal.
+ */
+html[data-appearance="skin"] body {
+  isolation: isolate;
+  background: var(--appearance-fallback, var(--bg));
+}
+
+html[data-appearance="skin"] body::before,
+html[data-appearance="skin"] body::after {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  display: block;
+  pointer-events: none;
+  content: "";
+}
+
+/* Image full or video poster fallback. Always present under active skin. */
+html[data-appearance="skin"] body::before {
+  z-index: -2;
+  background-color: var(--appearance-fallback, var(--bg));
+  background-image: var(--appearance-image);
+  background-position: var(--appearance-position-x, 50%) var(--appearance-position-y, 50%);
+  background-repeat: no-repeat;
+  background-size: var(--appearance-size, cover);
+}
+
+html[data-appearance="skin"] body::after {
+  z-index: -1;
+  background: var(--appearance-overlay-color, #000);
+  opacity: var(--appearance-overlay-opacity, 0);
+}
+
+/*
+ * Single decorative background video (VID-05 surfaces).
+ * VID-04 owns src attach/detach and play()/pause policy; this layer only
+ * paints when kind=video and a src is present, and never captures input.
+ */
+#appearance-bg-video {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  display: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  object-fit: var(--appearance-video-fit, cover);
+  object-position: var(--appearance-position-x, 50%) var(--appearance-position-y, 50%);
+  pointer-events: none;
+  background: transparent;
+}
+
+html[data-appearance="skin"][data-appearance-kind="video"] #appearance-bg-video {
+  display: block;
+}
+
+/* Poster-only / policy / error: keep poster on body::before; hide video paint. */
+html[data-appearance="skin"][data-appearance-kind="video"][data-appearance-playback="poster"] #appearance-bg-video,
+html[data-appearance="skin"][data-appearance-kind="video"][data-appearance-playback="paused-hidden"] #appearance-bg-video,
+html[data-appearance="skin"][data-appearance-kind="video"][data-appearance-playback="error"] #appearance-bg-video {
+  visibility: hidden;
+}
+
+html[data-appearance="skin"][data-appearance-kind="video"][data-appearance-playback="playing"] #appearance-bg-video {
+  visibility: visible;
+}
+
+/* Active-only token overrides: default light/dark values above are untouched. */
+html[data-appearance="skin"] {
+  --bg: rgb(255 255 255 / var(--appearance-panel-opacity, 90%));
+  --bg-panel: rgb(245 245 245 / var(--appearance-panel-opacity, 90%));
+  --bg-hover: rgb(238 238 238 / var(--appearance-panel-opacity, 90%));
+  --bg-selected: rgb(232 232 232 / var(--appearance-panel-opacity, 90%));
+  --assistant-bg: rgb(255 255 255 / var(--appearance-panel-opacity, 90%));
+  --user-bg: rgb(239 246 255 / var(--appearance-panel-opacity, 90%));
+  --tool-bg: rgb(249 250 251 / var(--appearance-panel-opacity, 90%));
+  --bg-subtle: rgb(0 0 0 / 0.03);
+  --bg-elevated: rgb(255 255 255 / 96%);
+  --bg-tool-solid: rgb(255 255 255 / 98%);
+  --appearance-fallback: #ffffff;
+  --appearance-overlay-color: #ffffff;
+}
+
+html.dark[data-appearance="skin"] {
+  --bg: rgb(26 26 26 / var(--appearance-panel-opacity, 90%));
+  --bg-panel: rgb(36 36 36 / var(--appearance-panel-opacity, 90%));
+  --bg-hover: rgb(46 46 46 / var(--appearance-panel-opacity, 90%));
+  --bg-selected: rgb(56 56 56 / var(--appearance-panel-opacity, 90%));
+  --assistant-bg: rgb(26 26 26 / var(--appearance-panel-opacity, 90%));
+  --user-bg: rgb(30 41 59 / var(--appearance-panel-opacity, 90%));
+  --tool-bg: rgb(31 41 55 / var(--appearance-panel-opacity, 90%));
+  --bg-subtle: rgb(255 255 255 / 0.04);
+  --bg-elevated: rgb(26 26 26 / 97%);
+  --bg-tool-solid: rgb(26 26 26 / 98%);
+  --appearance-fallback: #1a1a1a;
+  --appearance-overlay-color: #000000;
+}
+
+/* Portal/dialog and editor/terminal safety surfaces remain deliberately solid. */
+html[data-appearance="skin"] .pi-modal-panel,
+html[data-appearance="skin"] .app-prompt-dialog,
+html[data-appearance="skin"] .models-sync-modal,
+html[data-appearance="skin"] .app-toast,
+html[data-appearance="skin"] .session-stats-popover,
+html[data-appearance="skin"] .message-studio-injection-popover {
+  background: var(--bg-elevated) !important;
+}
+
+html[data-appearance="skin"] .terminal-panel-root,
+html[data-appearance="skin"] .file-viewer-root {
+  --bg: var(--bg-tool-solid);
+  --bg-panel: var(--bg-tool-solid);
+  --bg-subtle: var(--bg-tool-solid);
+}
+
+/* AppShell's inline semantic backgrounds can now reveal the fixed layer safely. */
+html[data-appearance="skin"] .app-shell-root {
+  position: relative;
+  isolation: isolate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-appearance="skin"] body::before,
+  html[data-appearance="skin"] body::after {
+    transition: none !important;
+  }
+
+  /* Prefer poster paint under reduced motion even before client policy runs. */
+  html[data-appearance="skin"][data-appearance-kind="video"] #appearance-bg-video {
+    visibility: hidden !important;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -6606,5 +6750,82 @@ button.settings-provider-back:focus-visible {
 
   .links-connection-card {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ── Settings → Appearance ─────────────────────────────────────────────── */
+.appearance-config { display: flex; flex-direction: column; gap: 16px; color: var(--text); }
+.appearance-config__header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.appearance-config__header h3 { margin: 0; font-size: 15px; }
+.appearance-config__header p, .appearance-help { margin: 5px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+.appearance-config button { border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; background: var(--bg); color: var(--text); cursor: pointer; font-size: 12px; }
+.appearance-config button:disabled { cursor: not-allowed; opacity: .55; }
+.appearance-config button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.appearance-config__notice { padding: 9px 11px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 11%, var(--bg)); color: var(--text); font-size: 12px; line-height: 1.45; }
+.appearance-config__empty { min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; text-align: center; color: var(--text-muted); font-size: 12px; }
+.appearance-config__grid { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.appearance-library, .appearance-editor { border: 1px solid var(--border); border-radius: 10px; padding: 11px; background: var(--bg-subtle); min-width: 0; }
+.appearance-library { display: flex; flex-direction: column; gap: 9px; }
+.appearance-skin-list { display: flex; flex-direction: column; gap: 7px; max-height: 285px; overflow-y: auto; }
+.appearance-skin-card { display: flex; gap: 5px; align-items: stretch; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.appearance-skin-card.is-active { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+.appearance-skin-card.is-selected:not(.is-active) { background: color-mix(in srgb, var(--accent) 7%, var(--bg)); }
+.appearance-skin-card__select { padding: 0 !important; border: 0 !important; background: transparent !important; display: flex; flex: 1; text-align: left; align-items: center; gap: 8px; min-width: 0; }
+.appearance-skin-thumb { position: relative; width: 46px; height: 38px; border-radius: 5px; flex: none; overflow: hidden; background: linear-gradient(135deg, var(--bg-panel), var(--border)); }
+.appearance-skin-thumb img, .appearance-default-swatch { width: 46px; height: 38px; border-radius: 5px; object-fit: cover; flex: none; background: linear-gradient(135deg, var(--bg-panel), var(--border)); }
+.appearance-skin-thumb img { display: block; width: 100%; height: 100%; border-radius: 0; }
+.appearance-skin-kind {
+  position: absolute; left: 2px; bottom: 2px; z-index: 1;
+  padding: 1px 4px; border-radius: 4px; font-size: 9px; line-height: 1.2;
+  background: rgb(0 0 0 / .68); color: #fff; white-space: nowrap;
+}
+.appearance-skin-card__select > span:not(.appearance-skin-thumb):not(.appearance-default-swatch) {
+  min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 2px;
+}
+.appearance-skin-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.appearance-skin-card small, .appearance-library__limit { color: var(--text-dim); font-size: 10px; }
+.appearance-skin-card b { align-self: center; color: var(--accent); font-size: 10px; white-space: nowrap; }
+.appearance-skin-card__actions { display: flex; flex-direction: column; gap: 3px; }
+.appearance-skin-card__actions button { padding: 3px 5px; font-size: 10px; }
+.appearance-upload { border: 1px dashed var(--border); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; color: var(--text-dim); font-size: 10px; line-height: 1.4; }
+.appearance-upload input { display: none; }
+.appearance-preview {
+  height: 150px; border-radius: 8px; overflow: hidden; background-repeat: no-repeat; background-color: var(--bg-panel);
+  display: flex; align-items: flex-end; padding: 10px; box-sizing: border-box; position: relative;
+}
+.appearance-preview.is-video::after {
+  content: "视频封面"; position: absolute; top: 8px; right: 8px;
+  padding: 2px 6px; border-radius: 999px; font-size: 10px;
+  background: rgb(0 0 0 / .62); color: #fff;
+}
+.appearance-preview span {
+  padding: 4px 7px; border-radius: 5px; background: rgb(0 0 0 / .58); color: #fff;
+  font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.appearance-editor { display: flex; flex-direction: column; gap: 13px; }
+.appearance-editor fieldset { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.appearance-editor legend { padding: 0 4px; font-size: 12px; font-weight: 700; }
+.appearance-editor fieldset > label { display: grid; grid-template-columns: 1fr auto; gap: 7px; align-items: center; font-size: 12px; }
+.appearance-editor input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.appearance-policy { gap: 8px; }
+.appearance-policy__toggle {
+  display: flex !important; grid-template-columns: none !important;
+  align-items: center; gap: 8px; font-size: 12px; cursor: pointer;
+}
+.appearance-policy__toggle input { width: auto; margin: 0; accent-color: var(--accent); }
+.appearance-segments { display: flex; flex-wrap: wrap; gap: 5px; }
+.appearance-segments button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--bg)); color: var(--accent); font-weight: 700; }
+.appearance-anchor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.appearance-anchor-grid button { min-height: 32px; padding: 3px; }
+.appearance-anchor-grid button[aria-checked="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--bg)); color: var(--accent); font-weight: 700; }
+@media (max-width: 640px) {
+  .appearance-config__grid { grid-template-columns: 1fr; }
+  .appearance-skin-list { max-height: none; }
+  .appearance-config__header { flex-direction: column; }
+  .appearance-upload { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .appearance-config *, .appearance-config *::before, .appearance-config *::after {
+    transition: none !important; animation: none !important;
   }
 }
