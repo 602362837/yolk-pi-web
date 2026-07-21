@@ -36,10 +36,10 @@ Handle an inbound GitHub PR end-to-end for **yolk-pi-web / pi-agnet-web**: claim
 
 ### If the user did not specify a PR
 
-Before asking which PR to handle, proactively query the current repository's open PR list. Do not claim, label, review, comment on, or merge anything until the user selects a PR. Resolve the repository from the primary remote (prefer `upstream`, otherwise `origin`) and run:
+Before asking which PR to handle, proactively query the current repository's open PR list. Do not claim, label, review, comment on, or merge anything until the user selects a PR. Resolve the repository from the primary remote (prefer `origin`, otherwise `upstream`) and run:
 
 ```bash
-REMOTE_URL="$(git remote get-url upstream 2>/dev/null || git remote get-url origin)"
+REMOTE_URL="$(git remote get-url origin 2>/dev/null || git remote get-url upstream)"
 REPO="$(printf '%s' "$REMOTE_URL" | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#\\.git$##')"
 gh pr list --repo "$REPO" --state open --limit 100 \
   --json number,title,headRefName,baseRefName,url \
@@ -63,7 +63,7 @@ Accept any of:
 | Input | How to resolve |
 | --- | --- |
 | Full URL | Parse `owner`, `repo`, `number` from `https://github.com/{owner}/{repo}/pull/{n}` |
-| Bare number / `#n` | Use this project's primary remote repo (prefer the remote that hosts the PR; usually `upstream` = `twofive1203/pi-agnet-web`, else `origin`) |
+| Bare number / `#n` | Use this project's primary remote repo (prefer `origin`, otherwise `upstream`) |
 | `owner/repo#n` | Use as given |
 
 Normalize once and reuse:
