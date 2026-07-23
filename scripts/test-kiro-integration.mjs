@@ -110,7 +110,7 @@ console.log("\n=== bootstrap / registry ===");
 const pe = read("lib/pi-provider-extensions.ts");
 
 test("fixed provider list is Grok then Kiro then Antigravity", () => {
-  assertIncludes(pe, "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension]", "order");
+  assertIncludes(pe, "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension, anyrouterProviderExtension]", "order");
   assertIncludes(pe, 'import("pi-kiro-provider")', "jiti kiro");
   assertIncludes(pe, 'import("pi-grok-cli")', "jiti grok");
   assertIncludes(pe, "export function ensureWebProvidersBootstrapped", "legacy OAuth bootstrap");

@@ -3,7 +3,7 @@
  *
  * Every Web entrypoint that creates session services or a provider-aware
  * ModelRuntime must include these factories so dynamic providers (currently
- * grok-cli, kiro, and google-antigravity) register on the *target*
+ * grok-cli, kiro, google-antigravity, and anyrouter) register on the *target*
  * ModelRuntime. Prefer `createWebAgentSessionServices` /
  * `getWebModelRuntime` from `lib/web-model-runtime.ts` over process-global
  * bootstrap side effects.
@@ -12,7 +12,7 @@
  *
  * Fixed providers must be injected into the ModelRuntime that will serve the
  * request. Do not treat a throwaway global bootstrap as a guarantee that a
- * different runtime has Grok/Kiro/Antigravity registered.
+ * different runtime has Grok/Kiro/Antigravity/AnyRouter registered.
  */
 
 import { createRequire } from "node:module";
@@ -24,10 +24,11 @@ import type { ExtensionFactory, InlineExtension } from "@earendil-works/pi-codin
 import { bridgePublicProviderOAuthToCompat } from "./pi-ai-oauth-compat";
 import { ANTIGRAVITY_PROVIDER_ID, GROK_CLI_PROVIDER_ID } from "./oauth-account-providers";
 
-// pi-grok-cli, pi-kiro-provider, and @yofriadi/pi-antigravity-oauth publish
-// TypeScript source with ESM-style `.js` / `.ts` specifiers. Loading them
-// through jiti keeps the extensions in the server runtime instead of asking
-// Next/Turbopack to resolve their source trees as application modules.
+// pi-grok-cli, pi-kiro-provider, @yofriadi/pi-antigravity-oauth, and
+// pi-anyrouter publish TypeScript source with ESM-style `.js` / `.ts`
+// specifiers. Loading them through jiti keeps the extensions in the server
+// runtime instead of asking Next/Turbopack to resolve their source trees as
+// application modules.
 //
 // Runtime anchors must NEVER use import.meta.url as the sole jiti/createRequire
 // base. Next production bundles rewrite import.meta.url to the build-machine
@@ -390,11 +391,85 @@ export const antigravityProviderExtension: InlineExtension = {
       await factory(api);
     } catch (err) {
       // Best-effort per provider: an Antigravity load failure must not block
-      // Grok, Kiro, or native providers. Log once-per-failure so silent Next
-      // resolution issues are visible in the server log.
+      // Grok, Kiro, AnyRouter, or native providers. Log once-per-failure so
+      // silent Next resolution issues are visible in the server log.
       const message = err instanceof Error ? err.message : String(err);
       _lastAntigravityLoadError = message;
       console.error("[pi-web] failed to load google-antigravity provider:", message);
+    }
+  },
+};
+
+let _lastAnyrouterLoadError: string | null = null;
+
+/** Last AnyRouter jiti load error message (null when healthy). Diagnostics only. */
+export function getLastAnyrouterProviderLoadError(): string | null {
+  return _lastAnyrouterLoadError;
+}
+
+/**
+ * Named inline extension wrapping the pi-anyrouter public default factory
+ * (provider id `anyrouter`).
+ *
+ * Only the package public entry is loaded via createRuntimeJiti. The Web
+ * loader intercepts `registerProvider("anyrouter")` so a static package
+ * apiKey never freezes over CredentialStore / Active runtime-bridge state.
+ * Load failures are isolated and must not block Grok/Kiro/Antigravity.
+ */
+export const anyrouterProviderExtension: InlineExtension = {
+  name: "pi-anyrouter",
+  factory: async (api) => {
+    try {
+      // Point the package at the Web-managed Active bridge BEFORE the package
+      // module is first evaluated (CONFIG_PATH is a module-level constant).
+      // Never rewrite this env per request / per account.
+      const { ensureAnyRouterConfigEnvPointsAtBridge, reconcileAnyRouterRuntimeMirrors } =
+        await import("./anyrouter-runtime-bridge");
+      ensureAnyRouterConfigEnvPointsAtBridge();
+
+      // Cold-load reconcile: repair bridge/auth from managed Active authority
+      // before the package reads the bridge for catalog registration.
+      try {
+        await reconcileAnyRouterRuntimeMirrors();
+      } catch (reconcileErr) {
+        // Incomplete Active / missing models must not block registration when a
+        // catalog-only bridge can still be written; hard failures are recorded
+        // but other providers continue.
+        const msg =
+          reconcileErr instanceof Error ? reconcileErr.message : String(reconcileErr);
+        console.error("[pi-web] anyrouter runtime bridge reconcile failed:", msg);
+      }
+
+      const loaded = await createRuntimeJiti().import("pi-anyrouter");
+      const factory = (loaded as { default?: ExtensionFactory }).default;
+      if (typeof factory !== "function") {
+        throw new Error("pi-anyrouter did not export an extension factory");
+      }
+      const originalRegisterProvider = api.registerProvider.bind(api);
+      api.registerProvider = ((name, config) => {
+        if (name === "anyrouter") {
+          // Keep models/stream adapter registration, but do not stamp a static
+          // apiKey into the target runtime. Active key/baseUrl come from the
+          // Web-managed runtime bridge + CredentialStore mirror; each stream
+          // call reloads the bridge file (webManaged snapshot).
+          const { apiKey: _ignoredApiKey, ...rest } = (config ?? {}) as {
+            apiKey?: unknown;
+            [key: string]: unknown;
+          };
+          void _ignoredApiKey;
+          originalRegisterProvider(name, { ...rest, apiKey: undefined } as typeof config);
+          return;
+        }
+        originalRegisterProvider(name, config);
+      }) as typeof api.registerProvider;
+      await factory(api);
+      _lastAnyrouterLoadError = null;
+    } catch (err) {
+      // Best-effort per provider: an AnyRouter load failure must not block
+      // Grok, Kiro, Antigravity, or native providers.
+      const message = err instanceof Error ? err.message : String(err);
+      _lastAnyrouterLoadError = message;
+      console.error("[pi-web] failed to load anyrouter provider:", message);
     }
   },
 };
@@ -413,20 +488,20 @@ export const grokSessionAccountExtension: InlineExtension = {
 };
 
 /**
- * Fixed Web provider extension list (Grok → Kiro → Antigravity).
+ * Fixed Web provider extension list (Grok → Kiro → Antigravity → AnyRouter).
  *
- * Always load all three before any call-site `extra` factories so the target
+ * Always load all four before any call-site `extra` factories so the target
  * ModelRuntime receives every fixed provider registration.
  */
 export function webProviderExtensions(): InlineExtension[] {
-  return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension];
+  return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension, anyrouterProviderExtension];
 }
 
 /**
  * Return the standard Web extension factory list with fixed providers prepended.
  *
- * Order: Grok → Kiro → Antigravity → `extra` factories (YPI Studio, Browser
- * Share, Studio child guard, etc.).
+ * Order: Grok → Kiro → Antigravity → AnyRouter → `extra` factories (YPI Studio,
+ * Browser Share, Studio child guard, etc.).
  *
  * Main inference no longer injects a session-bound Authorization header;
  * Grok requests use the global Active account from auth.json, reloaded into

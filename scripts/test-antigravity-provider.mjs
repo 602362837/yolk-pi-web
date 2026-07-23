@@ -122,7 +122,7 @@ test("fixed provider order is Grok → Kiro → Antigravity", () => {
   assertIncludes(peSource, "export const antigravityProviderExtension", "exports antigravity");
   assertIncludes(
     peSource,
-    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension]",
+    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension, anyrouterProviderExtension]",
     "order is Grok then Kiro then Antigravity",
   );
 });

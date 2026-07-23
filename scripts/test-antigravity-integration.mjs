@@ -177,7 +177,7 @@ const pe = read("lib/pi-provider-extensions.ts");
 test("fixed provider list is Grok → Kiro → Antigravity", () => {
   assertIncludes(
     pe,
-    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension]",
+    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension, anyrouterProviderExtension]",
     "order",
   );
   assertIncludes(pe, 'import("pi-grok-cli")', "jiti grok");

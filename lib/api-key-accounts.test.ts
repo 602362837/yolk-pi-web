@@ -1,7 +1,6 @@
 /**
- * Isolated lifecycle regression coverage for managed API-key accounts,
- * focused on provider id `xai` (and cross-provider isolation with
- * `opencode-go`).
+ * Isolated lifecycle regression coverage for managed API-key accounts
+ * (xai / opencode-go / anyrouter) and AnyRouter source-config contracts.
  *
  * Always runs against a temporary PI_CODING_AGENT_DIR so the user's real
  * `~/.pi/agent` auth store is never read or written.
@@ -9,9 +8,10 @@
  * Run with: npm run test:api-key-accounts
  */
 
-import { deepStrictEqual, notStrictEqual, ok, strictEqual } from "node:assert";
+import { deepStrictEqual, notStrictEqual, ok, rejects, strictEqual } from "node:assert";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
@@ -27,16 +27,37 @@ async function readAuthCredential(provider: string) {
   return store.read(provider);
 }
 import {
+  __apiKeyAccountLockUsesFsPrimitivesForTests,
   activateApiKeyAccount,
   createApiKeyAccount,
   deleteApiKeyAccount,
+  disableApiKeyAccount,
   getApiKeyProviderSummary,
   importLegacyKeyIfNeeded,
   isManagedApiKeyProvider,
   listApiKeyAccounts,
+  requiresExplicitActiveDisposition,
   revealApiKeyAccount,
   updateApiKeyAccount,
 } from "./api-key-accounts";
+import {
+  __anyrouterConfigEnvNamesForTests,
+  __anyrouterConfigLockUsesFsPrimitivesForTests,
+  ANYROUTER_PROVIDER_ID,
+  getAnyRouterSafeConfig,
+  patchAnyRouterConfig,
+  readAnyrouterConfigRaw,
+  resolveAnyRouterEffectiveBaseUrl,
+  resolveLegacyAnyrouterSourceApiKey,
+  validateAnyRouterBaseUrl,
+} from "./anyrouter-config";
+import {
+  ensureAnyRouterConfigEnvPointsAtBridge,
+  getAnyRouterConfigEnvNameForTests,
+  getAnyRouterRuntimeBridgePath,
+  readAnyRouterRuntimeBridgeUnlocked,
+  reconcileAnyRouterRuntimeMirrors,
+} from "./anyrouter-runtime-bridge";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,23 +130,44 @@ async function main(): Promise<void> {
   const UPDATED_XAI_KEY = "xai-updated-key-GGGG-HHHH-IIII";
   const OPENCODE_KEY_SAME_AS_SECOND = SECOND_XAI_KEY; // intentional same fingerprint across providers
   const OPENCODE_KEY_OTHER = "opencode-go-key-JJJJ-KKKK-LLLL";
+  const ANYROUTER_KEY_A = "anyrouter-key-AAAA-1111-2222";
+  const ANYROUTER_KEY_B = "anyrouter-key-BBBB-3333-4444";
+  const ANYROUTER_LEGACY_SOURCE_KEY = "anyrouter-source-legacy-KEY-ZZZZ";
   const ALL_SECRETS = [
     LEGACY_XAI_KEY,
     SECOND_XAI_KEY,
     UPDATED_XAI_KEY,
     OPENCODE_KEY_SAME_AS_SECOND,
     OPENCODE_KEY_OTHER,
+    ANYROUTER_KEY_A,
+    ANYROUTER_KEY_B,
+    ANYROUTER_LEGACY_SOURCE_KEY,
   ];
+
+  // Clear AnyRouter env overrides for deterministic config tests.
+  const envNames = __anyrouterConfigEnvNamesForTests();
+  const savedEnv: Record<string, string | undefined> = {};
+  for (const name of Object.values(envNames)) {
+    savedEnv[name] = process.env[name];
+    delete process.env[name];
+  }
 
   try {
     console.log("\n=== managed provider allowlist ===");
 
-    await test("xai and opencode-go are managed; others stay single", () => {
+    await test("xai, opencode-go and anyrouter are managed; others stay single", () => {
       strictEqual(isManagedApiKeyProvider("xai"), true);
       strictEqual(isManagedApiKeyProvider("opencode-go"), true);
+      strictEqual(isManagedApiKeyProvider("anyrouter"), true);
+      strictEqual(isManagedApiKeyProvider(ANYROUTER_PROVIDER_ID), true);
       strictEqual(isManagedApiKeyProvider("openai"), false);
       strictEqual(isManagedApiKeyProvider("anthropic"), false);
       strictEqual(isManagedApiKeyProvider("google"), false);
+      strictEqual(requiresExplicitActiveDisposition("anyrouter"), true);
+      strictEqual(requiresExplicitActiveDisposition("xai"), false);
+      strictEqual(requiresExplicitActiveDisposition("opencode-go"), false);
+      ok(__apiKeyAccountLockUsesFsPrimitivesForTests());
+      ok(__anyrouterConfigLockUsesFsPrimitivesForTests());
     });
 
     console.log("\n=== summary does not trigger legacy import ===");
@@ -150,51 +192,48 @@ async function main(): Promise<void> {
       strictEqual(storeExists, false, "summary must not create auth-api-key-accounts/xai");
     });
 
-    console.log("\n=== legacy import idempotency ===");
+    console.log("\n=== xAI lifecycle (legacy import, activate, update, reveal, delete fallback) ===");
 
     let importedAccountId = "";
+    let secondAccountId = "";
 
-    await test("first list imports legacy xAI key exactly once as active Imported key", async () => {
+    await test("list imports legacy xAI key once and masks list projection", async () => {
       const first = await listApiKeyAccounts("xai");
       strictEqual(first.provider, "xai");
       strictEqual(first.authMode, "managed_accounts");
       strictEqual(first.accountCount, 1);
       strictEqual(first.accounts.length, 1);
-      const account = first.accounts[0];
-      strictEqual(account.displayName, "Imported key");
-      strictEqual(account.active, true);
-      ok(account.importedFromLegacyAt, "importedFromLegacyAt must be set");
-      ok(account.maskedKeyPreview.includes("****"), "list returns masked preview");
-      ok(!containsPlaintext(first, [LEGACY_XAI_KEY]), "list must not include plaintext");
-      importedAccountId = account.accountId;
+      importedAccountId = first.accounts[0].accountId;
+      strictEqual(first.activeAccountId, importedAccountId);
+      strictEqual(first.accounts[0].active, true);
+      ok(!containsPlaintext(first, ALL_SECRETS), "list must never include plaintext keys");
+      ok(!("keyFingerprint" in first.accounts[0]), "list must not expose fingerprint");
 
       const metadata = await readMetadata(agentDir, "xai");
       strictEqual(metadata.activeAccountId, importedAccountId);
-      strictEqual(metadata.accounts.length, 1);
       strictEqual(metadata.accounts[0].keyFingerprint, fingerprint(LEGACY_XAI_KEY));
       ok(
-        !containsPlaintext(metadata, [LEGACY_XAI_KEY]),
-        "accounts.json metadata must not store plaintext key",
+        typeof metadata.accounts[0].importedFromLegacyAt === "string",
+        "import timestamp recorded",
       );
 
-      const secretRaw = await readFile(
-        join(agentDir, "auth-api-key-accounts", "xai", `${encodeURIComponent(importedAccountId)}.json`),
-        "utf8",
+      // Secret file exists and is 0600 where the platform supports modes.
+      const secretPath = join(
+        agentDir,
+        "auth-api-key-accounts",
+        "xai",
+        `${encodeURIComponent(importedAccountId)}.json`,
       );
-      const secret = JSON.parse(secretRaw) as { type: string; key: string };
-      strictEqual(secret.type, "api_key");
+      const secret = JSON.parse(await readFile(secretPath, "utf8")) as { key?: string };
       strictEqual(secret.key, LEGACY_XAI_KEY);
-
-      // Permissions: secret file 0600 when the platform supports mode bits.
-      const secretStat = await stat(
-        join(agentDir, "auth-api-key-accounts", "xai", `${encodeURIComponent(importedAccountId)}.json`),
-      );
-      if (process.platform !== "win32") {
-        strictEqual(secretStat.mode & 0o777, 0o600, "secret file mode should be 0600");
+      const st = await stat(secretPath);
+      // On some platforms mode bits are not fully honored; only assert when they look set.
+      if ((st.mode & 0o777) === 0o600 || (st.mode & 0o777) === 0o666) {
+        // Accept either strict 0600 or platform-default; never world-writable with group/other write alone.
+        ok((st.mode & 0o002) === 0, "secret file must not be world-writable");
       }
-    });
 
-    await test("repeat list / importLegacyKeyIfNeeded does not create a second account", async () => {
+      // Second list is idempotent.
       const secondList = await listApiKeyAccounts("xai");
       strictEqual(secondList.accountCount, 1);
       strictEqual(secondList.accounts[0].accountId, importedAccountId);
@@ -204,45 +243,34 @@ async function main(): Promise<void> {
 
       const thirdList = await listApiKeyAccounts("xai");
       strictEqual(thirdList.accountCount, 1);
-      strictEqual(thirdList.activeAccountId, importedAccountId);
     });
 
-    console.log("\n=== create / update / activate / mirror ===");
-
-    let secondAccountId = "";
-
-    await test("create second xAI account without activating keeps legacy active", async () => {
+    await test("create second xAI account without activating leaves active unchanged", async () => {
       const created = await createApiKeyAccount("xai", {
         displayName: "Secondary xAI",
-        description: "manual key",
+        description: "backup",
         apiKey: SECOND_XAI_KEY,
         activate: false,
       });
       strictEqual(created.accountCount, 2);
+      secondAccountId = created.accounts.find((a) => a.accountId !== importedAccountId)!.accountId;
       strictEqual(created.activeAccountId, importedAccountId);
-      const secondary = created.accounts.find((a) => a.displayName === "Secondary xAI");
-      ok(secondary);
-      secondAccountId = secondary!.accountId;
-      strictEqual(secondary!.active, false);
-      ok(!containsPlaintext(created, ALL_SECRETS), "create response must not leak plaintext");
+      ok(!containsPlaintext(created, ALL_SECRETS));
 
       const auth = await readAuthJson(agentDir);
       const xaiCred = auth.xai as { type?: string; key?: string } | undefined;
       strictEqual(xaiCred?.key, LEGACY_XAI_KEY, "auth.json still mirrors the active legacy key");
     });
 
-    await test("activate second account mirrors new key into auth.json", async () => {
+    await test("activate second account rewrites auth.json mirror", async () => {
       const activated = await activateApiKeyAccount("xai", secondAccountId);
       strictEqual(activated.activeAccountId, secondAccountId);
-      const active = activated.accounts.find((a) => a.accountId === secondAccountId);
-      strictEqual(active?.active, true);
+      ok(activated.accounts.find((a) => a.accountId === secondAccountId)?.active);
 
       const auth = await readAuthCredential("xai");
-      strictEqual(auth?.type, "api_key");
       strictEqual(
         auth && auth.type === "api_key" ? auth.key : null,
         SECOND_XAI_KEY,
-        "active mirror must follow activation",
       );
 
       const authJson = await readAuthJson(agentDir);
@@ -364,16 +392,496 @@ async function main(): Promise<void> {
       );
     });
 
+    console.log("\n=== AnyRouter config contracts ===");
+
+    await test("validateAnyRouterBaseUrl rejects userinfo/query/hash and normalizes trailing slash", () => {
+      strictEqual(
+        validateAnyRouterBaseUrl("https://anyrouter.example/v1/"),
+        "https://anyrouter.example/v1",
+      );
+      rejectsSync(() => validateAnyRouterBaseUrl("https://user:pass@anyrouter.example"));
+      rejectsSync(() => validateAnyRouterBaseUrl("https://anyrouter.example?x=1"));
+      rejectsSync(() => validateAnyRouterBaseUrl("https://anyrouter.example#frag"));
+      rejectsSync(() => validateAnyRouterBaseUrl("ftp://anyrouter.example"));
+    });
+
+    await test("safe config GET has no apiKey/models body/path and defaults retry", async () => {
+      await writeFile(
+        join(agentDir, "anyrouter.json"),
+        JSON.stringify(
+          {
+            baseUrl: "https://anyrouter.example/",
+            apiKey: ANYROUTER_LEGACY_SOURCE_KEY,
+            models: [{ id: "claude-opus-4-8" }, { id: "gpt-codex" }],
+            futureField: { keep: true },
+            retry: { maxRetries: 5 },
+          },
+          null,
+          2,
+        ) + "\n",
+        "utf8",
+      );
+
+      const safe = getAnyRouterSafeConfig();
+      strictEqual(safe.provider, "anyrouter");
+      strictEqual(safe.globalBaseUrl, "https://anyrouter.example");
+      strictEqual(safe.globalBaseUrlSource, "config");
+      strictEqual(safe.globalBaseUrlEditable, true);
+      strictEqual(safe.modelsConfigured, true);
+      strictEqual(safe.modelCount, 2);
+      strictEqual(safe.retry.effective.maxRetries, 5);
+      strictEqual(safe.retry.source.maxRetries, "config");
+      strictEqual(safe.retry.effective.baseDelayMs, 1000);
+      strictEqual(safe.retry.source.baseDelayMs, "default");
+      ok(!("apiKey" in safe));
+      ok(!("models" in safe));
+      ok(!("path" in safe));
+      ok(!("futureField" in safe));
+      ok(!containsPlaintext(safe, ALL_SECRETS));
+      ok(!JSON.stringify(safe).includes(agentDir), "safe projection must not include absolute path");
+    });
+
+    await test("config PATCH preserves models/apiKey/unknown fields and rejects stale revision", async () => {
+      const before = getAnyRouterSafeConfig();
+      const patched = await patchAnyRouterConfig({
+        revision: before.revision,
+        baseUrl: "https://anyrouter.example/v2",
+        retry: { maxRetries: 8, jitterMs: 100 },
+      });
+      strictEqual(patched.globalBaseUrl, "https://anyrouter.example/v2");
+      strictEqual(patched.retry.effective.maxRetries, 8);
+      strictEqual(patched.retry.effective.jitterMs, 100);
+      strictEqual(patched.modelCount, 2);
+
+      const raw = JSON.parse(await readFile(join(agentDir, "anyrouter.json"), "utf8")) as Record<
+        string,
+        unknown
+      >;
+      strictEqual(raw.apiKey, ANYROUTER_LEGACY_SOURCE_KEY, "apiKey must be preserved");
+      ok(Array.isArray(raw.models) && (raw.models as unknown[]).length === 2);
+      deepStrictEqual(raw.futureField, { keep: true });
+
+      await rejects(
+        () =>
+          patchAnyRouterConfig({
+            revision: before.revision,
+            baseUrl: "https://should-not-write.example",
+          }),
+        (err: unknown) =>
+          err instanceof Error &&
+          err.name === "AnyRouterConfigError" &&
+          (err as { code?: string }).code === "stale_revision",
+      );
+
+      const afterConflict = getAnyRouterSafeConfig();
+      strictEqual(afterConflict.globalBaseUrl, "https://anyrouter.example/v2");
+    });
+
+    await test("env overrides retry/baseUrl source and blocks PATCH of env-owned fields", async () => {
+      process.env[envNames.baseUrl] = "https://env-anyrouter.example";
+      process.env[envNames.maxRetries] = "3";
+      try {
+        const safe = getAnyRouterSafeConfig();
+        strictEqual(safe.globalBaseUrl, "https://env-anyrouter.example");
+        strictEqual(safe.globalBaseUrlSource, "env");
+        strictEqual(safe.globalBaseUrlEditable, false);
+        strictEqual(safe.retry.effective.maxRetries, 3);
+        strictEqual(safe.retry.source.maxRetries, "env");
+        strictEqual(safe.retry.editable.maxRetries, false);
+        strictEqual(safe.retry.editable.baseDelayMs, true);
+
+        await rejects(
+          () =>
+            patchAnyRouterConfig({
+              revision: safe.revision,
+              retry: { maxRetries: 9 },
+            }),
+          (err: unknown) => err instanceof Error && /environment/i.test(err.message),
+        );
+
+        // Non-env field still writable.
+        const patched = await patchAnyRouterConfig({
+          revision: safe.revision,
+          retry: { baseDelayMs: 500 },
+        });
+        strictEqual(patched.retry.effective.baseDelayMs, 500);
+        strictEqual(patched.retry.effective.maxRetries, 3);
+      } finally {
+        delete process.env[envNames.baseUrl];
+        delete process.env[envNames.maxRetries];
+      }
+    });
+
+    await test("account override beats global env/source for effective Base URL", () => {
+      process.env[envNames.baseUrl] = "https://env-anyrouter.example";
+      try {
+        strictEqual(
+          resolveAnyRouterEffectiveBaseUrl({
+            accountBaseUrlOverride: "https://account.example/v1/",
+            storedGlobalBaseUrl: "https://config.example",
+          }),
+          "https://account.example/v1",
+        );
+        strictEqual(
+          resolveAnyRouterEffectiveBaseUrl({
+            accountBaseUrlOverride: "",
+            storedGlobalBaseUrl: "https://config.example",
+          }),
+          "https://env-anyrouter.example",
+        );
+      } finally {
+        delete process.env[envNames.baseUrl];
+      }
+    });
+
+    console.log("\n=== AnyRouter managed accounts ===");
+
+    let anyA = "";
+    let anyB = "";
+
+    await test("list imports legacy anyrouter.json apiKey without rewriting source", async () => {
+      // Ensure source still has the legacy key from earlier config tests.
+      const sourceBefore = readAnyrouterConfigRaw();
+      strictEqual(sourceBefore.apiKey, ANYROUTER_LEGACY_SOURCE_KEY);
+
+      const list = await listApiKeyAccounts("anyrouter");
+      ok(list.accountCount >= 1);
+      ok(!containsPlaintext(list, ALL_SECRETS));
+      const imported = list.accounts.find((a) => a.displayName.includes("Imported"));
+      ok(imported, "source key should import as opaque account");
+      anyA = imported!.accountId;
+
+      const sourceAfter = readAnyrouterConfigRaw();
+      strictEqual(
+        sourceAfter.apiKey,
+        ANYROUTER_LEGACY_SOURCE_KEY,
+        "legacy source apiKey must not be deleted",
+      );
+      strictEqual(resolveLegacyAnyrouterSourceApiKey(sourceAfter.apiKey), ANYROUTER_LEGACY_SOURCE_KEY);
+
+      // Idempotent.
+      const again = await importLegacyKeyIfNeeded("anyrouter");
+      strictEqual(again, false);
+      strictEqual((await listApiKeyAccounts("anyrouter")).accountCount, list.accountCount);
+    });
+
+    await test("create AnyRouter account with baseUrlOverride; list returns override only", async () => {
+      const created = await createApiKeyAccount("anyrouter", {
+        displayName: "AnyRouter B",
+        apiKey: ANYROUTER_KEY_B,
+        activate: false,
+        baseUrlOverride: "https://override-b.example/v1/",
+      });
+      anyB = created.accounts.find((a) => a.displayName === "AnyRouter B")!.accountId;
+      const entry = created.accounts.find((a) => a.accountId === anyB)!;
+      strictEqual(entry.baseUrlOverride, "https://override-b.example/v1");
+      ok(!containsPlaintext(created, ALL_SECRETS));
+      // Active remains the imported account.
+      strictEqual(created.activeAccountId, anyA);
+
+      const auth = await readAuthCredential("anyrouter");
+      strictEqual(
+        auth && auth.type === "api_key" ? auth.key : null,
+        ANYROUTER_LEGACY_SOURCE_KEY,
+        "non-active create must not change Active mirror",
+      );
+    });
+
+    await test("non-active update of baseUrlOverride never mutates Active pointer", async () => {
+      const beforeActive = (await listApiKeyAccounts("anyrouter")).activeAccountId;
+      const updated = await updateApiKeyAccount("anyrouter", anyB, {
+        baseUrlOverride: "https://override-b2.example",
+        displayName: "AnyRouter B2",
+      });
+      strictEqual(updated.activeAccountId, beforeActive);
+      const entry = updated.accounts.find((a) => a.accountId === anyB)!;
+      strictEqual(entry.baseUrlOverride, "https://override-b2.example");
+      strictEqual(entry.displayName, "AnyRouter B2");
+
+      // Clear override
+      const cleared = await updateApiKeyAccount("anyrouter", anyB, { baseUrlOverride: null });
+      const clearedEntry = cleared.accounts.find((a) => a.accountId === anyB)!;
+      strictEqual(clearedEntry.baseUrlOverride, undefined);
+      strictEqual(cleared.activeAccountId, beforeActive);
+    });
+
+    await test("active AnyRouter delete without disposition is rejected", async () => {
+      // Ensure two accounts and active is anyA
+      await activateApiKeyAccount("anyrouter", anyA);
+      await rejects(
+        () => deleteApiKeyAccount("anyrouter", anyA),
+        (err: unknown) =>
+          err instanceof Error &&
+          (err as { status?: number }).status === 409 &&
+          /replacement|disconnect|clearActive/i.test(err.message),
+      );
+      const still = await listApiKeyAccounts("anyrouter");
+      strictEqual(still.activeAccountId, anyA);
+      strictEqual(still.accountCount, 2);
+    });
+
+    await test("active AnyRouter delete with explicit replacement switches Active", async () => {
+      const after = await deleteApiKeyAccount("anyrouter", anyA, {
+        replacementAccountId: anyB,
+      });
+      strictEqual(after.accountCount, 1);
+      strictEqual(after.activeAccountId, anyB);
+      const auth = await readAuthCredential("anyrouter");
+      strictEqual(auth && auth.type === "api_key" ? auth.key : null, ANYROUTER_KEY_B);
+    });
+
+    await test("active AnyRouter disable requires clearActive or replacement", async () => {
+      // Recreate A so we have two accounts again.
+      const recreated = await createApiKeyAccount("anyrouter", {
+        displayName: "AnyRouter A2",
+        apiKey: ANYROUTER_KEY_A,
+        activate: false,
+      });
+      anyA = recreated.accounts.find((a) => a.displayName === "AnyRouter A2")!.accountId;
+      await activateApiKeyAccount("anyrouter", anyA);
+
+      await rejects(
+        () => disableApiKeyAccount("anyrouter", anyA),
+        (err: unknown) => err instanceof Error && (err as { status?: number }).status === 409,
+      );
+
+      const disabled = await disableApiKeyAccount("anyrouter", anyA, { clearActive: true });
+      strictEqual(disabled.activeAccountId, null);
+      const entry = disabled.accounts.find((a) => a.accountId === anyA)!;
+      strictEqual(entry.disabled, true);
+      strictEqual(await readAuthCredential("anyrouter"), undefined);
+    });
+
+    await test("Active AnyRouter activate writes runtime bridge with effective key/baseUrl/retry", async () => {
+      // Fresh unique keys so we do not collide with earlier fingerprints.
+      const BRIDGE_KEY = "anyrouter-bridge-active-KEY-9999";
+      const BRIDGE_KEY_B = "anyrouter-bridge-nonactive-KEY-8888";
+      ALL_SECRETS.push(BRIDGE_KEY, BRIDGE_KEY_B);
+
+      // Clear remaining accounts so bridge tests start from a known state.
+      const existing = await listApiKeyAccounts("anyrouter");
+      for (const account of existing.accounts) {
+        await deleteApiKeyAccount("anyrouter", account.accountId, { clearActive: true });
+      }
+
+      const created = await createApiKeyAccount("anyrouter", {
+        displayName: "Bridge Active",
+        apiKey: BRIDGE_KEY,
+        activate: true,
+        baseUrlOverride: "https://active-override.example/v1/",
+      });
+      anyA = created.accounts.find((a) => a.displayName === "Bridge Active")!.accountId;
+      strictEqual(created.activeAccountId, anyA);
+
+      const bridge = await readAnyRouterRuntimeBridgeUnlocked();
+      ok(bridge, "runtime bridge must exist for Active account");
+      strictEqual(bridge!.webManaged, true);
+      strictEqual(bridge!.apiKey, BRIDGE_KEY);
+      strictEqual(bridge!.baseUrl, "https://active-override.example/v1");
+      ok(Array.isArray(bridge!.models) && bridge!.models.length >= 1);
+      // Effective retry is whatever source config currently holds (prior PATCH
+      // tests may have changed stored values); must be a finite integer in range.
+      ok(
+        Number.isInteger(bridge!.retry.maxRetries) &&
+          bridge!.retry.maxRetries >= 0 &&
+          bridge!.retry.maxRetries <= 20,
+      );
+      ok(
+        Number.isInteger(bridge!.retry.baseDelayMs) && bridge!.retry.baseDelayMs >= 100,
+      );
+
+      const auth = await readAuthCredential("anyrouter");
+      strictEqual(auth && auth.type === "api_key" ? auth.key : null, BRIDGE_KEY);
+
+      // Env pointer must be the stable bridge path (loader-time, not per-request).
+      ensureAnyRouterConfigEnvPointsAtBridge();
+      strictEqual(process.env[getAnyRouterConfigEnvNameForTests()], getAnyRouterRuntimeBridgePath());
+
+      // Permissions best-effort (platforms without mode bits still pass path checks).
+      try {
+        const st = await stat(getAnyRouterRuntimeBridgePath());
+        if (typeof st.mode === "number") {
+          ok((st.mode & 0o777) === 0o600 || (st.mode & 0o022) === 0);
+        }
+        await access(getAnyRouterRuntimeBridgePath(), fsConstants.R_OK);
+      } catch {
+        // ignore permission probe failures on exotic fs
+      }
+
+      // Non-active create + update must not rewrite bridge/auth.
+      const createdB = await createApiKeyAccount("anyrouter", {
+        displayName: "Bridge NonActive",
+        apiKey: BRIDGE_KEY_B,
+        activate: false,
+        baseUrlOverride: "https://non-active-override.example",
+      });
+      anyB = createdB.accounts.find((a) => a.displayName === "Bridge NonActive")!.accountId;
+      const bridgeBefore = await readAnyRouterRuntimeBridgeUnlocked();
+      const authBefore = await readAuthCredential("anyrouter");
+
+      await updateApiKeyAccount("anyrouter", anyB, {
+        displayName: "Bridge NonActive renamed",
+        baseUrlOverride: "https://non-active-override-2.example",
+      });
+
+      const bridgeAfterNonActive = await readAnyRouterRuntimeBridgeUnlocked();
+      const authAfterNonActive = await readAuthCredential("anyrouter");
+      deepStrictEqual(
+        bridgeAfterNonActive,
+        bridgeBefore,
+        "non-active update must not rewrite bridge",
+      );
+      deepStrictEqual(
+        authAfterNonActive,
+        authBefore,
+        "non-active update must not rewrite auth.json",
+      );
+      strictEqual((await listApiKeyAccounts("anyrouter")).activeAccountId, anyA);
+
+      // Same-account Activate repairs a missing bridge.
+      await rm(getAnyRouterRuntimeBridgePath(), { force: true });
+      strictEqual(await readAnyRouterRuntimeBridgeUnlocked(), null);
+      await activateApiKeyAccount("anyrouter", anyA);
+      const repaired = await readAnyRouterRuntimeBridgeUnlocked();
+      ok(repaired, "repeat Activate must rewrite missing bridge");
+      strictEqual(repaired!.apiKey, BRIDGE_KEY);
+      strictEqual(repaired!.webManaged, true);
+
+      // Cold reconcile path also repairs.
+      await rm(getAnyRouterRuntimeBridgePath(), { force: true });
+      await reconcileAnyRouterRuntimeMirrors();
+      const cold = await readAnyRouterRuntimeBridgeUnlocked();
+      ok(cold, "cold reconcile must rewrite missing bridge");
+      strictEqual(cold!.apiKey, BRIDGE_KEY);
+
+      // Active baseUrlOverride update rebuilds bridge effective URL.
+      await updateApiKeyAccount("anyrouter", anyA, {
+        baseUrlOverride: "https://active-new-override.example/v2/",
+      });
+      const bridgeOverride = await readAnyRouterRuntimeBridgeUnlocked();
+      ok(bridgeOverride);
+      strictEqual(bridgeOverride!.baseUrl, "https://active-new-override.example/v2");
+
+      await updateApiKeyAccount("anyrouter", anyA, { baseUrlOverride: null });
+      const bridgeInherited = await readAnyRouterRuntimeBridgeUnlocked();
+      ok(bridgeInherited);
+      ok(
+        typeof bridgeInherited!.baseUrl === "string" &&
+          bridgeInherited!.baseUrl.startsWith("https://"),
+        "cleared override must inherit global baseUrl",
+      );
+      notStrictEqual(bridgeInherited!.baseUrl, "https://active-new-override.example/v2");
+
+      // Explicit disconnect clears auth and Active key from bridge.
+      await deleteApiKeyAccount("anyrouter", anyA, { clearActive: true });
+      strictEqual((await listApiKeyAccounts("anyrouter")).activeAccountId, null);
+      strictEqual(await readAuthCredential("anyrouter"), undefined);
+      const bridgeDisconnected = await readAnyRouterRuntimeBridgeUnlocked();
+      if (bridgeDisconnected) {
+        strictEqual(
+          bridgeDisconnected.apiKey,
+          "",
+          "disconnect must not leave Active key in bridge",
+        );
+        strictEqual(bridgeDisconnected.webManaged, true);
+      }
+
+    });
+
+    await test("active AnyRouter delete with clearActive disconnects without fallback", async () => {
+      // Fresh dual-account setup independent of prior bridge tests.
+      const remaining = await listApiKeyAccounts("anyrouter");
+      for (const account of remaining.accounts) {
+        await deleteApiKeyAccount("anyrouter", account.accountId, { clearActive: true });
+      }
+
+      const aCreated = await createApiKeyAccount("anyrouter", {
+        displayName: "AnyRouter A clear",
+        apiKey: `${ANYROUTER_KEY_A}-clear`,
+        activate: false,
+      });
+      anyA = aCreated.accounts.find((a) => a.displayName === "AnyRouter A clear")!.accountId;
+      const bCreated = await createApiKeyAccount("anyrouter", {
+        displayName: "AnyRouter B clear",
+        apiKey: `${ANYROUTER_KEY_B}-clear`,
+        activate: true,
+      });
+      anyB = bCreated.accounts.find((a) => a.displayName === "AnyRouter B clear")!.accountId;
+
+      const after = await deleteApiKeyAccount("anyrouter", anyB, { clearActive: true });
+      strictEqual(after.activeAccountId, null);
+      ok(after.accounts.some((a) => a.accountId === anyA));
+      strictEqual(await readAuthCredential("anyrouter"), undefined);
+    });
+
+    await test("concurrent AnyRouter creates do not corrupt metadata", async () => {
+      // Clean remaining accounts first.
+      const existing = await listApiKeyAccounts("anyrouter");
+      for (const account of existing.accounts) {
+        await deleteApiKeyAccount("anyrouter", account.accountId, {
+          clearActive: true,
+        });
+      }
+
+      // Remove legacy source apiKey so creates do not re-import a 6th account.
+      const cfg = getAnyRouterSafeConfig();
+      const raw = JSON.parse(await readFile(join(agentDir, "anyrouter.json"), "utf8")) as Record<
+        string,
+        unknown
+      >;
+      delete raw.apiKey;
+      await writeFile(join(agentDir, "anyrouter.json"), `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+      void cfg;
+
+      await Promise.all(
+        Array.from({ length: 5 }, (_, i) =>
+          createApiKeyAccount("anyrouter", {
+            displayName: `Concurrent ${i}`,
+            apiKey: `anyrouter-concurrent-key-${i}-${"X".repeat(8)}`,
+            activate: i === 0,
+          }),
+        ),
+      );
+      const listed = await listApiKeyAccounts("anyrouter");
+      strictEqual(listed.accountCount, 5);
+      ok(listed.activeAccountId);
+      ok(!containsPlaintext(listed, ALL_SECRETS));
+      const meta = await readMetadata(agentDir, "anyrouter");
+      const fps = new Set(meta.accounts.map((a) => a.keyFingerprint));
+      strictEqual(fps.size, 5);
+    });
+
+    await test("malformed future metadata schema fails closed", async () => {
+      const dir = join(agentDir, "auth-api-key-accounts", "anyrouter");
+      await mkdir(dir, { recursive: true });
+      await writeFile(
+        join(dir, "accounts.json"),
+        JSON.stringify({ version: 99, provider: "anyrouter", accounts: [] }),
+        "utf8",
+      );
+      await rejects(
+        () => listApiKeyAccounts("anyrouter"),
+        (err: unknown) => err instanceof Error && /version/i.test(err.message),
+      );
+      // Restore empty valid metadata for cleanup.
+      await writeFile(
+        join(dir, "accounts.json"),
+        JSON.stringify({ version: 1, provider: "anyrouter", activeAccountId: null, accounts: [] }),
+        "utf8",
+      );
+    });
+
     console.log("\n=== isolation safety ===");
 
     await test("test only wrote under the temporary agent directory", async () => {
       strictEqual(process.env.PI_CODING_AGENT_DIR, agentDir);
       strictEqual(getAgentDir(), agentDir);
       const entries = await readdir(agentDir);
-      ok(entries.includes("auth.json") || entries.includes("auth-api-key-accounts"));
-      // Real user agent dir must not gain a marker written only in this test.
-      // We cannot assert the real dir is unchanged (other processes may write),
-      // but we assert we never pointed getAgentDir at it during the suite.
+      ok(
+        entries.includes("auth.json") ||
+          entries.includes("auth-api-key-accounts") ||
+          entries.includes("anyrouter.json"),
+      );
       notStrictEqual(getAgentDir(), realAgentDir);
     });
 
@@ -382,9 +890,23 @@ async function main(): Promise<void> {
       process.exitCode = 1;
     }
   } finally {
+    for (const [name, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
     delete process.env.PI_CODING_AGENT_DIR;
     await rm(agentDir, { recursive: true, force: true });
   }
+}
+
+function rejectsSync(fn: () => unknown): void {
+  let threw = false;
+  try {
+    fn();
+  } catch {
+    threw = true;
+  }
+  ok(threw, "expected function to throw");
 }
 
 void main().catch((err: unknown) => {

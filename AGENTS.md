@@ -29,6 +29,7 @@ npm run dev     # http://localhost:30141
 | Change UI behavior | `docs/modules/frontend.md` | Relevant file in `components/` or `hooks/` |
 | Change shared logic | `docs/modules/library.md` | Relevant file in `lib/` and all callers |
 | Change Grok/Kiro/Antigravity OAuth, accounts, quota, failover, or top-bar compact/aggregate usage | `docs/integrations/README.md` | `lib/pi-provider-extensions.ts`, `lib/grok-*.ts`, `lib/kiro-*.ts`, `lib/antigravity-*.ts`, `lib/oauth-account-providers.ts`, `app/api/auth/quota/[provider]/route.ts`, `components/*UsagePanel.tsx`, `components/ProviderUsageTrigger.tsx`, `components/ProviderUsageAggregatePanel.tsx` |
+| Change AnyRouter provider, managed API keys, Base URL override, retry config, or runtime bridge | `docs/integrations/README.md` | `lib/pi-provider-extensions.ts`, `lib/anyrouter-config.ts`, `lib/anyrouter-runtime-bridge.ts`, `lib/api-key-accounts.ts`, `app/api/auth/api-key/**`, `components/ModelsConfig.tsx`, `patches/pi-anyrouter+0.3.2.patch`, `scripts/verify-pi-anyrouter-patch.mjs` |
 | Change Links / GitHub OAuth connections | `docs/integrations/README.md` | `lib/links-*.ts`, `lib/github-link-oauth.ts`, `app/api/links/**`, `components/LinksConfig.tsx` |
 | Change session lifecycle, branching, JSONL, or SSE | `docs/architecture/overview.md` | `lib/rpc-manager.ts`, `lib/session-reader.ts`, `hooks/useAgentSession.ts` |
 | Change code/comment/test conventions | `docs/standards/code-style.md` | Existing nearby code |
@@ -43,7 +44,7 @@ npm run dev     # http://localhost:30141
 | `app/api/` | API route handlers for sessions, agent RPC/SSE, files, models, skills, auth, usage, model prices, Git/worktrees, Links, and config. | `docs/modules/api.md` |
 | `components/` | React UI components. | `docs/modules/frontend.md` |
 | `hooks/` | Client hooks for session state, theme, drag/drop, audio. | `docs/modules/frontend.md` |
-| `lib/` | Shared server/client utilities, parsing, lifecycle, config, provider helpers, and Grok/Kiro/Antigravity OAuth/accounts/quota modules. | `docs/modules/library.md` |
+| `lib/` | Shared server/client utilities, parsing, lifecycle, config, provider helpers, Grok/Kiro/Antigravity OAuth/accounts/quota modules, and AnyRouter config/runtime-bridge helpers. | `docs/modules/library.md` |
 | `bin/` | npm-published `ypi` entrypoint. | `docs/deployment/README.md` |
 | `scripts/` | Build and operational helpers. | `docs/deployment/README.md` |
 | `public/` | Static assets. | Inspect files directly. |
@@ -65,6 +66,7 @@ npm run dev     # http://localhost:30141
 | Links / GitHub OAuth Device Flow connections | `app/api/links/**`, `lib/links-*.ts`, `lib/github-link-oauth.ts`, `components/LinksConfig.tsx` | `docs/integrations/README.md`, `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md`, `docs/deployment/README.md`, `docs/operations/troubleshooting.md` |
 | YPI Studio members/workflows/tasks | `components/YpiStudioPanel.tsx`, `app/api/studio/**`, `lib/ypi-studio-*`, `lib/rpc-manager.ts` | `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md` |
 | Models, skills, auth, usage | `app/api/models*`, `app/api/skills/**`, `app/api/auth/**`, `app/api/usage/**` | `docs/modules/api.md`, `docs/integrations/README.md` |
+| AnyRouter fixed provider + managed API keys | `lib/anyrouter-config.ts`, `lib/anyrouter-runtime-bridge.ts`, `lib/api-key-accounts.ts`, `lib/pi-provider-extensions.ts`, `app/api/auth/api-key/**`, `components/ModelsConfig.tsx` | `docs/integrations/README.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md`, `docs/operations/troubleshooting.md` |
 | Global Usage ledger (calls) | `app/api/usage/calls/route.ts`, `lib/llm-usage-query.ts`, `lib/llm-usage-store.ts`, `lib/llm-usage-recorder.ts`, `lib/local-date-range.ts`, `components/UsageProviderModelTable.tsx`, `components/UsageLedgerIcon.tsx` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` |
 | Session top-bar usage rollup | `app/api/usage/route.ts`, `lib/usage-stats.ts`, `hooks/useAgentSession.ts`, `components/SessionStatsChips.tsx` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` |
 | Usage token display & cache-write removal | `lib/token-format.ts`, `lib/llm-usage-normalize.ts`, `lib/llm-usage-types.ts`, `components/UsageProviderModelTable.tsx`, `components/SessionStatsChips.tsx` | `docs/architecture/overview.md`, `docs/modules/library.md`, `docs/modules/frontend.md` |
@@ -130,6 +132,9 @@ node_modules/.bin/tsc --noEmit
 | Model config | `~/.pi/agent/models.json` |
 | Settings/default model | `~/.pi/agent/settings.json` |
 | Web UI settings (Yolk Pi chat defaults, WorkTree, Usage, Web Terminal, ChatGPT panel, Editor) | `~/.pi/agent/pi-web.json` |
+| AnyRouter source config (global Base URL, models, provider-wide retry) | `~/.pi/agent/anyrouter.json` |
+| Managed API-key accounts (OpenCode Go / xAI / AnyRouter) | `~/.pi/agent/auth-api-key-accounts/<provider>/` |
+| AnyRouter Active runtime bridge (0600, derived) | `~/.pi/agent/auth-api-key-accounts/anyrouter/.runtime/provider.json` |
 | Links storage (GitHub OAuth connections) | `~/.pi/agent/links/` |
 
 ## Archive Rules

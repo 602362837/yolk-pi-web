@@ -4,8 +4,8 @@
  * 0.80.8+ replaces AuthStorage + ModelRegistry.create with ModelRuntime and a
  * public CredentialStore. Web keeps Active credentials in auth.json via
  * `createWebCredentialStore` / `getWebCredentialStore`, and always injects the
- * fixed Grok → Kiro → Antigravity extension factories into the *target*
- * ModelRuntime through `createAgentSessionServices`.
+ * fixed Grok → Kiro → Antigravity → AnyRouter extension factories into the
+ * *target* ModelRuntime through `createAgentSessionServices`.
  *
  * ## Isolation
  *
@@ -211,7 +211,7 @@ async function registerFixedProvidersOnRuntime(
 
 /**
  * Canonical Web services helper: always injects fixed providers (Grok → Kiro →
- * Antigravity) plus caller extras into the target ModelRuntime.
+ * Antigravity → AnyRouter) plus caller extras into the target ModelRuntime.
  *
  * Main Chat and Studio child should each call this once per services/session
  * so cwd-local extension providers cannot leak across sessions. Admin paths

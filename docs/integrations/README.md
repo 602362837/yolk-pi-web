@@ -11,7 +11,8 @@ See `package.json` for exact versions.
 | `pi-grok-cli` | SuperGrok / X Premium OAuth provider, model catalog, inference, and request adapter. Integrated as a fixed, full extension; Web adds multi-account storage, global Active live reload, optional auto-failover, and quota management on top. Exact pin `0.5.0`. |
 | `pi-kiro-provider` | AWS Kiro OAuth provider (`kiro`) with Builder ID / Google / GitHub login methods and model catalog. Loaded like Grok via jiti (package ships TypeScript source); Web adds multi-account storage, GetUsageLimits quota, optional Path B auto-failover, and top-bar usage. Exact pin `0.2.2`. |
 | `@yofriadi/pi-antigravity-oauth` | Google Antigravity / Cloud Code Assist OAuth provider (`google-antigravity`) with Gemini/Claude/GPT-OSS catalog and stream adapter. Exact pin `0.3.0`; TypeScript source loaded only via jiti + `serverExternalPackages`. Web adds multi-account opaque store, fixed `fetchAvailableModels` per-model quota, model-aware Path B auto-failover, and Full/Compact/Aggregate top-bar. **Not** an official Google SLA channel. |
-| `jiti` | Runtime TypeScript loader used only for fixed provider packages (`pi-grok-cli`, `pi-kiro-provider`, `@yofriadi/pi-antigravity-oauth`) so Next/Turbopack never statically compiles their source trees. Listed in `next.config.ts` `serverExternalPackages`. Exact pin `2.7.0`. Loader anchors must use `process.cwd()/package.json` (`createRuntimeJiti` in `lib/pi-provider-extensions.ts`), not `import.meta.url`, because production bundles rewrite `import.meta.url` to the build-host absolute path. |
+| `pi-anyrouter` | AnyRouter Claude Code / Codex Responses Lite proxy provider (`anyrouter`). Exact pin `0.3.2`; TypeScript source loaded only via jiti + `serverExternalPackages`. Upstream 0.3.2 does **not** read Web `CredentialStore`; yolk-pi-web applies a version/source-hash-verified minimal compatibility patch (`patches/pi-anyrouter+0.3.2.patch`, postinstall `scripts/apply-pi-anyrouter-patch.mjs`, verify `scripts/verify-pi-anyrouter-patch.mjs`) for Web-managed config, deferred key check, provider-internal retry policy, AbortSignal-aware backoff, and safe final errors while preserving the packed Claude/Codex protocol bodies. Web owns managed multi-key accounts, optional account Base URL override, Active runtime bridge, and Models config UI. **No** auto-failover, quota API, or top-bar usage panel. |
+| `jiti` | Runtime TypeScript loader used only for fixed provider packages (`pi-grok-cli`, `pi-kiro-provider`, `@yofriadi/pi-antigravity-oauth`, `pi-anyrouter`) so Next/Turbopack never statically compiles their source trees. Listed in `next.config.ts` `serverExternalPackages`. Exact pin `2.7.0`. Loader anchors must use `process.cwd()/package.json` (`createRuntimeJiti` in `lib/pi-provider-extensions.ts`), not `import.meta.url`, because production bundles rewrite `import.meta.url` to the build-host absolute path. |
 | `react-markdown`, `remark-gfm`, `remark-math`, `rehype-raw`, `rehype-sanitize`, `rehype-katex`, `katex` | Markdown, raw HTML sanitization, and math rendering. |
 | `react-syntax-highlighter` | Code block highlighting. |
 | `mermaid` | Diagram rendering. |
@@ -40,8 +41,8 @@ Do **not** deep-import coding-agent private `core/auth-storage`, construct `Mode
 | --- | --- |
 | `lib/web-credential-store.ts` | App-owned file-backed `CredentialStore` over `~/.pi/agent/auth.json`. Auth-file-wide in-process queue + cross-process mkdir lock, lock-time reread, malformed-JSON fail-closed, same-dir atomic replace, dir `0700` / file `0600`. `createInMemoryWebCredentialStore()` for OAuth `accountMode=add` (save without replacing Active). |
 | `lib/web-auth-config-value.ts` | API-key config-value resolver used by the store `read()` path (literal, `$ENV`/`${ENV}`, `$$`/`$!`, leading `!command`). `list()` never resolves or returns secrets. |
-| `lib/web-model-runtime.ts` | `createWebModelRuntime` / `getWebModelRuntime` / `createWebAgentSessionServices`. Fixed providers (Grok → Kiro → Antigravity) plus caller extras register onto the **target** `ModelRuntime`. Only fixed-provider administrative runtimes are path-keyed and reused; main Chat / Studio child / temporary `modelsPath` always get isolated runtimes. |
-| `lib/pi-provider-extensions.ts` | jiti factories + `webExtensionFactories(extra)`. `ensureWebProvidersBootstrapped()` is a **legacy OAuth/cold-path preload only** (not a catalog guarantee for another runtime). `createWebProviderAwareModelRegistry()` is removed and throws; use `getWebModelRuntime()` / `createWebAgentSessionServices()`. |
+| `lib/web-model-runtime.ts` | `createWebModelRuntime` / `getWebModelRuntime` / `createWebAgentSessionServices`. Fixed providers (Grok → Kiro → Antigravity → AnyRouter) plus caller extras register onto the **target** `ModelRuntime`. Only fixed-provider administrative runtimes are path-keyed and reused; main Chat / Studio child / temporary `modelsPath` always get isolated runtimes. |
+| `lib/pi-provider-extensions.ts` | jiti factories + `webExtensionFactories(extra)` in fixed order Grok → Kiro → Antigravity → AnyRouter. AnyRouter loader points `PI_ANYROUTER_CC_CONFIG` at the Web-managed Active runtime bridge once, reconciles mirrors on cold load, intercepts `registerProvider("anyrouter")` so a static package apiKey cannot freeze over CredentialStore/bridge state, and isolates load failures. `ensureWebProvidersBootstrapped()` is a **legacy OAuth/cold-path preload only** (not a catalog guarantee for another runtime). `createWebProviderAwareModelRegistry()` is removed and throws; use `getWebModelRuntime()` / `createWebAgentSessionServices()`. |
 | `lib/rpc-manager.ts` `reloadRpcAuthState()` | Async: offline-refresh each live wrapper's `ModelRuntime`, replace same provider/id model descriptors without `setModel()` / `model_change` / settings defaults, then clean provider session resources. All Activate/login/logout/API-key mirror callers must `await` it. |
 
 **OAuth Active lifecycle and mirror:** OAuth/API-key multi-account pools stay under `auth-accounts/**` and `auth-api-key-accounts/**`. OAuth uses four explicit boundaries: `readOAuthActiveAccountId()` reads only managed metadata plus slot existence; `bootstrapOAuthActiveAccountCredential()` initializes legacy `auth.json` state only when no valid managed Active slot exists; `adoptOAuthActiveAccountCredential()` accepts the canonical mirror only after a successful provider-wide login or canonical runtime refresh; and `clearOAuthActiveAccount()` runs runtime logout then clears the pointer within one provider critical section while retaining saved slots. `listOAuthAccounts()` is a metadata-first, zero-write/zero-network projection: it neither reads `auth.json` or credential bodies nor refreshes, prunes, or remotely backfills labels. For Grok, the managed Active slot is authoritative: its coordinated file-backed store commits the slot before the one-way `auth.json` mirror under the shared provider lock. Non-Active refresh must not overwrite Active (provider lock + metadata CAS).
@@ -217,6 +218,90 @@ Web modules:
 3. Provider-layer: remove Antigravity from `webProviderExtensions()` and hide Models/Auth/Settings/topbar/API branches; Grok/Kiro/native keep working. When removing the fourth aggregate column, preserve the first three providers’ contract and Compact preference.
 4. Preserve `auth-accounts/google-antigravity/` and `.quota-cache.json`; do not bulk-delete user credentials.
 5. No Session JSONL / usage-ledger / cacheWrite migration exists for Antigravity, so no data rewrite rollback.
+
+### AnyRouter Provider, Managed API Keys & Runtime Bridge
+
+`pi-anyrouter@0.3.2` is a fixed Web provider (`provider id: anyrouter`) that exposes Claude Code (`/v1/messages?beta=true`) and Codex Responses Lite (`/v1/responses`) adapters from `anyrouter.json.models`. It is **not** an official Anthropic/OpenAI channel.
+
+#### Why a verified package patch is required
+
+Upstream 0.3.2 request closures load `PI_ANYROUTER_CC_*` / a config JSON path and do **not** call Web `CredentialStore`. Writing only `auth.json.anyrouter` therefore cannot drive live requests. Process-global env also cannot safely carry per-account Active key/Base URL under concurrent sessions. yolk-pi-web therefore:
+
+1. Exact-pins `pi-anyrouter@0.3.2` in `package.json` / lock / shrinkwrap and lists it in `serverExternalPackages`.
+2. Ships `patches/pi-anyrouter+0.3.2.patch` applied by `postinstall` → `scripts/apply-pi-anyrouter-patch.mjs`.
+3. Fail-closes on version or source-hash drift via `scripts/verify-pi-anyrouter-patch.mjs` (`npm run verify:pi-anyrouter-patch`). Unknown/unverified sources never run silently.
+
+The patch is intentionally narrow: Web-managed (`webManaged`) config mode, registration without a preconfigured key, configurable retry/backoff fields, AbortSignal-aware delay, and safe final error projection. Claude/Codex protocol conversion bodies stay traceable to the packed 0.3.2 source.
+
+#### Four-layer data model
+
+| Layer | Path / owner | Role |
+| --- | --- | --- |
+| Source config | `~/.pi/agent/anyrouter.json` (`lib/anyrouter-config.ts`) | Global Base URL, models catalog, provider-wide retry. Minimal PATCH preserves `apiKey`, `models`, and unknown top-level fields. |
+| Managed accounts | `~/.pi/agent/auth-api-key-accounts/anyrouter/` (`lib/api-key-accounts.ts`) | Multi-key metadata + per-account secret slots + Active pointer. Optional additive `baseUrlOverride`. Authority for which key is Active. |
+| Pi/Web auth mirror | `auth.json.anyrouter` via raw Web `CredentialStore` | Compatibility mirror for ModelRuntime auth status. Not what 0.3.2 stream adapters read. |
+| Runtime bridge | `auth-api-key-accounts/anyrouter/.runtime/provider.json` (0600) | Active-only snapshot (`webManaged: true`, effective key/baseUrl, models, retry) consumed by the patched package through fixed `PI_ANYROUTER_CC_CONFIG`. Never returned on ordinary API/DOM/SSE/log. |
+
+`pi-web.json` and account metadata **do not** store retry settings. Retry is provider-wide only.
+
+#### Precedence
+
+- **Effective Base URL (request):** account `baseUrlOverride` → `PI_ANYROUTER_CC_BASE_URL` → `anyrouter.json.baseUrl`.
+- **Retry policy:** explicit `PI_ANYROUTER_CC_MAX_RETRIES` / `PI_ANYROUTER_CC_BASE_DELAY_MS` / `PI_ANYROUTER_CC_MAX_DELAY_MS` / `PI_ANYROUTER_CC_JITTER_MS` / `PI_ANYROUTER_CC_RETRY_AFTER_CAP_MS` → `anyrouter.json.retry` → defaults (`maxRetries=10`, `baseDelayMs=1000`, `maxDelayMs=15000`, `jitterMs=250`, `retryAfterCapMs=30000`). Config ranges: `maxRetries 0..20` (0 = one attempt; 10 = up to 11 attempts), base delay 100–10000, max delay 100–60000, jitter 0–5000, Retry-After cap 0–120000, with base ≤ max.
+- **URL validation:** http(s) only, 1–2048 chars, no username/password/query/hash; trailing slash normalized away.
+
+#### Active lifecycle & locks
+
+- Managed slot/pointer is authority. Activate / Active key update / Active Base URL change / config PATCH rebuild the bridge under the AnyRouter provider lock, CAS-mirror `auth.json.anyrouter`, then `await reloadRpcAuthState()` after unlock. Success is returned only after bridge/auth/reload complete.
+- Lock order is **AnyRouter provider → auth.json**. Lock-held code uses the raw WebCredentialStore and must not re-enter the provider lock through decorators.
+- Non-Active create/update/reveal/delete never write the bridge or auth mirror.
+- Same-account Activate and cold provider load reconcile missing/failed derived mirrors.
+- Active delete/disable with remaining accounts requires explicit `replacementAccountId` or `clearActive` disconnect — **never** recent-account fallback (AnyRouter-only policy; xAI/OpenCode Go keep their existing contracts).
+- 429 / transient / network retries stay inside the patched stream adapter on the same Active snapshot; they never rotate accounts, emit account SSE, or touch Path B controllers.
+
+#### Models / API surface
+
+- Fixed recoverable provider card via `GET /api/auth/all-providers` even with 0 keys/models or provider load failure.
+- Managed account CRUD/Activate/Reveal under `app/api/auth/api-key/anyrouter/**` with `Cache-Control: no-store`; list returns masked keys + optional validated `baseUrlOverride` only.
+- Safe config GET/PATCH at `app/api/auth/api-key/anyrouter/config` projects effective/source/editable Base URL and retry fields; rejects client `apiKey`/`models`/`path`/`headers`.
+- Models UI (`components/ModelsConfig.tsx` `ApiKeyAccountsDetail`) shows global endpoint/model status, retry source badges (env fields read-only), no-auto-switch / no-quota copy, account endpoint inheritance/override, and explicit replacement-or-disconnect dialogs. Reveal plaintext is transient and cleared on provider change / Models close / unmount.
+
+#### Security boundaries
+
+- Directories `0700`, metadata/secret/bridge files `0600` where the platform supports mode bits.
+- Keys never enter ordinary account list, config projection, errors, SSE, DOM, logs, task/session JSONL, or usage ledger.
+- Legacy `anyrouter.json.apiKey` may import once on explicit account-list bootstrap as an opaque managed account; the source field is preserved and never auto-deleted.
+- Final provider errors are safe projections (stable code/status/attempts/fixed copy). Raw upstream bodies stay off ordinary wire; any operator debug path must continue redaction.
+
+#### Tests & install checks
+
+```bash
+npm install
+npm run verify:pi-anyrouter-patch
+npm run test:anyrouter-provider
+npm run test:anyrouter-accounts
+npm run test:anyrouter-retry
+npm run test:api-key-accounts
+npm run test:web-credential-store
+```
+
+Focused suites use temporary `PI_CODING_AGENT_DIR` and mocked network; they must not hit real AnyRouter endpoints or the operator `~/.pi/agent` tree.
+
+#### Key invariants
+
+- Never claim `auth.json` alone is consumed by `pi-anyrouter@0.3.2` request adapters; the Active runtime bridge is the request path.
+- Never rewrite process env per request / per account to switch Active.
+- Never add AnyRouter Path B failover, account rotation, session account pin, quota route, or top-bar usage panel.
+- Never put retry settings into `pi-web.json` or per-account metadata.
+- Never statically import `pi-anyrouter` TypeScript into Next app modules; only `createRuntimeJiti` public entry + `serverExternalPackages`.
+- Patch provenance is a release obligation: published installs must include patch + apply/verify scripts and keep the exact 0.3.2 pin.
+
+#### Rollback
+
+1. Remove AnyRouter from `webProviderExtensions()` / fixed registration order and hide Models/API config entry; keep Grok/Kiro/Antigravity and xAI/OpenCode Go contracts unchanged.
+2. Drop `pi-anyrouter` from dependencies / `serverExternalPackages` and disable the postinstall patch hook when fully retiring the provider.
+3. Preserve `anyrouter.json` and `auth-api-key-accounts/anyrouter/` user data; do not delete keys, Session JSONL, or usage ledger as part of rollback.
+4. Derived cleanup only on explicit disconnect or ops action: remove `.runtime/provider.json` and/or `auth.json.anyrouter`. Do not rewrite `anyrouter.json.models` or auto-delete legacy `apiKey`.
 
 ## Links / GitHub OAuth Device Flow Connections
 

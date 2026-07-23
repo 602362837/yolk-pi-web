@@ -105,7 +105,7 @@ test("Grok remains co-loaded with Kiro in fixed provider list", () => {
   assertIncludes(peSource, 'import("pi-grok-cli")', "still loads pi-grok-cli via jiti");
   assertIncludes(
     peSource,
-    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension]",
+    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension, anyrouterProviderExtension]",
     "order is Grok then Kiro then Antigravity",
   );
 });

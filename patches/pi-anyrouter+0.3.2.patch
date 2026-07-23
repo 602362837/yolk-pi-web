@@ -1,0 +1,458 @@
+--- a/node_modules/pi-anyrouter/index.ts
++++ b/node_modules/pi-anyrouter/index.ts
+@@ -37,15 +37,44 @@
+   maxTokens?: number;
+ };
+ 
++type RetryPolicy = {
++  maxRetries: number;
++  baseDelayMs: number;
++  maxDelayMs: number;
++  jitterMs: number;
++  retryAfterCapMs: number;
++};
++
+ type ProviderConfigFile = {
+   baseUrl?: string;
+   apiKey?: string;
+   models?: ProviderModelConfig[];
++  retry?: Partial<RetryPolicy>;
++  /** Web-managed Active runtime bridge snapshot (yolk-pi-web). */
++  webManaged?: boolean;
+ };
+ 
++type LoadedSourceProvider = {
++  baseUrl: string;
++  apiKey: string;
++  models: ProviderModelConfig[];
++  retry: RetryPolicy;
++  webManaged: boolean;
++  configPath: string;
++};
++
++const DEFAULT_RETRY_POLICY: RetryPolicy = {
++  maxRetries: 10,
++  baseDelayMs: 1000,
++  maxDelayMs: 15_000,
++  jitterMs: 250,
++  retryAfterCapMs: 30_000,
++};
++
+ const DEFAULT_CONFIG_PATH = join(homedir(), ".pi", "agent", "anyrouter.json");
+ const CONFIG_PATH = process.env.PI_ANYROUTER_CC_CONFIG || DEFAULT_CONFIG_PATH;
+ const PROVIDER_NAME = "anyrouter";
++// yolk-pi-web compatibility patch: webManaged config, deferred key check, abortable retry
+ // Keep this API id unique so pi uses this extension's streamSimple handler
+ // without touching the built-in anthropic-messages implementation.
+ const API_ID = "anyrouter-messages" as Api;
+@@ -105,7 +134,51 @@
+   return process.env[value] || value;
+ }
+ 
+-function loadSourceProvider() {
++function clampInt(value: unknown, fallback: number, min: number, max: number) {
++  const n = typeof value === "number" ? value : Number(value);
++  if (!Number.isFinite(n)) return fallback;
++  return Math.max(min, Math.min(max, Math.trunc(n)));
++}
++
++function resolveRetryPolicy(parsed: ProviderConfigFile, webManaged: boolean): RetryPolicy {
++  const file = parsed.retry || {};
++  // Web-managed bridge already carries the effective policy snapshot written by
++  // yolk-pi-web. Do not re-layer process env on top of that Active snapshot.
++  if (webManaged) {
++    return {
++      maxRetries: clampInt(file.maxRetries, DEFAULT_RETRY_POLICY.maxRetries, 0, 20),
++      baseDelayMs: clampInt(file.baseDelayMs, DEFAULT_RETRY_POLICY.baseDelayMs, 100, 10_000),
++      maxDelayMs: clampInt(file.maxDelayMs, DEFAULT_RETRY_POLICY.maxDelayMs, 100, 60_000),
++      jitterMs: clampInt(file.jitterMs, DEFAULT_RETRY_POLICY.jitterMs, 0, 5_000),
++      retryAfterCapMs: clampInt(file.retryAfterCapMs, DEFAULT_RETRY_POLICY.retryAfterCapMs, 0, 120_000),
++    };
++  }
++
++  const envMax = process.env.PI_ANYROUTER_CC_MAX_RETRIES;
++  const envBase = process.env.PI_ANYROUTER_CC_BASE_DELAY_MS;
++  const envMaxDelay = process.env.PI_ANYROUTER_CC_MAX_DELAY_MS;
++  const envJitter = process.env.PI_ANYROUTER_CC_JITTER_MS;
++  const envRetryAfterCap = process.env.PI_ANYROUTER_CC_RETRY_AFTER_CAP_MS;
++
++  let maxRetries = clampInt(file.maxRetries, DEFAULT_RETRY_POLICY.maxRetries, 0, 20);
++  let baseDelayMs = clampInt(file.baseDelayMs, DEFAULT_RETRY_POLICY.baseDelayMs, 100, 10_000);
++  let maxDelayMs = clampInt(file.maxDelayMs, DEFAULT_RETRY_POLICY.maxDelayMs, 100, 60_000);
++  let jitterMs = clampInt(file.jitterMs, DEFAULT_RETRY_POLICY.jitterMs, 0, 5_000);
++  let retryAfterCapMs = clampInt(file.retryAfterCapMs, DEFAULT_RETRY_POLICY.retryAfterCapMs, 0, 120_000);
++
++  if (envMax !== undefined && envMax !== "") maxRetries = clampInt(envMax, maxRetries, 0, 20);
++  if (envBase !== undefined && envBase !== "") baseDelayMs = clampInt(envBase, baseDelayMs, 100, 10_000);
++  if (envMaxDelay !== undefined && envMaxDelay !== "") maxDelayMs = clampInt(envMaxDelay, maxDelayMs, 100, 60_000);
++  if (envJitter !== undefined && envJitter !== "") jitterMs = clampInt(envJitter, jitterMs, 0, 5_000);
++  if (envRetryAfterCap !== undefined && envRetryAfterCap !== "") {
++    retryAfterCapMs = clampInt(envRetryAfterCap, retryAfterCapMs, 0, 120_000);
++  }
++  if (baseDelayMs > maxDelayMs) maxDelayMs = baseDelayMs;
++  return { maxRetries, baseDelayMs, maxDelayMs, jitterMs, retryAfterCapMs };
++}
++
++function loadSourceProvider(options: { requireApiKey?: boolean } = {}): LoadedSourceProvider {
++  const requireApiKey = options.requireApiKey !== false;
+   let content = "";
+   try {
+     content = readFileSync(CONFIG_PATH, "utf8");
+@@ -120,15 +193,26 @@
+     throw new Error(`Invalid JSON in ${CONFIG_PATH}: ${error instanceof Error ? error.message : String(error)}`);
+   }
+ 
+-  const baseUrl = process.env.PI_ANYROUTER_CC_BASE_URL || parsed.baseUrl;
+-  const apiKey = process.env.PI_ANYROUTER_CC_API_KEY || resolveConfigValue(parsed.apiKey);
++  const webManaged = parsed.webManaged === true;
++  // Web-managed Active bridge is an already-resolved snapshot: do not re-apply
++  // process-global env over the Active key/baseUrl (per-request env switching
++  // is unsafe under concurrent sessions).
++  const baseUrl = webManaged
++    ? (parsed.baseUrl || "")
++    : (process.env.PI_ANYROUTER_CC_BASE_URL || parsed.baseUrl || "");
++  const apiKey = webManaged
++    ? resolveConfigValue(parsed.apiKey)
++    : (process.env.PI_ANYROUTER_CC_API_KEY || resolveConfigValue(parsed.apiKey));
+   const models = parsed.models || [];
++  const retry = resolveRetryPolicy(parsed, webManaged);
+ 
+   if (!baseUrl) throw new Error(`Missing baseUrl in ${CONFIG_PATH}. You can also set PI_ANYROUTER_CC_BASE_URL.`);
+-  if (!apiKey) throw new Error(`Missing apiKey in ${CONFIG_PATH}. You can also set PI_ANYROUTER_CC_API_KEY.`);
++  if (requireApiKey && !apiKey) {
++    throw new Error(`Missing apiKey in ${CONFIG_PATH}. You can also set PI_ANYROUTER_CC_API_KEY.`);
++  }
+   if (!models.length) throw new Error(`No models configured in ${CONFIG_PATH}. Add at least one model entry.`);
+ 
+-  return { baseUrl, apiKey, models };
++  return { baseUrl, apiKey: apiKey || "", models, retry, webManaged, configPath: CONFIG_PATH };
+ }
+ 
+ function convertContentBlocks(content: (TextContent | ImageContent)[]) {
+@@ -330,10 +414,28 @@
+   writeFileSync(path, JSON.stringify(payload, null, 2), "utf8");
+ }
+ 
+-function delay(ms: number) {
+-  return new Promise((resolve) => setTimeout(resolve, ms));
++function createAbortError() {
++  const err = new Error("Request was aborted");
++  err.name = "AbortError";
++  return err;
+ }
+ 
++function delay(ms: number, signal?: AbortSignal) {
++  if (signal?.aborted) return Promise.reject(createAbortError());
++  return new Promise<void>((resolve, reject) => {
++    const timer = setTimeout(() => {
++      if (signal) signal.removeEventListener("abort", onAbort);
++      resolve();
++    }, Math.max(0, ms));
++    const onAbort = () => {
++      clearTimeout(timer);
++      if (signal) signal.removeEventListener("abort", onAbort);
++      reject(createAbortError());
++    };
++    if (signal) signal.addEventListener("abort", onAbort, { once: true });
++  });
++}
++
+ function isRetryableStatus(status: number) {
+   return [408, 409, 429, 500, 502, 503, 504, 520, 522, 524].includes(status);
+ }
+@@ -350,11 +452,42 @@
+   return undefined;
+ }
+ 
+-function getRetryDelayMs(attempt: number, retryAfterMs?: number) {
+-  if (typeof retryAfterMs === "number") return Math.max(0, Math.min(retryAfterMs, 30_000));
+-  const base = Math.min(1000 * (2 ** attempt), 15_000);
+-  const jitter = Math.floor(Math.random() * 250);
++function getRetryDelayMs(attempt: number, policy: RetryPolicy, retryAfterMs?: number) {
++  if (typeof retryAfterMs === "number") {
++    return Math.max(0, Math.min(retryAfterMs, policy.retryAfterCapMs));
++  }
++  const base = Math.min(policy.baseDelayMs * (2 ** attempt), policy.maxDelayMs);
++  const jitter = policy.jitterMs > 0 ? Math.floor(Math.random() * policy.jitterMs) : 0;
+   return base + jitter;
++}
++
++function isAbortLikeError(error: unknown) {
++  if (!error || typeof error !== "object") return false;
++  const name = (error as { name?: string }).name;
++  const message = String((error as { message?: string }).message || "");
++  return name === "AbortError" || /aborted|AbortError/i.test(message);
++}
++
++function toSafeAnyRouterError(options: {
++  status?: number;
++  attempts: number;
++  kind: string;
++  aborted?: boolean;
++}) {
++  if (options.aborted) return createAbortError();
++  const statusPart = typeof options.status === "number" ? `, status=${options.status}` : "";
++  // Never embed raw upstream bodies, Authorization headers, keys, or paths.
++  return new Error(`AnyRouter request failed (${options.kind}${statusPart}, attempts=${options.attempts})`);
++}
++
++function isRetryableNetworkError(error: unknown) {
++  if (isAbortLikeError(error)) return false;
++  if (!error || typeof error !== "object") return true;
++  const name = String((error as { name?: string }).name || "");
++  const message = String((error as { message?: string }).message || "");
++  if (/abort/i.test(name) || /abort/i.test(message)) return false;
++  // Transient network class: DNS/connect/reset/timeouts.
++  return true;
+ }
+ 
+ function getStreamMode(): StreamMode {
+@@ -647,10 +780,11 @@
+   }
+ }
+ 
+-async function tryStreamAnyRouterCodex(url: string, body: Json, apiKey: string, model: Model<Api>, output: AssistantMessage, stream: AssistantMessageEventStream, sessionId: string, metadata: ReturnType<typeof createCodexMetadata>, signal?: AbortSignal) {
++async function tryStreamAnyRouterCodex(url: string, body: Json, apiKey: string, model: Model<Api>, output: AssistantMessage, stream: AssistantMessageEventStream, sessionId: string, metadata: ReturnType<typeof createCodexMetadata>, signal?: AbortSignal, retry: RetryPolicy = DEFAULT_RETRY_POLICY) {
+   const bodyText = JSON.stringify(body);
+-  const maxRetries = Math.max(0, Number(process.env.PI_ANYROUTER_CC_MAX_RETRIES || "10") || 0);
++  const maxRetries = retry.maxRetries;
+   let response: Response | undefined;
++  let lastStatus: number | undefined;
+ 
+   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+     const headers = createCodexHeaders(apiKey, sessionId, metadata);
+@@ -658,24 +792,26 @@
+     try {
+       response = await fetchWithProxy(url, { method: "POST", signal, headers, body: bodyText });
+     } catch (error) {
+-      if (attempt < maxRetries && !signal?.aborted) {
+-        await delay(getRetryDelayMs(attempt));
++      if (isAbortLikeError(error) || signal?.aborted) throw createAbortError();
++      if (attempt < maxRetries && isRetryableNetworkError(error)) {
++        await delay(getRetryDelayMs(attempt, retry), signal);
+         continue;
+       }
+-      throw error;
++      throw toSafeAnyRouterError({ attempts: attempt + 1, kind: "codex-network" });
+     }
+ 
+     if (response.ok && (response.headers.get("content-type") || "").includes("text/event-stream")) break;
+     const raw = await response.text();
+     const parsed = tryParseJson(raw) || { raw };
+     const requestId = extractRequestId(parsed, response.headers);
++    lastStatus = response.status;
+     writeDebugFile("error", model.id, requestId, { status: response.status, requestId, body: parsed, raw, transport: "codex-sse", retryAttempt: attempt });
+     if (!response.ok && attempt < maxRetries && isRetryableStatus(response.status)) {
+-      await delay(getRetryDelayMs(attempt, parseRetryAfterMs(response.headers.get("retry-after"))));
++      await delay(getRetryDelayMs(attempt, retry, parseRetryAfterMs(response.headers.get("retry-after"))), signal);
+       response = undefined;
+       continue;
+     }
+-    throw new Error(raw || `HTTP ${response.status}`);
++    throw toSafeAnyRouterError({ status: response.status, attempts: attempt + 1, kind: "codex-http" });
+   }
+ 
+   if (!response?.body) throw new Error("Codex stream response body missing");
+@@ -895,10 +1031,10 @@
+   }
+ }
+ 
+-async function tryStreamAnyRouterCc(url: string, body: Json, apiKey: string, model: Model<Api>, output: AssistantMessage, stream: AssistantMessageEventStream, sessionId: string, signal?: AbortSignal) {
++async function tryStreamAnyRouterCc(url: string, body: Json, apiKey: string, model: Model<Api>, output: AssistantMessage, stream: AssistantMessageEventStream, sessionId: string, signal?: AbortSignal, retry: RetryPolicy = DEFAULT_RETRY_POLICY) {
+   const requestBody = { ...body, stream: true };
+   const bodyText = JSON.stringify(requestBody);
+-  const maxRetries = Math.max(0, Number(process.env.PI_ANYROUTER_CC_MAX_RETRIES || "10") || 0);
++  const maxRetries = retry.maxRetries;
+   let response: Response | undefined;
+ 
+   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+@@ -921,11 +1057,12 @@
+         body: bodyText,
+       });
+     } catch (error) {
+-      if (attempt < maxRetries && !signal?.aborted) {
+-        await delay(getRetryDelayMs(attempt));
++      if (isAbortLikeError(error) || signal?.aborted) throw createAbortError();
++      if (attempt < maxRetries && isRetryableNetworkError(error)) {
++        await delay(getRetryDelayMs(attempt, retry), signal);
+         continue;
+       }
+-      throw error;
++      throw toSafeAnyRouterError({ attempts: attempt + 1, kind: "claude-network" });
+     }
+ 
+     const contentType = response.headers.get("content-type") || "";
+@@ -954,12 +1091,12 @@
+       stream.push({ type: "text_start", contentIndex: retryBlockIndex, partial: output });
+       stream.push({ type: "text_delta", contentIndex: retryBlockIndex, delta: retryText, partial: output });
+       stream.push({ type: "text_end", contentIndex: retryBlockIndex, content: retryText, partial: output });
+-      await delay(getRetryDelayMs(attempt, parseRetryAfterMs(response.headers.get("retry-after"))));
++      await delay(getRetryDelayMs(attempt, retry, parseRetryAfterMs(response.headers.get("retry-after"))), signal);
+       response = undefined;
+       continue;
+     }
+-    if (response.ok) throw new Error(`stream response was not SSE (content-type=${contentType || "<missing>"})`);
+-    throw new Error(raw || `HTTP ${response.status}`);
++    if (response.ok) throw toSafeAnyRouterError({ attempts: attempt + 1, kind: "claude-non-sse" });
++    throw toSafeAnyRouterError({ status: response.status, attempts: attempt + 1, kind: "claude-http" });
+   }
+ 
+   if (!response?.body) throw new Error("stream response body missing");
+@@ -1012,10 +1149,10 @@
+   });
+ }
+ 
+-async function postJson(url: string, body: Json, apiKey: string, modelId: string, sessionId: string, signal?: AbortSignal) {
+-  const maxRetries = Math.max(0, Number(process.env.PI_ANYROUTER_CC_MAX_RETRIES || "10") || 0);
++async function postJson(url: string, body: Json, apiKey: string, modelId: string, sessionId: string, signal?: AbortSignal, retry: RetryPolicy = DEFAULT_RETRY_POLICY) {
++  const maxRetries = retry.maxRetries;
+   const bodyText = JSON.stringify(body);
+-  let lastErrorText = "";
++  let lastStatus: number | undefined;
+ 
+   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+     const headers = getClaudeCodeHeaders(apiKey, attempt, sessionId);
+@@ -1036,15 +1173,15 @@
+         body: bodyText,
+       });
+     } catch (error) {
+-      if (attempt < maxRetries) {
+-        await delay(getRetryDelayMs(attempt));
++      if (isAbortLikeError(error) || signal?.aborted) throw createAbortError();
++      if (attempt < maxRetries && isRetryableNetworkError(error)) {
++        await delay(getRetryDelayMs(attempt, retry), signal);
+         continue;
+       }
+-      throw error;
++      throw toSafeAnyRouterError({ attempts: attempt + 1, kind: "claude-json-network" });
+     }
+ 
+     const text = await response.text();
+-    lastErrorText = text;
+     let parsed: any = {};
+     try {
+       parsed = text ? JSON.parse(text) : {};
+@@ -1054,6 +1191,7 @@
+     const requestId = parsed?.error?.message?.match(/request id:\s*([^\)]+)/i)?.[1]
+       || response.headers.get("x-oneapi-request-id")
+       || undefined;
++    lastStatus = response.status;
+ 
+     writeDebugFile(response.ok ? "response" : "error", modelId, requestId, {
+       status: response.status,
+@@ -1068,13 +1206,13 @@
+ 
+     if (response.ok) return parsed;
+     if (attempt < maxRetries && isRetryableStatus(response.status)) {
+-      await delay(getRetryDelayMs(attempt, parseRetryAfterMs(response.headers.get("retry-after"))));
++      await delay(getRetryDelayMs(attempt, retry, parseRetryAfterMs(response.headers.get("retry-after"))), signal);
+       continue;
+     }
+-    throw new Error(text || `HTTP ${response.status}`);
++    throw toSafeAnyRouterError({ status: response.status, attempts: attempt + 1, kind: "claude-json-http" });
+   }
+ 
+-  throw new Error(lastErrorText || "HTTP request failed after retries");
++  throw toSafeAnyRouterError({ status: lastStatus, attempts: maxRetries + 1, kind: "claude-json-exhausted" });
+ }
+ 
+ function streamAnyRouterCc(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream {
+@@ -1092,7 +1230,10 @@
+     };
+ 
+     try {
+-      const source = loadSourceProvider();
++      const source = loadSourceProvider({ requireApiKey: true });
++      if (!source.apiKey) {
++        throw toSafeAnyRouterError({ attempts: 0, kind: "missing-api-key" });
++      }
+       const sessionId = randomUUID();
+ 
+       const configuredModel = source.models.find((item) => item.id === model.id);
+@@ -1111,8 +1252,9 @@
+           sessionId,
+           metadata,
+           options?.signal,
++          source.retry,
+         );
+-        if (options?.signal?.aborted) throw new Error("Request was aborted");
++        if (options?.signal?.aborted) throw createAbortError();
+         stream.push({ type: "done", reason: output.stopReason as "stop" | "length" | "toolUse", message: output });
+         stream.end();
+         return;
+@@ -1141,8 +1283,8 @@
+       const streamMode = getStreamMode();
+       if (streamMode !== "off") {
+         try {
+-          await tryStreamAnyRouterCc(url, requestBody, source.apiKey, model, output, stream, sessionId, options?.signal);
+-          if (options?.signal?.aborted) throw new Error("Request was aborted");
++          await tryStreamAnyRouterCc(url, requestBody, source.apiKey, model, output, stream, sessionId, options?.signal, source.retry);
++          if (options?.signal?.aborted) throw createAbortError();
+           stream.push({ type: "done", reason: output.stopReason as "stop" | "length" | "toolUse", message: output });
+           stream.end();
+           return;
+@@ -1151,7 +1293,13 @@
+             // All retries exhausted. Push a text block with the error so pi
+             // shows it, then end with done/stop to prevent pi from auto-retrying
+             // the entire provider stream.
+-            const errText = `[anyrouter] ${streamError instanceof Error ? streamError.message : String(streamError)}`;
++            // Project a safe fixed message — never surface raw upstream bodies.
++            const safe = isAbortLikeError(streamError) || options?.signal?.aborted
++              ? createAbortError()
++              : (streamError instanceof Error && streamError.message.startsWith("AnyRouter request failed")
++                ? streamError
++                : toSafeAnyRouterError({ attempts: source.retry.maxRetries + 1, kind: "claude-stream" }));
++            const errText = `[anyrouter] ${safe.message}`;
+             const contentIndex = output.content.length;
+             output.content.push({ type: "text", text: errText } as any);
+             output.stopReason = "stop";
+@@ -1171,13 +1319,19 @@
+         }
+       }
+ 
+-      const response = await postJson(url, requestBody, source.apiKey, model.id, sessionId, options?.signal);
++      const response = await postJson(url, requestBody, source.apiKey, model.id, sessionId, options?.signal, source.retry);
+       applyJsonResponseToOutput(response, output, stream, model);
+       stream.push({ type: "done", reason: output.stopReason as "stop" | "length" | "toolUse", message: output });
+       stream.end();
+     } catch (error) {
+-      output.stopReason = options?.signal?.aborted ? "aborted" : "error";
+-      output.errorMessage = error instanceof Error ? `[anyrouter] ${error.message}` : String(error);
++      const aborted = options?.signal?.aborted || isAbortLikeError(error);
++      output.stopReason = aborted ? "aborted" : "error";
++      const safeMessage = aborted
++        ? "Request was aborted"
++        : (error instanceof Error && error.message.startsWith("AnyRouter request failed")
++          ? error.message
++          : toSafeAnyRouterError({ attempts: 1, kind: aborted ? "aborted" : "stream" }).message);
++      output.errorMessage = `[anyrouter] ${safeMessage}`;
+       writeDebugFile("error", model.id, undefined, {
+         stopReason: output.stopReason,
+         errorMessage: output.errorMessage,
+@@ -1191,10 +1345,14 @@
+ 
+ export default function (pi: ExtensionAPI) {
+   try {
+-    const source = loadSourceProvider();
++    // Delay apiKey validation so Web-managed installs can register the catalog
++    // before an Active key exists. Requests still fail closed without a key.
++    const source = loadSourceProvider({ requireApiKey: false });
+     pi.registerProvider(PROVIDER_NAME, {
+       baseUrl: source.baseUrl,
+-      apiKey: source.apiKey,
++      // Prefer CredentialStore / runtime bridge over a frozen register-time key.
++      // Empty string keeps registration valid when no Active key is configured.
++      apiKey: source.apiKey || "",
+       api: API_ID,
+       models: source.models.map((model) => ({
+         id: model.id,
+@@ -1214,8 +1372,8 @@
+       streamSimple: streamAnyRouterCc,
+     });
+   } catch (error) {
++    // Safe diagnostics only — never log config contents (may contain keys).
+     console.error(`[anyrouter] Failed to register provider: ${error instanceof Error ? error.message : String(error)}`);
+-    console.error(`[anyrouter] Config path: ${CONFIG_PATH}`);
+     console.error(`[anyrouter] You can override with PI_ANYROUTER_CC_CONFIG, PI_ANYROUTER_CC_BASE_URL, PI_ANYROUTER_CC_API_KEY`);
+   }
+ }

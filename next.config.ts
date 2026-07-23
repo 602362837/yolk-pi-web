@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
     "pi-grok-cli",
     "pi-kiro-provider",
     "@yofriadi/pi-antigravity-oauth",
+    "pi-anyrouter",
     "@earendil-works/pi-coding-agent",
     "@earendil-works/pi-ai",
     "@earendil-works/pi-agent-core",

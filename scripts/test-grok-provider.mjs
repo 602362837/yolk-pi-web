@@ -109,7 +109,7 @@ test("exports webExtensionFactories() helper without session pin", () => {
   assertIncludes(peSource, "export function webProviderExtensions", "exports webProviderExtensions");
   assertIncludes(
     peSource,
-    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension]",
+    "return [grokCliExtension, kiroProviderExtension, antigravityProviderExtension, anyrouterProviderExtension]",
     "fixed list is Grok then Kiro then Antigravity",
   );
   assertNotIncludes(peSource, "[grokCliExtension, grokSessionAccountExtension", "session pin not wired");
