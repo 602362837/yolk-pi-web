@@ -3393,6 +3393,8 @@ interface ApiKeyAccountEntry {
   updatedAt: string;
   lastActivatedAt: string | null;
   importedFromLegacyAt: string | null;
+  /** AnyRouter optional account-level Base URL override (never a secret). */
+  baseUrlOverride?: string;
 }
 
 interface ApiKeyAccountsResponse {
@@ -3408,6 +3410,76 @@ interface ApiKeyRevealResponse {
   apiKey: string;
 }
 
+type AnyRouterConfigFieldSource = "env" | "config" | "default";
+
+interface AnyRouterRetryPolicyView {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+  jitterMs: number;
+  retryAfterCapMs: number;
+}
+
+interface AnyRouterSafeConfigResponse {
+  provider: "anyrouter";
+  revision: string;
+  globalBaseUrl: string | null;
+  globalBaseUrlSource: AnyRouterConfigFieldSource;
+  globalBaseUrlEditable: boolean;
+  modelsConfigured: boolean;
+  modelCount: number;
+  retry: {
+    effective: AnyRouterRetryPolicyView;
+    source: Record<keyof AnyRouterRetryPolicyView, AnyRouterConfigFieldSource>;
+    editable: Record<keyof AnyRouterRetryPolicyView, boolean>;
+  };
+}
+
+/** Managed-account providers that require explicit Active replacement/disconnect. */
+const EXPLICIT_ACTIVE_DISPOSITION_PROVIDERS = new Set(["anyrouter"]);
+
+const ANYROUTER_RETRY_FIELD_META: Array<{
+  key: keyof AnyRouterRetryPolicyView;
+  label: string;
+  min: number;
+  max: number;
+}> = [
+  { key: "maxRetries", label: "最大重试次数 (maxRetries)", min: 0, max: 20 },
+  { key: "baseDelayMs", label: "退避 Base Delay (ms)", min: 100, max: 10000 },
+  { key: "maxDelayMs", label: "退避 Max Delay (ms)", min: 100, max: 60000 },
+  { key: "jitterMs", label: "Jitter (ms)", min: 0, max: 5000 },
+  { key: "retryAfterCapMs", label: "Retry-After 上限 (ms)", min: 0, max: 120000 },
+];
+
+function anyRouterSourceBadgeLabel(source: AnyRouterConfigFieldSource): string {
+  if (source === "env") return "ENV";
+  if (source === "config") return "anyrouter.json";
+  return "默认";
+}
+
+/** Client-side Base URL check aligned with design (no userinfo/query/hash). */
+function validateClientBaseUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return "Base URL 不能为空";
+  if (trimmed.length > 2048) return "Base URL 最多 2048 字符";
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return "请输入合法的绝对 URL";
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return "仅支持 http 或 https";
+  }
+  if (url.username || url.password) {
+    return "不允许包含用户名或密码";
+  }
+  if (url.search || url.hash) {
+    return "不允许包含查询参数或 hash";
+  }
+  return null;
+}
+
 // ── API Key managed accounts detail ───────────────────────────────────────────
 
 function formatAccountTime(iso: string | null): string {
@@ -3418,6 +3490,10 @@ function formatAccountTime(iso: string | null): string {
 
 function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvider; onRefresh: () => void }) {
   const { toast } = usePrompt();
+  const requiresExplicitActiveDisposition = EXPLICIT_ACTIVE_DISPOSITION_PROVIDERS.has(provider.id);
+  const supportsBaseUrlOverride = provider.id === "anyrouter";
+  const supportsProviderConfig = provider.id === "anyrouter";
+
   const [accounts, setAccounts] = useState<ApiKeyAccountEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3435,6 +3511,9 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
   const [addDescription, setAddDescription] = useState("");
   const [addApiKey, setAddApiKey] = useState("");
   const [addActivate, setAddActivate] = useState(true);
+  const [addUseBaseUrlOverride, setAddUseBaseUrlOverride] = useState(false);
+  const [addBaseUrlOverride, setAddBaseUrlOverride] = useState("");
+  const [addBaseUrlError, setAddBaseUrlError] = useState<string | null>(null);
   const [addSaving, setAddSaving] = useState(false);
 
   // Edit dialog
@@ -3442,12 +3521,17 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editApiKey, setEditApiKey] = useState("");
+  const [editUseBaseUrlOverride, setEditUseBaseUrlOverride] = useState(false);
+  const [editBaseUrlOverride, setEditBaseUrlOverride] = useState("");
+  const [editBaseUrlError, setEditBaseUrlError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  // Delete confirmation
+  // Delete confirmation (explicit disposition for AnyRouter Active)
   const [deleteConfirm, setDeleteConfirm] = useState<ApiKeyAccountEntry | null>(null);
   const [deleteDeleting, setDeleteDeleting] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<"replace" | "disconnect">("disconnect");
+  const [deleteReplacementId, setDeleteReplacementId] = useState<string | null>(null);
 
   // Enable/disable states
   const [disablingId, setDisablingId] = useState<string | null>(null);
@@ -3456,9 +3540,19 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
   // Disable confirmation
   const [disableConfirm, setDisableConfirm] = useState<ApiKeyAccountEntry | null>(null);
   const [disableSaving, setDisableSaving] = useState(false);
+  const [disableMode, setDisableMode] = useState<"replace" | "disconnect">("disconnect");
   const [disableReplacementId, setDisableReplacementId] = useState<string | null>(null);
 
-  // Reset all state when provider changes
+  // AnyRouter provider-wide config
+  const [providerConfig, setProviderConfig] = useState<AnyRouterSafeConfigResponse | null>(null);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [configBaseUrl, setConfigBaseUrl] = useState("");
+  const [configRetry, setConfigRetry] = useState<AnyRouterRetryPolicyView | null>(null);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configFieldError, setConfigFieldError] = useState<string | null>(null);
+
+  // Reset all state when provider changes; clear revealed keys immediately.
   useEffect(() => {
     setAccounts([]);
     setLoading(false);
@@ -3472,28 +3566,79 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     setEnablingId(null);
     setDisableConfirm(null);
     setDisableSaving(false);
+    setDisableMode("disconnect");
     setDisableReplacementId(null);
     setAddOpen(false);
     setAddDisplayName("");
     setAddDescription("");
     setAddApiKey("");
     setAddActivate(true);
+    setAddUseBaseUrlOverride(false);
+    setAddBaseUrlOverride("");
+    setAddBaseUrlError(null);
     setAddSaving(false);
     setEditAccount(null);
     setEditDisplayName("");
     setEditDescription("");
     setEditApiKey("");
+    setEditUseBaseUrlOverride(false);
+    setEditBaseUrlOverride("");
+    setEditBaseUrlError(null);
     setEditSaving(false);
     setEditError(null);
     setDeleteConfirm(null);
     setDeleteDeleting(false);
+    setDeleteMode("disconnect");
+    setDeleteReplacementId(null);
+    setProviderConfig(null);
+    setConfigLoading(false);
+    setConfigError(null);
+    setConfigBaseUrl("");
+    setConfigRetry(null);
+    setConfigSaving(false);
+    setConfigFieldError(null);
   }, [provider.id]);
+
+  // Clear revealed keys on unmount (Models close / navigate away).
+  useEffect(() => {
+    return () => {
+      setRevealedKeys(new Map());
+    };
+  }, []);
+
+  const applyConfigProjection = useCallback((data: AnyRouterSafeConfigResponse) => {
+    setProviderConfig(data);
+    setConfigBaseUrl(data.globalBaseUrl ?? "");
+    setConfigRetry({ ...data.retry.effective });
+    setConfigFieldError(null);
+  }, []);
+
+  const loadProviderConfig = useCallback(async () => {
+    if (!supportsProviderConfig) return;
+    setConfigLoading(true);
+    setConfigError(null);
+    try {
+      const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}/config`, {
+        cache: "no-store",
+      });
+      const data = await res.json() as AnyRouterSafeConfigResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      applyConfigProjection(data);
+    } catch (e) {
+      setConfigError(e instanceof Error ? e.message : "加载全局配置失败");
+      setProviderConfig(null);
+    } finally {
+      setConfigLoading(false);
+    }
+  }, [provider.id, supportsProviderConfig, applyConfigProjection]);
 
   const loadAccounts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts`);
+      const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts`, {
+        cache: "no-store",
+      });
       const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
@@ -3508,6 +3653,10 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     void loadAccounts();
   }, [loadAccounts]);
 
+  useEffect(() => {
+    void loadProviderConfig();
+  }, [loadProviderConfig]);
+
   const showToast = useCallback((message: string, tone: "success" | "error" = "success") => {
     toast({ message, tone });
   }, [toast]);
@@ -3515,7 +3664,6 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
   // Reveal
   const handleReveal = useCallback(async (accountId: string) => {
     if (revealedKeys.has(accountId)) {
-      // Hide
       const next = new Map(revealedKeys);
       next.delete(accountId);
       setRevealedKeys(next);
@@ -3525,7 +3673,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     try {
       const res = await fetch(
         `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(accountId)}/reveal`,
-        { method: "POST" },
+        { method: "POST", cache: "no-store" },
       );
       const data = await res.json() as ApiKeyRevealResponse & { error?: string };
       if (!res.ok || !data.apiKey) throw new Error(data.error ?? "显示失败");
@@ -3543,12 +3691,11 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
   const handleCopy = useCallback(async (accountId: string) => {
     let key = revealedKeys.get(accountId);
     if (!key) {
-      // Reveal first then copy
       setRevealingId(accountId);
       try {
         const res = await fetch(
           `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(accountId)}/reveal`,
-          { method: "POST" },
+          { method: "POST", cache: "no-store" },
         );
         const data = await res.json() as ApiKeyRevealResponse & { error?: string };
         if (!res.ok || !data.apiKey) throw new Error(data.error ?? "显示失败");
@@ -3574,7 +3721,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     }
   }, [provider.id, revealedKeys, showToast]);
 
-  // Activate
+  // Activate → "设为 Active"
   const handleActivate = useCallback(async (accountId: string) => {
     setActivatingId(accountId);
     setError(null);
@@ -3586,16 +3733,16 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
-      showToast("账号已启用");
+      showToast(requiresExplicitActiveDisposition ? "已设为 Active" : "账号已启用");
       onRefresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "启用账号失败");
+      setError(e instanceof Error ? e.message : (requiresExplicitActiveDisposition ? "设为 Active 失败" : "启用账号失败"));
     } finally {
       setActivatingId(null);
     }
-  }, [provider.id, onRefresh, showToast]);
+  }, [provider.id, onRefresh, showToast, requiresExplicitActiveDisposition]);
 
-  // Enable
+  // Enable (re-enable disabled account)
   const handleEnable = useCallback(async (accountId: string) => {
     setEnablingId(accountId);
     setError(null);
@@ -3620,22 +3767,48 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     }
   }, [provider.id, onRefresh, showToast]);
 
-  // Open disable confirmation
   const openDisableConfirm = useCallback((account: ApiKeyAccountEntry) => {
     setDisableConfirm(account);
-    setDisableReplacementId(null);
     setDisableSaving(false);
-  }, []);
+    const candidates = accounts.filter((a) => a.accountId !== account.accountId && !a.disabled);
+    if (account.active && requiresExplicitActiveDisposition) {
+      if (candidates.length > 0) {
+        setDisableMode("replace");
+        setDisableReplacementId(candidates[0].accountId);
+      } else {
+        setDisableMode("disconnect");
+        setDisableReplacementId(null);
+      }
+    } else {
+      setDisableMode("disconnect");
+      setDisableReplacementId(null);
+    }
+  }, [accounts, requiresExplicitActiveDisposition]);
 
-  // Confirm disable
   const handleDisableConfirm = useCallback(async () => {
     if (!disableConfirm) return;
+    if (
+      disableConfirm.active &&
+      requiresExplicitActiveDisposition &&
+      disableMode === "replace" &&
+      !disableReplacementId
+    ) {
+      setError("请选择要切换到的 Active 账号");
+      return;
+    }
     setDisableSaving(true);
+    setDisablingId(disableConfirm.accountId);
     setError(null);
     try {
       const body: Record<string, unknown> = { action: "disable", disabledBy: "user" };
       if (disableConfirm.active) {
-        if (disableReplacementId) {
+        if (requiresExplicitActiveDisposition) {
+          if (disableMode === "replace" && disableReplacementId) {
+            body.replacementAccountId = disableReplacementId;
+          } else {
+            body.clearActive = true;
+          }
+        } else if (disableReplacementId) {
           body.replacementAccountId = disableReplacementId;
         } else {
           body.clearActive = true;
@@ -3653,32 +3826,56 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
       setDisableConfirm(null);
-      showToast(disableConfirm.active ? "账号已禁用，并已更新当前密钥" : "账号已禁用");
+      if (disableConfirm.active && requiresExplicitActiveDisposition) {
+        showToast(disableMode === "replace" ? "账号已禁用，Active 已切换" : "账号已禁用，AnyRouter 已断开 Active");
+      } else {
+        showToast(disableConfirm.active ? "账号已禁用，并已更新当前密钥" : "账号已禁用");
+      }
       onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "禁用账号失败");
     } finally {
       setDisableSaving(false);
+      setDisablingId(null);
     }
-  }, [provider.id, disableConfirm, disableReplacementId, onRefresh, showToast]);
+  }, [
+    provider.id,
+    disableConfirm,
+    disableMode,
+    disableReplacementId,
+    requiresExplicitActiveDisposition,
+    onRefresh,
+    showToast,
+  ]);
 
-  // Add
   const handleAdd = useCallback(async () => {
     if (!addApiKey.trim()) return;
+    if (supportsBaseUrlOverride && addUseBaseUrlOverride) {
+      const err = validateClientBaseUrl(addBaseUrlOverride);
+      if (err) {
+        setAddBaseUrlError(err);
+        return;
+      }
+    }
     setAddSaving(true);
     setError(null);
+    setAddBaseUrlError(null);
     try {
+      const body: Record<string, unknown> = {
+        displayName: addDisplayName.trim() || "未命名账号",
+        description: addDescription.trim(),
+        apiKey: addApiKey.trim(),
+        activate: addActivate,
+      };
+      if (supportsBaseUrlOverride) {
+        body.baseUrlOverride = addUseBaseUrlOverride ? addBaseUrlOverride.trim() : null;
+      }
       const res = await fetch(
         `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            displayName: addDisplayName.trim() || "未命名账号",
-            description: addDescription.trim(),
-            apiKey: addApiKey.trim(),
-            activate: addActivate,
-          }),
+          body: JSON.stringify(body),
         },
       );
       const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
@@ -3689,35 +3886,67 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       setAddDescription("");
       setAddApiKey("");
       setAddActivate(true);
-      showToast("账号已添加" + (addActivate ? "并已启用" : ""));
+      setAddUseBaseUrlOverride(false);
+      setAddBaseUrlOverride("");
+      showToast(
+        "账号已添加" +
+          (addActivate
+            ? (requiresExplicitActiveDisposition ? "并已设为 Active" : "并已启用")
+            : ""),
+      );
       onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "添加账号失败");
     } finally {
       setAddSaving(false);
     }
-  }, [provider.id, addDisplayName, addDescription, addApiKey, addActivate, onRefresh, showToast]);
+  }, [
+    provider.id,
+    addDisplayName,
+    addDescription,
+    addApiKey,
+    addActivate,
+    addUseBaseUrlOverride,
+    addBaseUrlOverride,
+    supportsBaseUrlOverride,
+    requiresExplicitActiveDisposition,
+    onRefresh,
+    showToast,
+  ]);
 
-  // Edit
   const openEdit = useCallback((account: ApiKeyAccountEntry) => {
     setEditAccount(account);
     setEditDisplayName(account.displayName);
     setEditDescription(account.description);
     setEditApiKey("");
+    setEditUseBaseUrlOverride(Boolean(account.baseUrlOverride));
+    setEditBaseUrlOverride(account.baseUrlOverride ?? "");
+    setEditBaseUrlError(null);
     setEditError(null);
   }, []);
 
   const handleEditSave = useCallback(async () => {
     if (!editAccount) return;
+    if (supportsBaseUrlOverride && editUseBaseUrlOverride) {
+      const err = validateClientBaseUrl(editBaseUrlOverride);
+      if (err) {
+        setEditBaseUrlError(err);
+        return;
+      }
+    }
     setEditSaving(true);
     setEditError(null);
+    setEditBaseUrlError(null);
     try {
-      const body: Record<string, string> = {
+      const body: Record<string, unknown> = {
         displayName: editDisplayName.trim() || "未命名账号",
         description: editDescription.trim(),
       };
       if (editApiKey.trim()) {
         body.apiKey = editApiKey.trim();
+      }
+      if (supportsBaseUrlOverride) {
+        body.baseUrlOverride = editUseBaseUrlOverride ? editBaseUrlOverride.trim() : null;
       }
       const res = await fetch(
         `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(editAccount.accountId)}`,
@@ -3731,61 +3960,190 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
       setEditAccount(null);
-      // Clear revealed key if key was replaced
       if (editApiKey.trim()) {
         const next = new Map(revealedKeys);
         next.delete(editAccount.accountId);
         setRevealedKeys(next);
       }
       showToast("账号已更新");
-      if (editApiKey.trim()) onRefresh();
+      if (editApiKey.trim() || supportsBaseUrlOverride) onRefresh();
     } catch (e) {
       setEditError(e instanceof Error ? e.message : "更新账号失败");
     } finally {
       setEditSaving(false);
     }
-  }, [provider.id, editAccount, editDisplayName, editDescription, editApiKey, revealedKeys, onRefresh, showToast]);
+  }, [
+    provider.id,
+    editAccount,
+    editDisplayName,
+    editDescription,
+    editApiKey,
+    editUseBaseUrlOverride,
+    editBaseUrlOverride,
+    supportsBaseUrlOverride,
+    revealedKeys,
+    onRefresh,
+    showToast,
+  ]);
 
-  // Delete
   const openDeleteConfirm = useCallback((account: ApiKeyAccountEntry) => {
     setDeleteConfirm(account);
     setDeleteDeleting(false);
-  }, []);
+    const candidates = accounts.filter((a) => a.accountId !== account.accountId && !a.disabled);
+    if (account.active && requiresExplicitActiveDisposition) {
+      if (candidates.length > 0) {
+        setDeleteMode("replace");
+        setDeleteReplacementId(candidates[0].accountId);
+      } else {
+        setDeleteMode("disconnect");
+        setDeleteReplacementId(null);
+      }
+    } else {
+      setDeleteMode("disconnect");
+      setDeleteReplacementId(null);
+    }
+  }, [accounts, requiresExplicitActiveDisposition]);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteConfirm) return;
+    if (
+      deleteConfirm.active &&
+      requiresExplicitActiveDisposition &&
+      accounts.length > 1 &&
+      deleteMode === "replace" &&
+      !deleteReplacementId
+    ) {
+      setError("请选择要切换到的 Active 账号");
+      return;
+    }
     setDeleteDeleting(true);
+    setDeletingId(deleteConfirm.accountId);
     setError(null);
     try {
+      const body: Record<string, unknown> = {};
+      if (deleteConfirm.active && requiresExplicitActiveDisposition && accounts.length > 1) {
+        if (deleteMode === "replace" && deleteReplacementId) {
+          body.replacementAccountId = deleteReplacementId;
+        } else {
+          body.clearActive = true;
+        }
+      }
       const res = await fetch(
         `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(deleteConfirm.accountId)}`,
-        { method: "DELETE" },
+        {
+          method: "DELETE",
+          headers: Object.keys(body).length > 0 ? { "Content-Type": "application/json" } : undefined,
+          body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+        },
       );
       const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setAccounts(data.accounts ?? []);
-      // Clear revealed key
       const next = new Map(revealedKeys);
       next.delete(deleteConfirm.accountId);
       setRevealedKeys(next);
       setDeleteConfirm(null);
-      showToast("账号已删除");
+      showToast(
+        deleteConfirm.active && requiresExplicitActiveDisposition && deleteMode === "disconnect"
+          ? "账号已删除，AnyRouter 已断开 Active"
+          : "账号已删除",
+      );
       onRefresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "删除账号失败");
       setDeleteConfirm(null);
     } finally {
       setDeleteDeleting(false);
+      setDeletingId(null);
     }
-  }, [provider.id, deleteConfirm, revealedKeys, onRefresh, showToast]);
+  }, [
+    provider.id,
+    deleteConfirm,
+    deleteMode,
+    deleteReplacementId,
+    accounts.length,
+    requiresExplicitActiveDisposition,
+    revealedKeys,
+    onRefresh,
+    showToast,
+  ]);
+
+  const handleSaveProviderConfig = useCallback(async () => {
+    if (!supportsProviderConfig || !providerConfig || !configRetry) return;
+    setConfigFieldError(null);
+    if (providerConfig.globalBaseUrlEditable) {
+      const trimmed = configBaseUrl.trim();
+      if (trimmed) {
+        const err = validateClientBaseUrl(trimmed);
+        if (err) {
+          setConfigFieldError(err);
+          return;
+        }
+      }
+    }
+    if (configRetry.baseDelayMs > configRetry.maxDelayMs) {
+      setConfigFieldError("baseDelayMs 不能大于 maxDelayMs");
+      return;
+    }
+    setConfigSaving(true);
+    setConfigError(null);
+    try {
+      const body: Record<string, unknown> = {
+        revision: providerConfig.revision,
+      };
+      if (providerConfig.globalBaseUrlEditable) {
+        const trimmed = configBaseUrl.trim();
+        body.baseUrl = trimmed ? trimmed : null;
+      }
+      const retryPatch: Partial<AnyRouterRetryPolicyView> = {};
+      let hasRetryPatch = false;
+      for (const field of ANYROUTER_RETRY_FIELD_META) {
+        if (providerConfig.retry.editable[field.key]) {
+          retryPatch[field.key] = configRetry[field.key];
+          hasRetryPatch = true;
+        }
+      }
+      if (hasRetryPatch) body.retry = retryPatch;
+
+      const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}/config`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      });
+      const data = await res.json() as AnyRouterSafeConfigResponse & { error?: string; code?: string };
+      if (!res.ok) {
+        if (data.code === "stale_revision" || res.status === 409) {
+          throw new Error("保存失败：配置有冲突 (Stale Revision)，请刷新后重试，确保 models 字段不被覆盖。");
+        }
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      applyConfigProjection(data);
+      showToast("全局运行配置已保存");
+      onRefresh();
+    } catch (e) {
+      setConfigError(e instanceof Error ? e.message : "保存配置失败");
+    } finally {
+      setConfigSaving(false);
+    }
+  }, [
+    supportsProviderConfig,
+    providerConfig,
+    configRetry,
+    configBaseUrl,
+    provider.id,
+    applyConfigProjection,
+    showToast,
+    onRefresh,
+  ]);
 
   const hasLegacyImport = accounts.some((a) => a.importedFromLegacyAt);
   const isConfigured = accounts.length > 0 && accounts.some((a) => a.active);
   const activeAccount = accounts.find((a) => a.active);
 
-  // Compute fallback message for delete confirmation
+  // Legacy auto-fallback name (xAI / OpenCode Go only)
   const deleteFallbackName = (() => {
-    if (!deleteConfirm || !deleteConfirm.active) return null;
+    if (!deleteConfirm || !deleteConfirm.active || requiresExplicitActiveDisposition) return null;
     const others = accounts.filter((a) => a.accountId !== deleteConfirm.accountId);
     if (others.length === 0) return null;
     const sorted = [...others].sort((a, b) => {
@@ -3796,7 +4154,6 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     return sorted[0].displayName;
   })();
 
-  // ── Resolve button style helpers ──
   const actionBtnBase: React.CSSProperties = {
     padding: "4px 9px",
     background: "none",
@@ -3807,11 +4164,56 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     cursor: "pointer",
   };
 
+  const sourceBadgeStyle = (source: AnyRouterConfigFieldSource): React.CSSProperties => ({
+    fontSize: 10,
+    fontWeight: 600,
+    padding: "1px 6px",
+    borderRadius: 4,
+    border: "1px solid var(--border)",
+    background: source === "env" ? "rgba(96,165,250,0.12)" : "var(--bg-panel)",
+    color: source === "env" ? "#60a5fa" : "var(--text-dim)",
+    flexShrink: 0,
+  });
+
+  const configDirty = (() => {
+    if (!providerConfig || !configRetry) return false;
+    const baseChanged =
+      providerConfig.globalBaseUrlEditable &&
+      (configBaseUrl.trim() || "") !== (providerConfig.globalBaseUrl ?? "");
+    if (baseChanged) return true;
+    return ANYROUTER_RETRY_FIELD_META.some(
+      (f) =>
+        providerConfig.retry.editable[f.key] &&
+        configRetry[f.key] !== providerConfig.retry.effective[f.key],
+    );
+  })();
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="api-key-accounts-detail" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <SectionTitle>API Key 账号</SectionTitle>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flexWrap: "wrap" }}>
+          <SectionTitle>{supportsProviderConfig ? "AnyRouter" : "API Key 账号"}</SectionTitle>
+          {supportsProviderConfig && (
+            <>
+              <span style={{
+                fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4,
+                background: provider.modelCount > 0 ? "rgba(74,222,128,0.12)" : "var(--bg-panel)",
+                color: provider.modelCount > 0 ? "#4ade80" : "var(--text-dim)",
+                border: "1px solid var(--border)",
+              }}>
+                {provider.modelCount > 0 ? `${provider.modelCount} 模型` : (providerConfig?.modelsConfigured ? `${providerConfig.modelCount} 模型` : "未配置模型")}
+              </span>
+              <span style={{
+                fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4,
+                background: "rgba(245,158,11,0.12)", color: "#f59e0b",
+                border: "1px solid rgba(245,158,11,0.3)",
+              }}>
+                非官方第三方
+              </span>
+            </>
+          )}
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: isConfigured ? "#4ade80" : "var(--border)", display: "inline-block" }} />
           <span style={{ fontSize: 11, color: isConfigured ? "#4ade80" : "var(--text-dim)" }}>
@@ -3822,17 +4224,153 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
 
       {/* Description */}
       <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-        {activeAccount
-          ? `当前账号：${activeAccount.displayName}。你可以保存多个 API Key 并在它们之间切换。`
-          : accounts.length > 0
-            ? `已保存 ${accounts.length} 个账号，但尚未启用任何一个。`
-            : `添加你的 ${provider.displayName} API Key${provider.modelCount > 0 ? `，以启用 ${provider.modelCount} 个模型` : ""}。`}
+        {supportsProviderConfig ? (
+          <>
+            AnyRouter 提供安全的 API Key 多账号管理。
+            <strong style={{ color: "var(--text)", fontWeight: 600 }}>无自动切号</strong>
+            ：429 或瞬时网络错误只在当前 Active 账号内重试，不会隐式轮换账号。
+            <strong style={{ color: "var(--text)", fontWeight: 600 }}>无公开用量查询</strong>
+            ，顶部面板不展示 AnyRouter quota。
+            {activeAccount ? ` 当前 Active：${activeAccount.displayName}。` : accounts.length > 0 ? " 已有账号但尚未设为 Active。" : ""}
+          </>
+        ) : activeAccount ? (
+          `当前账号：${activeAccount.displayName}。你可以保存多个 API Key 并在它们之间切换。`
+        ) : accounts.length > 0 ? (
+          `已保存 ${accounts.length} 个账号，但尚未启用任何一个。`
+        ) : (
+          `添加你的 ${provider.displayName} API Key${provider.modelCount > 0 ? `，以启用 ${provider.modelCount} 个模型` : ""}。`
+        )}
       </p>
 
       {/* Error banner */}
       {error && (
-        <div style={{ padding: "10px 14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 6, fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>
+        <div role="alert" className="api-key-accounts-alert" style={{ padding: "10px 14px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 6, fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>
           {error}
+        </div>
+      )}
+
+      {/* AnyRouter global config card */}
+      {supportsProviderConfig && (
+        <div className="anyrouter-config-card" style={{ background: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: 8, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>全局运行配置</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => void loadProviderConfig()}
+                disabled={configLoading || configSaving}
+                style={{ ...actionBtnBase, color: "var(--text-muted)", cursor: configLoading || configSaving ? "not-allowed" : "pointer" }}
+              >
+                刷新
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSaveProviderConfig()}
+                disabled={configLoading || configSaving || !providerConfig || !configDirty}
+                style={{
+                  ...actionBtnBase,
+                  color: configLoading || configSaving || !providerConfig || !configDirty ? "var(--text-dim)" : "#fff",
+                  background: configLoading || configSaving || !providerConfig || !configDirty ? "var(--bg-panel)" : "var(--accent)",
+                  borderColor: configLoading || configSaving || !providerConfig || !configDirty ? "var(--border)" : "var(--accent)",
+                  cursor: configLoading || configSaving || !providerConfig || !configDirty ? "not-allowed" : "pointer",
+                }}
+              >
+                {configSaving ? "保存中…" : "保存配置"}
+              </button>
+            </div>
+          </div>
+
+          {configError && (
+            <div role="alert" style={{ padding: "8px 10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 6, fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>
+              {configError}
+              <div style={{ marginTop: 4, color: "var(--text-dim)", fontSize: 11 }}>账号管理仍可用；协议扩展可能暂不可用。</div>
+            </div>
+          )}
+          {configFieldError && (
+            <div role="alert" style={{ fontSize: 12, color: "#f87171" }}>{configFieldError}</div>
+          )}
+
+          {configLoading && !providerConfig ? (
+            <div style={{ fontSize: 12, color: "var(--text-dim)" }}>正在加载配置…</div>
+          ) : providerConfig && configRetry ? (
+            <div className="anyrouter-config-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-muted)" }}>
+                  <span>全局默认 Base URL</span>
+                  <span style={sourceBadgeStyle(providerConfig.globalBaseUrlSource)}>
+                    {anyRouterSourceBadgeLabel(providerConfig.globalBaseUrlSource)}
+                  </span>
+                </div>
+                <input
+                  value={configBaseUrl}
+                  onChange={(e) => setConfigBaseUrl(e.target.value)}
+                  disabled={!providerConfig.globalBaseUrlEditable || configSaving}
+                  placeholder="https://…"
+                  style={{
+                    ...inputStyle,
+                    fontFamily: "var(--font-mono)",
+                    opacity: providerConfig.globalBaseUrlEditable ? 1 : 0.75,
+                    cursor: providerConfig.globalBaseUrlEditable ? "text" : "not-allowed",
+                  }}
+                  title={providerConfig.globalBaseUrlEditable ? "写入 anyrouter.json" : "由环境变量覆盖，只读"}
+                />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-muted)" }}>
+                  <span>模型配置来源</span>
+                  <span style={sourceBadgeStyle("config")}>anyrouter.json</span>
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text)", padding: "6px 0" }}>
+                  {providerConfig.modelsConfigured
+                    ? `共 ${providerConfig.modelCount} 个模型（只读）`
+                    : "未配置模型目录（只读）"}
+                </div>
+              </div>
+
+              {ANYROUTER_RETRY_FIELD_META.map((field) => {
+                const editable = providerConfig.retry.editable[field.key];
+                const source = providerConfig.retry.source[field.key];
+                return (
+                  <div key={field.key} style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-muted)", flexWrap: "wrap" }}>
+                      <span>{field.label}</span>
+                      <span style={sourceBadgeStyle(source)}>{anyRouterSourceBadgeLabel(source)}</span>
+                    </div>
+                    <input
+                      type="number"
+                      min={field.min}
+                      max={field.max}
+                      value={configRetry[field.key]}
+                      disabled={!editable || configSaving}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isFinite(n)) return;
+                        setConfigRetry((prev) => prev ? { ...prev, [field.key]: Math.trunc(n) } : prev);
+                      }}
+                      style={{
+                        ...inputStyle,
+                        maxWidth: 160,
+                        opacity: editable ? 1 : 0.75,
+                        cursor: editable ? "text" : "not-allowed",
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
+            重试为 provider-wide 设置，不按账号保存；优先级：环境变量 &gt; anyrouter.json &gt; 默认。
+          </div>
+        </div>
+      )}
+
+      {/* Accounts section header */}
+      {supportsProviderConfig && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>API Key 账号</div>
         </div>
       )}
 
@@ -3842,7 +4380,11 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "#60a5fa", flexShrink: 0, marginTop: 1 }}>
             <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
-          <span>已导入你之前的 API Key。可在下方重命名或继续添加更多密钥。</span>
+          <span>
+            {supportsProviderConfig
+              ? "已导入 legacy anyrouter.json apiKey（源配置字段保留，不会自动删除）。可在下方重命名或继续添加更多密钥。"
+              : "已导入你之前的 API Key。可在下方重命名或继续添加更多密钥。"}
+          </span>
         </div>
       )}
 
@@ -3854,7 +4396,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           padding: "28px 16px", textAlign: "center", border: "1px dashed var(--border)",
           borderRadius: 8, color: "var(--text-dim)", fontSize: 12, lineHeight: 1.6,
         }}>
-          <div style={{ marginBottom: 8, fontWeight: 600 }}>尚未保存 API Key</div>
+          <div style={{ marginBottom: 8, fontWeight: 600 }}>暂无 API Key</div>
           <div>添加你的第一个 {provider.displayName} API Key 以开始使用。</div>
         </div>
       ) : (
@@ -3865,11 +4407,16 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
             const isCopied = copiedId === account.accountId;
             const isActive = account.active;
             const isDisabled = account.disabled === true;
-            const isBusy = activatingId === account.accountId || disablingId === account.accountId || enablingId === account.accountId || deletingId === account.accountId;
+            const isBusy =
+              activatingId === account.accountId ||
+              disablingId === account.accountId ||
+              enablingId === account.accountId ||
+              deletingId === account.accountId;
 
             return (
               <div
                 key={account.accountId}
+                className={`api-key-account-card${isBusy ? " is-busy" : ""}${isActive ? " is-active" : ""}`}
                 style={{
                   background: isActive ? "rgba(96,165,250,0.04)" : isDisabled ? "rgba(239,68,68,0.03)" : "var(--bg-panel)",
                   border: `1px solid ${isActive ? "rgba(96,165,250,0.45)" : isDisabled ? "rgba(239,68,68,0.25)" : "var(--border)"}`,
@@ -3878,10 +4425,20 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   display: "flex",
                   flexDirection: "column",
                   gap: 8,
-                  opacity: isDisabled ? 0.85 : 1,
+                  opacity: isBusy ? 0.65 : isDisabled ? 0.85 : 1,
+                  position: "relative",
+                  pointerEvents: isBusy ? "none" : "auto",
                 }}
               >
-                {/* Row 1: display name + badges */}
+                {isBusy && (
+                  <div style={{
+                    position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, fontWeight: 600, color: "var(--text)", background: "rgba(0,0,0,0.04)", borderRadius: 6, zIndex: 1,
+                  }}>
+                    处理中…
+                  </div>
+                )}
+
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -3889,7 +4446,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                     </span>
                     {isActive && (
                       <span style={{ fontSize: 10, fontWeight: 600, background: "rgba(74,222,128,0.15)", color: "#4ade80", padding: "1px 6px", borderRadius: 4, border: "1px solid rgba(74,222,128,0.3)", flexShrink: 0 }}>
-                        当前
+                        {requiresExplicitActiveDisposition ? "Active" : "当前"}
                       </span>
                     )}
                     {isDisabled && (
@@ -3908,14 +4465,20 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   </span>
                 </div>
 
-                {/* Row 2: description */}
                 {account.description && (
                   <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>
                     {account.description}
                   </div>
                 )}
 
-                {/* Row 2.5: disabled reason */}
+                {supportsBaseUrlOverride && (
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={account.baseUrlOverride || undefined}>
+                    {account.baseUrlOverride
+                      ? `Override: ${account.baseUrlOverride}`
+                      : "使用默认端点"}
+                  </div>
+                )}
+
                 {isDisabled && account.disabledReason && (
                   <div style={{ fontSize: 11, color: "#f87171", lineHeight: 1.4, padding: "6px 10px", background: "rgba(239,68,68,0.06)", borderRadius: 5, border: "1px solid rgba(239,68,68,0.15)" }}>
                     {account.disabledReason}
@@ -3923,38 +4486,39 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   </div>
                 )}
 
-                {/* Row 3: masked key + reveal area */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <code style={{
-                    fontSize: 11,
-                    fontFamily: "var(--font-mono)",
-                    color: isRevealed ? "#fbbf24" : "var(--text-dim)",
-                    background: "var(--bg)",
-                    padding: "3px 8px",
-                    borderRadius: 4,
-                    flex: 1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    minWidth: 0,
-                  }}>
+                  <code
+                    aria-label={isRevealed ? "API Key 明文" : "API Key 掩码"}
+                    style={{
+                      fontSize: 11,
+                      fontFamily: "var(--font-mono)",
+                      color: isRevealed ? "#fbbf24" : "var(--text-dim)",
+                      background: "var(--bg)",
+                      padding: "3px 8px",
+                      borderRadius: 4,
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      minWidth: 0,
+                    }}
+                  >
                     {isRevealed ? revealedKeys.get(account.accountId) : account.maskedKeyPreview}
                   </code>
                 </div>
 
-                {/* Row 4: actions */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <div className="api-key-account-actions" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   {isActive ? (
                     <span style={{ ...actionBtnBase, color: "#4ade80", borderColor: "rgba(74,222,128,0.3)", cursor: "default" }}>
-                      当前
+                      {requiresExplicitActiveDisposition ? "Active" : "当前"}
                     </span>
                   ) : isDisabled ? (
                     <button
                       disabled={true}
-                      title={account.disabledReason || "账号已禁用。请先启用后再激活。"}
+                      title={account.disabledReason || "账号已禁用。请先启用后再设为 Active。"}
                       style={{ ...actionBtnBase, color: "var(--text-dim)", cursor: "not-allowed", opacity: 0.5 }}
                     >
-                      启用
+                      {requiresExplicitActiveDisposition ? "设为 Active" : "启用"}
                     </button>
                   ) : (
                     <button
@@ -3962,11 +4526,12 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                       disabled={isBusy}
                       style={{ ...actionBtnBase, color: isBusy ? "var(--text-dim)" : "var(--accent)", cursor: isBusy ? "not-allowed" : "pointer" }}
                     >
-                      {activatingId === account.accountId ? "启用中…" : "启用"}
+                      {activatingId === account.accountId
+                        ? (requiresExplicitActiveDisposition ? "设置中…" : "启用中…")
+                        : (requiresExplicitActiveDisposition ? "设为 Active" : "启用")}
                     </button>
                   )}
 
-                  {/* Enable / Disable */}
                   {isDisabled ? (
                     <button
                       onClick={() => handleEnable(account.accountId)}
@@ -3977,7 +4542,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                         borderColor: isBusy ? "var(--border)" : "rgba(74,222,128,0.3)",
                         cursor: isBusy ? "not-allowed" : "pointer",
                       }}
-                      title="重新启用该账号，使其可被激活"
+                      title="重新启用该账号"
                     >
                       {enablingId === account.accountId ? "启用中…" : "启用"}
                     </button>
@@ -3991,7 +4556,13 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                         borderColor: isBusy ? "var(--border)" : "rgba(245,158,11,0.3)",
                         cursor: isBusy ? "not-allowed" : "pointer",
                       }}
-                      title={isActive ? "禁用该账号——你需要选择替代账号，或确认清空当前密钥" : "禁用该账号，在重新启用前无法激活"}
+                      title={
+                        isActive && requiresExplicitActiveDisposition
+                          ? "禁用 Active 账号——必须显式选择替换或断开"
+                          : isActive
+                            ? "禁用该账号——你需要选择替代账号，或确认清空当前密钥"
+                            : "禁用该账号"
+                      }
                     >
                       禁用
                     </button>
@@ -4000,6 +4571,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   <button
                     onClick={() => handleReveal(account.accountId)}
                     disabled={isRevealing}
+                    aria-label={isRevealed ? "隐藏 API Key" : "显示 API Key"}
                     {...iconFlowAttrs(isRevealing ? "off" : "interactive")}
                     style={{
                       ...actionBtnBase,
@@ -4076,7 +4648,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                     disabled={isBusy}
                     style={{ ...actionBtnBase, color: "#ef4444", borderColor: "rgba(239,68,68,0.3)", cursor: isBusy ? "not-allowed" : "pointer" }}
                   >
-                    删除
+                    {isActive && requiresExplicitActiveDisposition ? "断开" : "删除"}
                   </button>
                 </div>
               </div>
@@ -4087,7 +4659,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
 
       {/* Add account section */}
       {!addOpen ? (
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             onClick={() => setAddOpen(true)}
             style={{
@@ -4103,22 +4675,21 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           >
             + 添加 API Key
           </button>
-          {isConfigured && (
+          {isConfigured && activeAccount && (
             <button
-              onClick={() => openDeleteConfirm(activeAccount!)}
-              disabled={!activeAccount}
+              onClick={() => openDeleteConfirm(activeAccount)}
               style={{
                 padding: "7px 14px",
                 background: "none",
                 border: "1px solid rgba(239,68,68,0.3)",
                 borderRadius: 5,
                 color: "#ef4444",
-                cursor: activeAccount ? "pointer" : "not-allowed",
+                cursor: "pointer",
                 fontSize: 12,
                 fontWeight: 600,
               }}
             >
-              断开连接
+              {requiresExplicitActiveDisposition ? "断开 Active" : "断开连接"}
             </button>
           )}
         </div>
@@ -4138,22 +4709,61 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
             <SecretTextInput
               value={addApiKey}
               onChange={setAddApiKey}
-              placeholder="op_zen_…"
+              placeholder={supportsProviderConfig ? "sk-…" : "op_zen_…"}
               mono
               autoComplete="off"
               spellCheck={false}
             />
           </Field>
 
+          {supportsBaseUrlOverride && (
+            <>
+              <Check
+                label="使用独立的 Base URL 覆盖"
+                checked={addUseBaseUrlOverride}
+                onChange={(v) => {
+                  setAddUseBaseUrlOverride(v);
+                  setAddBaseUrlError(null);
+                  if (!v) setAddBaseUrlOverride("");
+                }}
+              />
+              {addUseBaseUrlOverride && (
+                <Field label="账号级 Base URL">
+                  <TextInput
+                    value={addBaseUrlOverride}
+                    onChange={(v) => {
+                      setAddBaseUrlOverride(v);
+                      setAddBaseUrlError(null);
+                    }}
+                    placeholder="https://api.custom.example/v1"
+                    mono
+                  />
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 4 }}>
+                    留空则继承全局默认 Base URL；不允许 userinfo / query / hash。
+                  </div>
+                  {addBaseUrlError && <div role="alert" style={{ fontSize: 11, color: "#f87171", marginTop: 4 }}>{addBaseUrlError}</div>}
+                </Field>
+              )}
+            </>
+          )}
+
           <Check
-            label="保存并设为当前密钥"
+            label={requiresExplicitActiveDisposition ? "保存并设为 Active 账号" : "保存并设为当前密钥"}
             checked={addActivate}
             onChange={setAddActivate}
           />
 
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button
-              onClick={() => { setAddOpen(false); setAddApiKey(""); setAddDisplayName(""); setAddDescription(""); }}
+              onClick={() => {
+                setAddOpen(false);
+                setAddApiKey("");
+                setAddDisplayName("");
+                setAddDescription("");
+                setAddUseBaseUrlOverride(false);
+                setAddBaseUrlOverride("");
+                setAddBaseUrlError(null);
+              }}
               disabled={addSaving}
               style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 5, color: "var(--text-muted)", cursor: addSaving ? "not-allowed" : "pointer", fontSize: 12 }}
             >
@@ -4181,10 +4791,12 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       {editAccount && (
         <div
           className="pi-modal-overlay"
+          role="presentation"
           style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={(e) => { if (e.target === e.currentTarget && !editSaving) setEditAccount(null); }}
+          onKeyDown={(e) => { if (e.key === "Escape" && !editSaving) setEditAccount(null); }}
         >
-          <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 480, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+          <div className="pi-modal-panel pi-modal-panel-compact" role="dialog" aria-modal="true" aria-label="编辑账号" style={{ width: 480, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
             <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>编辑账号</div>
@@ -4209,7 +4821,34 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   spellCheck={false}
                 />
               </Field>
-              {editError && <div style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{editError}</div>}
+              {supportsBaseUrlOverride && (
+                <>
+                  <Check
+                    label="使用独立的 Base URL 覆盖"
+                    checked={editUseBaseUrlOverride}
+                    onChange={(v) => {
+                      setEditUseBaseUrlOverride(v);
+                      setEditBaseUrlError(null);
+                      if (!v) setEditBaseUrlOverride("");
+                    }}
+                  />
+                  {editUseBaseUrlOverride && (
+                    <Field label="账号级 Base URL">
+                      <TextInput
+                        value={editBaseUrlOverride}
+                        onChange={(v) => {
+                          setEditBaseUrlOverride(v);
+                          setEditBaseUrlError(null);
+                        }}
+                        placeholder="https://api.custom.example/v1"
+                        mono
+                      />
+                      {editBaseUrlError && <div role="alert" style={{ fontSize: 11, color: "#f87171", marginTop: 4 }}>{editBaseUrlError}</div>}
+                    </Field>
+                  )}
+                </>
+              )}
+              {editError && <div role="alert" style={{ fontSize: 12, color: "#f87171", lineHeight: 1.5 }}>{editError}</div>}
             </div>
             <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button type="button" disabled={editSaving} onClick={() => setEditAccount(null)} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: editSaving ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
@@ -4220,42 +4859,123 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       )}
 
       {/* Delete confirmation dialog */}
-      {deleteConfirm && (
-        <div
-          className="pi-modal-overlay"
-          style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={(e) => { if (e.target === e.currentTarget && !deleteDeleting) setDeleteConfirm(null); }}
-        >
-          <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 440, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
-            <div style={{ padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>删除账号？</div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                {deleteConfirm.active && deleteFallbackName && accounts.length > 2 ? (
-                  <>
-                    这是当前 <strong style={{ color: "#4ade80" }}>正在使用</strong> 的账号。
-                    删除后，系统将自动启用 <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong> 作为新的当前账号。
-                  </>
-                ) : deleteConfirm.active && accounts.length === 2 ? (
-                  <>
-                    这是当前 <strong style={{ color: "#4ade80" }}>正在使用</strong> 的账号。
-                    删除后，将自动启用 <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong>。
-                  </>
-                ) : deleteConfirm.active && accounts.length === 1 ? (
-                  <>
-                    这是最后一个已保存账号。删除后将 <strong style={{ color: "#ef4444" }}>断开</strong> {provider.displayName} 提供商。
-                  </>
-                ) : (
-                  <>确定删除「{deleteConfirm.displayName}」？</>
+      {deleteConfirm && (() => {
+        const isDeletingActive = deleteConfirm.active;
+        const enabledCandidates = accounts.filter(
+          (a) => a.accountId !== deleteConfirm.accountId && !a.disabled,
+        );
+        const needsExplicit = isDeletingActive && requiresExplicitActiveDisposition && accounts.length > 1;
+
+        return (
+          <div
+            className="pi-modal-overlay"
+            role="presentation"
+            style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
+            onClick={(e) => { if (e.target === e.currentTarget && !deleteDeleting) setDeleteConfirm(null); }}
+            onKeyDown={(e) => { if (e.key === "Escape" && !deleteDeleting) setDeleteConfirm(null); }}
+          >
+            <div className="pi-modal-panel pi-modal-panel-compact" role="dialog" aria-modal="true" aria-label="删除账号" style={{ width: 480, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+              <div style={{ padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+                  {needsExplicit ? "断开 Active 账号" : "删除账号？"}
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  {needsExplicit ? (
+                    <>
+                      您正在删除当前全局 Active 的 {provider.displayName} 账号
+                      <strong style={{ color: "var(--text)" }}> {deleteConfirm.displayName}</strong>。
+                      {provider.displayName} 不会自动回退到“最近使用”的账号，请显式选择处理方式：
+                    </>
+                  ) : isDeletingActive && requiresExplicitActiveDisposition && accounts.length === 1 ? (
+                    <>
+                      这是最后一个已保存账号。删除后将 <strong style={{ color: "#ef4444" }}>断开</strong> {provider.displayName} 连接（无 Active 账号）。
+                    </>
+                  ) : isDeletingActive && deleteFallbackName && accounts.length > 2 ? (
+                    <>
+                      这是当前 <strong style={{ color: "#4ade80" }}>正在使用</strong> 的账号。
+                      删除后，系统将自动启用 <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong> 作为新的当前账号。
+                    </>
+                  ) : isDeletingActive && accounts.length === 2 && deleteFallbackName ? (
+                    <>
+                      这是当前 <strong style={{ color: "#4ade80" }}>正在使用</strong> 的账号。
+                      删除后，将自动启用 <strong style={{ color: "var(--text)" }}>{deleteFallbackName}</strong>。
+                    </>
+                  ) : isDeletingActive && accounts.length === 1 ? (
+                    <>
+                      这是最后一个已保存账号。删除后将 <strong style={{ color: "#ef4444" }}>断开</strong> {provider.displayName} 提供商。
+                    </>
+                  ) : (
+                    <>确定删除「{deleteConfirm.displayName}」？</>
+                  )}
+                </div>
+
+                {needsExplicit && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {enabledCandidates.length > 0 && (
+                      <label style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12, color: "var(--text)" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <input
+                            type="radio"
+                            name="deleteDisposition"
+                            checked={deleteMode === "replace"}
+                            onChange={() => {
+                              setDeleteMode("replace");
+                              if (!deleteReplacementId) setDeleteReplacementId(enabledCandidates[0].accountId);
+                            }}
+                            style={{ accentColor: "var(--accent)" }}
+                          />
+                          将 Active 切换至其他账号
+                        </span>
+                        {deleteMode === "replace" && (
+                          <select
+                            value={deleteReplacementId ?? ""}
+                            onChange={(e) => setDeleteReplacementId(e.target.value || null)}
+                            style={{ ...inputStyle, marginLeft: 24, width: "calc(100% - 24px)" }}
+                          >
+                            {enabledCandidates.map((c) => (
+                              <option key={c.accountId} value={c.accountId}>
+                                {c.displayName} ({c.maskedKeyPreview})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </label>
+                    )}
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#f87171", fontWeight: 600 }}>
+                      <input
+                        type="radio"
+                        name="deleteDisposition"
+                        checked={deleteMode === "disconnect" || enabledCandidates.length === 0}
+                        onChange={() => {
+                          setDeleteMode("disconnect");
+                          setDeleteReplacementId(null);
+                        }}
+                        style={{ accentColor: "var(--accent)" }}
+                      />
+                      断开 {provider.displayName} 连接（无 Active 账号）
+                    </label>
+                  </div>
                 )}
               </div>
-            </div>
-            <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button type="button" disabled={deleteDeleting} onClick={() => setDeleteConfirm(null)} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
-              <button type="button" disabled={deleteDeleting} onClick={handleDeleteConfirm} style={{ padding: "6px 14px", background: deleteDeleting ? "var(--bg-panel)" : "#ef4444", border: "none", borderRadius: 6, color: "#fff", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}>{deleteDeleting ? "删除中…" : "删除"}</button>
+              <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button type="button" disabled={deleteDeleting} onClick={() => setDeleteConfirm(null)} style={{ padding: "6px 12px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12 }}>取消</button>
+                <button
+                  type="button"
+                  disabled={deleteDeleting || (needsExplicit && deleteMode === "replace" && !deleteReplacementId)}
+                  onClick={handleDeleteConfirm}
+                  style={{ padding: "6px 14px", background: deleteDeleting ? "var(--bg-panel)" : "#ef4444", border: "none", borderRadius: 6, color: "#fff", cursor: deleteDeleting ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 700 }}
+                >
+                  {deleteDeleting
+                    ? "处理中…"
+                    : needsExplicit && deleteMode === "disconnect"
+                      ? "确认断开"
+                      : "删除"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Disable confirmation dialog */}
       {disableConfirm && (() => {
@@ -4264,20 +4984,29 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
           (a) => a.accountId !== disableConfirm.accountId && !a.disabled,
         );
         const hasCandidates = enabledCandidates.length > 0;
+        const needsExplicit = isDisablingActive && requiresExplicitActiveDisposition;
 
         return (
           <div
             className="pi-modal-overlay"
+            role="presentation"
             style={{ position: "fixed", inset: 0, zIndex: 1210, background: "rgba(0,0,0,0.42)", display: "flex", alignItems: "center", justifyContent: "center" }}
             onClick={(e) => { if (e.target === e.currentTarget && !disableSaving) setDisableConfirm(null); }}
+            onKeyDown={(e) => { if (e.key === "Escape" && !disableSaving) setDisableConfirm(null); }}
           >
-            <div className="pi-modal-panel pi-modal-panel-compact" style={{ width: 480, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
+            <div className="pi-modal-panel pi-modal-panel-compact" role="dialog" aria-modal="true" aria-label="禁用账号" style={{ width: 480, maxWidth: "calc(100vw - 32px)", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 36px rgba(0,0,0,0.28)", overflow: "hidden" }}>
               <div style={{ padding: "16px 16px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
-                  {isDisablingActive ? "禁用当前激活账号" : "禁用账号"}
+                  {needsExplicit ? "断开 Active 账号" : isDisablingActive ? "禁用当前激活账号" : "禁用账号"}
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                  {isDisablingActive ? (
+                  {needsExplicit ? (
+                    <>
+                      您正在禁用当前全局 Active 的 {provider.displayName} 账号
+                      <strong style={{ color: "var(--text)" }}> {disableConfirm.displayName}</strong>。
+                      不会自动回退到“最近使用”的账号，请显式选择处理方式：
+                    </>
+                  ) : isDisablingActive ? (
                     <>
                       你正在禁用当前激活的 {provider.displayName} 账号 <strong style={{ color: "var(--text)" }}>{disableConfirm.displayName}</strong>。
                       禁用后该账号不能被激活，直到重新启用。
@@ -4290,63 +5019,110 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   )}
                 </div>
 
-                {/* Active account disable: replacement selection */}
                 {isDisablingActive && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {hasCandidates ? (
-                      <>
-                        <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 4 }}>
-                          选择一个替代账号激活，或清空 active key：
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 160, overflowY: "auto" }}>
-                          {enabledCandidates.map((candidate) => (
-                            <label
-                              key={candidate.accountId}
-                              style={{
-                                display: "flex", alignItems: "center", gap: 8,
-                                padding: "8px 10px", borderRadius: 6,
-                                border: `1px solid ${disableReplacementId === candidate.accountId ? "rgba(96,165,250,0.45)" : "var(--border)"}`,
-                                background: disableReplacementId === candidate.accountId ? "rgba(96,165,250,0.06)" : "var(--bg-panel)",
-                                cursor: "pointer", fontSize: 12,
-                              }}
-                              onClick={() => setDisableReplacementId(candidate.accountId)}
-                            >
+                      needsExplicit ? (
+                        <>
+                          <label style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12, color: "var(--text)" }}>
+                            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               <input
                                 type="radio"
-                                name="disableReplacement"
-                                checked={disableReplacementId === candidate.accountId}
-                                onChange={() => setDisableReplacementId(candidate.accountId)}
+                                name="disableDisposition"
+                                checked={disableMode === "replace"}
+                                onChange={() => {
+                                  setDisableMode("replace");
+                                  if (!disableReplacementId) setDisableReplacementId(enabledCandidates[0].accountId);
+                                }}
                                 style={{ accentColor: "var(--accent)" }}
                               />
-                              <span style={{ color: "var(--text)", fontWeight: 600 }}>{candidate.displayName}</span>
-                              <span style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)" }}>{candidate.maskedKeyPreview}</span>
-                            </label>
-                          ))}
-                        </div>
-                        <label
-                          style={{
-                            display: "flex", alignItems: "center", gap: 8,
-                            padding: "8px 10px", borderRadius: 6,
-                            border: `1px solid ${disableReplacementId === null ? "rgba(239,68,68,0.35)" : "var(--border)"}`,
-                            background: disableReplacementId === null ? "rgba(239,68,68,0.04)" : "var(--bg-panel)",
-                            cursor: "pointer", fontSize: 12,
-                          }}
-                          onClick={() => setDisableReplacementId(null)}
-                        >
-                          <input
-                            type="radio"
-                            name="disableReplacement"
-                            checked={disableReplacementId === null}
-                            onChange={() => setDisableReplacementId(null)}
-                            style={{ accentColor: "var(--accent)" }}
-                          />
-                          <span style={{ color: "#f87171", fontWeight: 600 }}>清空 active key</span>
-                          <span style={{ color: "var(--text-dim)", fontSize: 11 }}>（后续没有可用 managed key 时将无法调用）</span>
-                        </label>
-                      </>
+                              将 Active 切换至其他账号
+                            </span>
+                            {disableMode === "replace" && (
+                              <select
+                                value={disableReplacementId ?? ""}
+                                onChange={(e) => setDisableReplacementId(e.target.value || null)}
+                                style={{ ...inputStyle, marginLeft: 24, width: "calc(100% - 24px)" }}
+                              >
+                                {enabledCandidates.map((c) => (
+                                  <option key={c.accountId} value={c.accountId}>
+                                    {c.displayName} ({c.maskedKeyPreview})
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </label>
+                          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#f87171", fontWeight: 600 }}>
+                            <input
+                              type="radio"
+                              name="disableDisposition"
+                              checked={disableMode === "disconnect"}
+                              onChange={() => {
+                                setDisableMode("disconnect");
+                                setDisableReplacementId(null);
+                              }}
+                              style={{ accentColor: "var(--accent)" }}
+                            />
+                            断开 {provider.displayName} 连接（无 Active 账号）
+                          </label>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 4 }}>
+                            选择一个替代账号激活，或清空 active key：
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 160, overflowY: "auto" }}>
+                            {enabledCandidates.map((candidate) => (
+                              <label
+                                key={candidate.accountId}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 8,
+                                  padding: "8px 10px", borderRadius: 6,
+                                  border: `1px solid ${disableReplacementId === candidate.accountId ? "rgba(96,165,250,0.45)" : "var(--border)"}`,
+                                  background: disableReplacementId === candidate.accountId ? "rgba(96,165,250,0.06)" : "var(--bg-panel)",
+                                  cursor: "pointer", fontSize: 12,
+                                }}
+                                onClick={() => setDisableReplacementId(candidate.accountId)}
+                              >
+                                <input
+                                  type="radio"
+                                  name="disableReplacement"
+                                  checked={disableReplacementId === candidate.accountId}
+                                  onChange={() => setDisableReplacementId(candidate.accountId)}
+                                  style={{ accentColor: "var(--accent)" }}
+                                />
+                                <span style={{ color: "var(--text)", fontWeight: 600 }}>{candidate.displayName}</span>
+                                <span style={{ color: "var(--text-dim)", fontSize: 10, fontFamily: "var(--font-mono)" }}>{candidate.maskedKeyPreview}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <label
+                            style={{
+                              display: "flex", alignItems: "center", gap: 8,
+                              padding: "8px 10px", borderRadius: 6,
+                              border: `1px solid ${disableReplacementId === null ? "rgba(239,68,68,0.35)" : "var(--border)"}`,
+                              background: disableReplacementId === null ? "rgba(239,68,68,0.04)" : "var(--bg-panel)",
+                              cursor: "pointer", fontSize: 12,
+                            }}
+                            onClick={() => setDisableReplacementId(null)}
+                          >
+                            <input
+                              type="radio"
+                              name="disableReplacement"
+                              checked={disableReplacementId === null}
+                              onChange={() => setDisableReplacementId(null)}
+                              style={{ accentColor: "var(--accent)" }}
+                            />
+                            <span style={{ color: "#f87171", fontWeight: 600 }}>清空 active key</span>
+                            <span style={{ color: "var(--text-dim)", fontSize: 11 }}>（后续没有可用 managed key 时将无法调用）</span>
+                          </label>
+                        </>
+                      )
                     ) : (
                       <div style={{ padding: "8px 10px", borderRadius: 6, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", fontSize: 11, color: "#f87171", lineHeight: 1.5 }}>
-                        没有其他 enabled 账号可用。禁用后 <strong>active key 将被清空</strong>，后续无法使用 managed key 进行模型调用。确定要继续吗？
+                        {needsExplicit
+                          ? "没有其他可用账号。继续将断开 Active 连接，不会自动选择最近账号。"
+                          : <>没有其他 enabled 账号可用。禁用后 <strong>active key 将被清空</strong>，后续无法使用 managed key 进行模型调用。确定要继续吗？</>}
                       </div>
                     )}
                   </div>
@@ -4363,11 +5139,11 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                 </button>
                 <button
                   type="button"
-                  disabled={disableSaving}
+                  disabled={disableSaving || (needsExplicit && disableMode === "replace" && !disableReplacementId)}
                   onClick={handleDisableConfirm}
                   style={{
                     padding: "6px 14px",
-                    background: disableSaving ? "var(--bg-panel)" : isDisablingActive && disableReplacementId === null && !hasCandidates ? "#ef4444" : "#f59e0b",
+                    background: disableSaving ? "var(--bg-panel)" : needsExplicit && disableMode === "disconnect" ? "#ef4444" : "#f59e0b",
                     border: "none", borderRadius: 6,
                     color: "#fff",
                     cursor: disableSaving ? "not-allowed" : "pointer",
@@ -4375,10 +5151,14 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
                   }}
                 >
                   {disableSaving
-                    ? "禁用中…"
-                    : isDisablingActive && disableReplacementId === null
-                      ? "禁用并清空 active"
-                      : "确认禁用"}
+                    ? "处理中…"
+                    : needsExplicit && disableMode === "disconnect"
+                      ? "确认断开"
+                      : needsExplicit
+                        ? "确认切换并禁用"
+                        : isDisablingActive && disableReplacementId === null
+                          ? "禁用并清空 active"
+                          : "确认禁用"}
                 </button>
               </div>
             </div>

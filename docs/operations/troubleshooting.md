@@ -76,16 +76,51 @@ Use `scripts/start-pi-web-proxy.sh` or `scripts/start-pi-web-proxy.ps1` when pro
 2. Remove `app/api/models-config/sync/route.ts` — preview cache is in-memory only and disappears on restart.
 3. Do **not** delete models already added by sync; users can manually delete unwanted `{ id }` entries in ModelsConfig.
 
-## Managed API-key accounts (OpenCode Go, xAI)
+## Managed API-key accounts (OpenCode Go, xAI, AnyRouter)
 
 Allowlisted providers store multi-account metadata and secrets under `~/.pi/agent/auth-api-key-accounts/<provider>/`:
 
 - OpenCode Go: `~/.pi/agent/auth-api-key-accounts/opencode-go/`
 - xAI: `~/.pi/agent/auth-api-key-accounts/xai/`
+- AnyRouter: `~/.pi/agent/auth-api-key-accounts/anyrouter/` (plus derived Active runtime bridge under `.runtime/provider.json`)
 
-Each directory holds `accounts.json` (masked previews, fingerprints, active id, optional disable metadata) and per-account `<accountId>.json` secret files (mode 0600). Metadata never contains plaintext keys. Accounts are provider-scoped; matching fingerprints across providers are not shared or deduped.
+Each directory holds `accounts.json` (masked previews, fingerprints, active id, optional disable metadata, optional AnyRouter `baseUrlOverride`) and per-account `<accountId>.json` secret files (mode 0600). Metadata never contains plaintext keys. Accounts are provider-scoped; matching fingerprints across providers are not shared or deduped.
 
-Both providers support **manual** multi-key management in Settings → Models (add/edit/activate/enable/disable/delete/reveal). Only OpenCode Go has optional automatic failover (`opencodeGo.autoFailover`). **xAI does not auto-failover** — users must activate the desired key manually.
+All three support **manual** multi-key management in Settings → Models (add/edit/activate/enable/disable/delete/reveal). Only OpenCode Go has optional automatic failover (`opencodeGo.autoFailover`). **xAI and AnyRouter do not auto-failover** — users must activate the desired key manually. AnyRouter Active delete/disable with remaining accounts requires an explicit replacement account or disconnect; it never silently picks the most recent account.
+
+## AnyRouter Provider, Config & Runtime Bridge
+
+AnyRouter is a fixed jiti-loaded provider (`pi-anyrouter@0.3.2` + verified Web compatibility patch). Models can manage accounts/config even when the catalog has 0 models or the extension failed to load.
+
+### AnyRouter missing from model selector after cold start
+
+1. Confirm `pi-anyrouter@0.3.2` is installed, listed in `next.config.ts` `serverExternalPackages` with `jiti`, and present in lock/shrinkwrap.
+2. Run `npm run verify:pi-anyrouter-patch`. A version/source-hash mismatch is fail-closed — reinstall and re-apply `patches/pi-anyrouter+0.3.2.patch` rather than running an unverified tree.
+3. Confirm `~/.pi/agent/anyrouter.json` has a valid `baseUrl` and non-empty `models[]` when you expect catalog entries. Managed keys alone do not invent model ids.
+4. Check server logs for `[pi-web] failed to load anyrouter provider` / runtime bridge reconcile errors. An AnyRouter load failure must not remove Grok/Kiro/Antigravity.
+5. After Activate or config save, success paths await live auth reload; open a new request or new session if an in-flight call still used the previous Active snapshot.
+
+### Requests still use the old key / Base URL
+
+1. In Models → AnyRouter, confirm the intended account shows **Active** and (if used) the account Base URL override is correct or cleared to inherit default.
+2. Inspect derived files only on a secure host: Active bridge `~/.pi/agent/auth-api-key-accounts/anyrouter/.runtime/provider.json` (0600) should hold the Active key/effective Base URL; `auth.json.anyrouter` is a CredentialStore compatibility mirror and is **not** what 0.3.2 stream adapters read.
+3. Re-Activate the same account to force bridge/auth reconcile after a partial mirror failure; do not hand-edit process env per request.
+4. Effective Base URL order is account override → `PI_ANYROUTER_CC_BASE_URL` → `anyrouter.json.baseUrl`. Retry order is `PI_ANYROUTER_CC_*` retry env → `anyrouter.json.retry` → defaults. Env-overridden fields are read-only in Models and are not stored in `pi-web.json`.
+
+### Config save conflict / stale revision
+
+Models config PATCH uses revision CAS. On conflict, refresh the AnyRouter config card and retry; never force-write `models`, legacy `apiKey`, or unknown fields from the UI. Safe GET/PATCH never return secrets or absolute paths.
+
+### Rate limits and long waits
+
+429/transient errors retry **inside** the provider stream adapter on the current Active key only — they do not switch accounts. Defaults are `maxRetries=10` (up to 11 attempts) with exponential backoff, jitter, and Retry-After cap; Session abort must cancel fetch and backoff. High retry settings can make manual failure cases slow; lower `maxRetries` or abort the turn.
+
+### Rollback / disconnect
+
+1. To stop using AnyRouter without deleting user data: remove Active via explicit disconnect/last-account delete, or hide/remove the fixed provider registration and Models entry in a code rollback.
+2. Preserve `anyrouter.json` and `auth-api-key-accounts/anyrouter/` unless the operator intentionally purges them. Derived bridge/auth mirrors may be removed on explicit disconnect.
+3. Do not auto-delete legacy `anyrouter.json.apiKey` or rewrite `models` as part of rollback.
+4. xAI/OpenCode Go managed-account behavior must remain unchanged when AnyRouter is rolled back.
 
 ## OpenCode Go Auto Failover & Account Recovery
 
@@ -128,7 +163,7 @@ OpenCode Go failover inspects managed account metadata at `~/.pi/agent/auth-api-
 - `accounts.json` — metadata for all accounts, including `disabled`, `disabledReason`, `disabledBy`, `autoDisabledReason`, `enabledAt`, `enabledBy`.
 - `<accountId>.json` (mode 0600) — per-account secret; never inspect this file casually.
 
-xAI multi-key state (manual only) uses the same layout under `~/.pi/agent/auth-api-key-accounts/xai/`; it is independent of the OpenCode Go store and is not read by auto-failover.
+xAI multi-key state (manual only) uses the same layout under `~/.pi/agent/auth-api-key-accounts/xai/`; it is independent of the OpenCode Go store and is not read by auto-failover. AnyRouter multi-key state uses `.../anyrouter/` with the same secret layout plus an Active-only `.runtime/provider.json` bridge; it is also independent of OpenCode Go failover.
 
 A disabled account has `disabled: true` in `accounts.json`. An enabled account either has `disabled: false` or the field is absent (old metadata defaults to enabled).
 

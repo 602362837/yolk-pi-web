@@ -12,8 +12,11 @@
  *   closes, the provider is switched, or the page is refreshed.
  */
 
-import { NextResponse } from "next/server";
-import { revealApiKeyAccount, ApiKeyAccountStoreError } from "@/lib/api-key-accounts";
+import { revealApiKeyAccount } from "@/lib/api-key-accounts";
+import {
+  apiKeyRouteErrorResponse,
+  jsonNoStore,
+} from "@/lib/api-key-route-helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -23,16 +26,11 @@ export async function POST(_req: Request, { params }: Params) {
   const { provider, accountId } = await params;
   try {
     const result = await revealApiKeyAccount(provider, accountId);
-    return NextResponse.json(result, {
-      headers: { "Cache-Control": "no-store" },
-    });
+    return jsonNoStore(result);
   } catch (error) {
     // Security: ApiKeyAccountStoreError messages are generic (e.g. "Account not found")
     // and never contain the API key.  For unexpected errors we return an
     // opaque message to prevent any accidental secret leakage.
-    if (error instanceof ApiKeyAccountStoreError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    return NextResponse.json({ error: "Reveal failed" }, { status: 500 });
+    return apiKeyRouteErrorResponse(error, "Reveal failed");
   }
 }
