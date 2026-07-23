@@ -33,7 +33,7 @@ npm install -g @alan-zhao/yolk-pi-web
 ypi
 ```
 
-Default URL: `http://localhost:30141`. The CLI attempts to open the browser after the server is ready.
+Default URL: `http://localhost:30141`. On interactive desktops the CLI attempts to open the browser after the server is ready. Auto-open is skipped when `--no-open` / `YPI_NO_OPEN=1` is set, when `CI` is set, or on Linux without `DISPLAY`/`WAYLAND_DISPLAY` (typical Docker/headless hosts). Missing helpers such as `xdg-open` never crash a Ready server.
 
 ### CLI Options
 
@@ -41,7 +41,9 @@ Default URL: `http://localhost:30141`. The CLI attempts to open the browser afte
 ypi --port 8080              # custom port
 ypi --hostname 127.0.0.1     # bind to localhost only
 ypi -p 8080 -H 127.0.0.1     # short options
+ypi --no-open                # do not auto-open a browser after Ready
 PORT=8080 ypi                # environment variable is also supported
+YPI_NO_OPEN=1 ypi            # same as --no-open
 ypi --proxy http://127.0.0.1:7897                 # HTTP_PROXY/HTTPS_PROXY
 ypi --socks-proxy socks5://127.0.0.1:7897         # ALL_PROXY/SOCKS proxy
 ```
