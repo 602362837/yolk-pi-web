@@ -34,6 +34,8 @@ const SERVER_ARG_SPEC = {
     proxy: { type: "string" },
     "socks-proxy": { type: "string" },
     "no-proxy": { type: "string" },
+    // Disable auto browser open after Ready (Docker/headless/server installs).
+    "no-open": { type: "boolean", default: false },
   },
   strict: false,
 };
@@ -96,13 +98,53 @@ function createRuntimeEnv(baseEnv, { httpProxy, socksProxy, noProxy } = {}) {
 }
 
 /**
+ * Decide whether ypi should auto-open a browser after Ready.
+ * Explicit `--no-open` / `YPI_NO_OPEN=1` always wins. Headless Linux (no
+ * DISPLAY/WAYLAND) and CI default to false so containers do not spawn xdg-open.
+ */
+function shouldAutoOpenBrowser({ noOpen = false } = {}) {
+  if (noOpen === true) return false;
+  const envNoOpen = process.env.YPI_NO_OPEN;
+  if (envNoOpen === "1" || envNoOpen === "true" || envNoOpen === "yes") return false;
+  if (process.env.CI === "true" || process.env.CI === "1") return false;
+  if (process.platform === "linux") {
+    const hasDisplay = Boolean(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
+    if (!hasDisplay) return false;
+  }
+  return true;
+}
+
+/**
  * Open a URL in the user's default browser. Cross-platform best effort.
+ *
+ * Never throws and never emits unhandled ChildProcess errors: missing
+ * helpers such as `xdg-open` in Alpine/Docker must not crash a Ready server.
  */
 function openBrowser(url) {
-  const isWindows = process.platform === "win32";
-  const isMac = process.platform === "darwin";
-  const openCmd = isWindows ? "start" : isMac ? "open" : "xdg-open";
-  spawn(openCmd, [url], { shell: isWindows, stdio: "ignore", detached: true }).unref();
+  if (typeof url !== "string" || !url) return;
+  try {
+    const isWindows = process.platform === "win32";
+    const isMac = process.platform === "darwin";
+    const openCmd = isWindows ? "cmd" : isMac ? "open" : "xdg-open";
+    const args = isWindows ? ["/c", "start", "", url] : [url];
+    const child = spawn(openCmd, args, {
+      shell: false,
+      stdio: "ignore",
+      detached: true,
+      windowsHide: true,
+    });
+    child.on("error", () => {
+      // Missing binary (ENOENT) or spawn failures are non-fatal.
+    });
+    // Detach without keeping the parent alive; ignore if already exited.
+    try {
+      child.unref();
+    } catch {
+      // ignore
+    }
+  } catch {
+    // Best-effort only — never fail the caller.
+  }
 }
 
 /**
@@ -213,6 +255,7 @@ module.exports = {
   resolveNextBin,
   createRuntimeEnv,
   ensurePortableRequiredServerFiles,
+  shouldAutoOpenBrowser,
   openBrowser,
   startNextServer,
 };

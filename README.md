@@ -34,7 +34,7 @@ npm install -g @alan-zhao/yolk-pi-web
 ypi
 ```
 
-默认监听 `http://localhost:30141`。服务就绪后，CLI 会尝试自动打开浏览器。
+默认监听 `http://localhost:30141`。在桌面环境下服务就绪后，CLI 会尝试自动打开浏览器；无桌面/Docker/CI 或使用 `--no-open` 时会跳过，且缺少 `xdg-open` 也不会导致进程退出。
 
 ## 终端聊天入口 `ypic`
 
@@ -112,10 +112,14 @@ TTY 底部固定输入区与状态栏：
 ypi --port 8080              # 自定义端口
 ypi --hostname 127.0.0.1     # 仅本机访问
 ypi -p 8080 -H 127.0.0.1     # 短参数组合
+ypi --no-open                # 就绪后不自动打开浏览器（Docker/无桌面环境推荐）
 PORT=8080 ypi                # 也支持 PORT 环境变量
+YPI_NO_OPEN=1 ypi            # 与 --no-open 相同
 ypi --proxy http://127.0.0.1:7897                 # HTTP/HTTPS 代理
 ypi --socks-proxy socks5://127.0.0.1:7897         # ALL_PROXY/SOCKS 代理
 ```
+
+无 `DISPLAY`/`WAYLAND_DISPLAY` 的 Linux 容器、CI，或缺少 `xdg-open` 时，自动开浏览器会跳过或静默失败，**不会**拖垮已 Ready 的服务。
 
 `npx` 同样支持这些参数：
 

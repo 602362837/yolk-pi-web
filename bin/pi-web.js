@@ -12,7 +12,7 @@
 const path = require("path");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const serverRunner = require("./server-runner");
-const { parseServerArgs, startNextServer } = serverRunner;
+const { parseServerArgs, shouldAutoOpenBrowser, startNextServer } = serverRunner;
 
 const pkgDir = path.join(__dirname, "..");
 
@@ -23,6 +23,7 @@ const hostname   = cliArgs.hostname ?? process.env.HOSTNAME ?? null;
 const httpProxy  = cliArgs.proxy ?? process.env.PROXY_URL ?? process.env.HTTP_PROXY ?? process.env.http_proxy ?? null;
 const socksProxy = cliArgs["socks-proxy"] ?? process.env.SOCKS_PROXY_URL ?? process.env.ALL_PROXY ?? process.env.all_proxy ?? null;
 const noProxy    = cliArgs["no-proxy"] ?? process.env.NO_PROXY ?? process.env.no_proxy ?? null;
+const openBrowser = shouldAutoOpenBrowser({ noOpen: cliArgs["no-open"] === true });
 
 const { child } = startNextServer({
   pkgDir,
@@ -31,7 +32,7 @@ const { child } = startNextServer({
   httpProxy,
   socksProxy,
   noProxy,
-  openBrowser: true,
+  openBrowser,
 });
 
 child.on("exit", (code) => process.exit(code ?? 0));
