@@ -257,32 +257,38 @@ Default proxy is `http://127.0.0.1:7897`; override with `PROXY_URL` or `SOCKS_PR
 
 The Links module enables GitHub identity connections through GitHub OAuth Device Flow using a **product-owned OAuth App**.
 
-### Prerequisites
+### Official run (out of the box)
 
-- A GitHub OAuth App with **Device Flow enabled** (no callback URL needed).
-- The OAuth App client id must be provided via server-only env var `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`.
-- **No client secret** is required or configured.
-
-### Official build / deployment
+Official `ypi` / `npm run start` does **not** require exporting a Client ID. The server-only resolver in `lib/github-link-oauth.ts` uses the built-in product default Client ID `Ov23li1Cb4aoB9kKQZNq` (Device Flow enabled) when the env var is unset, empty, or whitespace-only.
 
 ```bash
-export YPI_LINKS_GITHUB_OAUTH_CLIENT_ID=<product-client-id>
 ypi
+# or
+npm run start
 ```
 
-This value is server-only and never exposed to the browser or `NEXT_PUBLIC_*`.
+Terminal users do not create an OAuth App, paste a PAT, or fill any Links form. There is **no client secret**, no `NEXT_PUBLIC_*` Client ID, no `pi-web.json` field, and no Settings Client ID UI.
 
-### Source developers
+### Optional server env override
 
-Developers can obtain their own GitHub OAuth App client id (Device Flow enabled) for local testing:
+Source developers and deployers may override the product default with a non-empty, **trimmed** server-only env value:
+
+| Env var | Purpose | Required |
+| --- | --- | --- |
+| `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` | Optional override of the product default GitHub OAuth App client id (Device Flow enabled) | No — unset / `""` / whitespace falls back to the product default |
 
 ```bash
-YPI_LINKS_GITHUB_OAUTH_CLIENT_ID=your-dev-client-id npm run dev
+# Source developer / custom deploy override (value is trimmed)
+YPI_LINKS_GITHUB_OAUTH_CLIENT_ID='  your-dev-client-id  ' npm run dev
 ```
 
-### Missing configuration
+Priority: non-empty trimmed `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` > product default. Blank env is **not** a disable switch. A wrong non-empty override is an explicit override and does **not** silently fall back to the product default. Resolver results are process-lifetime cached — change the env and **restart** the process.
 
-When `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` is not set, the Links UI shows a safe "GitHub authorization is not configured" state. The authorization start API returns `503 github_authorization_not_configured`. There is **no PAT fallback** — the configuration must be provided to enable Links.
+This value is server-only and never exposed to the browser, `NEXT_PUBLIC_*`, React state, DOM, or `/api/links` wire fields. Client ID is sent only server-to-GitHub on the fixed Device Flow endpoints.
+
+### Defensive not-configured path
+
+Normal production without env is **configured** (`GET /api/links` reports GitHub authorization configured). The stable `503 github_authorization_not_configured` code and the existing Settings “not configured” UI remain as defensive / test-only fail-closed surfaces (for example focused-test forced null, or an unexpected resolver fault). There is **no PAT fallback** and no empty-env production disable.
 
 ## Repository Remotes
 

@@ -255,22 +255,137 @@ async function main() {
     console.log("3. GitHub OAuth adapter");
 
     const setClientId = (id) => githubOAuth._testOverrideGithubClientId(id);
+    const PRODUCT_DEFAULT_GITHUB_CLIENT_ID = "Ov23li1Cb4aoB9kKQZNq";
+    const ENV_GITHUB_CLIENT_ID = "YPI_LINKS_GITHUB_OAUTH_CLIENT_ID";
+    const originalEnvClientId = process.env[ENV_GITHUB_CLIENT_ID];
 
-    await test("resolveGithubOAuthClientId returns null when not set", () => {
-      setClientId(null);
-      assert.equal(githubOAuth.resolveGithubOAuthClientId(), null);
+    /** Restore process env + clear test override/cache after each env-resolution case. */
+    function restoreGithubClientIdEnv() {
+      if (originalEnvClientId === undefined) {
+        delete process.env[ENV_GITHUB_CLIENT_ID];
+      } else {
+        process.env[ENV_GITHUB_CLIENT_ID] = originalEnvClientId;
+      }
+      // undefined = clear cache; next resolve re-reads env > product default
+      setClientId(undefined);
+    }
+
+    await test("resolveGithubOAuthClientId returns product default when env unset", () => {
+      try {
+        delete process.env[ENV_GITHUB_CLIENT_ID];
+        setClientId(undefined);
+        assert.equal(
+          githubOAuth.resolveGithubOAuthClientId(),
+          PRODUCT_DEFAULT_GITHUB_CLIENT_ID,
+        );
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
+      } finally {
+        restoreGithubClientIdEnv();
+      }
     });
 
-    await test("resolveGithubOAuthClientId returns value from override", () => {
-      setClientId("test-client-id-123");
-      assert.equal(githubOAuth.resolveGithubOAuthClientId(), "test-client-id-123");
+    await test("resolveGithubOAuthClientId falls back to product default for empty env", () => {
+      try {
+        process.env[ENV_GITHUB_CLIENT_ID] = "";
+        setClientId(undefined);
+        assert.equal(
+          githubOAuth.resolveGithubOAuthClientId(),
+          PRODUCT_DEFAULT_GITHUB_CLIENT_ID,
+        );
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
+      } finally {
+        restoreGithubClientIdEnv();
+      }
     });
 
-    await test("isGithubOAuthConfigured reflects client id", () => {
-      setClientId("test-client-id-123");
-      assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
-      setClientId(null);
-      assert.equal(githubOAuth.isGithubOAuthConfigured(), false);
+    await test("resolveGithubOAuthClientId falls back to product default for whitespace env", () => {
+      try {
+        process.env[ENV_GITHUB_CLIENT_ID] = "   \t  ";
+        setClientId(undefined);
+        assert.equal(
+          githubOAuth.resolveGithubOAuthClientId(),
+          PRODUCT_DEFAULT_GITHUB_CLIENT_ID,
+        );
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
+      } finally {
+        restoreGithubClientIdEnv();
+      }
+    });
+
+    await test("resolveGithubOAuthClientId prefers non-empty trimmed env override", () => {
+      try {
+        process.env[ENV_GITHUB_CLIENT_ID] = "  custom-client-id-override  ";
+        setClientId(undefined);
+        assert.equal(
+          githubOAuth.resolveGithubOAuthClientId(),
+          "custom-client-id-override",
+        );
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
+      } finally {
+        restoreGithubClientIdEnv();
+      }
+    });
+
+    await test("resolveGithubOAuthClientId caches env override until reset", () => {
+      try {
+        process.env[ENV_GITHUB_CLIENT_ID] = "cached-env-client";
+        setClientId(undefined);
+        assert.equal(githubOAuth.resolveGithubOAuthClientId(), "cached-env-client");
+        // Mutating env without cache clear must not hot-reload.
+        process.env[ENV_GITHUB_CLIENT_ID] = "later-env-client";
+        assert.equal(githubOAuth.resolveGithubOAuthClientId(), "cached-env-client");
+        setClientId(undefined);
+        assert.equal(githubOAuth.resolveGithubOAuthClientId(), "later-env-client");
+      } finally {
+        restoreGithubClientIdEnv();
+      }
+    });
+
+    await test("_testOverrideGithubClientId forces string / null / undefined reset", () => {
+      try {
+        delete process.env[ENV_GITHUB_CLIENT_ID];
+        setClientId("  forced-test-client  ");
+        assert.equal(githubOAuth.resolveGithubOAuthClientId(), "forced-test-client");
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
+
+        setClientId(null);
+        assert.equal(githubOAuth.resolveGithubOAuthClientId(), null);
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), false);
+
+        // blank forced string is treated as fail-closed, not product default
+        setClientId("   ");
+        assert.equal(githubOAuth.resolveGithubOAuthClientId(), null);
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), false);
+
+        // undefined clears override/cache and re-reads env > product default
+        setClientId(undefined);
+        assert.equal(
+          githubOAuth.resolveGithubOAuthClientId(),
+          PRODUCT_DEFAULT_GITHUB_CLIENT_ID,
+        );
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
+      } finally {
+        restoreGithubClientIdEnv();
+      }
+    });
+
+    await test("isGithubOAuthConfigured is true for product default and env override", () => {
+      try {
+        delete process.env[ENV_GITHUB_CLIENT_ID];
+        setClientId(undefined);
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
+
+        process.env[ENV_GITHUB_CLIENT_ID] = "env-configured-client";
+        setClientId(undefined);
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
+
+        setClientId("test-client-id-123");
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), true);
+        setClientId(null);
+        assert.equal(githubOAuth.isGithubOAuthConfigured(), false);
+      } finally {
+        restoreGithubClientIdEnv();
+      }
     });
 
     await test("parseGrantedScopes handles various inputs", () => {
@@ -387,11 +502,68 @@ async function main() {
     });
 
     await test("requestDeviceCode throws when not configured", async () => {
-      setClientId(null);
-      await assert.rejects(
-        () => githubOAuth.requestDeviceCode(),
-        (err) => err.code === "github_authorization_not_configured",
-      );
+      try {
+        setClientId(null);
+        await assert.rejects(
+          () => githubOAuth.requestDeviceCode(),
+          (err) => err.code === "github_authorization_not_configured",
+        );
+      } finally {
+        restoreGithubClientIdEnv();
+      }
+    });
+
+    await test("requestDeviceCode uses trimmed env override as client_id", async () => {
+      try {
+        process.env[ENV_GITHUB_CLIENT_ID] = "  env-device-client  ";
+        setClientId(undefined);
+        let seenBody = "";
+        setMockFetchHandler((url, init) => {
+          if (url === types.GITHUB_DEVICE_CODE_URL) {
+            seenBody = typeof init?.body === "string" ? init.body : "";
+            return makeMockResponse({
+              device_code: DEVICE_CODE_SENTINEL,
+              user_code: USER_CODE_SENTINEL,
+              verification_uri: "https://github.com/login/device",
+              expires_in: 900,
+              interval: 5,
+            }, 200);
+          }
+        });
+        await githubOAuth.requestDeviceCode();
+        const params = new URLSearchParams(seenBody);
+        assert.equal(params.get("client_id"), "env-device-client");
+        assert.equal(params.get("scope"), "read:user");
+      } finally {
+        setMockFetchHandler(null);
+        restoreGithubClientIdEnv();
+      }
+    });
+
+    await test("requestDeviceCode uses product default client_id when env blank", async () => {
+      try {
+        process.env[ENV_GITHUB_CLIENT_ID] = "";
+        setClientId(undefined);
+        let seenBody = "";
+        setMockFetchHandler((url, init) => {
+          if (url === types.GITHUB_DEVICE_CODE_URL) {
+            seenBody = typeof init?.body === "string" ? init.body : "";
+            return makeMockResponse({
+              device_code: DEVICE_CODE_SENTINEL,
+              user_code: USER_CODE_SENTINEL,
+              verification_uri: "https://github.com/login/device",
+              expires_in: 900,
+              interval: 5,
+            }, 200);
+          }
+        });
+        await githubOAuth.requestDeviceCode();
+        const params = new URLSearchParams(seenBody);
+        assert.equal(params.get("client_id"), PRODUCT_DEFAULT_GITHUB_CLIENT_ID);
+      } finally {
+        setMockFetchHandler(null);
+        restoreGithubClientIdEnv();
+      }
     });
 
     await test("requestDeviceCode rejects non-GitHub verificationUri", async () => {
@@ -1125,6 +1297,114 @@ async function main() {
       assertNotIncludes(oauthSrc, "NEXT_PUBLIC", "no NEXT_PUBLIC client id");
       assertIncludes(oauthSrc, "YPI_LINKS_GITHUB_OAUTH_CLIENT_ID", "server-only env var");
       assertIncludes(oauthSrc, "process.env", "uses process.env");
+      assertIncludes(
+        oauthSrc,
+        `PRODUCT_DEFAULT_GITHUB_CLIENT_ID = "${PRODUCT_DEFAULT_GITHUB_CLIENT_ID}"`,
+        "product default constant",
+      );
+    });
+
+    await test("product default client id stays out of browser UI and wire routes", () => {
+      // Scope scans to browser/runtime + wire surfaces (not server-only docs).
+      // LinksConfig may mention the env name in defensive not-configured copy;
+      // that is pre-existing UI and not a product-default leak.
+      const browserAndWirePaths = [
+        "components/LinksConfig.tsx",
+        "app/api/links/route.ts",
+        "app/api/links/[provider]/authorizations/route.ts",
+        "app/api/links/[provider]/authorizations/[authorizationId]/route.ts",
+        "app/api/links/[provider]/authorizations/[authorizationId]/events/route.ts",
+        "app/api/links/[provider]/connections/route.ts",
+        "app/api/links/[provider]/connections/[connectionId]/route.ts",
+        "lib/links-types.ts",
+      ];
+      for (const rel of browserAndWirePaths) {
+        const src = readSource(rel);
+        assertNotIncludes(
+          src,
+          PRODUCT_DEFAULT_GITHUB_CLIENT_ID,
+          `${rel} must not embed product default client id`,
+        );
+        assertNotIncludes(
+          src,
+          "NEXT_PUBLIC",
+          `${rel} must not introduce NEXT_PUBLIC links config`,
+        );
+        assertNotIncludes(
+          src,
+          "resolveGithubOAuthClientId",
+          `${rel} must not import client-id resolver into wire/UI surface`,
+        );
+        assertNotIncludes(
+          src,
+          "_testOverrideGithubClientId",
+          `${rel} must not import test client-id override`,
+        );
+      }
+
+      // Browser component must not import the server-only oauth module.
+      const configSrc = readSource("components/LinksConfig.tsx");
+      assertNotIncludes(
+        configSrc,
+        "github-link-oauth",
+        "LinksConfig must not import server oauth module",
+      );
+      assertNotIncludes(
+        configSrc,
+        "PRODUCT_DEFAULT_GITHUB_CLIENT_ID",
+        "LinksConfig must not reference product default constant",
+      );
+
+      // Catalog projects configured boolean only; never the raw client id value.
+      const catalogSrc = readSource("app/api/links/route.ts");
+      assertIncludes(
+        catalogSrc,
+        "authorizationConfigured",
+        "catalog projects configured boolean",
+      );
+      assertIncludes(
+        catalogSrc,
+        "isGithubOAuthConfigured",
+        "catalog uses configured helper",
+      );
+      assertNotIncludes(
+        catalogSrc,
+        "YPI_LINKS_GITHUB_OAUTH_CLIENT_ID",
+        "catalog response path must not mention env name",
+      );
+
+      // Wire type projects the boolean, not a clientId field.
+      const typesSrc = readSource("lib/links-types.ts");
+      assertIncludes(
+        typesSrc,
+        "authorizationConfigured",
+        "wire type has authorizationConfigured",
+      );
+      assertNotIncludes(
+        typesSrc,
+        "clientId",
+        "wire type has no clientId field",
+      );
+      assertNotIncludes(
+        typesSrc,
+        "YPI_LINKS_GITHUB_OAUTH_CLIENT_ID",
+        "wire type has no env name",
+      );
+
+      // Forbidden-body helper still blocks client-submitted client id fields.
+      const apiHelpersSrc = readSource("lib/links-api-helpers.ts");
+      assertIncludes(apiHelpersSrc, '"clientId"', "forbids clientId body key");
+      assertIncludes(apiHelpersSrc, '"client_id"', "forbids client_id body key");
+      assertNotIncludes(
+        apiHelpersSrc,
+        PRODUCT_DEFAULT_GITHUB_CLIENT_ID,
+        "api helpers must not embed product default",
+      );
+      assertNotIncludes(
+        apiHelpersSrc,
+        "NEXT_PUBLIC",
+        "api helpers must not introduce NEXT_PUBLIC",
+      );
     });
 
     // ══════════════════════════════════════════════════════════════════

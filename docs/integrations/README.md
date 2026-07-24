@@ -309,8 +309,8 @@ The **Links** domain is an isolated subsystem that lets users connect multiple G
 
 ### Design
 
-- **App identity**: Product-owned GitHub OAuth App with Device Flow enabled. Client id from server-only `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`. **No client secret** required or configured.
-- **Terminal user**: Does not create an OAuth App, does not paste PAT.
+- **App identity**: Product-owned GitHub OAuth App with Device Flow enabled. Server-only product default Client ID `Ov23li1Cb4aoB9kKQZNq` is built into `lib/github-link-oauth.ts`. Optional non-empty trimmed `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` overrides that default. **No client secret** required or configured.
+- **Terminal user**: Official `ypi` / `npm run start` needs no export. Does not create an OAuth App, does not paste PAT, does not configure Client ID in the browser or `pi-web.json`.
 - **Scope**: Fixed `read:user` only.
 - **Multi-account**: Multiple GitHub numeric user ids can be connected simultaneously.
 - **Duplicate identity**: Returns `409 duplicate_identity`; existing credentials are not replaced.
@@ -321,9 +321,9 @@ The **Links** domain is an isolated subsystem that lets users connect multiple G
 
 | Env var | Purpose | Required |
 | --- | --- | --- |
-| `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` | Server-only client id for the product-owned GitHub OAuth App (Device Flow enabled) | Yes — missing means `github_authorization_not_configured` and the UI shows a safe unavailable state |
+| `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` | Optional server-only override of the product default GitHub OAuth App client id (Device Flow enabled) | No — unset / empty / whitespace falls back to product default `Ov23li1Cb4aoB9kKQZNq` |
 
-No client secret is needed. No browser/client-side config. Source developers can set their own OAuth App client id for local testing.
+Priority: non-empty trimmed env > product default. Blank env is fallback, **not** disable. Wrong non-empty overrides are explicit and do not silently fall back. Resolver cache is process-lifetime; restart after changing env. No client secret, no `NEXT_PUBLIC_*`, no browser/client-side config, no `pi-web.json` field, no Settings Client ID form. Source developers/deployers may set their own Device-Flow-enabled OAuth App client id for local testing or custom deploys. The catalog/UI “not configured” path and `github_authorization_not_configured` remain defensive / test-only fail-closed surfaces.
 
 ### Network Contract
 

@@ -4,9 +4,14 @@
  * ## Design
  *
  * - Uses a **product-owned** GitHub OAuth App with Device Flow enabled.
- * - Client id is read from server-only `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`.
+ * - Client id resolution (server-only):
+ *     non-empty trimmed `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` > product default.
+ *   Unset / empty / whitespace env falls back to the product default; blank is
+ *   **not** an explicit disable. There is no production disable switch.
  * - **No client secret** (Device Flow does not require it).
- * - Missing configuration returns a stable error — never falls back to PAT.
+ * - Normal production resolution always yields a non-empty client id.
+ *   Defensive null guards and `github_authorization_not_configured` remain for
+ *   test-only forced-null / fault injection — never falls back to PAT.
  * - Fixed endpoints, fixed `read:user` scope, fixed verification URI.
  * - device_code and access token are server-only values and must never
  *   appear in wire snapshots, API responses, SSE frames, metadata, logs,
@@ -53,7 +58,14 @@ import type { LinkProviderAdapter } from "./links-provider-registry";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Server-only env var for the product-owned GitHub OAuth App client id. */
+/**
+ * Product-default GitHub OAuth App client id (Device Flow enabled).
+ * Server-only: never export to browser bundles, wire fields, or pi-web.json.
+ * Public OAuth app identifier — not a secret — but configuration entry remains server-only.
+ */
+const PRODUCT_DEFAULT_GITHUB_CLIENT_ID = "Ov23li1Cb4aoB9kKQZNq";
+
+/** Optional server-only env override for the GitHub OAuth App client id. */
 const ENV_GITHUB_CLIENT_ID = "YPI_LINKS_GITHUB_OAUTH_CLIENT_ID";
 
 /** Fixed P0 scope. */
@@ -92,8 +104,9 @@ const GITHUB_API_VERSION = "2022-11-28";
 // ─── Safe error messages ─────────────────────────────────────────────────────
 
 const SAFE_ERRORS = {
+  // Defensive / test-only path. Production defaults to a built-in product client id.
   not_configured:
-    "GitHub Device Flow is not configured. Set YPI_LINKS_GITHUB_OAUTH_CLIENT_ID.",
+    "GitHub Device Flow authorization is not available in this process.",
   network: "Network error contacting GitHub",
   timeout: "GitHub request timed out",
   upstream_error: "GitHub returned an unexpected error",
@@ -154,40 +167,72 @@ function mapGitHubTokenError(
 
 // ─── Client id resolution (server-only) ──────────────────────────────────────
 
+/**
+ * Process-lifetime cache:
+ * - `undefined` → not resolved yet (next call reads env > product default)
+ * - `string` → resolved / forced client id
+ * - `null` → fail-closed (test-only forced null; production resolver never writes this)
+ */
 let _cachedClientId: string | null | undefined;
 
 /**
- * Resolve the GitHub OAuth App client id from server environment.
+ * Resolve the GitHub OAuth App client id (server-only).
  *
- * Returns `null` when not configured (fail closed).
- * The value is cached after first read for the process lifetime.
+ * Priority:
+ * 1. non-empty trimmed `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`
+ * 2. product default `PRODUCT_DEFAULT_GITHUB_CLIENT_ID`
+ *
+ * Unset / empty / whitespace env falls back to the product default.
+ * Production resolution always returns a non-empty string; `null` is only
+ * reachable via test-only forced-null override. Result is cached for the
+ * process lifetime (env changes require restart).
  */
 export function resolveGithubOAuthClientId(): string | null {
   if (_cachedClientId !== undefined) return _cachedClientId;
 
   const raw = process.env[ENV_GITHUB_CLIENT_ID];
-  if (typeof raw !== "string" || raw.trim().length === 0) {
-    _cachedClientId = null;
-    return null;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (trimmed.length > 0) {
+      _cachedClientId = trimmed;
+      return _cachedClientId;
+    }
   }
-  _cachedClientId = raw.trim();
+
+  _cachedClientId = PRODUCT_DEFAULT_GITHUB_CLIENT_ID;
   return _cachedClientId;
 }
 
 /**
  * Check whether GitHub OAuth is configured (client id is present).
+ * True for product default and non-empty env override; false only under
+ * test-only forced-null (or other defensive null cache states).
  */
 export function isGithubOAuthConfigured(): boolean {
   return resolveGithubOAuthClientId() !== null;
 }
 
 /**
- * Override the cached client id (for tests).
+ * Test-only client id cache control (three-state):
+ * - `string`: force a trimmed client id (blank/whitespace → forced null)
+ * - `null`: force fail-closed (`github_authorization_not_configured`)
+ * - `undefined`: clear cache; next resolve re-reads env > product default
+ *
+ * Not a production configuration surface.
  */
 export function _testOverrideGithubClientId(
-  clientId: string | null,
+  clientId: string | null | undefined,
 ): void {
-  _cachedClientId = clientId === null ? null : clientId.trim() || null;
+  if (clientId === undefined) {
+    _cachedClientId = undefined;
+    return;
+  }
+  if (clientId === null) {
+    _cachedClientId = null;
+    return;
+  }
+  const trimmed = clientId.trim();
+  _cachedClientId = trimmed.length > 0 ? trimmed : null;
 }
 
 // ─── Scope parsing ───────────────────────────────────────────────────────────
