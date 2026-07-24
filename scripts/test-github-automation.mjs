@@ -4412,7 +4412,7 @@ await test("GHCRED-06 installation token cache clears after local rotation and d
     new Request("http://localhost/api/github-automation/credentials", {
       method: "DELETE",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ confirm: credentialsRoute._CREDENTIALS_DELETE_CONFIRM }),
+      body: JSON.stringify({ confirm: "remove_local_credentials" }),
     }),
   );
   const delBody = await responseJson(del);
@@ -4743,7 +4743,7 @@ await test("GHCRED-06 credentials route GET/PUT/DELETE contracts and sentinel is
         method: "DELETE",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          confirm: credentialsRoute._CREDENTIALS_DELETE_CONFIRM,
+          confirm: "remove_local_credentials",
         }),
       }),
     ),

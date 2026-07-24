@@ -630,5 +630,3 @@ export async function PATCH(): Promise<NextResponse> {
   );
 }
 
-// Re-export for tests that want the confirm constant without hardcoding drift.
-export const _CREDENTIALS_DELETE_CONFIRM = DELETE_CONFIRM;
