@@ -469,6 +469,95 @@ Settings → Links is a root-level leaf (after Studio, before 模型与用量). 
 
 Hide the `links` Settings leaf and return 503 from authorization start. Retain `~/.pi/agent/links/` data — do not auto-delete or migrate back to `auth.json`. Pending authorizations are memory-only; a server restart naturally clears them. Remote GitHub OAuth grants must be manually revoked by the user at GitHub Settings → Applications → Authorized OAuth Apps.
 
+## GitHub App automation (P0 triage)
+
+The **GitHub automation** domain is separate from Links and from LLM auth. It uses a **GitHub App installation** for webhook intake, labels, comments, and assignment API mutations. The **machine active GitHub credential user** is only the Issue **Assignee display identity** — never a Bot/API/publisher fallback.
+
+P0 ships independently and is headless-capable. It does **not** include unattended full-agent implementation, WorkTree orchestration, or App PR publishing by default.
+
+### P1 unattended (default-off)
+
+When operator enables `mode=unattended` **and** `unattended.enabled=true` (still **default-off**), owner adoption after a **complete claim** may start durable WorkTree + Studio + **standard full agent** for the `docs-and-small-bugfix` risk profile, then a **server-owned App publisher** opens exactly one same-repo PR with `Fixes #N`. P1 is **not** a sandbox:
+
+- Full agent retains normal file/bash/network capabilities for its OS user.
+- Owner-only trigger, WorkTree, policy/checker/final-diff gates, pause, and server publisher are **business/publish guards**, not host isolation.
+- Product guarantees only that App private key/JWT/installation token, webhook secret, and machine personal credentials are **not deliberately injected** into agent prompt/task/session/env; tests scan those surfaces with sentinels. This does **not** prove the agent cannot read same-OS-user files on its own.
+- Recommend running production automation under a **dedicated low-privilege OS account or container** with minimal host credentials and network policy.
+- Global unattended concurrency is 1; pause/stop/retry resume the same durable job/generation (no automatic merge/release/main push).
+- Rollback: `unattended.enabled=false` returns owner adoption to `accepted_waiting_automation`; `enabled=false`/`mode=off` stops new jobs without deleting Issue/comment/label/assignee/worktree/task/branch/PR/audit records.
+
+Focused tests: `npm run test:github-automation` (P0), `npm run test:github-unattended` (P1 adversarial/recovery/E2E with mocks), `npm run test:github-publish-policy` (diff/PR/publisher).
+
+### Identity matrix
+
+| Identity | Allowed | Forbidden |
+| --- | --- | --- |
+| GitHub App installation | webhook, labels, comments, add-assignee API, later P1 push/PR | pretending to be owner approval; becoming the human Assignee |
+| Machine active `gh` / fixed `github.com` git credential user | Assignee display only; login discovery + assignability check | Bot comments, labels, push/PR fallback; storing token in config/task/session |
+| Repository owner actor | Affirmative natural-language adoption comments | Supplying paths/commands/policy/tokens |
+
+### Successful claim definition
+
+`claimed=true` only when **all** of the following are true:
+
+1. Local issue lease is held.
+2. Issue has Bot-managed `ypi:claimed`.
+3. Issue assignees **read back** contain the resolved machine login (HTTP 2xx alone is not success; GitHub may silently ignore).
+4. Canonical Bot triage comment with automation marker exists.
+
+Incomplete identity/assign/read-back → `blocked_claim_assignee`. Bot-managed `ypi:claimed` is withheld or removed; optional `ypi:claim-blocked` may be set; App publishes a safe incomplete-claim comment. Fix credentials/collaborator/Issues permissions and retry the same durable job.
+
+### P0 flow
+
+```text
+POST /api/github-automation/webhook
+  → capped raw body + X-Hub-Signature-256 (timingSafeEqual)
+  → allowlist by immutable repository.id
+  → exclusive delivery + durable job enqueue → 202
+  → scheduler + per-issue lease
+  → resolve machine login (gh active, else github.com git credential + GET /user)
+  → App assign + Issue read-back + ensure ypi:claimed
+  → triage labels + Chinese conclusion comment
+  → owner actor + affirmative intent
+  → accepted_waiting_automation   # P0 stop: no WorkTree / no PR
+```
+
+### Permissions and events (P0)
+
+| Permission | P0 |
+| --- | --- |
+| Metadata | read |
+| Issues | read/write |
+| Pull requests | not required |
+| Contents | not required |
+
+Events: `issues`, `issue_comment`, plus installation lifecycle for later binding. Operator provides a **public HTTPS** ingress to the webhook route (self-hosted reverse proxy/tunnel); the product does not ship a cloud relay.
+
+### Secrets and storage
+
+Server-only env (never `pi-web.json`, Links, browser, or agent context):
+
+- `YPI_GITHUB_APP_ID`
+- `YPI_GITHUB_APP_PRIVATE_KEY_FILE` (file mode `0600`)
+- `YPI_GITHUB_APP_WEBHOOK_SECRET`
+- optional `YPI_GITHUB_APP_SLUG`
+
+Durable non-secret state under `~/.pi/agent/github-automation/` (`config.json`, deliveries, jobs, issue state, safe events, mkdir leases). Raw webhook bodies, signatures, Issue/comment text, App JWT/installation tokens, and machine personal tokens must not be persisted there.
+
+### Disable / rollback
+
+- `enabled=false` or `mode=off` stops new jobs; webhook still verifies and records safe paused/ignored deliveries.
+- Does **not** delete Issue comments/labels/assignees, jobs, audit events, or force a false successful claim.
+- Machine credential failure blocks new claims (`blocked_claim_assignee`); it does not fall back to App-bot assignee or personal PAT Bot identity.
+
+Focused tests (offline, temp `PI_CODING_AGENT_DIR`, mocked GitHub/credentials; no real operator secrets or live GitHub network):
+
+```bash
+npm run test:github-automation
+npm run test:github-unattended
+npm run test:github-publish-policy
+```
+
 ## Session File Format
 
 Default location:

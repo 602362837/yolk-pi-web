@@ -529,7 +529,8 @@ export interface YpiStudioApprovalGate {
   to: "awaiting_approval";
 }
 
-/** Allowlisted approval grant sources. Historical grants use user-input; widget CTAs write user-widget. */
+/** Allowlisted interactive approval grant sources. Historical grants use user-input; widget CTAs write user-widget.
+ *  GitHub unattended automation must NOT use these sources — it uses policyGrant(source="policy-engine"). */
 export type YpiStudioApprovalGrantSource = "user-input" | "user-widget";
 
 export interface YpiStudioApprovalGrant {
@@ -540,10 +541,94 @@ export interface YpiStudioApprovalGrant {
   source: YpiStudioApprovalGrantSource;
 }
 
+/** Task execution mode. Historical / omitted tasks are interactive. */
+export type YpiStudioExecutionMode = "interactive" | "github_unattended";
+
+/** Owner adoption evidence from GitHub automation (not a chat user approval). */
+export interface YpiStudioOwnerAuthorization {
+  authorizedAt: string;
+  source: "github-owner-intent";
+  repositoryId: number;
+  issueNumber: number;
+  ownerActorId: number;
+  ownerCommentId: number;
+  /** Hash of stripped comment text for binding; never store raw body. */
+  ownerCommentHash: string;
+  /** Only complete claims may authorize unattended implementation. */
+  claimStatus: "complete";
+  recommendation: "yes";
+  matchedPhrase?: string;
+}
+
+/** Internal-only policy grant source. Public API/tool/widget cannot write this. */
+export type YpiStudioPolicyGrantSource = "policy-engine";
+
+export type YpiStudioUnattendedRiskProfile = "docs-and-small-bugfix";
+export type YpiStudioUnattendedExecutionProfile = "full-agent";
+export type YpiStudioUnattendedUiGate = "pass" | "blocked_manual_ui_approval";
+
+/**
+ * Internal policy authorization for GitHub unattended implementing.
+ * Bound to repo/issue/owner comment/policy/plan revision+hash/scope/expiry.
+ * Cannot substitute for interactive user-input/user-widget approvalGrant.
+ */
+export interface YpiStudioPolicyGrant {
+  source: YpiStudioPolicyGrantSource;
+  grantedAt: string;
+  expiresAt: string;
+  policyId: string;
+  policyVersion: string;
+  policyHash: string;
+  planRevision: number;
+  planHash: string;
+  scopeFingerprint: string;
+  riskProfile: YpiStudioUnattendedRiskProfile;
+  executionProfile: YpiStudioUnattendedExecutionProfile;
+  repositoryId: number;
+  issueNumber: number;
+  ownerActorId: number;
+  ownerCommentId: number;
+  claimStatus: "complete";
+  uiGate: YpiStudioUnattendedUiGate;
+}
+
+/**
+ * Server-recorded completion evidence required before unattended auto-finish/publish handoff.
+ * Written only by internal complete/evaluate helpers — never by public routes or tools.
+ */
+export interface YpiStudioUnattendedCompletionEvidence {
+  recordedAt: string;
+  planRevision: number;
+  planHash: string;
+  scopeFingerprint: string;
+  riskProfile: YpiStudioUnattendedRiskProfile;
+  checkerPassed: boolean;
+  validationPassed: boolean;
+  finalDiffAllowed: boolean;
+  /** Optional hash of operator notes / validation command summary (no secrets). */
+  notesHash?: string;
+}
+
+/** Safe automation binding metadata stored on unattended tasks (no tokens/paths/bodies). */
+export interface YpiStudioAutomationBinding {
+  repositoryId: number;
+  issueNumber: number;
+  scopeFingerprint: string;
+  jobId?: string;
+}
+
 export interface YpiStudioTaskMeta extends Record<string, unknown> {
   approvalGate?: YpiStudioApprovalGate;
+  /** Interactive chat/widget grant only. Never use for GitHub unattended. */
   approvalGrant?: YpiStudioApprovalGrant;
   planRevision?: number;
+  /** Omitted / historical tasks are treated as interactive. */
+  executionMode?: YpiStudioExecutionMode;
+  ownerAuthorization?: YpiStudioOwnerAuthorization;
+  /** Internal policy-engine grant for github_unattended only. */
+  policyGrant?: YpiStudioPolicyGrant;
+  completionEvidence?: YpiStudioUnattendedCompletionEvidence;
+  automationBinding?: YpiStudioAutomationBinding;
 }
 
 export type YpiStudioImprovementStatus =

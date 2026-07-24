@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-24T04:42:53.127Z",
+  "updatedAt": "2026-07-24T06:40:56.590Z",
   "entries": [
+    {
+      "id": "20260724-144056-github-议题自动处理闭环-app-bot-认领分析打标-owner-采纳后自动-ypi-实",
+      "title": "GitHub 议题自动处理闭环：App Bot 认领分析打标 + owner 采纳后自动 YPI 实现并提 PR",
+      "taskId": "20260723-151625-github-议题自动处理闭环-app-bot-认领分析打标-owner-采纳后自动-ypi-实",
+      "taskKey": "archived:2026-07:20260723-151625-github-议题自动处理闭环-app-bot-认领分析打标-owner-采纳后自动-ypi-实",
+      "workflowId": "feature-dev",
+      "summary": "## 交付结论 P0–P2 代码与文档已按修订并批准的 plan 落地；**GHA-11 自动化验证全部通过**。 **真实 test-App / 公网 HTTPS / 可控 machine assignee 的 live UAT 未执行**，按 checks 为 **真实仓库 P1 启用前的 release blocker**，不伪造通过。 ## 分期结果 | 分期 | 状态 | 说明 | | --- | --- | --- | | P0 | 可独立发布（自动化） | App webhook、label+machine-assignee 完整认领、triage、owner intent；采纳只到 `accepted_waiting_automation` | | P1 | 默认关闭；自动化门禁通过 | owner-only + complete claim → full agent docs/small-bugfix → server App publisher 唯一 `Fixes #N` PR；不 auto-merge | | P2 | 自动化/代码审查通过 | PR lifecycle、safe status/config/job APIs、Settings 投影与 full-agent 常驻风险 warning | ## 关键验收（对照 checks） 1. **Claim**：成功 = `ypi:claimed` + Issue 回读 machine login assignee；2xx silent-ignore / credential 失败 → `blocked_claim_assignee`，不保留假 claimed。 2. **身份**：App 负责 mutation/publisher；本机 credential 仅解析 assignee；无 Links/PAT fallback。 3. **P1**：interactive Studio grant 不变；automation 用 internal policy grant；UI/高风险 fai…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260723-151625-github-议题自动处理闭环-app-bot-认领分析打标-owner-采纳后自动-ypi-实",
+      "knowledgePath": ".ypi/knowledge/20260724-144056-github-议题自动处理闭环-app-bot-认领分析打标-owner-采纳后自动-ypi-实.md",
+      "createdAt": "2026-07-24T06:40:56.590Z",
+      "archivedAt": "2026-07-24T06:40:56.590Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260724-124253-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
       "title": "排查并优化 session 列表与相关入口的加载性能（项目/设置/模型）",

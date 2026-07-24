@@ -19,11 +19,23 @@ export interface AgentSessionBootstrapOptions {
   cwd?: string;
   provider?: string;
   modelId?: string;
+  /**
+   * When provided and non-empty, restricts active tools to these names.
+   * When omitted, the standard full tool set remains active (file/bash/network).
+   * GitHub unattended (GHA-06) deliberately omits this so restricted tools are
+   * not a launch hard gate. Pass `[]` only when the caller intentionally wants
+   * all tools disabled.
+   */
   toolNames?: string[];
   thinkingLevel?: string;
   applyAutoThinkingLevel?: boolean;
   projectId?: string;
   spaceId?: string;
+  /**
+   * Optional pre-start hook used by GitHub unattended automation to scrub
+   * automation-owned secret env vars. Does not provide host sandboxing.
+   */
+  beforeStart?: () => void | Promise<void>;
 }
 
 export interface AgentSessionBootstrapResult {
@@ -57,9 +69,15 @@ export async function createConfiguredEmptyAgentSession({
   applyAutoThinkingLevel = true,
   projectId,
   spaceId,
+  beforeStart,
 }: AgentSessionBootstrapOptions): Promise<AgentSessionBootstrapResult> {
   if (!cwd || typeof cwd !== "string") {
     throw new AgentSessionBootstrapError("cwd is required");
+  }
+
+  // Optional env/context scrub (e.g. GitHub automation-owned secrets). Not a sandbox.
+  if (beforeStart) {
+    await beforeStart();
   }
 
   const canonicalCwd = canonicalizeCwd(cwd);

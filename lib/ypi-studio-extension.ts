@@ -259,6 +259,10 @@ function summarizeWorkflowTriggers(root: string): string {
 
 function hasRecordedApprovalGrant(task: { meta?: unknown }, key: string | null): boolean {
   if (!key || !isObj(task.meta)) return false;
+  // Interactive chat/widget grant only. github_unattended uses internal policyGrant and must not
+  // be treated as user-approved via this helper (and policy-engine is never a valid source here).
+  const executionMode = str(task.meta.executionMode);
+  if (executionMode === "github_unattended") return false;
   const grant = isObj(task.meta.approvalGrant) ? task.meta.approvalGrant : null;
   if (!grant) return false;
   const contextId = str(grant.contextId);
@@ -273,6 +277,25 @@ function hasRecordedApprovalGrant(task: { meta?: unknown }, key: string | null):
   const approvedMs = Date.parse(approvedAt);
   const enteredMs = Date.parse(enteredAt);
   return Number.isFinite(approvedMs) && Number.isFinite(enteredMs) ? approvedMs > enteredMs : true;
+}
+
+function isGithubUnattendedTaskMeta(task: { meta?: unknown }): boolean {
+  return isObj(task.meta) && str(task.meta.executionMode) === "github_unattended";
+}
+
+function hasValidUnattendedPolicyGrant(task: { meta?: unknown; implementationPlan?: unknown }): boolean {
+  if (!isGithubUnattendedTaskMeta(task) || !isObj(task.meta)) return false;
+  const policy = isObj(task.meta.policyGrant) ? task.meta.policyGrant : null;
+  const owner = isObj(task.meta.ownerAuthorization) ? task.meta.ownerAuthorization : null;
+  if (!policy || !owner) return false;
+  if (str(policy.source) !== "policy-engine") return false;
+  if (str(policy.uiGate) === "blocked_manual_ui_approval") return false;
+  if (str(policy.claimStatus) !== "complete" || str(owner.claimStatus) !== "complete") return false;
+  const expiresAt = str(policy.expiresAt);
+  if (!expiresAt) return false;
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) return false;
+  return true;
 }
 
 function buildImprovementStateInjection(task: YpiStudioTaskDetail): string {
@@ -321,13 +344,16 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
 
   const workflow = readYpiStudioWorkflow(root, current.workflowId);
   const state = workflow?.states[current.status];
+  const isUnattended = isGithubUnattendedTaskMeta(current);
   const approvalGranted = current.status === "awaiting_approval" && hasRecordedApprovalGrant(current, key);
+  const unattendedAuthorized = current.status === "awaiting_approval" && isUnattended && hasValidUnattendedPolicyGrant(current);
   const knowledge = getYpiStudioKnowledgeContextForPrompt(root, [current.title, current.workflowId, current.status, query].join(" "), { maxEntries: 3, maxTotalChars: 2600 });
   return [
     "<ypi-studio-state>",
     `Task: ${current.id} (${current.status})`,
     `Title: ${current.title}`,
     `Workflow: ${workflow?.name ?? current.workflowId}`,
+    `Execution mode: ${isUnattended ? "github_unattended" : "interactive"}`,
     `Current state: ${current.progress.label}`,
     `Progress: ${current.progress.percent}%`,
     `Owner: ${current.progress.owner}`,
@@ -342,10 +368,14 @@ function buildStudioState(root: string, key: string | null, query = ""): string 
     current.status === "implementing" && current.implementationPlan ? "Implementing with a plan: fill available concurrency slots, not just one. First inspect ready work with ypi_studio_task(action=implementation_next, limit=<available slots>). Then claim ready subtask(s) up to maxConcurrency with ypi_studio_task(action=claim_implementation_subtask, limit=<available slots>, status=running) or explicit subtaskIds, and start one ypi_studio_subagent(action=start, mode=async, member=implementer, subtaskId=<claimed id>) per claimed subtask. Each implementer run handles exactly one subtaskId, but a single orchestration turn should launch multiple async runs when multiple ready subtasks and free slots exist. After launching async run(s), call ypi_studio_wait(runIds=<started run ids>) so this main chat waits for terminal results and continues from the tool result. Do not delegate the whole implementation at once." : "",
     current.status === "waiting_for_improvements" ? buildImprovementStateInjection(current) : "",
     current.status === "review" && current.improvements?.parentStatus === "review_ready" && current.improvements.instances.length > 0 ? "All improvements have been resolved. The main task is back in review — ask the user to re-accept the main task before completing it." : "",
-    current.status === "awaiting_approval" && approvalGranted ? "The user has explicitly approved the plan in this chat session. You may now transition to implementing in this turn and then dispatch implementer work if needed." : "",
-    current.status === "awaiting_approval" && !approvalGranted ? "Current task is awaiting approval: direct the user to review plan-review.md, summarize the plan/artifacts, and ask for explicit approval or change requests. Do not transition to implementing until a later user input explicitly says 确认/批准/开始实现/approve/go ahead." : "",
-    state?.requiresUserApproval && !approvalGranted ? "This state requires explicit user approval before moving forward." : "",
-    "Never enter implementing from awaiting_approval unless a server-recorded user approval grant exists.",
+    current.status === "awaiting_approval" && !isUnattended && approvalGranted ? "The user has explicitly approved the plan in this chat session. You may now transition to implementing in this turn and then dispatch implementer work if needed." : "",
+    current.status === "awaiting_approval" && !isUnattended && !approvalGranted ? "Current task is awaiting approval: direct the user to review plan-review.md, summarize the plan/artifacts, and ask for explicit approval or change requests. Do not transition to implementing until a later user input explicitly says 确认/批准/开始实现/approve/go ahead." : "",
+    current.status === "awaiting_approval" && isUnattended && unattendedAuthorized ? "GitHub unattended authorization is present (complete claim + ownerAuthorization + internal policyGrant). Transition to implementing is allowed only through the automation path; do not invent interactive user approval." : "",
+    current.status === "awaiting_approval" && isUnattended && !unattendedAuthorized ? "GitHub unattended task is awaiting internal policy authorization: require complete claim, ownerAuthorization, and policyGrant(source=policy-engine). Interactive user-input/user-widget approval cannot authorize this task. UI/user-visible work must fail closed to manual HTML approval." : "",
+    state?.requiresUserApproval && !isUnattended && !approvalGranted ? "This state requires explicit user approval before moving forward." : "",
+    isUnattended
+      ? "Never enter implementing from awaiting_approval on github_unattended unless a server-recorded internal policyGrant is valid; interactive approvalGrant cannot substitute."
+      : "Never enter implementing from awaiting_approval unless a server-recorded user approval grant exists.",
     "</ypi-studio-state>",
     knowledge,
   ].filter(Boolean).join("\n");

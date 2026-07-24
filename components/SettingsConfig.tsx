@@ -9,6 +9,7 @@ import { TerminalSshProfileEditor } from "./TerminalSshProfileEditor";
 import { TrellisWorkflowVisualizer } from "./TrellisWorkflowVisualizer";
 import { ModelPricesConfig } from "./ModelPricesConfig";
 import { LinksConfig } from "./LinksConfig";
+import { GithubAutomationConfig } from "./GithubAutomationConfig";
 import { AppearanceConfig } from "./AppearanceConfig";
 import { SettingsProviderHub } from "./SettingsProviderHub";
 import {
@@ -1839,6 +1840,8 @@ export function SettingsConfig({
                   <AppearanceConfig />
                 ) : view === "links" ? (
                   <LinksConfig />
+                ) : view === "githubAutomation" ? (
+                  <GithubAutomationConfig />
                 ) : view === "modelPrices" ? (
                   <ModelPricesConfig cwd={cwd} />
                 ) : view === "providerHub" ? (
@@ -2600,10 +2603,14 @@ export function SettingsConfig({
         </div>
 
         <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 10, flexShrink: 0 }}>
-          {view === "links" || view === "appearance" ? (
+          {view === "links" || view === "appearance" || view === "githubAutomation" ? (
             <>
               <span style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.45, maxWidth: 520 }}>
-                {view === "appearance" ? "外观页面的上传、切换、编辑和删除会即时保存。全局「保存 / 恢复默认值」仅作用于 " : "Links 页面的连接 / 断开会即时保存。全局「保存 / 恢复默认值」仅作用于 "}<code style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>pi-web.json</code> 配置项，在此页禁用以免误解。
+                {view === "appearance"
+                  ? "外观页面的上传、切换、编辑和删除会即时保存。全局「保存 / 恢复默认值」仅作用于 "
+                  : view === "githubAutomation"
+                    ? "GitHub 自动化的策略与操作会独立即时保存。全局「保存 / 恢复默认值」只作用于 "
+                    : "Links 页面的连接 / 断开会即时保存。全局「保存 / 恢复默认值」仅作用于 "}<code style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>pi-web.json</code> 配置项，在此页禁用以免误解。
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <button

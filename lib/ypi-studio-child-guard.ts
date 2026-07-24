@@ -22,6 +22,12 @@ const TASK_JSON_PATH_RE = /(?:^|[\s'"`])(?:\.\/)?\.ypi\/tasks\/(?:archive\/[^\s'
 export interface YpiStudioChildGuardOptions {
   workspaceRoot?: string;
   blockTaskJsonWrites?: boolean;
+  /**
+   * GitHub unattended full-agent children still block recursive Studio tools and
+   * direct task.json mutation. This flag documents that bash/network/file tools
+   * remain available — restricted tools are not a launch hard gate (GHA-06).
+   */
+  fullAgent?: boolean;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -63,6 +69,8 @@ export function isYpiStudioTaskJsonMutatingBash(command: string, workspaceRoot?:
 }
 
 export function createYpiStudioChildGuardExtension(options: YpiStudioChildGuardOptions = {}) {
+  // fullAgent is informational: we still only block recursive/browser tools.
+  void options.fullAgent;
   return function ypiStudioChildGuardExtension(pi: Pick<ExtensionAPI, "on">): void {
     pi.on?.("tool_call", async (event) => {
       const toolName = typeof event.toolName === "string" ? event.toolName : "";

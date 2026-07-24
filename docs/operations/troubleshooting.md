@@ -585,6 +585,79 @@ To fully revoke the GitHub authorization:
 
 This is a GitHub-side operation only; the yolk pi web Links module does not call GitHub's revocation API in P0.
 
+## GitHub App automation (P0 triage)
+
+### Webhook returns 401
+
+`X-Hub-Signature-256` missing/wrong, or `YPI_GITHUB_APP_WEBHOOK_SECRET` does not match the App webhook secret. Verify the secret in the server env only; never log the raw body or signature. Oversized bodies return 413.
+
+### Webhook 202 but no job / “ignored”
+
+Common safe ignore reasons:
+
+- repository not in allowlist (immutable `repository.id`)
+- `enabled=false` (`automation_disabled`) or `mode=off` (`mode_off`)
+- unknown/unsupported event
+- installation id mismatch for a configured repo
+
+Deliveries still leave an audit record under `~/.pi/agent/github-automation/deliveries/` without Issue body text.
+
+### Claim shows incomplete / `blocked_claim_assignee`
+
+Successful claim requires **both** `ypi:claimed` and Assignees containing the machine active GitHub login after App read-back. Failures include:
+
+1. `gh` not installed / not logged in / multi-account with no active account
+2. git credential fallback only works for fixed `github.com` + canonical `/user` (username alone is not login)
+3. login not a collaborator / not assignable (GitHub may return 2xx but omit assignee)
+4. App Issues write permission missing
+
+Operator actions: `gh auth login` / `gh auth switch`, ensure collaborator access, reinstall App with Issues write, then retry the same job. Automation must not keep a false `ypi:claimed` (may show `ypi:claim-blocked`) and must not start implementation.
+
+### App vs assignee vs Links confusion
+
+- **Links** OAuth (`YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`, `read:user`) is unrelated and cannot power App webhooks or assignment.
+- **App Bot** authors comments/labels/assignment API calls; it is **not** the human Assignee.
+- **Machine active credential user** is the Assignee display identity only; its token is never a Bot/API fallback.
+
+### Owner commented “采纳” but nothing implements
+
+Expected when **P1 is off** (`mode=triage` or `unattended.enabled=false`, the default): complete claim + owner actor + affirmative intent only records `accepted_waiting_automation` — no WorkTree/PR.
+
+If P1 is on but still no implement:
+
+1. Claim incomplete (`blocked_claim_assignee` / missing machine assignee read-back).
+2. Non-owner / bot / quote/code / negation / question comment.
+3. Policy blocked (UI, workflow/release, secret/auth, lockfile, over-limit, uncertain).
+4. Global `paused=true` or job `pauseRequested` at a checkpoint.
+5. `installation_missing` / `permission_missing` (App uninstalled or Contents/PR scopes missing).
+6. Job is `retry_due` after 429/`github_rate_limited` or network — wait for nextRetryAt or operator retry.
+
+Non-owner, incomplete claims, and high-risk final diffs must never open a PR.
+
+### Full agent residual risk (not a sandbox)
+
+P1 uses the **standard full agent** (file/bash/network). Owner gate, WorkTree, and final diff gate are publish/business controls only. The agent may still run arbitrary commands, access the network, or read same-OS-user files outside the WorkTree before any publish gate runs. Product code scrubs App/machine automation secrets from child env and refuses secret markers in runner state/prompts; **sentinel tests do not prove host isolation**. Prefer a dedicated low-privilege OS account/container.
+
+### Pause / resume / retry
+
+- Pause records a checkpoint flag; it does **not** force-kill an in-flight OS command.
+- Resume/retry wakes the **same** durable job/generation and reconciles remote effects (labels/comment/worktree/PR); it must not inject comment text as an agent shell command.
+- Unknown push/PR outcomes must list existing head/base PRs before creating another.
+
+### Disable without losing audit
+
+Set `enabled=false` or `mode=off`. Set `unattended.enabled=false` to return to P0 adoption parking. Historical deliveries/jobs/events/worktrees/PRs remain; do not bulk-delete `github-automation/` unless intentionally wiping operator data. Disable must not rewrite blocked claims into `complete`.
+
+### Tests
+
+```bash
+npm run test:github-automation
+npm run test:github-unattended
+npm run test:github-publish-policy
+```
+
+Must pass offline with temp agent dir + mocks (no real GitHub network / operator credentials).
+
 ## Memory Diagnostic Snapshots
 
 When the Yolk Pi Web process memory grows (potentially to multiple GiB after days of uptime), generate a bounded read-only diagnostic snapshot to gather evidence for offline analysis. This is a diagnosis tool only; it does **not** fix or clean up leaks, abort sessions, force GC, or take heap snapshots.

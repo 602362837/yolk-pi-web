@@ -19,6 +19,18 @@ description: >
 - 合并不是创建 PR 的默认动作。除非用户明确要求合并，不要执行 `gh pr merge`。
 - PR 被合并时必须使用 `gh pr merge ... --delete-branch`，或在合并已由他人完成后删除对应远程和本地源分支；删除前确认 PR 的 `state` 为 `MERGED`，绝不删除未合并分支。
 
+## 与 GitHub 自动化 publisher 的边界（必读）
+
+| 模式 | 谁 push/开 PR | 身份 | Closing 契约 |
+| --- | --- | --- | --- |
+| **Manual（本 Skill）** | 当前用户 `gh` / git | 操作者本人 | 关联 Issue 可写“暂无”；有议题时**推荐**同仓库 `Fixes #N` |
+| **Automation runner publisher** | server-owned GitHub App（`github-git-publisher`） | App installation；**不是**本机 personal token | **必须**且仅有一条同仓库 `Fixes #N`；创建前按 head/base 复用已有 PR；**不** merge、**不**关 Issue |
+
+- 本 Skill **保持 manual 流程不变**；不要在 manual 路径改用 App installation token。
+- 当分支名匹配 `ypi/gha/...` 或任务上下文标明 GitHub unattended automation 时：**不要**由 agent/本 Skill 自行 `git push` / `gh pr create`；发布由 server publisher 在 final diff + validation 通过后执行。
+- Automation PR 正文禁止跨仓库 closing（如 `Fixes other/repo#1`），禁止用“关联 Issue：暂无”代替 `Fixes #N`。
+- full agent 残留风险：即使随后由 server 发布，执行期副作用也不由本 Skill 撤销。
+
 ## 固定流程
 
 ### 1. 检查仓库和变更
@@ -98,10 +110,12 @@ git push -u <remote> <source-branch>
 - **回滚方式：** <回滚方式；无则写“按 GitHub PR 回滚合并提交”>
 
 ## 七、关联信息
-- **关联 Issue：** <#编号或“暂无”>
+- **关联 Issue：** <#编号或“暂无”>；若本 PR 用于关闭同仓库议题，正文中另需独立一行 `Fixes #N`（推荐，便于 GitHub Development）
 - **测试说明：** <测试数据、手工步骤或“见验证结果”>
 - **源分支：** `<source-branch>`
 - **目标分支：** `main`
+
+> Automation 发布路径（非本 Skill）强制：正文有且仅有一条同仓库 `Fixes #N`，且含 `<!-- ypi-github-automation:pr-contract v1 -->` marker。
 
 ## 八、提交确认
 - [ ] 已确认变更范围与 PR 描述一致

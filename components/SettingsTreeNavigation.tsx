@@ -21,6 +21,7 @@ export type SettingsSection =
   | "studio"
   | "appearance"
   | "links"
+  | "githubAutomation"
   | "usage"
   | "modelPrices"
   | "terminal"
@@ -104,6 +105,7 @@ export function ancestorGroupsForView(view: SettingsView): SettingsGroupId[] {
     case "studio":
     case "appearance":
     case "links":
+    case "githubAutomation":
       return [];
     case "usage":
     case "modelPrices":
@@ -217,6 +219,17 @@ export function flattenVisibleTreeNodes(expanded: SettingsExpandedGroups): Focus
     label: "Links",
     description: "GitHub 多账号身份连接管理",
     icon: "↗",
+  });
+
+  // Root leaf after Links, before 模型与用量 (approved product order).
+  nodes.push({
+    focusId: "view:githubAutomation",
+    kind: "view",
+    view: "githubAutomation",
+    level: 0,
+    label: "GitHub 自动化",
+    description: "GitHub App Bot 非敏感策略与安全状态",
+    icon: "◉",
   });
 
   nodes.push({
@@ -717,6 +730,16 @@ export function SettingsTreeNavigation({
           label: "Links",
           description: "GitHub 多账号身份连接管理",
           icon: "↗",
+        })}
+
+        {renderViewButton({
+          focusId: "view:githubAutomation",
+          kind: "view",
+          view: "githubAutomation",
+          level: 0,
+          label: "GitHub 自动化",
+          description: "GitHub App Bot 非敏感策略与安全状态",
+          icon: "◉",
         })}
 
         {renderGroup(

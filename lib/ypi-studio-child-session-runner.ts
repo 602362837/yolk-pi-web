@@ -77,6 +77,18 @@ export interface StudioSdkChildRunOptions {
   signal?: AbortSignal;
   onUpdate?: ToolUpdateCallback;
   persistence?: StudioSdkChildRunCallbacks;
+  /**
+   * Optional preflight hook (e.g. scrub automation-owned secret env vars before
+   * the child AgentSession is created). GitHub unattended full-agent runs use
+   * this for defense-in-depth; it is not a host sandbox guarantee.
+   */
+  beforeStart?: () => void | Promise<void>;
+  /**
+   * When true, child still uses the standard full tool set minus recursive
+   * Studio/browser tools. Restricted-tools-only mode is intentionally not a
+   * launch gate for GitHub unattended (GHA-06 product decision).
+   */
+  fullAgent?: boolean;
 }
 
 const CHILD_RECENT_PROGRESS_LIMIT = 5;
@@ -255,7 +267,9 @@ function modelFromPolicyArg(
 }
 
 export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOptions): Promise<StudioSdkChildRunResult> {
-  const { root, prompt, policy, meta, writer, signal, onUpdate, persistence } = options;
+  const { root, prompt, policy, meta, writer, signal, onUpdate, persistence, beforeStart } = options;
+  // fullAgent is accepted for call-site clarity; standard exclude list already keeps file/bash/network.
+  void options.fullAgent;
   const warnings: string[] = [];
   const recentItems: YpiStudioSubagentTranscriptItem[] = [];
   let eventCount = 0;
@@ -579,6 +593,9 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
   };
 
   try {
+    if (beforeStart) {
+      await beforeStart();
+    }
     const pi = await import("@earendil-works/pi-coding-agent");
     const agentDir = pi.getAgentDir();
     const sessionManager = pi.SessionManager.create(root, undefined, meta.parentSessionFile ? { parentSession: meta.parentSessionFile } : undefined);
