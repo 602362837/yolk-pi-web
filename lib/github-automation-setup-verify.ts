@@ -1,12 +1,15 @@
 /**
- * github-automation-setup-verify — fixed readiness checklist for Settings (IMP-001 / IMP-03).
+ * github-automation-setup-verify — fixed readiness checklist for Settings (IMP-001 / IMP-03 / GHCRED-04).
  *
  * ## Contract
  *
  * - Read-only: never enqueues jobs, never wakes the scheduler/runner, never mutates GitHub
- *   beyond App JWT read calls (installation capability lookup).
+ *   beyond App JWT read calls (installation capability lookup), never writes credential store.
  * - Safe projection only: no private key material, webhook secret, absolute projectRoot,
- *   raw webhook bodies, tokens, or PEM contents.
+ *   raw webhook bodies, tokens, PEM contents, key paths, or fingerprints.
+ * - First three checklist items default to Settings local credential card guidance;
+ *   env names remain advanced override hints only (never values).
+ * - Invalid/unsupported local fallback is actionable without blocking full env-configured deploys.
  * - Every non-ready item includes an actionable Chinese next-step (not only an error code).
  */
 
@@ -19,6 +22,7 @@ import {
   ENV_GITHUB_APP_WEBHOOK_SECRET,
   getGithubAppCredentialSafeProjection,
 } from "./github-app-credentials";
+// Credential store mutations are intentionally not imported: verify is read-only.
 import { getGithubInstallationCapability } from "./github-app-client";
 import {
   readGithubAutomationConfig,
@@ -107,9 +111,12 @@ export interface GithubAutomationSetupVerifyResult {
       | "readiness"
       | "hasAppId"
       | "hasPrivateKeyFile"
+      | "hasPrivateKey"
       | "hasWebhookSecret"
       | "appSlug"
       | "checkedAt"
+      | "local"
+      | "sources"
     >;
     installation: {
       present: boolean;
@@ -151,17 +158,24 @@ export interface GithubAutomationSetupVerifyResult {
 
 // ─── Fixed next-step copy (Chinese; no secrets / absolute paths) ─────────────
 
+const LOCAL_CREDENTIAL_CARD =
+  "上方「本机 GitHub App 凭据」卡" as const;
+
 const NEXT_STEPS = {
   missing_app_id:
-    `在服务器环境设置 ${ENV_GITHUB_APP_ID}=<GitHub App 数字 ID>，然后重新验证。浏览器不会接收或保存该值。`,
+    `在${LOCAL_CREDENTIAL_CARD}填写 App ID 并「保存到本机」，然后重新验证。高级覆盖可设置 ${ENV_GITHUB_APP_ID}（CI/容器/专业部署）；页面不会回显已保存值。`,
   missing_private_key_file:
-    `在服务器环境设置 ${ENV_GITHUB_APP_PRIVATE_KEY_FILE}=/secure/path/app.pem，将私钥文件权限设为 0600（目录 0700）。不要在浏览器上传或粘贴 PEM 内容。`,
+    `在${LOCAL_CREDENTIAL_CARD}粘贴或选择 GitHub App RSA 私钥 PEM 并「保存到本机」。高级覆盖可设置 ${ENV_GITHUB_APP_PRIVATE_KEY_FILE} 指向 0600 PEM（仅服务器，不在页面输入路径）。`,
   private_key_unreadable:
-    `确认 ${ENV_GITHUB_APP_PRIVATE_KEY_FILE} 指向的文件存在、对运行用户可读，且权限为 0600。不要把私钥路径或内容写进浏览器配置。`,
+    `当前生效私钥不可读。若使用环境变量覆盖，确认 ${ENV_GITHUB_APP_PRIVATE_KEY_FILE} 指向存在且权限为 0600 的 PEM；若使用本机凭据，请在${LOCAL_CREDENTIAL_CARD}重新粘贴/选择私钥并保存。页面不会显示路径或内容。`,
   private_key_invalid:
-    `确认私钥文件是有效的 GitHub App PEM（RSA），且未被截断或改写成证书。更新文件后重新验证；页面不会显示文件内容。`,
+    `当前生效私钥无效。请确认是完整的 GitHub App RSA PEM（非证书/公钥）。本机配置请在${LOCAL_CREDENTIAL_CARD}重新提交；高级覆盖请更新 ${ENV_GITHUB_APP_PRIVATE_KEY_FILE}。页面不会显示文件内容。`,
+  local_credentials_invalid:
+    `本机凭据 fallback 损坏或不一致。请在${LOCAL_CREDENTIAL_CARD}移除本机凭据后重新提交完整 App ID、私钥与 Webhook secret。当前若由环境变量完整覆盖仍可继续运行；不会显示损坏内容、路径或指纹。`,
+  local_credentials_unsupported:
+    `本机凭据 schema 不受支持。请在${LOCAL_CREDENTIAL_CARD}移除本机凭据后按当前版本重新配置完整 bundle。不会自动覆盖未知 schema，也不会显示文件内容。`,
   missing_webhook_secret:
-    `在部署 secret manager / 服务器环境设置 ${ENV_GITHUB_APP_WEBHOOK_SECRET}，并与 GitHub App webhook secret 一致。不要在 UI 输入或复制 secret 值。`,
+    `在${LOCAL_CREDENTIAL_CARD}填写 Webhook secret 并「保存到本机」，且与 GitHub App webhook secret 一致。高级覆盖可设置 ${ENV_GITHUB_APP_WEBHOOK_SECRET}；页面不会回显 secret。`,
   installation_missing:
     "在 GitHub 上将 App 安装到目标 owner/repo，并在「允许仓库」中填写对应 installation id 后保存，再验证。",
   installation_partial:
@@ -185,6 +199,10 @@ const NEXT_STEPS = {
   ready: null as string | null,
 } as const;
 
+function hasEffectivePrivateKey(app: GithubAppCredentialSafeProjection): boolean {
+  return app.hasPrivateKey === true || app.hasPrivateKeyFile === true;
+}
+
 function appCredentialItemStates(
   app: GithubAppCredentialSafeProjection,
 ): {
@@ -193,7 +211,11 @@ function appCredentialItemStates(
   webhookSecret: GithubAutomationSetupChecklistItem;
 } {
   const readiness = app.readiness as GithubAppCredentialReadinessCode;
+  const sources = app.sources;
+  const local = app.local;
+  const hasKey = hasEffectivePrivateKey(app);
 
+  // App ID — missing points to Settings local card; env is advanced override only.
   const appIdState: GithubAutomationSetupItemState = app.hasAppId
     ? "ready"
     : "pending";
@@ -201,34 +223,60 @@ function appCredentialItemStates(
     code: "app_id",
     order: 1,
     state: appIdState,
-    title: "配置 YPI_GITHUB_APP_ID",
+    title: "配置 App ID（本机凭据）",
     reasonCode: app.hasAppId ? null : "missing_app_id",
     nextStep: app.hasAppId ? null : NEXT_STEPS.missing_app_id,
+    // Keep env name copyable as advanced override; never values.
     envNames: [ENV_GITHUB_APP_ID],
   };
 
   let privateKeyState: GithubAutomationSetupItemState = "ready";
   let privateKeyReason: string | null = null;
   let privateKeyStep: string | null = null;
-  if (!app.hasPrivateKeyFile || readiness === "missing_private_key_file") {
-    privateKeyState = "pending";
-    privateKeyReason = "missing_private_key_file";
-    privateKeyStep = NEXT_STEPS.missing_private_key_file;
-  } else if (readiness === "private_key_unreadable") {
+  // Diagnose invalid/unreadable before plain missing so damaged local bundles are actionable.
+  if (readiness === "private_key_unreadable") {
     privateKeyState = "needs_fix";
     privateKeyReason = "private_key_unreadable";
     privateKeyStep = NEXT_STEPS.private_key_unreadable;
   } else if (readiness === "private_key_invalid") {
     privateKeyState = "needs_fix";
-    privateKeyReason = "private_key_invalid";
-    privateKeyStep = NEXT_STEPS.private_key_invalid;
+    // Prefer local-bundle diagnostics when the effective key depends on local.
+    if (local?.readiness === "unsupported") {
+      privateKeyReason = "local_credentials_unsupported";
+      privateKeyStep = NEXT_STEPS.local_credentials_unsupported;
+    } else if (local?.readiness === "invalid" && sources?.key !== "env") {
+      privateKeyReason = "local_credentials_invalid";
+      privateKeyStep = NEXT_STEPS.local_credentials_invalid;
+    } else {
+      privateKeyReason = "private_key_invalid";
+      privateKeyStep = NEXT_STEPS.private_key_invalid;
+    }
+  } else if (!hasKey || readiness === "missing_private_key_file") {
+    privateKeyState = "pending";
+    privateKeyReason = "missing_private_key_file";
+    privateKeyStep = NEXT_STEPS.missing_private_key_file;
+  } else if (
+    // Effective key ready (e.g. full env overlay) but local fallback is damaged:
+    // surface an actionable, non-blocking notice so env deployments stay ready.
+    (local?.readiness === "invalid" || local?.readiness === "unsupported") &&
+    hasKey
+  ) {
+    privateKeyState = "ready";
+    privateKeyReason =
+      local.readiness === "unsupported"
+        ? "local_credentials_unsupported"
+        : "local_credentials_invalid";
+    privateKeyStep =
+      local.readiness === "unsupported"
+        ? NEXT_STEPS.local_credentials_unsupported
+        : NEXT_STEPS.local_credentials_invalid;
   }
-  // If app id missing but key file path set, still report key file independently.
+
   const privateKey: GithubAutomationSetupChecklistItem = {
     code: "private_key_file",
     order: 2,
     state: privateKeyState,
-    title: "配置私钥文件（0600）",
+    title: "配置 GitHub App 私钥（本机凭据）",
     reasonCode: privateKeyReason,
     nextStep: privateKeyStep,
     envNames: [ENV_GITHUB_APP_PRIVATE_KEY_FILE],
@@ -241,7 +289,7 @@ function appCredentialItemStates(
     code: "webhook_secret",
     order: 3,
     state: webhookState,
-    title: "配置 Webhook secret",
+    title: "配置 Webhook secret（本机凭据）",
     reasonCode: app.hasWebhookSecret ? null : "missing_webhook_secret",
     nextStep: app.hasWebhookSecret ? null : NEXT_STEPS.missing_webhook_secret,
     envNames: [ENV_GITHUB_APP_WEBHOOK_SECRET],
@@ -709,9 +757,13 @@ export async function runGithubAutomationSetupVerify(
         readiness: app.readiness,
         hasAppId: app.hasAppId,
         hasPrivateKeyFile: app.hasPrivateKeyFile,
+        hasPrivateKey: app.hasPrivateKey ?? app.hasPrivateKeyFile,
         hasWebhookSecret: app.hasWebhookSecret,
         appSlug: app.appSlug,
         checkedAt: app.checkedAt,
+        // Additive local/source projection for Settings; never values/paths/fingerprints.
+        ...(app.local ? { local: app.local } : {}),
+        ...(app.sources ? { sources: app.sources } : {}),
       },
       installation: {
         present: install.present,

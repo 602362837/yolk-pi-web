@@ -31,6 +31,8 @@ function hasDisallowedBodyKeys(body: unknown): string | null {
   }
   for (const key of Object.keys(body as Record<string, unknown>)) {
     const lower = key.toLowerCase();
+    // Verify never accepts credential mutation, store paths, or shell commands.
+    // Local credential writes belong only on PUT /api/github-automation/credentials.
     if (
       lower.includes("token") ||
       lower.includes("secret") ||
@@ -38,6 +40,11 @@ function hasDisallowedBodyKeys(body: unknown): string | null {
       lower.includes("password") ||
       lower.includes("credential") ||
       lower.includes("pem") ||
+      lower.includes("fingerprint") ||
+      lower === "appid" ||
+      lower === "appslug" ||
+      lower === "keyfile" ||
+      lower === "keysha256" ||
       lower === "projectroot" ||
       lower === "command" ||
       lower === "shell" ||

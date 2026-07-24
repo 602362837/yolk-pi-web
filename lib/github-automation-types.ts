@@ -200,7 +200,9 @@ export interface GithubAutomationUnattendedConfig {
  * Non-secret automation config stored under
  * `~/.pi/agent/github-automation/config.json` (or PI_CODING_AGENT_DIR override).
  *
- * App ID / private-key path / webhook secret are env-only and never written here.
+ * App ID / private key / webhook secret never live here. Local secret material is
+ * stored separately under `credentials.v1.json` + generation PEM files; process
+ * env may override those values at runtime (see github-app-credentials).
  */
 export interface GithubAutomationConfigV1 {
   schemaVersion: GithubAutomationConfigSchemaVersion;
@@ -233,16 +235,69 @@ export type GithubAppCredentialReadinessCode =
   | "missing_webhook_secret"
   | "unknown";
 
+/**
+ * Where an effective credential field came from after env → local → missing overlay.
+ * Safe to project; never includes values, paths, or fingerprints.
+ */
+export type GithubAppCredentialValueSource = "env" | "local" | "missing";
+
+/**
+ * Local on-disk credential bundle readiness (independent of env overlay).
+ * - ready: complete valid v1 bundle
+ * - missing: no local bundle
+ * - invalid: present but unreadable / inconsistent / non-RSA / fingerprint mismatch
+ * - unsupported: unknown/future schema or kind (fail closed; ordinary upsert must not overwrite)
+ */
+export type GithubAppLocalCredentialReadiness =
+  | "ready"
+  | "missing"
+  | "invalid"
+  | "unsupported";
+
+/** Server-only schema version for credentials.v1.json under github-automation/. */
+export const GITHUB_APP_LOCAL_CREDENTIALS_SCHEMA_VERSION = 1 as const;
+
+/** Discriminator written into credentials.v1.json. */
+export const GITHUB_APP_LOCAL_CREDENTIALS_KIND =
+  "ypi-github-app-local-credentials" as const;
+
+/**
+ * Safe summary of the local (disk) credential bundle only.
+ * Never includes App ID value, webhook secret, PEM, path, basename, or fingerprint.
+ */
+export interface GithubAppLocalCredentialSafeSummary {
+  configured: boolean;
+  readiness: GithubAppLocalCredentialReadiness;
+  hasAppId: boolean;
+  hasKey: boolean;
+  hasWebhook: boolean;
+  updatedAt: string | null;
+}
+
 export interface GithubAppCredentialSafeProjection {
   configured: boolean;
   readiness: GithubAppCredentialReadinessCode;
-  /** Optional App slug when provided via env; never a secret. */
+  /** Optional App slug when provided via env/local; never a secret. */
   appSlug: string | null;
-  /** Whether App id is present (not the id value when we choose not to expose it). */
+  /** Whether App id is present (not the id value). */
   hasAppId: boolean;
   hasPrivateKeyFile: boolean;
   hasWebhookSecret: boolean;
   checkedAt: string;
+  /**
+   * Additive alias of hasPrivateKeyFile. Present after local/env credential productization.
+   * Optional for backward-compatible wire consumers.
+   */
+  hasPrivateKey?: boolean;
+  /** Local disk bundle summary (independent of env overlay). Additive. */
+  local?: GithubAppLocalCredentialSafeSummary;
+  /** Per-field effective source after env → local → missing. Additive. */
+  sources?: {
+    appId: GithubAppCredentialValueSource;
+    key: GithubAppCredentialValueSource;
+    webhook: GithubAppCredentialValueSource;
+    slug: GithubAppCredentialValueSource;
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

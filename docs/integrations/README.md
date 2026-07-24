@@ -377,7 +377,7 @@ All responses: `Cache-Control: no-store` (SSE: `no-cache, no-store`). Never retu
 
 ## GitHub App automation (P0 triage)
 
-**Customer/operator setup guide (create your own GitHub App):** [`docs/integrations/github-app-automation-setup.md`](./github-app-automation-setup.md). Each deployment creates and installs its own App; the product does not host a shared cloud App or accept private keys in the browser.
+**Customer/operator setup guide (create your own GitHub App):** [`docs/integrations/github-app-automation-setup.md`](./github-app-automation-setup.md). Each deployment creates and installs its own App; the product does not host a shared cloud App. **Default path:** Settings → GitHub 自动化 → 本机凭据 (paste/select App ID, Webhook secret, RSA PEM once; restart without env still works). Env is advanced override only.
 
 Repository Issue automation is a **separate domain** from Links OAuth connections and from LLM auth.
 
@@ -385,21 +385,21 @@ Repository Issue automation is a **separate domain** from Links OAuth connection
 
 - **App Bot identity**: GitHub App installation performs webhook verification, labels, comments, and assignment API calls. Later P1 also owns push/PR publishing. Never falls back to Links tokens, personal PAT, or `gh auth` for those mutations.
 - **Machine assignee identity**: the host’s active `gh` login (else fixed `github.com` git credential + canonical `GET /user`) is added as the Issue **Assignee** for human-visible ownership. Credential material is resolver-only and never stored in automation config/jobs/task/session.
+- **Local App credentials**: server-only store under `github-automation/credentials.v1.json` + generation PEM (`0700`/`0600`, atomic pointer, lock). Runtime resolves each field **env → local → missing**. Safe APIs project booleans/sources only (no values/paths/fingerprints). Successful local save/delete clears installation token cache.
 - **Successful claim**: `ypi:claimed` **and** Issue read-back assignees contain the machine login (plus local lease + marker comment). Assign HTTP 2xx without read-back is **not** success.
 - **Claim blocked**: missing/invalid/unassignable credentials or read-back failure → `blocked_claim_assignee`; do not keep a false `ypi:claimed`; optional `ypi:claim-blocked` + safe App comment; retry after operator fix.
 - **P0 stop condition**: owner affirmative adoption records `accepted_waiting_automation` only when unattended is off.
 - **P1 unattended (default-off)**: with `mode=unattended` and `unattended.enabled=true`, complete claim + owner actor + affirmative intent may start durable WorkTree + Studio + **full agent** (`executionProfile=full-agent`, `riskProfile=docs-and-small-bugfix`), then server App publisher opens one `Fixes #N` PR (never auto-merge). Full agent is **not sandboxed**: arbitrary commands, network, and same-OS-user filesystem reads remain residual risk; only product-owned App/machine secrets are guaranteed not to be deliberately injected into agent context. Prefer a dedicated low-privilege OS account/container. Pause/retry resume the same job; `unattended.enabled=false` rolls back to P0 adoption parking.
 
-### Configuration (server-only)
+### Configuration
 
-| Env var | Purpose |
+| Path | Purpose |
 | --- | --- |
-| `YPI_GITHUB_APP_ID` | GitHub App id |
-| `YPI_GITHUB_APP_PRIVATE_KEY_FILE` | Absolute path to PEM private key (`0600`) |
-| `YPI_GITHUB_APP_WEBHOOK_SECRET` | Webhook HMAC secret |
-| `YPI_GITHUB_APP_SLUG` | Optional App slug for display |
+| Settings **本机 GitHub App 凭据** / `GET\|PUT\|DELETE /api/github-automation/credentials` | Default product path: persist App ID + webhook secret + RSA PEM; blank-preserve rotation; delete local only |
+| `github-automation/credentials.v1.json` + `private-key.<generation>.pem` | Server-only local secret store (`0600`); not in git / Links / `pi-web.json` |
+| Advanced env `YPI_GITHUB_APP_ID` / `YPI_GITHUB_APP_PRIVATE_KEY_FILE` / `YPI_GITHUB_APP_WEBHOOK_SECRET` / optional `YPI_GITHUB_APP_SLUG` | Per-field non-empty env overrides local; blank env falls back; never written back to disk |
 
-Non-secret policy lives under `~/.pi/agent/github-automation/config.json` (default `enabled=false`, `mode=off`, unattended disabled, **`repositories: []`**). Operators manage the allowlist in Settings (or CAS PATCH): any `owner/repo` keyed by immutable GitHub `repositoryId`, bound to a Project Registry `projectId` (server resolves `projectRoot`). Historical yolk-pi-web id is recognition-only for legacy seeds — not a product default hard lock. Settings **验证配置** uses `POST /api/github-automation/verify` for a fixed readiness checklist and never starts jobs. Operator must expose `POST /api/github-automation/webhook` on a **public HTTPS** ingress; the product does not provide a cloud relay.
+Non-secret policy lives under `~/.pi/agent/github-automation/config.json` (default `enabled=false`, `mode=off`, unattended disabled, **`repositories: []`**). Operators manage the allowlist in Settings (or CAS PATCH): any `owner/repo` keyed by immutable GitHub `repositoryId`, bound to a Project Registry `projectId` (server resolves `projectRoot`). Historical yolk-pi-web id is recognition-only for legacy seeds — not a product default hard lock. Settings **验证配置** uses `POST /api/github-automation/verify` for a fixed readiness checklist and never starts jobs or accepts secret bodies. Operator must expose **only** `POST /api/github-automation/webhook` on a **public HTTPS** ingress; keep Settings/credentials/config management on loopback/VPN/controlled access. The product does not provide a cloud relay.
 
 ### Permissions / events (P0)
 
@@ -408,7 +408,7 @@ Non-secret policy lives under `~/.pi/agent/github-automation/config.json` (defau
 
 ### Key modules
 
-`lib/github-automation-*` (including `github-automation-setup-verify.ts`), `lib/github-app-*`, `lib/github-machine-assignee.ts`, `lib/github-webhook-verify.ts`, `lib/github-issue-triage-runner.ts`, `lib/github-owner-intent.ts`, `lib/github-full-agent-profile.ts`, `lib/github-automation-runner.ts`, `lib/github-git-publisher.ts`, `lib/github-risk-policy.ts`, `lib/github-diff-policy.ts`, `lib/github-pr-contract.ts`, routes under `app/api/github-automation/` (`webhook`, `status`, `config`, `verify`, `jobs`), UI `components/GithubAutomationConfig.tsx`.
+`lib/github-automation-*` (including `github-automation-setup-verify.ts`), `lib/github-app-*` (including `github-app-credential-store.ts`, `github-app-credentials.ts`), `lib/github-machine-assignee.ts`, `lib/github-webhook-verify.ts`, `lib/github-issue-triage-runner.ts`, `lib/github-owner-intent.ts`, `lib/github-full-agent-profile.ts`, `lib/github-automation-runner.ts`, `lib/github-git-publisher.ts`, `lib/github-risk-policy.ts`, `lib/github-diff-policy.ts`, `lib/github-pr-contract.ts`, routes under `app/api/github-automation/` (`webhook`, `credentials`, `status`, `config`, `verify`, `jobs`), UI `components/GithubAutomationConfig.tsx`.
 
 ### Tests
 

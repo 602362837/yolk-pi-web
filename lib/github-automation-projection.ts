@@ -91,7 +91,33 @@ export const GITHUB_AUTOMATION_PROJECTION_FORBIDDEN_KEYS = [
   "installationToken",
   "appJwt",
   "credential",
+  // Local credential store internals (never wire these containers/values).
+  "privateKeyPem",
+  "private_key_pem",
+  "privateKeyFile",
+  "keyFile",
+  "keySha256",
+  "fingerprint",
+  "appIdValue",
 ] as const;
+
+/**
+ * Safe additive credential-projection field names that may contain forbidden
+ * substrings (e.g. hasPrivateKey contains "privateKey") but are never secret
+ * containers. Exact-match only; do not broaden to prefix/suffix wildcards.
+ */
+const GITHUB_AUTOMATION_PROJECTION_SAFE_KEY_ALLOWLIST = new Set([
+  "hasprivatekey",
+  "hasprivatekeyfile",
+  "haswebhooksecret",
+  "hasappid",
+  "haskey",
+  "haswebhook",
+  // Checklist item codes (not secret containers).
+  "private_key_file",
+  "webhook_secret",
+  "app_id",
+]);
 
 // ─── Wire types ──────────────────────────────────────────────────────────────
 
@@ -663,6 +689,12 @@ export function assertGithubAutomationProjectionSafe(
   }
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const lower = key.toLowerCase();
+    // Explicit safe boolean / checklist code names pass even when they contain
+    // forbidden substrings (hasPrivateKey, hasWebhookSecret, private_key_file).
+    if (GITHUB_AUTOMATION_PROJECTION_SAFE_KEY_ALLOWLIST.has(lower)) {
+      assertGithubAutomationProjectionSafe(child, `${path}.${key}`);
+      continue;
+    }
     for (const forbidden of GITHUB_AUTOMATION_PROJECTION_FORBIDDEN_KEYS) {
       if (lower === forbidden.toLowerCase() || lower.includes(forbidden.toLowerCase())) {
         // Allow safe nested field names that are not secret containers:
@@ -686,6 +718,13 @@ export function assertGithubAutomationProjectionSafe(
           lower === "rawbody" ||
           lower === "webhooksecret" ||
           lower === "privatekey" ||
+          lower === "privatekeypem" ||
+          lower === "private_key_pem" ||
+          lower === "privatekeyfile" ||
+          lower === "keyfile" ||
+          lower === "keysha256" ||
+          lower === "fingerprint" ||
+          lower === "appidvalue" ||
           lower === "installationtoken" ||
           lower === "appjwt" ||
           lower === "authorization" ||

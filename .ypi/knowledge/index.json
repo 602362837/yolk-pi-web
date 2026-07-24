@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-24T06:40:56.590Z",
+  "updatedAt": "2026-07-24T10:55:39.042Z",
   "entries": [
+    {
+      "id": "20260724-185539-github-自动化凭据产品化-本机持久化-设置页配置-env-仅覆盖",
+      "title": "GitHub 自动化凭据产品化：本机持久化 + 设置页配置 + env 仅覆盖",
+      "taskId": "20260724-173213-github-自动化凭据产品化-本机持久化-设置页配置-env-仅覆盖",
+      "taskKey": "archived:2026-07:20260724-173213-github-自动化凭据产品化-本机持久化-设置页配置-env-仅覆盖",
+      "workflowId": "feature-dev",
+      "summary": "## Status - Workflow phase: implementing closeout - Active subtask: **GHCRED-08** → **done** - Plan progress: **8/8 done** - Production code changes in this subtask: **none** (validation-only) - No `commit` / `push` / `merge` - No real user `ypi` process start/stop ## GHCRED-08 Result Integrated checker validation **passed** against the already-implemented GHCRED-01…07 surface. ### Validation commands | Command | Result | | --- | --- | | `npm run lint` | **pass** (exit 0; 11 pre-existing warnings only, 0 errors; none in GitHub credentials paths) | | `node_modules/.bin/tsc --noEmit` | **pass** (exit 0) | | `npm run test:github-automation` | **pass** `76/76` | | `npm run test:github-unattended` | **pass** `17/17` | | `npm run test:github-publish-policy` | **pass** `23/23` | ### Evidence covered by focused suite (no destructive host ypi restart) `scripts/test-github-automation.mjs` GHCRED-…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260724-173213-github-自动化凭据产品化-本机持久化-设置页配置-env-仅覆盖",
+      "knowledgePath": ".ypi/knowledge/20260724-185539-github-自动化凭据产品化-本机持久化-设置页配置-env-仅覆盖.md",
+      "createdAt": "2026-07-24T10:55:39.042Z",
+      "archivedAt": "2026-07-24T10:55:39.042Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260724-144056-github-议题自动处理闭环-app-bot-认领分析打标-owner-采纳后自动-ypi-实",
       "title": "GitHub 议题自动处理闭环：App Bot 认领分析打标 + owner 采纳后自动 YPI 实现并提 PR",

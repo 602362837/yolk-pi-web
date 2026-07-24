@@ -587,9 +587,34 @@ This is a GitHub-side operation only; the yolk pi web Links module does not call
 
 ## GitHub App automation (P0 triage)
 
+### App credentials missing / not configured after restart
+
+Default path is **Settings → GitHub 自动化 → 本机 GitHub App 凭据** (not shell env). Checklist:
+
+1. Save a complete local bundle (App ID + RSA PEM + Webhook secret) via **保存到本机**.
+2. Confirm status/credentials GET shows `configured` with sources `local` (or `env` if advanced override is intentional).
+3. Fully stop and restart `ypi` with no `YPI_GITHUB_APP_*` in the process environment; local bundle should still load.
+4. If local readiness is `invalid` / `unsupported`, use **移除本机凭据** then re-save a complete bundle — do not hand-edit `credentials.v1.json`.
+5. Advanced env only: non-empty `YPI_GITHUB_APP_ID` / `YPI_GITHUB_APP_PRIVATE_KEY_FILE` / `YPI_GITHUB_APP_WEBHOOK_SECRET` override matching fields; blank env falls back to local. Mixed env+local values must belong to the **same** App.
+
+APIs never return App ID value, secret, PEM, path, or fingerprint — diagnose via readiness/source enums and verify next steps only.
+
+### Local credential save/delete errors
+
+| Code / symptom | Operator action |
+| --- | --- |
+| `invalid_app_id` / `invalid_webhook_secret` / `invalid_private_key` | Fix the submitted field; paste/file must be a GitHub App RSA private key |
+| `private_key_too_large` / `invalid_credentials_request` | Single reasonable-size PEM; paste and file are mutually exclusive; no JSON/path fields |
+| `local_credentials_invalid` / `local_credentials_unsupported` | Delete local fallback and reconfigure fully; unknown schema is fail-closed |
+| `credentials_lock_timeout` / `credentials_store_error` | Retry; do not delete live lock dirs by hand; check agent-dir permissions (`0700`/`0600`) |
+| Saved but UI still shows env sources | Process still has non-empty env overrides; local fallback was updated but effective runtime prefers env |
+| Delete local but still configured | Expected when env still supplies a complete set |
+
+Successful save/delete clears installation token cache; a post-rotation App/key must not reuse an old cached installation token.
+
 ### Webhook returns 401
 
-`X-Hub-Signature-256` missing/wrong, or `YPI_GITHUB_APP_WEBHOOK_SECRET` does not match the App webhook secret. Verify the secret in the server env only; never log the raw body or signature. Oversized bodies return 413.
+`X-Hub-Signature-256` missing/wrong, or the **effective** webhook secret (non-empty env override, else local bundle) does not match the App webhook secret. Re-save the secret in Settings local credentials, or align advanced env; never log the raw body or signature. Oversized bodies return 413.
 
 ### Webhook 202 but no job / “ignored”
 

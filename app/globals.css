@@ -7222,6 +7222,171 @@ a.github-automation-button--help > span[aria-hidden="true"] {
   opacity: 0.6;
   cursor: not-allowed;
 }
+.github-automation-field--full {
+  grid-column: 1 / -1;
+}
+.github-automation-field-hint {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+.github-automation-card--busy {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.78;
+}
+.github-automation-cred-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.github-automation-cred-status-item {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-subtle, var(--bg));
+}
+.github-automation-cred-status-item small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 750;
+}
+.github-automation-cred-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+.github-automation-cred-status-line strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 750;
+}
+.github-automation-cred-source {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.github-automation-cred-source b {
+  color: var(--text);
+  font-weight: 700;
+}
+.github-automation-cred-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+.github-automation-cred-seg {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  width: min(360px, 100%);
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-subtle, var(--bg));
+}
+.github-automation-cred-seg-btn {
+  min-height: 31px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.github-automation-cred-seg-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+.github-automation-cred-seg-btn.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: var(--bg);
+  color: var(--accent);
+}
+.github-automation-cred-seg-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.github-automation-cred-seg-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.github-automation-cred-pem {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-subtle, var(--bg));
+  color: var(--text);
+  font: 11px/1.45 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+}
+.github-automation-cred-pem:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.github-automation-cred-pem:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.github-automation-cred-filebox {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  background: var(--bg-subtle, var(--bg));
+  text-align: center;
+  color: var(--text-muted);
+}
+.github-automation-cred-filebox input {
+  max-width: 100%;
+}
+.github-automation-cred-filebox p {
+  margin: 8px 0 0;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.github-automation-cred-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.github-automation-cred-form-actions-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.github-automation-cred-error {
+  margin: 0;
+  color: var(--danger, #b91c1c);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
 .github-automation-form-footer {
   display: flex;
   justify-content: flex-end;
@@ -7702,8 +7867,22 @@ a.github-automation-button--help > span[aria-hidden="true"] {
   .github-automation-split,
   .github-automation-readiness,
   .github-automation-repo-grid,
-  .github-automation-form-grid {
+  .github-automation-form-grid,
+  .github-automation-cred-status-grid {
     grid-template-columns: 1fr;
+  }
+  .github-automation-field--full {
+    grid-column: auto;
+  }
+  .github-automation-cred-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .github-automation-cred-form-actions-right {
+    justify-content: stretch;
+  }
+  .github-automation-cred-form-actions-right .github-automation-button {
+    flex: 1;
   }
   .github-automation-check-row {
     grid-template-columns: 22px minmax(0, 1fr);

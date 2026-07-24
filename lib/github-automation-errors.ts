@@ -24,6 +24,16 @@ export type GithubAutomationErrorCode =
   | "credential_host_unsupported"
   | "credential_no_active_account"
   | "credential_timeout"
+  // Local GitHub App credentials store / API (GHCRED-03). Path-free and secret-free.
+  | "invalid_credentials_request"
+  | "invalid_app_id"
+  | "invalid_webhook_secret"
+  | "invalid_private_key"
+  | "private_key_too_large"
+  | "local_credentials_invalid"
+  | "local_credentials_unsupported"
+  | "credentials_lock_timeout"
+  | "credentials_store_error"
   | "github_network_error"
   | "github_timeout"
   | "github_bad_response"
@@ -50,6 +60,16 @@ const SAFE_DEFAULT_MESSAGES: Record<GithubAutomationErrorCode, string> = {
   credential_host_unsupported: "Only github.com credentials are supported for assignee resolution",
   credential_no_active_account: "No active gh account is selected",
   credential_timeout: "Local credential resolution timed out",
+  invalid_credentials_request: "GitHub App credentials request is invalid",
+  invalid_app_id: "GitHub App ID is invalid",
+  invalid_webhook_secret: "GitHub App webhook secret is invalid",
+  invalid_private_key: "GitHub App private key is invalid",
+  private_key_too_large: "GitHub App private key exceeds size limit",
+  local_credentials_invalid: "Local GitHub App credentials are invalid",
+  local_credentials_unsupported:
+    "Local GitHub App credentials use an unsupported schema",
+  credentials_lock_timeout: "GitHub App credentials store lock timed out",
+  credentials_store_error: "GitHub App credentials store error",
   github_network_error: "Network error contacting GitHub",
   github_timeout: "GitHub request timed out",
   github_bad_response: "GitHub returned an unexpected response",
@@ -156,6 +176,13 @@ function defaultStatusForCode(code: GithubAutomationErrorCode): GithubAutomation
     case "invalid_config":
     case "repository_not_allowlisted":
     case "credential_host_unsupported":
+    case "invalid_credentials_request":
+    case "invalid_app_id":
+    case "invalid_webhook_secret":
+    case "invalid_private_key":
+    case "private_key_too_large":
+    case "local_credentials_invalid":
+    case "local_credentials_unsupported":
       return 400;
     case "github_auth_failed":
     case "credential_invalid":
@@ -175,12 +202,15 @@ function defaultStatusForCode(code: GithubAutomationErrorCode): GithubAutomation
       return 429;
     case "github_timeout":
     case "credential_timeout":
+    case "credentials_lock_timeout":
       return 504;
     case "github_network_error":
     case "github_bad_response":
     case "github_redirect_rejected":
     case "assignee_readback_failed":
       return 502;
+    case "credentials_store_error":
+      return 500;
     default:
       return 500;
   }

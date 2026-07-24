@@ -535,14 +535,31 @@ Events: `issues`, `issue_comment`, plus installation lifecycle for later binding
 
 ### Secrets and storage
 
-Server-only env (never `pi-web.json`, Links, browser, or agent context):
+**Default product path:** Settings → GitHub 自动化 → **本机 GitHub App 凭据** (`GET|PUT|DELETE /api/github-automation/credentials`). Users paste/select App ID, Webhook secret, and RSA PEM once; the server persists them under the agent data dir and restarts without env still resolve as configured.
+
+Local secret store (server-only, isolated from Links / LLM auth / `pi-web.json` / Session / Task):
+
+```text
+~/.pi/agent/github-automation/           # 0700 (PI_CODING_AGENT_DIR override applies)
+  credentials.v1.json                    # 0600 metadata + secret fields + key generation pointer
+  private-key.<generation>.pem           # 0600 active RSA private key (metadata basename only)
+  .locks/credentials.lock/               # cross-process write lock
+  config.json                            # non-secret CAS control plane (no secrets)
+  deliveries/ jobs/ repositories/ events/
+```
+
+Write rules: process queue + mkdir lock; generation key file is written and fsynced before an atomic `credentials.v1.json` pointer switch; readers follow metadata only (basename containment, regular file, RSA parse, SHA-256 fingerprint); unknown schema / inconsistent bundle fail closed. Successful local upsert/delete clears the in-memory installation-token cache so rotated App identity is not reused.
+
+**Runtime overlay (per field):** non-empty process env → local bundle snapshot → missing. Empty env does not override. Env never imports into local files; delete local never mutates env. Optional advanced env for CI/containers/pro deploy:
 
 - `YPI_GITHUB_APP_ID`
-- `YPI_GITHUB_APP_PRIVATE_KEY_FILE` (file mode `0600`)
+- `YPI_GITHUB_APP_PRIVATE_KEY_FILE` (operator-managed PEM path, mode `0600`)
 - `YPI_GITHUB_APP_WEBHOOK_SECRET`
 - optional `YPI_GITHUB_APP_SLUG`
 
-Durable non-secret state under `~/.pi/agent/github-automation/` (`config.json`, deliveries, jobs, issue state, safe events, mkdir leases). Raw webhook bodies, signatures, Issue/comment text, App JWT/installation tokens, and machine personal tokens must not be persisted there.
+**Safe projection only** on credentials/status/verify/config: `configured`, readiness, `hasAppId` / `hasPrivateKey`(+`hasPrivateKeyFile`) / `hasWebhookSecret`, per-field `sources` (`env`|`local`|`missing`), local readiness booleans/timestamp. Never project App ID value, secret, PEM, absolute path, key basename, fingerprint, JWT, or installation token. Browser may submit **this turn's** secret material on PUT; no reveal/copy/download of saved values.
+
+Durable non-secret state remains under the same root (`config.json`, deliveries, jobs, issue state, safe events, mkdir leases). Raw webhook bodies, signatures, Issue/comment text, App JWT/installation tokens, and machine personal tokens must not be persisted in audit/job records. **Public HTTPS** should expose only `POST /api/github-automation/webhook`; management UI and credentials/config APIs must stay on loopback/VPN/controlled access — writing App credentials amplifies unauthenticated management-surface risk.
 
 ### Disable / rollback
 

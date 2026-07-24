@@ -65,9 +65,19 @@ export function _testOverrideGithubAppClientNowMs(now: number | null): void {
     typeof now === "number" && Number.isFinite(now) ? Math.floor(now) : null;
 }
 
-/** Clear installation token cache (tests). */
-export function _testClearGithubAppInstallationTokenCache(): void {
+/**
+ * Clear every cached installation access token.
+ * Call after successful local credential upsert/delete so a rotated App/key
+ * cannot reuse tokens minted under the previous identity.
+ * Safe to call when the cache is empty.
+ */
+export function clearGithubAppInstallationTokenCache(): void {
   installationTokenCache.clear();
+}
+
+/** Test alias for clearGithubAppInstallationTokenCache. */
+export function _testClearGithubAppInstallationTokenCache(): void {
+  clearGithubAppInstallationTokenCache();
 }
 
 function nowMs(): number {

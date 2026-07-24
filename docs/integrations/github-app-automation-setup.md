@@ -1,7 +1,7 @@
 # 自建 GitHub App：议题自动处理配置指南
 
 本文面向 **蛋黄派客户与自托管运维**。  
-每位部署方需要 **自己创建并安装 GitHub App**；产品不会替你托管云端 App，也不会在网页里收集私钥。
+每位部署方需要 **自己创建并安装 GitHub App**；产品不会替你托管云端共享 App。
 
 完成后可以做到：
 
@@ -12,16 +12,22 @@
 
 在蛋黄派里配置入口：**设置 → GitHub 自动化**。
 
+**默认凭据路径是设置页「本机 GitHub App 凭据」**：填写 App ID、Webhook secret，粘贴或选择私钥 PEM，保存到本机 agent data dir 后，正常启动 / 重启 `ypi` 即可复用。  
+环境变量 `YPI_GITHUB_APP_*` 仅作为 CI / 容器 / 专业部署的**高级覆盖**（见文末），不是普通本机用户的必选步骤。
+
 ---
 
 ## 整体流程（先看这张图）
 
 ```text
 1. 在 GitHub 创建你自己的 App
-2. 下载私钥，配置到运行蛋黄派的服务器环境变量
+2. 下载私钥与 Webhook secret（先妥善保存在本机，不要提交 git）
 3. 把 App 安装到目标仓库
-4. 准备公网 HTTPS，让 GitHub 能通知蛋黄派
-5. 在「设置 → GitHub 自动化」关联仓库并验证配置
+4. 准备公网 HTTPS，只把 webhook 路由暴露给 GitHub
+5. 在「设置 → GitHub 自动化」：
+   a. 本机凭据卡保存 App ID / Webhook secret / 私钥 PEM
+   b. 关联允许仓库
+   c. 验证配置
 6. 先开「仅 Triage」试跑，确认无误后再考虑自动实现
 ```
 
@@ -32,17 +38,24 @@
 | 准备项 | 为什么需要 |
 | --- | --- |
 | 一台能长期运行蛋黄派的机器 | 用来接收 GitHub 通知并处理议题 |
-| 公网 HTTPS 地址 | GitHub 云端必须能访问你的服务；仅本机 `127.0.0.1` 不够 |
+| 公网 HTTPS 地址（仅 webhook） | GitHub 云端必须能访问 webhook 路由；仅本机 `127.0.0.1` 不够 |
 | 可创建 GitHub App 的账号或组织 | 每位客户创建 **自己的** App |
 | 对本机 GitHub 登录（推荐 `gh auth login`） | 认领时把你的用户写到议题 Assignee |
 
-你的 Webhook 地址会是：
+你的 **Webhook** 地址会是：
 
 ```text
 https://你的域名/api/github-automation/webhook
 ```
 
 把「你的域名」换成真实公网域名即可。本地开发端口（如 30141 / 30142）需要通过反代或隧道暴露成 HTTPS。
+
+### 公网暴露边界（必读）
+
+- **应公网可达**：`POST /api/github-automation/webhook`
+- **不应无认证公网暴露**：Settings UI、`/api/github-automation/credentials`、`/config`、`/status`、`/verify`、`/jobs/*` 等管理面  
+  本机凭据 API 允许写入 App 身份材料；请仅在本机 loopback、VPN 或受控访问后使用。  
+  反代时建议只把 webhook 路径放到公网入口，管理面走本机或额外访问控制。
 
 ---
 
@@ -87,7 +100,7 @@ https://你的域名/api/github-automation/webhook
 ### 2.4 事件怎么勾
 
 | 事件 | 是否需要 | 作用 |
-| --- | --- | --- |
+| --- | --- |
 | Issues | 必需 | 新议题触发处理 |
 | Issue comment | 必需 | 你回复「采纳」时触发后续流程 |
 | Installation / Installation repositories | 推荐 | 感知安装与仓库变更 |
@@ -99,7 +112,10 @@ https://你的域名/api/github-automation/webhook
 2. **Private key**（点 Generate a private key 下载的 `.pem` 文件）  
 3. **Webhook secret**（你自己填的那串）
 
-私钥保存示例：
+下载的 PEM 只作**临时**保管，下一步会在设置页粘贴或选择文件交给服务端安全落盘。  
+不要把 PEM / secret 提交进 git、聊天、截图或 PR。
+
+可选：若你只想先把下载文件挪出浏览器默认下载目录（仍是本地文件，不是产品主路径）：
 
 ```bash
 mkdir -p ~/.pi/agent/secrets
@@ -122,28 +138,66 @@ chmod 600 ~/.pi/agent/secrets/ypi-github-app.pem
 
 ---
 
-## 4. 在服务器配置环境变量
+## 4. 在设置页配置本机 GitHub App 凭据（默认路径）
 
-在 **实际运行蛋黄派的机器/进程** 上设置，然后重启服务：
+打开：**设置 → GitHub 自动化**，页面上方主卡是 **本机 GitHub App 凭据**。
 
-```bash
-export YPI_GITHUB_APP_ID="123456"
-export YPI_GITHUB_APP_PRIVATE_KEY_FILE="$HOME/.pi/agent/secrets/ypi-github-app.pem"
-export YPI_GITHUB_APP_WEBHOOK_SECRET="与 GitHub 里填的 webhook secret 完全一致"
+### 4.1 填写并「保存到本机」
+
+| 字段 | 怎么填 |
+| --- | --- |
+| App ID | 创建 App 后显示的数字 ID |
+| Webhook secret | 与 GitHub App webhook secret **完全一致**（`password` 输入，页面不回显已保存值） |
+| 私钥 | **粘贴 PEM** 或 **选择本机 `.pem` 文件**（二选一；切换输入方式会清理另一种临时值） |
+
+点击 **保存到本机**：
+
+1. 浏览器通过 `PUT /api/github-automation/credentials` 提交本次输入（multipart）  
+2. 服务端校验后写入 agent data dir（见下节），并清理 installation token 内存缓存  
+3. 成功后页面清空 password / PEM / File 临时输入；状态只显示「已配置 · 本机」等安全投影  
+4. **不需要**配置 shell 环境变量，也**不需要**每次 `export`
+
+首次保存必须三项齐全；之后轮换可只填变更项，**留空表示保留已保存本机值**（不会从环境变量反写到本机）。
+
+### 4.2 页面不会回显什么
+
+| 永不回显 / 不下载 | 会显示 |
+| --- | --- |
+| App ID 原值 | 是否已配置 |
+| Webhook secret / 任意 masked 片段 | 来源：`本机` / `env` / `未配置` |
+| 私钥 PEM、文件名、绝对路径、指纹 | readiness / 本地 bundle 是否可用 |
+| JWT、installation token | 校验失败时的固定安全文案 |
+
+### 4.3 本机存储位置与权限（了解即可）
+
+服务端在 agent data dir 的 `github-automation/` 下持久化（默认 `~/.pi/agent/`，可用 `PI_CODING_AGENT_DIR` 覆盖）：
+
+```text
+github-automation/                         # 0700
+  credentials.v1.json                      # 0600，schema v1 元数据 + secret 字段
+  private-key.<generation>.pem             # 0600，metadata 原子指针指向的当前私钥
+  .locks/credentials.lock/                 # 跨进程写锁
+  config.json                              # 非 secret 控制面（模式/allowlist 等，无密钥）
+  deliveries/ jobs/ repositories/ ...
 ```
 
-| 环境变量 | 必填 | 含义 |
-| --- | --- | --- |
-| `YPI_GITHUB_APP_ID` | 是 | App ID 数字 |
-| `YPI_GITHUB_APP_PRIVATE_KEY_FILE` | 是 | 私钥文件路径（不是把私钥内容贴到网页） |
-| `YPI_GITHUB_APP_WEBHOOK_SECRET` | 是 | Webhook 签名密钥 |
-| `YPI_GITHUB_APP_SLUG` | 否 | App 名称 slug，仅展示用 |
+写入规则摘要：
 
-### 安全要求
+- 先写新 generation 私钥文件，再原子切换 `credentials.v1.json` 指针  
+- 同目录临时文件 + fsync + rename；进程队列 + mkdir 锁  
+- 读取时校验 basename 范围、普通文件、RSA 私钥与指纹；损坏 / 未知 schema **fail closed**  
+- 与 Links、`auth.json`、模型 CredentialStore、Session/Task **隔离**；不写 `pi-web.json`
 
-- 私钥和 secret **只放服务器环境变量或密钥管理系统**  
-- **不要**贴进蛋黄派网页、聊天、PR、截图或 git 仓库  
-- 设置页故意不提供密钥输入框，这是正常设计  
+保存或删除成功后：后续 webhook / JWT / GitHub API 立即使用新有效值；**重启 `ypi` 且无任何 `YPI_GITHUB_APP_*` 时仍应保持 configured**。
+
+### 4.4 移除本机凭据
+
+危险操作 **移除本机凭据** 会要求确认，且：
+
+- **只删除**本机 fallback（`credentials.v1.json` 与当前 generation 私钥）  
+- **不删除** GitHub App、installation、允许仓库、jobs、审计  
+- **不修改**进程环境变量  
+- 若某字段仍由 env 覆盖且三项仍完整，effective 状态可能继续显示「已配置 · env」
 
 ---
 
@@ -171,6 +225,10 @@ gh auth switch
 
 该用户需要对目标仓库有可被指派的权限（通常是可写协作者）。
 
+> **身份隔离**：App Bot 负责 webhook 验签、标签、评论、指派 API 与后续 PR 发布；  
+> 本机 `gh` / git 凭据用户 **只作为 Assignee 展示身份**，不会变成 Bot 或 publisher 回退。  
+> Links 里的 GitHub OAuth 连接与本功能无关。
+
 ---
 
 ## 6. 打通公网 Webhook
@@ -185,22 +243,23 @@ GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 
 1. 公网地址可访问：`https://你的域名/api/github-automation/webhook`  
 2. GitHub App 的 Webhook URL 与上面一致  
-3. Webhook secret 与环境变量一致  
-4. 在 GitHub App 的 **Recent Deliveries** 里能看到成功投递（通常是 200/202）  
+3. Webhook secret 与 **设置页本机凭据**（或高级 env 覆盖）一致  
+4. 管理面（设置页 / credentials / config API）**未**无认证挂到同一公网入口  
+5. 在 GitHub App 的 **Recent Deliveries** 里能看到成功投递（通常是 200/202）  
 
 ---
 
-## 7. 在蛋黄派里完成配置
+## 7. 在蛋黄派里完成其余配置
 
 打开：**设置 → GitHub 自动化**
 
 ### 7.1 先看 Setup checklist，再点「验证配置」
 
-页面会按顺序检查：
+凭据卡下方的 checklist 会按顺序检查，例如：
 
-1. App ID 是否配置  
-2. 私钥文件是否可读  
-3. Webhook secret 是否配置  
+1. App ID 是否已配置（默认引导：上方本机凭据卡）  
+2. 私钥是否可用  
+3. Webhook secret 是否已配置  
 4. App 是否安装并绑定  
 5. 权限是否足够  
 6. 本机 Assignee 是否可用  
@@ -208,7 +267,8 @@ GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 8. 是否绑定本地项目  
 9. Webhook 是否健康  
 
-某一项未通过时，会直接给出「下一步做什么」，而不是只丢错误码。
+「验证配置」是只读探测：不写盘、不入队、不唤醒调度器、不做 GitHub 写操作，也不接收 secret body。  
+某一项未通过时会给出「下一步做什么」，而不是只丢错误码或路径。
 
 ### 7.2 关联允许仓库
 
@@ -238,7 +298,8 @@ GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 3. 再考虑打开无人值守  
 
 无人值守默认使用完整 agent 能力，可以执行命令和访问网络，因此只应在你明确接受风险后开启。  
-只有 **仓库所有者** 明确表示采纳时才会开始自动实现。
+只有 **仓库所有者** 明确表示采纳时才会开始自动实现。  
+产品保证不会把 App 私钥 / JWT / installation token、Webhook secret、本机个人凭据**主动注入** agent 上下文；这不等于 OS 级沙箱。生产建议使用独立低权限系统用户或容器。
 
 ---
 
@@ -246,12 +307,13 @@ GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 
 ### 8.1 最小验收：只开 Triage
 
-1. 环境变量已配置并重启蛋黄派  
-2. App 已安装到测试仓库  
-3. 设置页已关联该仓库  
-4. 「验证配置」无关键阻塞项  
-5. 模式设为 **仅 Triage** 并启用  
-6. 在测试仓库新建一个 Issue  
+1. 设置页本机凭据已保存（**可不设置**任何 `YPI_GITHUB_APP_*`）  
+2. 完全停止并重新启动蛋黄派后，status / 验证仍显示 App 凭据已配置  
+3. App 已安装到测试仓库  
+4. 设置页已关联该仓库  
+5. 「验证配置」无关键阻塞项  
+6. 模式设为 **仅 Triage** 并启用  
+7. 在测试仓库新建一个 Issue  
 
 预期结果：
 
@@ -280,45 +342,77 @@ GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 
 ---
 
-## 9. 常见问题
+## 9. 高级：环境变量覆盖（CI / 容器 / 专业部署）
+
+普通本机安装 **不需要** 配置环境变量。  
+若你使用 secret manager、systemd、容器编排等，可对进程注入以下变量；**非空 env 按字段覆盖本机值**：
+
+```bash
+export YPI_GITHUB_APP_ID="123456"
+export YPI_GITHUB_APP_PRIVATE_KEY_FILE="/secure/path/app.pem"   # 服务器可读的 0600 PEM 路径
+export YPI_GITHUB_APP_WEBHOOK_SECRET="与 GitHub 一致的 secret"
+# 可选
+export YPI_GITHUB_APP_SLUG="your-app-slug"
+```
+
+| 规则 | 说明 |
+| --- | --- |
+| 优先级 | 每个字段独立：`非空 env` → `本机持久值` → `未配置` |
+| 空白 env | 视为未设置，回落本机 |
+| 混合来源 | 可只覆盖某一字段；设置页会显示每项来源。**覆盖值必须属于同一 App**，否则 JWT/验签会失败 |
+| 不写回 | 设置页保存 **永不** 把 env 值复制进本机文件；删除本机凭据也 **不修改** env |
+| 无 reveal | UI / status / verify 只显示来源枚举，不显示 env 值或路径 |
+
+适用场景：CI、不可写 agent dir 的容器、由运维统一注入的密钥。  
+本机用户请优先使用第 4 节设置页路径。
+
+---
+
+## 10. 常见问题
 
 | 现象 | 怎么处理 |
 | --- | --- |
-| 提示 App 凭据缺失 | 检查三个环境变量是否配置到 **当前运行中的进程**，改完后重启 |
-| 私钥无效或不可读 | 检查路径、文件是否为 PEM、权限是否为 600 |
-| Webhook 一直不健康 | 检查公网 HTTPS、Webhook URL、secret 是否一致，并看 GitHub Recent Deliveries |
+| 提示 App 凭据缺失 | 打开设置页本机凭据卡，三项完整保存后点「验证配置」；若使用高级 env，确认注入到 **当前运行中的进程** |
+| 私钥无效或不可读 | 重新粘贴/选择 **GitHub App RSA 私钥** PEM 并保存；高级 env 路径需为 0600 普通文件（非 symlink） |
+| 本机 bundle 损坏 / 不支持 | 使用「移除本机凭据」后完整重配；不要手改 `credentials.v1.json` |
+| 轮换后仍像旧 App | 保存/删除会清 installation token 缓存；若仍异常，确认 env 是否仍覆盖旧值 |
+| Webhook 一直不健康 / 401 | 检查公网 HTTPS、Webhook URL、secret 是否与本机或 env 一致；看 GitHub Recent Deliveries；勿在日志中打印 raw body / signature |
 | 安装缺失 | App 是否安装到该仓库；设置里 Installation ID 是否填对 |
 | 权限不足 | 回 App 权限页补齐后，到安装页接受新权限 |
 | Assignee 失败 | 执行 `gh auth status`；确认该用户可被指派到仓库 |
 | 允许仓库是空的 | 正常，需要你手动关联，不会默认塞任何仓库 |
 | 无人值守按钮不可用 | 先完成 checklist；若要自动 PR，还需 Contents / Pull requests 权限 |
-| 想立刻停掉 | 在设置里关闭自动化，或改回「仅 Triage」 |
+| 想立刻停掉 | 在设置里关闭自动化，或改回「仅 Triage」；不必删除本机凭据 |
+| 删除本机后仍显示已配置 | 进程 env 仍提供完整字段时属预期；去掉 env 后会变为未配置 |
 
 ---
 
-## 10. 推荐落地清单
+## 11. 推荐落地清单
 
 - [ ] 创建自己的 GitHub App  
 - [ ] 先授予 Metadata + Issues；需要自动 PR 时再加 Pull requests + Contents  
 - [ ] 勾选 Issues、Issue comment 事件  
-- [ ] 保存 App ID、私钥文件、Webhook secret  
-- [ ] 配置三个环境变量并重启蛋黄派  
+- [ ] 保存 App ID、私钥 PEM、Webhook secret（勿入库）  
+- [ ] 在「设置 → GitHub 自动化」本机凭据卡保存三项  
 - [ ] 安装 App 到目标仓库，记录 Installation ID  
-- [ ] 配置公网 HTTPS Webhook  
+- [ ] 配置公网 HTTPS **仅** Webhook 路由；管理面受控  
 - [ ] 本机 `gh` 登录完成  
-- [ ] 在「设置 → GitHub 自动化」关联仓库并验证配置  
+- [ ] 关联允许仓库并「验证配置」  
+- [ ] 重启 `ypi`（无 `YPI_GITHUB_APP_*`）确认仍 configured  
 - [ ] 先用「仅 Triage」跑通一个测试议题  
 - [ ] 确认无误后，再决定是否开启无人值守  
+- [ ] （可选）CI/容器再配置高级 env 覆盖  
 
 ---
 
-## 11. 产品边界（给客户的预期）
+## 12. 产品边界（给客户的预期）
 
 | 会做 | 不会做 |
 | --- | --- |
-| 帮你认领、分析、打标签、写结论 | 替客户托管一个共用 GitHub App |
-| 在设置页引导缺什么、下一步做什么 | 在网页里收集或展示私钥 / Webhook secret |
+| 在设置页安全写入本机 App 凭据并重启复用 | 替客户托管一个共用 GitHub App |
+| 显示配置状态与来源（本机 / env / 未配置） | 回显、复制或下载已保存 secret / PEM / 路径 / 指纹 |
 | 按你关联的仓库工作 | 默认锁死只能处理某一个固定仓库 |
 | 所有者采纳后可选自动开 PR | 自动合并 PR、自动发布版本 |
+| 公网 webhook 验签与 durable job | 把管理 UI/凭据 API 设计为可安全裸奔公网 |
 
-如果某一步卡在 GitHub 页面或环境变量注入方式上，优先看设置页「验证配置」给出的下一步提示。
+如果某一步卡在 GitHub 页面或本机凭据状态上，优先看设置页「验证配置」给出的下一步提示。

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Focused tests for independently releasable GitHub automation P0
- * (GHA-01 + GHA-02 + GHA-03 + GHA-04).
+ * (GHA-01 + GHA-02 + GHA-03 + GHA-04) plus GHCRED local credentials.
  *
  * Covers:
  * - config schema defaults, normalize, CAS revision, safe projection
@@ -17,8 +17,14 @@
  *   P0 capability without Contents/PR permissions, docs identity contracts,
  *   incomplete-claim owner-adoption refusal, recovery retry path
  * - IMP-001/IMP-05: empty default allowlist, user-managed repositories,
- *   setup verify checklist (no scheduler side effects), no secret paste surface,
+ *   setup verify checklist (no scheduler side effects),
  *   no product-default yolk-pi-web hard lock
+ * - GHCRED-06: local credential store first-save/rotation/delete/restart,
+ *   0700/0600 permissions, generation atomicity, lock/concurrency,
+ *   malformed/future/symlink/oversize/non-RSA fail-closed,
+ *   env-over-local overlay + blank env fallback, JWT/HMAC/cache,
+ *   credentials route contracts, setup/status source semantics,
+ *   secret/PEM/path/fingerprint sentinel isolation
  *
  * Always uses temporary PI_CODING_AGENT_DIR — never real ~/.pi/agent.
  * Never uses real operator credentials or live GitHub network.
@@ -30,16 +36,22 @@
 import assert from "node:assert/strict";
 import {
   generateKeyPairSync,
+  createHash,
   createPublicKey,
   createVerify,
 } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -51,17 +63,33 @@ import { createJiti } from "jiti";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const jiti = createJiti(join(root, "package.json"), { interopDefault: true });
+const jitiWithAlias = createJiti(join(root, "package.json"), {
+  interopDefault: true,
+  alias: { "@": root },
+});
 
 // ─── Temp agent dir ──────────────────────────────────────────────────────────
 
 const agentDir = mkdtempSync(join(tmpdir(), "pi-gha-test-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
+// GHCRED tests assume no ambient App env from the host shell.
+for (const name of [
+  "YPI_GITHUB_APP_ID",
+  "YPI_GITHUB_APP_PRIVATE_KEY_FILE",
+  "YPI_GITHUB_APP_WEBHOOK_SECRET",
+  "YPI_GITHUB_APP_SLUG",
+]) {
+  delete process.env[name];
+}
 
 const APP_KEY_SENTINEL = "GHA_APP_PRIVATE_KEY_SENTINEL_do_not_leak";
 const WEBHOOK_SECRET_SENTINEL = "gha_webhook_secret_SENTINEL_7f3c91ab";
 const INSTALL_TOKEN_SENTINEL = "ghs_INSTALL_TOKEN_SENTINEL_91ab7f3c2d4e";
 const MACHINE_TOKEN_SENTINEL = "gho_MACHINE_TOKEN_SENTINEL_ab2d4e7f3c91";
 const JWT_MARKER = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
+/** Unique App ID used only for local-store leakage scans (never projected). */
+const LOCAL_APP_ID_SENTINEL = "918273645501";
+const LOCAL_WEBHOOK_SECRET_SENTINEL = "gha_local_webhook_SECRET_sentinel_c91ab7f3";
 
 let passed = 0;
 let failed = 0;
@@ -126,6 +154,10 @@ const types = jiti(join(root, "lib/github-automation-types.ts"));
 const errors = jiti(join(root, "lib/github-automation-errors.ts"));
 const config = jiti(join(root, "lib/github-automation-config.ts"));
 const credentials = jiti(join(root, "lib/github-app-credentials.ts"));
+const credentialStore = jiti(join(root, "lib/github-app-credential-store.ts"));
+const credentialsRoute = jitiWithAlias(
+  join(root, "app/api/github-automation/credentials/route.ts"),
+);
 const client = jiti(join(root, "lib/github-app-client.ts"));
 const assignee = jiti(join(root, "lib/github-machine-assignee.ts"));
 const webhookVerify = jiti(join(root, "lib/github-webhook-verify.ts"));
@@ -3660,24 +3692,35 @@ await test("IMP-05 config GET projects + multi-repo add/remove stay path-free", 
   assert.deepEqual(cleared.projection.repositories, []);
 });
 
-await test("IMP-05 UI/API surfaces reject secret paste and avoid yolk-pi-web hard lock", () => {
+await test("IMP-05 UI/API surfaces use local credentials path without yolk-pi-web hard lock", () => {
   const ui = readFileSync(join(root, "components/GithubAutomationConfig.tsx"), "utf8");
   assert.ok(ui.includes("Setup checklist") || ui.includes("验证配置"));
   assert.ok(ui.includes("关联仓库") || ui.includes("尚未关联仓库"));
   assert.ok(ui.includes("/api/github-automation/verify"));
+  assert.ok(ui.includes("/api/github-automation/credentials"));
   assert.ok(ui.includes("YPI_GITHUB_APP_ID"));
   assert.ok(ui.includes("YPI_GITHUB_APP_PRIVATE_KEY_FILE"));
   assert.ok(ui.includes("YPI_GITHUB_APP_WEBHOOK_SECRET"));
   assert.ok(ui.includes("不会预置 yolk-pi-web") || ui.includes("不会预置"));
-  // No secret value input/reveal surface.
-  assert.ok(!/type=["']password["']/.test(ui));
-  assert.ok(!/name=["'](token|secret|privateKey|webhookSecret|pem)["']/i.test(ui));
+  // Local credential form is write-only: password input is allowed, reveal/download is not.
+  assert.ok(/type=["']password["']/.test(ui), "webhook secret uses password input");
+  assert.ok(ui.includes('autoComplete="new-password"') || ui.includes("autocomplete=\"new-password\""));
+  assert.ok(!/type=["']password["'][\s\S]{0,200}reveal/i.test(ui));
+  assert.ok(!/download.*privateKey|privateKey.*download/i.test(ui));
   assert.ok(!/localStorage\.(setItem|getItem)/.test(ui));
   assert.ok(!/navigator\.clipboard\.writeText\([^\)]*(token|secret|pem|projectRoot)/i.test(ui));
   // Clipboard helpers may copy env *names* only.
   assert.ok(ui.includes("copyEnvName") || ui.includes("已复制"));
   assert.ok(!ui.includes("BEGIN PRIVATE KEY"));
   assert.ok(!ui.includes("projectRoot:"));
+  assert.ok(
+    ui.includes("本机 GitHub App 凭据") || ui.includes("保存到本机"),
+    "primary CTA is local credentials",
+  );
+  assert.ok(
+    ui.includes("高级：环境变量覆盖") || ui.includes("环境变量覆盖"),
+    "env is advanced override, not the only path",
+  );
 
   const verifyRoute = readFileSync(
     join(root, "app/api/github-automation/verify/route.ts"),
@@ -3708,6 +3751,7 @@ await test("IMP-05 UI/API surfaces reject secret paste and avoid yolk-pi-web har
   assert.ok(!/wakeGithubAutomationScheduler/.test(setupSrc));
   assert.ok(!/createQueuedGithubAutomationJob/.test(setupSrc));
   assert.ok(setupSrc.includes("enqueuedJobs: false"));
+  assert.ok(setupSrc.includes("本机 GitHub App 凭据") || setupSrc.includes("LOCAL_CREDENTIAL_CARD"));
 });
 
 await test("IMP-05 sentinel scan over setup projection + config GET", async () => {
@@ -3777,6 +3821,1074 @@ await test("IMP-05 sentinel scan over setup projection + config GET", async () =
   credentials._testOverrideGithubAppCredentialEnv(null);
 });
 
+// ─── GHCRED-06: local credential store / overlay / API / leakage ─────────────
+
+function posixMode(path) {
+  try {
+    return statSync(path).mode & 0o777;
+  } catch {
+    return null;
+  }
+}
+
+function assertPosixMode(path, expected, label) {
+  const mode = posixMode(path);
+  if (mode === null) return;
+  // Skip hard mode asserts on platforms that ignore POSIX permission bits.
+  if (process.platform === "win32") return;
+  assert.equal(mode, expected, `${label} mode expected ${expected.toString(8)} got ${mode.toString(8)}`);
+}
+
+function makeLocalRsaPemPair() {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+  });
+  return {
+    pem: privateKey.export({ type: "pkcs8", format: "pem" }),
+    publicKeyPem: publicKey.export({ type: "spki", format: "pem" }),
+  };
+}
+
+function makeEcPrivateKeyPem() {
+  const { privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  return privateKey.export({ type: "pkcs8", format: "pem" });
+}
+
+function automationRoot() {
+  return join(agentDir, "github-automation");
+}
+
+function credentialsMetadataPath() {
+  return join(automationRoot(), "credentials.v1.json");
+}
+
+function listGenerationKeys() {
+  const rootDir = automationRoot();
+  if (!existsSync(rootDir)) return [];
+  return readdirSync(rootDir).filter((name) =>
+    /^private-key\.[A-Za-z0-9_-]{8,64}\.pem$/.test(name),
+  );
+}
+
+function readActiveLocalBundle() {
+  const metaPath = credentialsMetadataPath();
+  if (!existsSync(metaPath)) return null;
+  return JSON.parse(readFileSync(metaPath, "utf8"));
+}
+
+function fingerprintPemText(pem) {
+  return `sha256:${createHash("sha256").update(pem.replace(/\r\n/g, "\n").trim(), "utf8").digest("hex")}`;
+}
+
+function localSentinelExtras(extra = []) {
+  const bundle = readActiveLocalBundle();
+  const extras = [
+    LOCAL_APP_ID_SENTINEL,
+    LOCAL_WEBHOOK_SECRET_SENTINEL,
+    WEBHOOK_SECRET_SENTINEL,
+    APP_KEY_SENTINEL,
+    INSTALL_TOKEN_SENTINEL,
+    MACHINE_TOKEN_SENTINEL,
+    "BEGIN PRIVATE KEY",
+    "BEGIN RSA PRIVATE KEY",
+    "sha256:",
+    ...extra,
+  ];
+  if (bundle?.keyFile) extras.push(bundle.keyFile);
+  if (bundle?.keySha256) extras.push(bundle.keySha256);
+  if (bundle?.appId) extras.push(String(bundle.appId));
+  if (bundle?.webhookSecret) extras.push(String(bundle.webhookSecret));
+  return extras;
+}
+
+async function clearLocalCredentialsForTests() {
+  credentials._testOverrideGithubAppCredentialEnv(null);
+  credentialStore._testResetGithubAppCredentialStoreQueue();
+  try {
+    await credentialStore.deleteGithubAppLocalCredentials();
+  } catch {
+    // missing is fine
+  }
+  // Hard wipe residual metadata/keys if delete recovered partially.
+  const rootDir = automationRoot();
+  if (existsSync(credentialsMetadataPath())) {
+    unlinkSync(credentialsMetadataPath());
+  }
+  for (const name of listGenerationKeys()) {
+    try {
+      unlinkSync(join(rootDir, name));
+    } catch {
+      // ignore
+    }
+  }
+}
+
+async function saveCompleteLocalBundle(overrides = {}) {
+  const key = overrides.pem ? { pem: overrides.pem } : makeLocalRsaPemPair();
+  const summary = await credentialStore.upsertGithubAppLocalCredentials({
+    appId: overrides.appId ?? LOCAL_APP_ID_SENTINEL,
+    webhookSecret: overrides.webhookSecret ?? LOCAL_WEBHOOK_SECRET_SENTINEL,
+    privateKeyPem: key.pem,
+    appSlug: overrides.appSlug === undefined ? "ypi-local-bot" : overrides.appSlug,
+  });
+  return { summary, pem: key.pem, publicKeyPem: key.publicKeyPem };
+}
+
+async function responseJson(response) {
+  const text = await response.text();
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = text;
+  }
+  return {
+    status: response.status,
+    headers: Object.fromEntries(response.headers.entries()),
+    body,
+    text,
+  };
+}
+
+function assertNoStore(headers, label) {
+  const cache = String(headers["cache-control"] || headers["Cache-Control"] || "");
+  assert.ok(cache.includes("no-store"), `${label} must set Cache-Control: no-store`);
+}
+
+function assertSafeCredentialStatus(status, label) {
+  assert.equal(typeof status, "object");
+  assert.equal(typeof status.configured, "boolean");
+  assert.equal(typeof status.readiness, "string");
+  assert.equal(typeof status.hasAppId, "boolean");
+  assert.equal(typeof status.hasPrivateKeyFile, "boolean");
+  assert.equal(typeof status.hasPrivateKey, "boolean");
+  assert.equal(typeof status.hasWebhookSecret, "boolean");
+  assert.ok(status.local && typeof status.local === "object");
+  assert.ok(status.sources && typeof status.sources === "object");
+  for (const key of ["appId", "key", "webhook", "slug"]) {
+    assert.ok(["env", "local", "missing"].includes(status.sources[key]), `${label} sources.${key}`);
+  }
+  projection.assertGithubAutomationProjectionSafe(status);
+  assertNoSentinel(status, label, localSentinelExtras());
+}
+
+await test("GHCRED-06 local store first-save permissions generation and restart-import", async () => {
+  await clearLocalCredentialsForTests();
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+
+  const missing = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(missing.configured, false);
+  assert.equal(missing.local.readiness, "missing");
+  assert.equal(missing.sources.appId, "missing");
+  assertSafeCredentialStatus(missing, "missing local projection");
+
+  // Partial first save must not create a half bundle.
+  await assert.rejects(
+    () =>
+      credentialStore.upsertGithubAppLocalCredentials({
+        appId: LOCAL_APP_ID_SENTINEL,
+        webhookSecret: LOCAL_WEBHOOK_SECRET_SENTINEL,
+      }),
+    (err) => err?.code === "local_credentials_invalid",
+  );
+  assert.equal(existsSync(credentialsMetadataPath()), false);
+  assert.deepEqual(listGenerationKeys(), []);
+
+  const saved = await saveCompleteLocalBundle();
+  assert.equal(saved.summary.configured, true);
+  assert.equal(saved.summary.readiness, "ready");
+
+  const rootDir = automationRoot();
+  assert.ok(existsSync(rootDir));
+  assertPosixMode(rootDir, 0o700, "automation root");
+  assertPosixMode(credentialsMetadataPath(), 0o600, "credentials.v1.json");
+  const keys = listGenerationKeys();
+  assert.equal(keys.length, 1);
+  assertPosixMode(join(rootDir, keys[0]), 0o600, "generation key");
+
+  const bundle = readActiveLocalBundle();
+  assert.equal(bundle.schemaVersion, types.GITHUB_APP_LOCAL_CREDENTIALS_SCHEMA_VERSION);
+  assert.equal(bundle.kind, types.GITHUB_APP_LOCAL_CREDENTIALS_KIND);
+  assert.equal(bundle.appId, LOCAL_APP_ID_SENTINEL);
+  assert.equal(bundle.webhookSecret, LOCAL_WEBHOOK_SECRET_SENTINEL);
+  assert.equal(bundle.keyFile, keys[0]);
+  assert.ok(!String(bundle.keyFile).includes("/"));
+  assert.ok(bundle.keySha256.startsWith("sha256:"));
+
+  // Same-process re-read (simulates restart without ambient env).
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+  const ready = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(ready.configured, true);
+  assert.equal(ready.readiness, "ready");
+  assert.equal(ready.local.configured, true);
+  assert.equal(ready.sources.appId, "local");
+  assert.equal(ready.sources.key, "local");
+  assert.equal(ready.sources.webhook, "local");
+  assert.equal(ready.appSlug, "ypi-local-bot");
+  assertSafeCredentialStatus(ready, "local-only ready projection");
+
+  const loaded = await credentials.loadGithubAppCredentials();
+  assert.equal(loaded.appId, LOCAL_APP_ID_SENTINEL);
+  assert.equal(loaded.webhookSecret, LOCAL_WEBHOOK_SECRET_SENTINEL);
+  assert.ok(loaded.privateKeyFile.includes(bundle.keyFile));
+
+  // Child process restart-import: fresh modules, no YPI_GITHUB_APP_* env.
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--loader",
+      "./scripts/ts-extension-loader.mjs",
+      "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+      "--input-type=module",
+      "-e",
+      `
+        import { createJiti } from "jiti";
+        import { join } from "node:path";
+        process.env.PI_CODING_AGENT_DIR = ${JSON.stringify(agentDir)};
+        for (const k of [
+          "YPI_GITHUB_APP_ID",
+          "YPI_GITHUB_APP_PRIVATE_KEY_FILE",
+          "YPI_GITHUB_APP_WEBHOOK_SECRET",
+          "YPI_GITHUB_APP_SLUG",
+        ]) delete process.env[k];
+        const jiti = createJiti(join(process.cwd(), "package.json"), { interopDefault: true });
+        const credentials = jiti(join(process.cwd(), "lib/github-app-credentials.ts"));
+        const status = await credentials.getGithubAppCredentialSafeProjection();
+        if (!status.configured || status.readiness !== "ready") {
+          console.error(JSON.stringify(status));
+          process.exit(2);
+        }
+        if (status.sources?.appId !== "local" || status.sources?.key !== "local" || status.sources?.webhook !== "local") {
+          console.error(JSON.stringify(status.sources));
+          process.exit(3);
+        }
+        const loaded = await credentials.loadGithubAppCredentials();
+        if (loaded.appId !== ${JSON.stringify(LOCAL_APP_ID_SENTINEL)}) process.exit(4);
+        if (loaded.webhookSecret !== ${JSON.stringify(LOCAL_WEBHOOK_SECRET_SENTINEL)}) process.exit(5);
+        const serialized = JSON.stringify(status);
+        for (const needle of [
+          ${JSON.stringify(LOCAL_APP_ID_SENTINEL)},
+          ${JSON.stringify(LOCAL_WEBHOOK_SECRET_SENTINEL)},
+          "BEGIN PRIVATE KEY",
+          "sha256:",
+        ]) {
+          if (serialized.includes(needle)) process.exit(6);
+        }
+        console.log("restart-import-ok");
+      `,
+    ],
+    {
+      cwd: root,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PI_CODING_AGENT_DIR: agentDir,
+        YPI_GITHUB_APP_ID: "",
+        YPI_GITHUB_APP_PRIVATE_KEY_FILE: "",
+        YPI_GITHUB_APP_WEBHOOK_SECRET: "",
+        YPI_GITHUB_APP_SLUG: "",
+      },
+    },
+  );
+  assert.equal(child.status, 0, `restart-import child failed: ${child.stderr || child.stdout}`);
+  assert.ok(String(child.stdout).includes("restart-import-ok"));
+
+  credentials._testOverrideGithubAppCredentialEnv(null);
+});
+
+await test("GHCRED-06 partial rotation atomic generation and blank-preserve", async () => {
+  await clearLocalCredentialsForTests();
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+
+  const first = await saveCompleteLocalBundle();
+  const before = readActiveLocalBundle();
+  const beforeKeys = listGenerationKeys();
+  assert.equal(beforeKeys.length, 1);
+
+  // Blank/omitted fields preserve local values (never import env).
+  const rotatedSecret = await credentialStore.upsertGithubAppLocalCredentials({
+    webhookSecret: "gha_local_webhook_rotated_SECRET_9f3c",
+  });
+  assert.equal(rotatedSecret.configured, true);
+  const afterSecret = readActiveLocalBundle();
+  assert.equal(afterSecret.appId, before.appId);
+  assert.equal(afterSecret.keyFile, before.keyFile);
+  assert.equal(afterSecret.webhookSecret, "gha_local_webhook_rotated_SECRET_9f3c");
+  assert.deepEqual(listGenerationKeys(), beforeKeys);
+
+  const nextKey = makeLocalRsaPemPair();
+  await credentialStore.upsertGithubAppLocalCredentials({
+    privateKeyPem: nextKey.pem,
+  });
+  const afterKey = readActiveLocalBundle();
+  assert.equal(afterKey.appId, before.appId);
+  assert.equal(afterKey.webhookSecret, "gha_local_webhook_rotated_SECRET_9f3c");
+  assert.notEqual(afterKey.keyFile, before.keyFile);
+  const storedPem = readFileSync(join(automationRoot(), afterKey.keyFile), "utf8");
+  assert.equal(afterKey.keySha256, fingerprintPemText(storedPem));
+  // Active generation only (old slot cleaned best-effort).
+  const keys = listGenerationKeys();
+  assert.ok(keys.includes(afterKey.keyFile));
+  assert.equal(keys.length, 1, "old generation cleaned after rotation");
+
+  // JWT verifies with the rotated key.
+  const creds = await credentials.loadGithubAppCredentials();
+  const jwt = credentials.createGithubAppJwt(creds, {
+    nowSeconds: 1_700_000_100,
+    lifetimeSeconds: 120,
+  });
+  const [h, p, s] = jwt.token.split(".");
+  const verify = createVerify("RSA-SHA256");
+  verify.update(`${h}.${p}`);
+  verify.end();
+  assert.equal(
+    verify.verify(createPublicKey(nextKey.publicKeyPem), Buffer.from(s, "base64url")),
+    true,
+  );
+  const payload = JSON.parse(Buffer.from(p, "base64url").toString("utf8"));
+  assert.equal(payload.iss, LOCAL_APP_ID_SENTINEL);
+  assertNoSentinel({ iat: jwt.iat, exp: jwt.exp }, "rotated jwt metadata", localSentinelExtras([first.pem.slice(0, 40)]));
+
+  credentials._testOverrideGithubAppCredentialEnv(null);
+});
+
+await test("GHCRED-06 env overlay matrix blank fallback and invalid local masking", async () => {
+  await clearLocalCredentialsForTests();
+  const local = await saveCompleteLocalBundle();
+
+  // local-only
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+  let status = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(status.configured, true);
+  assert.deepEqual(status.sources, {
+    appId: "local",
+    key: "local",
+    webhook: "local",
+    slug: "local",
+  });
+
+  // env-only path still works with ambient override + no local required.
+  await clearLocalCredentialsForTests();
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: "424242",
+    privateKeyFile: keyMaterial.keyPath,
+    webhookSecret: WEBHOOK_SECRET_SENTINEL,
+    appSlug: "env-bot",
+  });
+  status = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(status.configured, true);
+  assert.equal(status.sources.appId, "env");
+  assert.equal(status.sources.key, "env");
+  assert.equal(status.sources.webhook, "env");
+  assert.equal(status.appSlug, "env-bot");
+  assertSafeCredentialStatus(status, "env-only projection");
+
+  // partial overlays: restore local then override one field at a time
+  await saveCompleteLocalBundle({ pem: local.pem });
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: "555001",
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+  status = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(status.configured, true);
+  assert.equal(status.sources.appId, "env");
+  assert.equal(status.sources.key, "local");
+  assert.equal(status.sources.webhook, "local");
+
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: keyMaterial.keyPath,
+    webhookSecret: null,
+    appSlug: null,
+  });
+  status = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(status.configured, true);
+  assert.equal(status.sources.key, "env");
+  assert.equal(status.sources.appId, "local");
+  assert.equal(status.sources.webhook, "local");
+
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: "env_override_webhook_secret_VALUE",
+    appSlug: null,
+  });
+  status = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(status.configured, true);
+  assert.equal(status.sources.webhook, "env");
+  const loadedMixed = await credentials.loadGithubAppCredentials();
+  assert.equal(loadedMixed.webhookSecret, "env_override_webhook_secret_VALUE");
+  assert.equal(loadedMixed.appId, LOCAL_APP_ID_SENTINEL);
+
+  // blank env override must fall back to local (override null/empty).
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: "",
+    privateKeyFile: "",
+    webhookSecret: "",
+    appSlug: "",
+  });
+  status = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(status.configured, true);
+  assert.equal(status.sources.appId, "local");
+  assert.equal(status.sources.key, "local");
+  assert.equal(status.sources.webhook, "local");
+
+  // Damage local key fingerprint while env fully covers → effective ready + local warning.
+  const damaged = readActiveLocalBundle();
+  damaged.keySha256 = "sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+  writeFileSync(credentialsMetadataPath(), `${JSON.stringify(damaged, null, 2)}\n`, { mode: 0o600 });
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: "424242",
+    privateKeyFile: keyMaterial.keyPath,
+    webhookSecret: WEBHOOK_SECRET_SENTINEL,
+    appSlug: "env-cover",
+  });
+  status = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(status.configured, true);
+  assert.equal(status.readiness, "ready");
+  assert.equal(status.sources.appId, "env");
+  assert.equal(status.sources.key, "env");
+  assert.equal(status.sources.webhook, "env");
+  assert.ok(["invalid", "unsupported"].includes(status.local.readiness));
+  assertSafeCredentialStatus(status, "env masks invalid local");
+
+  // Partial env + invalid local must fail closed for missing local-dependent fields.
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: "424242",
+    privateKeyFile: null,
+    webhookSecret: WEBHOOK_SECRET_SENTINEL,
+    appSlug: null,
+  });
+  status = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(status.configured, false);
+  assert.ok(
+    status.readiness === "private_key_invalid" || status.readiness === "missing_private_key_file",
+  );
+  assertSafeCredentialStatus(status, "partial env + invalid local");
+
+  credentials._testOverrideGithubAppCredentialEnv(null);
+  await clearLocalCredentialsForTests();
+});
+
+await test("GHCRED-06 local webhook HMAC pass/fail and env secret override", async () => {
+  await clearLocalCredentialsForTests();
+  await saveCompleteLocalBundle();
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+
+  const secret = await credentials.loadGithubAppWebhookSecret();
+  assert.equal(secret, LOCAL_WEBHOOK_SECRET_SENTINEL);
+  const raw = Buffer.from(JSON.stringify({ ping: true, n: 1 }), "utf8");
+  const goodHex = webhookVerify.computeGithubWebhookSignatureHex(raw, secret);
+  assert.equal(
+    webhookVerify.verifyGithubWebhookSignature({
+      rawBody: raw,
+      signatureHeader: `sha256=${goodHex}`,
+      secret,
+    }),
+    true,
+  );
+  assert.equal(
+    webhookVerify.verifyGithubWebhookSignature({
+      rawBody: raw,
+      signatureHeader: `sha256=${"ab".repeat(32)}`,
+      secret,
+    }),
+    false,
+  );
+  assert.throws(
+    () =>
+      webhookVerify.assertValidGithubWebhookSignature({
+        rawBody: raw,
+        signatureHeader: `sha256=${"cd".repeat(32)}`,
+        secret,
+      }),
+    (err) => err?.status === 401 || err?.code === "github_auth_failed",
+  );
+
+  // env webhook overrides local for verification path.
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: WEBHOOK_SECRET_SENTINEL,
+    appSlug: null,
+  });
+  const envSecret = await credentials.loadGithubAppWebhookSecret();
+  assert.equal(envSecret, WEBHOOK_SECRET_SENTINEL);
+  const envHex = webhookVerify.computeGithubWebhookSignatureHex(raw, WEBHOOK_SECRET_SENTINEL);
+  assert.equal(
+    webhookVerify.verifyGithubWebhookSignature({
+      rawBody: raw,
+      signatureHeader: `sha256=${envHex}`,
+      secret: envSecret,
+    }),
+    true,
+  );
+  // Local secret must not bypass env override.
+  assert.equal(
+    webhookVerify.verifyGithubWebhookSignature({
+      rawBody: raw,
+      signatureHeader: `sha256=${goodHex}`,
+      secret: envSecret,
+    }),
+    false,
+  );
+
+  credentials._testOverrideGithubAppCredentialEnv(null);
+  await clearLocalCredentialsForTests();
+});
+
+await test("GHCRED-06 installation token cache clears after local rotation and delete", async () => {
+  await clearLocalCredentialsForTests();
+  await saveCompleteLocalBundle();
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+
+  client._testClearGithubAppInstallationTokenCache();
+  client._testOverrideGithubAppClientNowMs(1_700_000_000_000);
+  let tokenPosts = 0;
+  client._testOverrideGithubAppClientFetch(async (url) => {
+    const u = String(url);
+    if (u.includes("/app/installations/77/access_tokens")) {
+      tokenPosts += 1;
+      return new Response(
+        JSON.stringify({
+          token: `${INSTALL_TOKEN_SENTINEL}_${tokenPosts}`,
+          expires_at: new Date(1_700_000_000_000 + 60 * 60 * 1000).toISOString(),
+        }),
+        { status: 201, headers: { "content-type": "application/json" } },
+      );
+    }
+    return new Response("{}", { status: 404, headers: { "content-type": "application/json" } });
+  });
+
+  const first = await client.getGithubInstallationToken(77);
+  assert.equal(first.token, `${INSTALL_TOKEN_SENTINEL}_1`);
+  const cached = await client.getGithubInstallationToken(77);
+  assert.equal(cached.token, `${INSTALL_TOKEN_SENTINEL}_1`);
+  assert.equal(tokenPosts, 1, "second lookup hits cache");
+
+  // Rotation must invalidate cache.
+  await credentialStore.upsertGithubAppLocalCredentials({
+    privateKeyPem: makeLocalRsaPemPair().pem,
+  });
+  client.clearGithubAppInstallationTokenCache();
+  const afterRotation = await client.getGithubInstallationToken(77);
+  assert.equal(afterRotation.token, `${INSTALL_TOKEN_SENTINEL}_2`);
+  assert.equal(tokenPosts, 2);
+
+  // Route-level delete also clears cache (call path mirrors production).
+  const del = await credentialsRoute.DELETE(
+    new Request("http://localhost/api/github-automation/credentials", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirm: credentialsRoute._CREDENTIALS_DELETE_CONFIRM }),
+    }),
+  );
+  const delBody = await responseJson(del);
+  assert.equal(delBody.status, 200);
+  assert.equal(delBody.body.ok, true);
+  assertNoStore(delBody.headers, "DELETE credentials");
+  assertSafeCredentialStatus(delBody.body.status, "delete response status");
+
+  // Reconfigure env-only and ensure previous local token identity is gone.
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: "424242",
+    privateKeyFile: keyMaterial.keyPath,
+    webhookSecret: WEBHOOK_SECRET_SENTINEL,
+  });
+  const afterDelete = await client.getGithubInstallationToken(77);
+  assert.equal(afterDelete.token, `${INSTALL_TOKEN_SENTINEL}_3`);
+  assert.equal(tokenPosts, 3);
+
+  client._testOverrideGithubAppClientFetch(undefined);
+  client._testClearGithubAppInstallationTokenCache();
+  credentials._testOverrideGithubAppCredentialEnv(null);
+  await clearLocalCredentialsForTests();
+});
+
+await test("GHCRED-06 fail-closed malformed future symlink oversize non-RSA and concurrent upsert", async () => {
+  await clearLocalCredentialsForTests();
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+
+  // non-RSA rejected before write
+  await assert.rejects(
+    () =>
+      credentialStore.upsertGithubAppLocalCredentials({
+        appId: LOCAL_APP_ID_SENTINEL,
+        webhookSecret: LOCAL_WEBHOOK_SECRET_SENTINEL,
+        privateKeyPem: makeEcPrivateKeyPem(),
+      }),
+    (err) => err?.code === "invalid_private_key",
+  );
+  assert.equal(existsSync(credentialsMetadataPath()), false);
+
+  // oversize PEM rejected
+  const huge = `${"A".repeat(70 * 1024)}\n-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n`;
+  await assert.rejects(
+    () =>
+      credentialStore.upsertGithubAppLocalCredentials({
+        appId: LOCAL_APP_ID_SENTINEL,
+        webhookSecret: LOCAL_WEBHOOK_SECRET_SENTINEL,
+        privateKeyPem: huge,
+      }),
+    (err) => err?.code === "private_key_too_large" || err?.code === "invalid_private_key",
+  );
+
+  const saved = await saveCompleteLocalBundle();
+  const goodBundle = readActiveLocalBundle();
+
+  // future schema is unsupported and ordinary upsert refuses to overwrite
+  writeFileSync(
+    credentialsMetadataPath(),
+    `${JSON.stringify({ ...goodBundle, schemaVersion: 99, kind: "future-kind" }, null, 2)}\n`,
+    { mode: 0o600 },
+  );
+  const unsupported = await credentialStore.getGithubAppLocalCredentialSafeSummary();
+  assert.equal(unsupported.readiness, "unsupported");
+  await assert.rejects(
+    () =>
+      credentialStore.upsertGithubAppLocalCredentials({
+        appId: LOCAL_APP_ID_SENTINEL,
+        webhookSecret: LOCAL_WEBHOOK_SECRET_SENTINEL,
+        privateKeyPem: saved.pem,
+      }),
+    (err) => err?.code === "local_credentials_unsupported",
+  );
+  // Explicit delete recovers.
+  await credentialStore.deleteGithubAppLocalCredentials();
+  assert.equal(existsSync(credentialsMetadataPath()), false);
+
+  await saveCompleteLocalBundle({ pem: saved.pem });
+  // malformed JSON metadata fail closed
+  writeFileSync(credentialsMetadataPath(), "{not-json", { mode: 0o600 });
+  const invalid = await credentialStore.getGithubAppLocalCredentialSafeSummary();
+  assert.equal(invalid.readiness, "invalid");
+  await assert.rejects(
+    () =>
+      credentialStore.upsertGithubAppLocalCredentials({
+        webhookSecret: "x",
+      }),
+    (err) => err?.code === "local_credentials_invalid",
+  );
+  await credentialStore.deleteGithubAppLocalCredentials();
+
+  // symlink key rejected
+  const again = await saveCompleteLocalBundle({ pem: saved.pem });
+  void again;
+  const active = readActiveLocalBundle();
+  const keyPath = join(automationRoot(), active.keyFile);
+  const outside = join(agentDir, "outside-real.pem");
+  writeFileSync(outside, saved.pem, { mode: 0o600 });
+  unlinkSync(keyPath);
+  try {
+    symlinkSync(outside, keyPath);
+  } catch (err) {
+    // Some CI images disallow symlinks; skip only that branch.
+    if (err && (err.code === "EPERM" || err.code === "ENOTSUP")) {
+      writeFileSync(keyPath, saved.pem, { mode: 0o600 });
+    } else {
+      throw err;
+    }
+  }
+  if (lstatSync(keyPath).isSymbolicLink()) {
+    const summary = await credentialStore.getGithubAppLocalCredentialSafeSummary();
+    assert.equal(summary.readiness, "invalid");
+    await assert.rejects(
+      () => credentials.loadGithubAppCredentials(),
+      (err) => err?.code === "not_configured" || err?.code === "local_credentials_invalid",
+    );
+  }
+
+  // basename traversal rejected by path helper
+  assert.throws(
+    () => credentialStore.resolveGithubAppCredentialKeyPath("../secrets.pem"),
+    (err) => err?.code === "local_credentials_invalid",
+  );
+  assert.throws(
+    () => credentialStore.resolveGithubAppCredentialKeyPath("/tmp/evil.pem"),
+    (err) => err?.code === "local_credentials_invalid",
+  );
+
+  // concurrent upserts serialize under process queue + lock; final state remains valid complete bundle
+  await clearLocalCredentialsForTests();
+  const base = await saveCompleteLocalBundle({ pem: saved.pem });
+  void base;
+  const pemA = makeLocalRsaPemPair().pem;
+  const pemB = makeLocalRsaPemPair().pem;
+  const results = await Promise.allSettled([
+    credentialStore.upsertGithubAppLocalCredentials({
+      webhookSecret: "concurrent-secret-A-SENTINEL",
+      privateKeyPem: pemA,
+    }),
+    credentialStore.upsertGithubAppLocalCredentials({
+      webhookSecret: "concurrent-secret-B-SENTINEL",
+      privateKeyPem: pemB,
+    }),
+  ]);
+  assert.ok(results.every((r) => r.status === "fulfilled"));
+  const finalBundle = readActiveLocalBundle();
+  assert.ok(finalBundle);
+  assert.ok(
+    finalBundle.webhookSecret === "concurrent-secret-A-SENTINEL" ||
+      finalBundle.webhookSecret === "concurrent-secret-B-SENTINEL",
+  );
+  assert.equal(listGenerationKeys().length, 1);
+  const finalStatus = await credentials.getGithubAppCredentialSafeProjection();
+  // no env → local complete
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+  assert.equal((await credentials.getGithubAppCredentialSafeProjection()).configured, true);
+  assertSafeCredentialStatus(finalStatus, "post-concurrent projection");
+
+  // delete must not touch non-secret config / jobs dirs
+  mkdirSync(join(automationRoot(), "jobs"), { recursive: true });
+  writeFileSync(join(automationRoot(), "jobs", "keep-me.json"), "{\"ok\":true}\n");
+  await config.writeGithubAutomationConfig(config.createDefaultGithubAutomationConfig());
+  await credentialStore.deleteGithubAppLocalCredentials();
+  assert.equal(existsSync(join(automationRoot(), "config.json")), true);
+  assert.equal(existsSync(join(automationRoot(), "jobs", "keep-me.json")), true);
+  assert.equal(existsSync(credentialsMetadataPath()), false);
+
+  credentials._testOverrideGithubAppCredentialEnv(null);
+  await clearLocalCredentialsForTests();
+});
+
+await test("GHCRED-06 credentials route GET/PUT/DELETE contracts and sentinel isolation", async () => {
+  await clearLocalCredentialsForTests();
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+
+  const getEmpty = await responseJson(
+    await credentialsRoute.GET(
+      new Request("http://localhost/api/github-automation/credentials"),
+    ),
+  );
+  assert.equal(getEmpty.status, 200);
+  assert.equal(getEmpty.body.ok, true);
+  assertNoStore(getEmpty.headers, "GET empty");
+  assertSafeCredentialStatus(getEmpty.body.status, "GET empty status");
+  assert.equal(getEmpty.body.status.configured, false);
+
+  // Reject JSON body for PUT
+  const putJson = await responseJson(
+    await credentialsRoute.PUT(
+      new Request("http://localhost/api/github-automation/credentials", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          appId: LOCAL_APP_ID_SENTINEL,
+          webhookSecret: LOCAL_WEBHOOK_SECRET_SENTINEL,
+          privateKeyPem: makeLocalRsaPemPair().pem,
+        }),
+      }),
+    ),
+  );
+  assert.equal(putJson.status, 400);
+  assert.equal(putJson.body.code, "invalid_credentials_request");
+  assertNoStore(putJson.headers, "PUT json reject");
+  assertNoSentinel(putJson.body, "PUT json reject body", localSentinelExtras());
+
+  // Reject query secrets
+  const getQuery = await responseJson(
+    await credentialsRoute.GET(
+      new Request(
+        `http://localhost/api/github-automation/credentials?webhookSecret=${LOCAL_WEBHOOK_SECRET_SENTINEL}`,
+      ),
+    ),
+  );
+  assert.equal(getQuery.status, 400);
+  assert.equal(getQuery.body.code, "invalid_credentials_request");
+  assertNoSentinel(getQuery.body, "GET query secret reject", localSentinelExtras());
+
+  const pem = makeLocalRsaPemPair().pem;
+  const form = new FormData();
+  form.set("appId", LOCAL_APP_ID_SENTINEL);
+  form.set("webhookSecret", LOCAL_WEBHOOK_SECRET_SENTINEL);
+  form.set("privateKeyPem", pem);
+  form.set("appSlug", "route-bot");
+  const putOk = await responseJson(
+    await credentialsRoute.PUT(
+      new Request("http://localhost/api/github-automation/credentials", {
+        method: "PUT",
+        body: form,
+      }),
+    ),
+  );
+  assert.equal(putOk.status, 200, JSON.stringify(putOk.body));
+  assert.equal(putOk.body.ok, true);
+  assertNoStore(putOk.headers, "PUT success");
+  assertSafeCredentialStatus(putOk.body.status, "PUT success status");
+  assert.equal(putOk.body.status.configured, true);
+  assert.equal(putOk.body.status.sources.appId, "local");
+  assert.equal(putOk.body.status.local.configured, true);
+  // Response must not echo submitted secrets / PEM / path / fingerprint.
+  assertNoSentinel(putOk, "PUT success full response", [
+    ...localSentinelExtras([pem.slice(0, 48)]),
+    join(automationRoot(), "private-key"),
+  ]);
+
+  // Ambiguous paste+file rejected
+  const ambiguous = new FormData();
+  ambiguous.set("privateKeyPem", pem);
+  ambiguous.set(
+    "privateKeyFile",
+    new File([pem], "app.pem", { type: "application/x-pem-file" }),
+  );
+  const putAmbiguous = await responseJson(
+    await credentialsRoute.PUT(
+      new Request("http://localhost/api/github-automation/credentials", {
+        method: "PUT",
+        body: ambiguous,
+      }),
+    ),
+  );
+  assert.equal(putAmbiguous.status, 400);
+  assert.equal(putAmbiguous.body.code, "invalid_credentials_request");
+  assertNoSentinel(putAmbiguous.body, "ambiguous key reject", localSentinelExtras([pem.slice(0, 32)]));
+
+  // Unknown field rejected
+  const unknown = new FormData();
+  unknown.set("webhookSecret", "new-secret");
+  unknown.set("extraField", "nope");
+  const putUnknown = await responseJson(
+    await credentialsRoute.PUT(
+      new Request("http://localhost/api/github-automation/credentials", {
+        method: "PUT",
+        body: unknown,
+      }),
+    ),
+  );
+  assert.equal(putUnknown.status, 400);
+  assert.equal(putUnknown.body.code, "invalid_credentials_request");
+
+  // File-only rotation works
+  const rotatedPem = makeLocalRsaPemPair().pem;
+  const fileForm = new FormData();
+  fileForm.set(
+    "privateKeyFile",
+    new File([rotatedPem], "rotated.pem", { type: "text/plain" }),
+  );
+  const putFile = await responseJson(
+    await credentialsRoute.PUT(
+      new Request("http://localhost/api/github-automation/credentials", {
+        method: "PUT",
+        body: fileForm,
+      }),
+    ),
+  );
+  assert.equal(putFile.status, 200, JSON.stringify(putFile.body));
+  assert.equal(putFile.body.status.configured, true);
+  assertNoSentinel(putFile, "PUT file rotation", localSentinelExtras([rotatedPem.slice(0, 40)]));
+
+  // DELETE requires exact confirm
+  const delBad = await responseJson(
+    await credentialsRoute.DELETE(
+      new Request("http://localhost/api/github-automation/credentials", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirm: "yes" }),
+      }),
+    ),
+  );
+  assert.equal(delBad.status, 400);
+  assert.equal(existsSync(credentialsMetadataPath()), true);
+
+  const delOk = await responseJson(
+    await credentialsRoute.DELETE(
+      new Request("http://localhost/api/github-automation/credentials", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          confirm: credentialsRoute._CREDENTIALS_DELETE_CONFIRM,
+        }),
+      }),
+    ),
+  );
+  assert.equal(delOk.status, 200);
+  assert.equal(delOk.body.ok, true);
+  assert.equal(delOk.body.status.local.configured, false);
+  assertNoStore(delOk.headers, "DELETE success");
+  assertSafeCredentialStatus(delOk.body.status, "DELETE success status");
+  assert.equal(existsSync(credentialsMetadataPath()), false);
+
+  // After delete, env-only still projects configured without leaking.
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: "424242",
+    privateKeyFile: keyMaterial.keyPath,
+    webhookSecret: WEBHOOK_SECRET_SENTINEL,
+  });
+  const getEnv = await responseJson(
+    await credentialsRoute.GET(
+      new Request("http://localhost/api/github-automation/credentials"),
+    ),
+  );
+  assert.equal(getEnv.body.status.configured, true);
+  assert.equal(getEnv.body.status.sources.appId, "env");
+  assertSafeCredentialStatus(getEnv.body.status, "GET env-only after delete");
+
+  credentials._testOverrideGithubAppCredentialEnv(null);
+  await clearLocalCredentialsForTests();
+});
+
+await test("GHCRED-06 setup/status source semantics and non-credential surfaces stay clean", async () => {
+  await clearLocalCredentialsForTests();
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: null,
+    privateKeyFile: null,
+    webhookSecret: null,
+    appSlug: null,
+  });
+
+  const emptyApp = await credentials.getGithubAppCredentialSafeProjection();
+  const emptyVerify = await setupVerify.runGithubAutomationSetupVerify({
+    config: config.createDefaultGithubAutomationConfig(),
+    resolveLive: false,
+    appProjection: emptyApp,
+    assigneeProjection: makeAssigneeProjection(),
+    capability: makeCapabilityProjection(),
+    webhookHealth: "unknown",
+  });
+  assert.equal(emptyVerify.sideEffects.enqueuedJobs, false);
+  assert.equal(emptyVerify.sideEffects.schedulerWoken, false);
+  assert.equal(emptyVerify.sideEffects.githubMutations, false);
+  const appIdItem = emptyVerify.checklist.find((item) => item.code === "app_id" || /App ID/.test(item.title));
+  assert.ok(appIdItem);
+  assert.ok(
+    /本机 GitHub App 凭据|保存到本机/.test(appIdItem.nextStep || ""),
+    "missing App ID next step points to local card",
+  );
+  assertNoSentinel(emptyVerify, "empty setup verify", localSentinelExtras());
+  projection.assertGithubAutomationProjectionSafe(emptyVerify);
+
+  await saveCompleteLocalBundle();
+  const localApp = await credentials.getGithubAppCredentialSafeProjection();
+  assert.equal(localApp.configured, true);
+  assert.equal(localApp.sources.key, "local");
+
+  const localVerify = await setupVerify.runGithubAutomationSetupVerify({
+    config: config.createDefaultGithubAutomationConfig(),
+    resolveLive: false,
+    appProjection: localApp,
+    assigneeProjection: makeAssigneeProjection({
+      readiness: "ready",
+      login: "bot",
+      actorId: 1,
+      assignable: true,
+      identitySource: "gh",
+      reasonCode: null,
+    }),
+    capability: makeCapabilityProjection({
+      permissions: {
+        metadata: "read",
+        issues: "write",
+        pull_requests: "none",
+        contents: "none",
+      },
+    }),
+    webhookHealth: "unknown",
+  });
+  assertNoSentinel(localVerify, "local setup verify", localSentinelExtras());
+  projection.assertGithubAutomationProjectionSafe(localVerify);
+
+  // Status projection with live credential resolve remains secret-free.
+  const statusProjection = await projection.buildGithubAutomationStatusProjection({
+    resolveLive: false,
+  });
+  assertNoSentinel(statusProjection, "status projection", localSentinelExtras());
+  projection.assertGithubAutomationProjectionSafe(statusProjection);
+
+  // Non-secret config disk + jobs/events must not contain local secrets.
+  const cfg = await config.readGithubAutomationConfig();
+  assertNoSentinel(cfg, "config after local save", localSentinelExtras());
+  if (existsSync(join(automationRoot(), "config.json"))) {
+    assertNoSentinel(
+      readFileSync(join(automationRoot(), "config.json"), "utf8"),
+      "config.json disk",
+      localSentinelExtras(),
+    );
+  }
+
+  // Source isolation: credential store not imported by Links/OAuth domains; credentials route not by verify.
+  const verifyRouteSrc = readFileSync(
+    join(root, "app/api/github-automation/verify/route.ts"),
+    "utf8",
+  );
+  assert.ok(!/upsertGithubAppLocalCredentials|deleteGithubAppLocalCredentials/.test(verifyRouteSrc));
+  assert.ok(!/from\s+["'][^"']*github-app-credential-store/.test(verifyRouteSrc));
+
+  const statusRouteSrc = readFileSync(
+    join(root, "app/api/github-automation/status/route.ts"),
+    "utf8",
+  );
+  assert.ok(!/upsertGithubAppLocalCredentials|deleteGithubAppLocalCredentials/.test(statusRouteSrc));
+
+  const storeSrc = readFileSync(join(root, "lib/github-app-credential-store.ts"), "utf8");
+  // Comments may mention sibling secret stores for isolation guidance; imports must not.
+  assert.ok(
+    !/from\s+["'][^"']*(web-credential-store|links-store|oauth-accounts|api-key-accounts)/.test(
+      storeSrc,
+    ),
+  );
+  assert.ok(
+    !/require\(["'][^"']*(web-credential-store|links-store|oauth-accounts|api-key-accounts)/.test(
+      storeSrc,
+    ),
+  );
+
+  // UI static scan: no hardcoded PEM / absolute path import controls.
+  const ui = readFileSync(join(root, "components/GithubAutomationConfig.tsx"), "utf8");
+  assert.ok(!ui.includes("BEGIN PRIVATE KEY"));
+  assert.ok(!/privateKeyPath|serverPath|absolutePath/.test(ui));
+  assert.ok(ui.includes("/api/github-automation/credentials"));
+
+  credentials._testOverrideGithubAppCredentialEnv(null);
+  await clearLocalCredentialsForTests();
+});
+
 // ─── Cleanup hooks ───────────────────────────────────────────────────────────
 
 scheduler._testResetGithubAutomationScheduler();
@@ -3789,7 +4901,13 @@ client._testOverrideGithubAppClientFetch(undefined);
 client._testClearGithubAppInstallationTokenCache();
 credentials._testOverrideGithubAppCredentialEnv(null);
 credentials._testOverrideGithubAppNowSeconds(null);
+credentialStore._testResetGithubAppCredentialStoreQueue();
 projection._testResetGithubAutomationActionRateLimit();
+try {
+  await credentialStore.deleteGithubAppLocalCredentials();
+} catch {
+  // ignore
+}
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
 

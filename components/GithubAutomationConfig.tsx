@@ -1,17 +1,26 @@
 "use client";
 
 /**
- * GitHub 自动化 Settings leaf (GHA-10 / IMP-001 IMP-04).
+ * GitHub 自动化 Settings leaf (GHA-10 / GHCRED-05).
  *
- * Product surface (approved setup prototype):
- * - Setup checklist + env/deploy guidance + verify above status/jobs
+ * Product surface (approved local-credentials prototype):
+ * - Local GitHub App credential card (save/rotate/delete) above checklist/status/jobs
+ * - Safe projection only: configured/source/readiness; never App ID value / secret / PEM / path
+ * - Setup checklist + collapsed advanced env override guidance
  * - Empty default allowlist; operator-managed repositories linked to Project Registry
- * - Independent CAS save; polling never enqueues work
- * - No App key / webhook secret / personal token / absolute projectRoot input or reveal
+ * - Independent CAS / immediate credential save; polling never enqueues work
  * - Full-agent residual-risk warning is non-dismissible
  */
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { usePrompt } from "./AppPromptProvider";
 
 // ─── Wire types (mirror server projection; client never invents policy truth) ─
@@ -28,14 +37,35 @@ interface AssigneeProjection {
   reasonCode: string | null;
 }
 
+type CredentialValueSource = "env" | "local" | "missing";
+
+type LocalCredentialReadiness = "ready" | "missing" | "invalid" | "unsupported";
+
+interface LocalCredentialSummary {
+  configured: boolean;
+  readiness: LocalCredentialReadiness;
+  hasAppId: boolean;
+  hasKey: boolean;
+  hasWebhook: boolean;
+  updatedAt: string | null;
+}
+
 interface AppCredentialProjection {
   configured: boolean;
   readiness: string;
   appSlug: string | null;
   hasAppId: boolean;
   hasPrivateKeyFile: boolean;
+  hasPrivateKey?: boolean;
   hasWebhookSecret: boolean;
   checkedAt: string;
+  local?: LocalCredentialSummary;
+  sources?: {
+    appId: CredentialValueSource;
+    key: CredentialValueSource;
+    webhook: CredentialValueSource;
+    slug: CredentialValueSource;
+  };
 }
 
 interface JobActionAvailability {
@@ -212,9 +242,12 @@ interface VerifyResult {
       | "readiness"
       | "hasAppId"
       | "hasPrivateKeyFile"
+      | "hasPrivateKey"
       | "hasWebhookSecret"
       | "appSlug"
       | "checkedAt"
+      | "local"
+      | "sources"
     >;
     installation: {
       present: boolean;
@@ -282,6 +315,10 @@ const GITHUB_AUTOMATION_HELP_HREF = "/docs/github-app-automation-setup.html";
 const ENV_APP_ID = "YPI_GITHUB_APP_ID";
 const ENV_PRIVATE_KEY_FILE = "YPI_GITHUB_APP_PRIVATE_KEY_FILE";
 const ENV_WEBHOOK_SECRET = "YPI_GITHUB_APP_WEBHOOK_SECRET";
+const ENV_APP_SLUG = "YPI_GITHUB_APP_SLUG";
+
+const CREDENTIALS_DELETE_CONFIRM = "remove_local_credentials";
+type PrivateKeyInputMode = "paste" | "file";
 
 const ALWAYS_MANUAL_CHIPS = [
   "UI / 交互",
@@ -310,6 +347,15 @@ const ALLOWED_ERROR_CODES = new Set([
   "github_bad_response",
   "github_auth_failed",
   "github_rate_limited",
+  "invalid_credentials_request",
+  "invalid_app_id",
+  "invalid_webhook_secret",
+  "invalid_private_key",
+  "private_key_too_large",
+  "local_credentials_invalid",
+  "local_credentials_unsupported",
+  "credentials_lock_timeout",
+  "credentials_store_error",
 ]);
 
 const FALLBACK_CHECKLIST: SetupChecklistItem[] = [
@@ -317,27 +363,30 @@ const FALLBACK_CHECKLIST: SetupChecklistItem[] = [
     code: "app_id",
     order: 1,
     state: "pending",
-    title: "配置 YPI_GITHUB_APP_ID",
+    title: "配置 App ID（本机凭据）",
     reasonCode: "missing_app_id",
-    nextStep: `在服务器环境设置 ${ENV_APP_ID}=<GitHub App 数字 ID>，然后重新验证。浏览器不会接收或保存该值。`,
+    nextStep:
+      "在上方「本机 GitHub App 凭据」卡填写 App ID 并「保存到本机」，然后重新验证。高级覆盖可设置 YPI_GITHUB_APP_ID；页面不会回显已保存值。",
     envNames: [ENV_APP_ID],
   },
   {
     code: "private_key_file",
     order: 2,
     state: "pending",
-    title: "配置私钥文件路径（0600）",
+    title: "配置 GitHub App 私钥（本机凭据）",
     reasonCode: "missing_private_key_file",
-    nextStep: `在服务器环境设置 ${ENV_PRIVATE_KEY_FILE}=/secure/path/app.pem，将私钥文件权限设为 0600。不要在浏览器上传或粘贴 PEM 内容。`,
+    nextStep:
+      "在上方「本机 GitHub App 凭据」卡粘贴或选择 GitHub App RSA 私钥 PEM 并「保存到本机」。高级覆盖可设置 YPI_GITHUB_APP_PRIVATE_KEY_FILE 指向 0600 PEM（仅服务器）。",
     envNames: [ENV_PRIVATE_KEY_FILE],
   },
   {
     code: "webhook_secret",
     order: 3,
     state: "pending",
-    title: "配置 Webhook secret 与 HTTPS",
+    title: "配置 Webhook secret（本机凭据）",
     reasonCode: "missing_webhook_secret",
-    nextStep: `在部署 secret manager / 服务器环境设置 ${ENV_WEBHOOK_SECRET}，并在 GitHub App 填入公网 HTTPS webhook URL。不要在 UI 输入 secret。`,
+    nextStep:
+      "在上方「本机 GitHub App 凭据」卡填写 Webhook secret 并「保存到本机」，且与 GitHub App webhook secret 一致。高级覆盖可设置 YPI_GITHUB_APP_WEBHOOK_SECRET。",
     envNames: [ENV_WEBHOOK_SECRET],
   },
   {
@@ -393,9 +442,27 @@ function allowlistedMessage(code: string | undefined, fallback: string): string 
       case "github_timeout":
         return "无法联系 GitHub 完成仓库核验";
       case "github_auth_failed":
-        return "GitHub App 鉴权失败，请检查 server-only 凭据";
+        return "GitHub App 鉴权失败，请检查本机凭据或高级 env 覆盖";
       case "github_bad_response":
         return "GitHub 返回异常，仓库身份未确认";
+      case "invalid_credentials_request":
+        return "凭据请求无效（字段/格式/大小不符合要求）";
+      case "invalid_app_id":
+        return "App ID 无效，请填写正整数字符串";
+      case "invalid_webhook_secret":
+        return "Webhook secret 无效或超出允许长度";
+      case "invalid_private_key":
+        return "私钥无效：需要完整的 GitHub App RSA PEM";
+      case "private_key_too_large":
+        return "私钥文件过大";
+      case "local_credentials_invalid":
+        return "本机凭据损坏或不一致；请移除后重新完整配置";
+      case "local_credentials_unsupported":
+        return "本机凭据 schema 不受支持；请移除后按当前版本重配";
+      case "credentials_lock_timeout":
+        return "凭据写入锁超时，请稍后重试";
+      case "credentials_store_error":
+        return "本机凭据存储失败，服务端配置未更新";
       default:
         return fallback;
     }
@@ -481,13 +548,74 @@ function assigneePill(
 
 function appCredentialText(app: AppCredentialProjection): string {
   if (app.configured && app.readiness === "ready") return "已配置";
-  if (app.readiness === "missing_app_id") return "缺失 App id";
-  if (app.readiness === "missing_private_key_file") return "缺失 private-key file";
+  if (app.readiness === "missing_app_id") return "缺失 App ID";
+  if (app.readiness === "missing_private_key_file") return "缺失 private key";
   if (app.readiness === "private_key_unreadable" || app.readiness === "private_key_invalid") {
-    return "private-key 不可用";
+    return "private key 不可用";
   }
   if (app.readiness === "missing_webhook_secret") return "缺失 webhook secret";
   return "缺失";
+}
+
+function hasEffectivePrivateKey(app: AppCredentialProjection): boolean {
+  return app.hasPrivateKey === true || app.hasPrivateKeyFile === true;
+}
+
+function credentialSourceOf(
+  app: AppCredentialProjection | null | undefined,
+  field: "appId" | "key" | "webhook" | "slug",
+): CredentialValueSource {
+  const sources = app?.sources;
+  if (!sources) {
+    if (!app) return "missing";
+    if (field === "appId") return app.hasAppId ? "local" : "missing";
+    if (field === "key") return hasEffectivePrivateKey(app) ? "local" : "missing";
+    if (field === "webhook") return app.hasWebhookSecret ? "local" : "missing";
+    return app.appSlug ? "local" : "missing";
+  }
+  return sources[field];
+}
+
+function sourceLabel(source: CredentialValueSource): string {
+  if (source === "env") return "env";
+  if (source === "local") return "本机";
+  return "未配置";
+}
+
+function sourcePillTone(source: CredentialValueSource): "ok" | "warn" | "bad" | "info" {
+  if (source === "env") return "info";
+  if (source === "local") return "ok";
+  return "warn";
+}
+
+function fieldConfiguredLabel(
+  configured: boolean,
+  options?: { unavailable?: boolean },
+): string {
+  if (options?.unavailable) return "不可用";
+  return configured ? "已配置" : "未配置";
+}
+
+function sourceDetailText(source: CredentialValueSource, localInvalid: boolean): string {
+  if (source === "env") return "环境变量覆盖";
+  if (source === "local") return localInvalid ? "本机 bundle 损坏" : "本机持久凭据";
+  return "未配置";
+}
+
+function overallCredentialPill(
+  app: AppCredentialProjection | null,
+  local: LocalCredentialSummary | null,
+  saving: boolean,
+): { label: string; tone: "ok" | "warn" | "bad" | "info" } {
+  if (saving) return { label: "保存中…", tone: "info" };
+  if (!app) return { label: "待配置", tone: "warn" };
+  if (app.configured && app.readiness === "ready") {
+    return { label: "已配置", tone: "ok" };
+  }
+  if (local?.readiness === "invalid" || local?.readiness === "unsupported") {
+    return { label: "需修复", tone: "bad" };
+  }
+  return { label: "待配置", tone: "warn" };
 }
 
 function installationText(status: StatusProjection): string {
@@ -710,7 +838,7 @@ function primaryBanner(
       tone: "error",
       title: "尚未配置 GitHub App",
       message:
-        "请先按上方 Setup checklist 在 server-only env / 0600 文件配置 App id、private-key file 与 webhook secret；此页不会提供输入或 reveal 控件。",
+        "在下方「本机 GitHub App 凭据」卡保存 App ID、Webhook secret 与私钥 PEM。无需配置 shell 环境变量。",
     };
   }
   if (status.repositories.length === 0) {
@@ -842,6 +970,11 @@ export function GithubAutomationConfig() {
   const projectIdFieldId = useId();
   const ownerActorIdsId = useId();
   const formErrorId = useId();
+  const credentialAppIdFieldId = useId();
+  const credentialWebhookFieldId = useId();
+  const credentialPemFieldId = useId();
+  const credentialFileFieldId = useId();
+  const credentialLiveRegionId = useId();
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [status, setStatus] = useState<StatusProjection | null>(null);
@@ -849,11 +982,16 @@ export function GithubAutomationConfig() {
   const [projectChoices, setProjectChoices] = useState<ProjectChoice[]>([]);
   const [checklist, setChecklist] = useState<SetupChecklistItem[]>(FALLBACK_CHECKLIST);
   const [verifySummary, setVerifySummary] = useState<VerifyResult["summary"] | null>(null);
+  const [credentialStatus, setCredentialStatus] = useState<AppCredentialProjection | null>(null);
   const [stale, setStale] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [repoSaving, setRepoSaving] = useState(false);
+  const [credentialSaving, setCredentialSaving] = useState(false);
+  const [credentialDeleting, setCredentialDeleting] = useState(false);
+  const [credentialError, setCredentialError] = useState<string | null>(null);
+  const [credentialNotice, setCredentialNotice] = useState<InlineNotice | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -863,14 +1001,22 @@ export function GithubAutomationConfig() {
   const [formMode, setFormMode] = useState<FormMode>({ kind: "closed" });
   const [draft, setDraft] = useState<RepositoryDraft>(emptyDraft);
   const [formError, setFormError] = useState<string | null>(null);
-  const [envGuideOpen, setEnvGuideOpen] = useState(true);
+  const [envGuideOpen, setEnvGuideOpen] = useState(false);
+  const [appIdDraft, setAppIdDraft] = useState("");
+  const [webhookSecretDraft, setWebhookSecretDraft] = useState("");
+  const [privateKeyPemDraft, setPrivateKeyPemDraft] = useState("");
+  const [privateKeyFile, setPrivateKeyFile] = useState<File | null>(null);
+  const [privateKeyMode, setPrivateKeyMode] = useState<PrivateKeyInputMode>("paste");
 
   const fetchGenerationRef = useRef(0);
+  const credentialGenerationRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const credentialAbortRef = useRef<AbortController | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const formSectionRef = useRef<HTMLFormElement | null>(null);
+  const privateKeyFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const clearPoll = useCallback(() => {
     if (pollTimerRef.current) {
@@ -897,6 +1043,8 @@ export function GithubAutomationConfig() {
     if (!mountedRef.current) return;
     if (generation !== fetchGenerationRef.current) return;
     setStatus(next);
+    // Status readiness.app uses the same safe projection (sources/local additive).
+    setCredentialStatus(next.readiness.app);
     // Keep config revision aligned when status carries a fresher CAS token.
     setConfig((prev) => {
       if (!prev) return next.config;
@@ -913,6 +1061,99 @@ export function GithubAutomationConfig() {
     setStale(false);
     setConflict(false);
   }, []);
+
+  const clearCredentialTransient = useCallback(() => {
+    setAppIdDraft("");
+    setWebhookSecretDraft("");
+    setPrivateKeyPemDraft("");
+    setPrivateKeyFile(null);
+    if (privateKeyFileInputRef.current) {
+      privateKeyFileInputRef.current.value = "";
+    }
+  }, []);
+
+  const setPrivateKeyInputMode = useCallback(
+    (mode: PrivateKeyInputMode) => {
+      setPrivateKeyMode(mode);
+      // Mutual exclusion: switching input mode clears the other transient value.
+      if (mode === "paste") {
+        setPrivateKeyFile(null);
+        if (privateKeyFileInputRef.current) {
+          privateKeyFileInputRef.current.value = "";
+        }
+      } else {
+        setPrivateKeyPemDraft("");
+      }
+    },
+    [],
+  );
+
+  const applyCredentialStatus = useCallback(
+    (next: AppCredentialProjection, generation: number) => {
+      if (!mountedRef.current) return;
+      if (generation !== credentialGenerationRef.current) return;
+      setCredentialStatus(next);
+      setStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              readiness: {
+                ...prev.readiness,
+                app: next,
+              },
+            }
+          : prev,
+      );
+    },
+    [],
+  );
+
+  const fetchCredentials = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const generation = ++credentialGenerationRef.current;
+      credentialAbortRef.current?.abort();
+      const controller = new AbortController();
+      credentialAbortRef.current = controller;
+
+      try {
+        const res = await fetch("/api/github-automation/credentials", {
+          method: "GET",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+        const data = (await res.json().catch(() => null)) as {
+          ok?: boolean;
+          status?: AppCredentialProjection;
+          code?: string;
+          message?: string;
+        } | null;
+
+        if (generation !== credentialGenerationRef.current) return null;
+
+        if (!res.ok || !data?.ok || !data.status) {
+          if (!options?.silent) {
+            setCredentialError(
+              allowlistedMessage(data?.code, "无法读取本机凭据状态"),
+            );
+          }
+          return null;
+        }
+
+        applyCredentialStatus(data.status, generation);
+        if (!options?.silent) setCredentialError(null);
+        return data.status;
+      } catch (err) {
+        if (isAbortError(err)) return null;
+        if (generation !== credentialGenerationRef.current) return null;
+        if (!options?.silent) {
+          setCredentialError("无法读取本机凭据状态");
+        }
+        return null;
+      }
+    },
+    [applyCredentialStatus],
+  );
 
   const fetchConfig = useCallback(async (generation: number, signal: AbortSignal) => {
     const res = await fetch("/api/github-automation/config", {
@@ -1012,12 +1253,17 @@ export function GithubAutomationConfig() {
   useEffect(() => {
     mountedRef.current = true;
     void fetchStatus();
+    void fetchCredentials({ silent: true });
     return () => {
       mountedRef.current = false;
       fetchGenerationRef.current += 1;
+      credentialGenerationRef.current += 1;
       abortRef.current?.abort();
+      credentialAbortRef.current?.abort();
       clearPoll();
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      // Never leave secret/PEM/File objects in component state after unmount.
+      clearCredentialTransient();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only bootstrap
   }, []);
@@ -1177,6 +1423,228 @@ export function GithubAutomationConfig() {
     [fetchStatus, flashSaved, prompt, revision],
   );
 
+  const onSaveCredentials = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (credentialSaving || credentialDeleting) return;
+
+      const generation = ++credentialGenerationRef.current;
+      setCredentialSaving(true);
+      setCredentialError(null);
+      setCredentialNotice(null);
+
+      const formData = new FormData();
+      const appId = appIdDraft.trim();
+      const webhookSecret = webhookSecretDraft; // do not trim interior; only skip blank
+      if (appId) formData.set("appId", appId);
+      if (webhookSecret.trim().length > 0) formData.set("webhookSecret", webhookSecret);
+
+      if (privateKeyMode === "paste") {
+        const pem = privateKeyPemDraft;
+        if (pem.trim().length > 0) formData.set("privateKeyPem", pem);
+      } else if (privateKeyFile) {
+        formData.set("privateKeyFile", privateKeyFile, privateKeyFile.name || "app.pem");
+      }
+
+      try {
+        const res = await fetch("/api/github-automation/credentials", {
+          method: "PUT",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+          body: formData,
+        });
+        const data = (await res.json().catch(() => null)) as {
+          ok?: boolean;
+          status?: AppCredentialProjection;
+          code?: string;
+          message?: string;
+        } | null;
+
+        if (generation !== credentialGenerationRef.current || !mountedRef.current) return;
+
+        if (!res.ok || !data?.ok || !data.status) {
+          // Keep transient inputs so the user can fix validation errors.
+          // Never put submitted secret/PEM content into toast or notice.
+          const msg = allowlistedMessage(
+            data?.code,
+            "保存本机凭据失败，服务端配置未更新",
+          );
+          setCredentialError(msg);
+          setCredentialNotice({
+            tone: "error",
+            title: "保存失败，服务端配置未更新",
+            message: msg,
+          });
+          prompt.toast({ message: msg, tone: "error" });
+          return;
+        }
+
+        applyCredentialStatus(data.status, generation);
+        clearCredentialTransient();
+        setCredentialError(null);
+        const envOverride =
+          data.status.sources &&
+          (data.status.sources.appId === "env" ||
+            data.status.sources.key === "env" ||
+            data.status.sources.webhook === "env");
+        setCredentialNotice({
+          tone: "success",
+          title: "本机凭据已保存",
+          message: envOverride
+            ? "本机 fallback 已更新。当前进程仍优先使用环境变量覆盖的字段。"
+            : "已写入本机 agent data dir。重启 ypi 后仍可用；临时输入已清空。",
+        });
+        prompt.toast({ message: "本机凭据已保存", tone: "success" });
+        void fetchStatus({ silent: true, reason: "after-credentials" });
+        // Refresh checklist from verify without enqueue.
+        void (async () => {
+          try {
+            const verifyRes = await fetch("/api/github-automation/verify", {
+              method: "POST",
+              cache: "no-store",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+              },
+              body: "{}",
+            });
+            const verifyData = (await verifyRes.json().catch(() => null)) as
+              | VerifyResult
+              | null;
+            if (
+              mountedRef.current &&
+              generation === credentialGenerationRef.current &&
+              verifyData &&
+              verifyData.ok === true &&
+              Array.isArray(verifyData.checklist)
+            ) {
+              setChecklist([...verifyData.checklist].sort((a, b) => a.order - b.order));
+              setVerifySummary(verifyData.summary);
+            }
+          } catch {
+            /* verify refresh is best-effort */
+          }
+        })();
+      } catch {
+        if (generation !== credentialGenerationRef.current || !mountedRef.current) return;
+        const msg = "网络错误，本机凭据未保存";
+        setCredentialError(msg);
+        setCredentialNotice({
+          tone: "error",
+          title: "保存失败，服务端配置未更新",
+          message: msg,
+        });
+        prompt.toast({ message: msg, tone: "error" });
+      } finally {
+        if (generation === credentialGenerationRef.current && mountedRef.current) {
+          setCredentialSaving(false);
+        }
+      }
+    },
+    [
+      applyCredentialStatus,
+      appIdDraft,
+      clearCredentialTransient,
+      credentialDeleting,
+      credentialSaving,
+      fetchStatus,
+      privateKeyFile,
+      privateKeyMode,
+      privateKeyPemDraft,
+      prompt,
+      webhookSecretDraft,
+    ],
+  );
+
+  const onDeleteLocalCredentials = useCallback(async () => {
+    if (credentialSaving || credentialDeleting) return;
+
+    const ok = await prompt.confirm({
+      title: "移除本机凭据？",
+      message:
+        "只删除本机保存的 GitHub App 凭据。不会删除 GitHub App、installation、允许仓库、jobs，也不会修改环境变量。若 env 仍存在，当前进程可能继续显示已配置。",
+      confirmLabel: "确认移除",
+      intent: "danger",
+    });
+    if (!ok) return;
+
+    const generation = ++credentialGenerationRef.current;
+    setCredentialDeleting(true);
+    setCredentialError(null);
+    setCredentialNotice(null);
+
+    try {
+      const res = await fetch("/api/github-automation/credentials", {
+        method: "DELETE",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ confirm: CREDENTIALS_DELETE_CONFIRM }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        status?: AppCredentialProjection;
+        code?: string;
+        message?: string;
+      } | null;
+
+      if (generation !== credentialGenerationRef.current || !mountedRef.current) return;
+
+      if (!res.ok || !data?.ok || !data.status) {
+        const msg = allowlistedMessage(data?.code, "移除本机凭据失败");
+        setCredentialError(msg);
+        setCredentialNotice({
+          tone: "error",
+          title: "移除失败",
+          message: msg,
+        });
+        prompt.toast({ message: msg, tone: "error" });
+        return;
+      }
+
+      applyCredentialStatus(data.status, generation);
+      clearCredentialTransient();
+      setCredentialError(null);
+
+      const stillConfigured = data.status.configured;
+      setCredentialNotice({
+        tone: stillConfigured ? "info" : "success",
+        title: stillConfigured ? "本机凭据已移除（env 仍生效）" : "本机凭据已移除",
+        message: stillConfigured
+          ? "本机 fallback 已删除。当前进程仍由环境变量提供有效凭据。"
+          : "本机 fallback 已删除。在重新配置前 automation 将保持 fail closed。",
+      });
+      prompt.toast({
+        message: stillConfigured ? "本机凭据已移除（env 仍生效）" : "本机凭据已移除",
+        tone: "success",
+      });
+      void fetchStatus({ silent: true, reason: "after-credentials-delete" });
+    } catch {
+      if (generation !== credentialGenerationRef.current || !mountedRef.current) return;
+      const msg = "网络错误，本机凭据未移除";
+      setCredentialError(msg);
+      setCredentialNotice({
+        tone: "error",
+        title: "移除失败",
+        message: msg,
+      });
+      prompt.toast({ message: msg, tone: "error" });
+    } finally {
+      if (generation === credentialGenerationRef.current && mountedRef.current) {
+        setCredentialDeleting(false);
+      }
+    }
+  }, [
+    applyCredentialStatus,
+    clearCredentialTransient,
+    credentialDeleting,
+    credentialSaving,
+    fetchStatus,
+    prompt,
+  ]);
+
   const onVerify = useCallback(async () => {
     setVerifying(true);
     setActionNotice(null);
@@ -1214,6 +1682,10 @@ export function GithubAutomationConfig() {
         [...verified.checklist].sort((a, b) => a.order - b.order),
       );
       setVerifySummary(verified.summary);
+      if (verified.summary?.app) {
+        const generation = ++credentialGenerationRef.current;
+        applyCredentialStatus(verified.summary.app, generation);
+      }
       setActionNotice({
         tone: verified.allReady ? "success" : "warning",
         title: verified.allReady
@@ -1237,7 +1709,7 @@ export function GithubAutomationConfig() {
     } finally {
       if (mountedRef.current) setVerifying(false);
     }
-  }, [fetchStatus, prompt]);
+  }, [applyCredentialStatus, fetchStatus, prompt]);
 
   const openAddForm = useCallback(() => {
     setFormMode({ kind: "add" });
@@ -1690,6 +2162,33 @@ export function GithubAutomationConfig() {
 
   const displayChecklist = checklist.length > 0 ? checklist : FALLBACK_CHECKLIST;
 
+  const effectiveCredential = credentialStatus ?? status?.readiness.app ?? null;
+  const localSummary = effectiveCredential?.local ?? null;
+  const localPresent =
+    Boolean(localSummary?.configured) ||
+    Boolean(localSummary?.hasAppId) ||
+    Boolean(localSummary?.hasKey) ||
+    Boolean(localSummary?.hasWebhook) ||
+    localSummary?.readiness === "invalid" ||
+    localSummary?.readiness === "unsupported";
+  const localInvalid =
+    localSummary?.readiness === "invalid" || localSummary?.readiness === "unsupported";
+  const credentialBusy = credentialSaving || credentialDeleting;
+  const overallCredPill = overallCredentialPill(
+    effectiveCredential,
+    localSummary,
+    credentialSaving,
+  );
+  const appIdSource = credentialSourceOf(effectiveCredential, "appId");
+  const keySource = credentialSourceOf(effectiveCredential, "key");
+  const webhookSource = credentialSourceOf(effectiveCredential, "webhook");
+  const appIdConfigured = Boolean(effectiveCredential?.hasAppId);
+  const keyConfigured = effectiveCredential ? hasEffectivePrivateKey(effectiveCredential) : false;
+  const webhookConfigured = Boolean(effectiveCredential?.hasWebhookSecret);
+  const anyEnvOverride =
+    appIdSource === "env" || keySource === "env" || webhookSource === "env";
+  const firstSaveRequired = !localPresent;
+
   return (
     <div className="github-automation-page" aria-labelledby={headingId}>
       <header className="github-automation-page-head">
@@ -1699,8 +2198,8 @@ export function GithubAutomationConfig() {
             GitHub 自动化
           </h3>
           <p className="github-automation-lead">
-            先完成安全配置与仓库关联，再启用 Triage 或低风险无人值守。与 Links 账号连接完全隔离。每位部署方需自行创建
-            GitHub App；点右侧「帮助」查看完整配置步骤。
+            先在本机安全保存你自己的 GitHub App 凭据，再安装 App、关联仓库并验证。关闭电脑或重启 ypi
+            后仍然保留。与 Links 账号连接完全隔离；点右侧「帮助」查看完整配置步骤。
           </p>
         </div>
         <div className="github-automation-page-head-actions">
@@ -1735,6 +2234,314 @@ export function GithubAutomationConfig() {
           </span>
         </div>
       ) : null}
+
+      {credentialNotice ? (
+        <div
+          className={`github-automation-notice github-automation-notice--${credentialNotice.tone}`}
+          role={credentialNotice.tone === "error" ? "alert" : "status"}
+          id={credentialLiveRegionId}
+        >
+          <span className="github-automation-notice__mark" aria-hidden="true">
+            {credentialNotice.tone === "info" || credentialNotice.tone === "success"
+              ? "i"
+              : "!"}
+          </span>
+          <span>
+            <strong>{credentialNotice.title}</strong>
+            <br />
+            {credentialNotice.message}
+          </span>
+        </div>
+      ) : null}
+
+      {/* ── Local GitHub App credentials (primary, above checklist) ── */}
+      <section
+        className={`github-automation-card${credentialBusy ? " github-automation-card--busy" : ""}`}
+        aria-label="本机 GitHub App 凭据"
+        aria-busy={credentialBusy}
+      >
+        <div className="github-automation-card-head">
+          <div>
+            <h4 className="github-automation-card-title">本机 GitHub App 凭据</h4>
+            <p className="github-automation-card-sub">
+              只写入运行 ypi 的本机 agent data dir（目录 0700 / 文件 0600）。已保存的 secret 与私钥永不回显。
+            </p>
+          </div>
+          <span
+            className={`github-automation-pill github-automation-pill--${overallCredPill.tone}`}
+          >
+            {overallCredPill.label}
+          </span>
+        </div>
+        <div className="github-automation-card-body">
+          <div className="github-automation-cred-status-grid" aria-label="凭据状态">
+            <div className="github-automation-cred-status-item">
+              <small>App ID</small>
+              <div className="github-automation-cred-status-line">
+                <strong>
+                  {fieldConfiguredLabel(appIdConfigured, {
+                    unavailable: localInvalid && appIdSource !== "env" && !appIdConfigured,
+                  })}
+                </strong>
+                <span
+                  className={`github-automation-pill github-automation-pill--${sourcePillTone(appIdSource)}`}
+                >
+                  {sourceLabel(appIdSource)}
+                </span>
+              </div>
+              <div className="github-automation-cred-source">
+                来源：<b>{sourceDetailText(appIdSource, localInvalid)}</b>
+              </div>
+            </div>
+            <div className="github-automation-cred-status-item">
+              <small>Private key</small>
+              <div className="github-automation-cred-status-line">
+                <strong>
+                  {fieldConfiguredLabel(keyConfigured, {
+                    unavailable:
+                      !keyConfigured &&
+                      (effectiveCredential?.readiness === "private_key_invalid" ||
+                        effectiveCredential?.readiness === "private_key_unreadable" ||
+                        (localInvalid && keySource !== "env")),
+                  })}
+                </strong>
+                <span
+                  className={`github-automation-pill github-automation-pill--${sourcePillTone(keySource)}`}
+                >
+                  {sourceLabel(keySource)}
+                </span>
+              </div>
+              <div className="github-automation-cred-source">
+                来源：<b>{sourceDetailText(keySource, localInvalid)}</b>
+              </div>
+            </div>
+            <div className="github-automation-cred-status-item">
+              <small>Webhook secret</small>
+              <div className="github-automation-cred-status-line">
+                <strong>{fieldConfiguredLabel(webhookConfigured)}</strong>
+                <span
+                  className={`github-automation-pill github-automation-pill--${sourcePillTone(webhookSource)}`}
+                >
+                  {sourceLabel(webhookSource)}
+                </span>
+              </div>
+              <div className="github-automation-cred-source">
+                来源：<b>{sourceDetailText(webhookSource, localInvalid)}</b>
+              </div>
+            </div>
+          </div>
+
+          {anyEnvOverride ? (
+            <div
+              className="github-automation-notice github-automation-notice--info"
+              role="note"
+            >
+              <span className="github-automation-notice__mark" aria-hidden="true">
+                i
+              </span>
+              <span>
+                当前进程优先使用环境变量覆盖的字段。下方保存只更新本机 fallback；移除 env
+                后自动回落。请确保 env 与本机 fallback 属于同一个 GitHub App。
+              </span>
+            </div>
+          ) : null}
+
+          {localInvalid ? (
+            <div
+              className="github-automation-notice github-automation-notice--error"
+              role="alert"
+            >
+              <span className="github-automation-notice__mark" aria-hidden="true">
+                !
+              </span>
+              <span>
+                <strong>本机凭据不可用</strong>
+                <br />
+                metadata、私钥文件或指纹不一致。系统已 fail closed；请移除损坏的本机凭据后重新提交完整三项。不会显示损坏内容。
+              </span>
+            </div>
+          ) : null}
+
+          <form
+            className="github-automation-cred-form"
+            onSubmit={(event) => void onSaveCredentials(event)}
+            aria-describedby={credentialError ? credentialLiveRegionId : undefined}
+          >
+            <div className="github-automation-form-grid">
+              <label className="github-automation-field" htmlFor={credentialAppIdFieldId}>
+                App ID
+                <input
+                  id={credentialAppIdFieldId}
+                  name="appId"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={credentialBusy}
+                  value={appIdDraft}
+                  onChange={(event) => setAppIdDraft(event.target.value)}
+                  placeholder={
+                    appIdConfigured || localPresent
+                      ? "留空则保留已配置 App ID"
+                      : "例如 123456"
+                  }
+                />
+                <span className="github-automation-field-hint">
+                  在 GitHub App 设置页查看数字 App ID。已配置时不回显原值。
+                </span>
+              </label>
+
+              <label className="github-automation-field" htmlFor={credentialWebhookFieldId}>
+                Webhook secret
+                <input
+                  id={credentialWebhookFieldId}
+                  name="webhookSecret"
+                  type="password"
+                  autoComplete="new-password"
+                  disabled={credentialBusy}
+                  value={webhookSecretDraft}
+                  onChange={(event) => setWebhookSecretDraft(event.target.value)}
+                  placeholder={
+                    webhookConfigured || localPresent
+                      ? "留空则保留已配置 secret"
+                      : "输入你在 GitHub App 中设置的 secret"
+                  }
+                />
+                <span className="github-automation-field-hint">
+                  保存后清空；不会显示历史值或 masked 片段。
+                </span>
+              </label>
+
+              <div className="github-automation-field github-automation-field--full">
+                <span id={`${credentialPemFieldId}-label`}>Private key PEM</span>
+                <div
+                  className="github-automation-cred-seg"
+                  role="group"
+                  aria-labelledby={`${credentialPemFieldId}-label`}
+                >
+                  <button
+                    type="button"
+                    className={
+                      privateKeyMode === "paste"
+                        ? "github-automation-cred-seg-btn is-selected"
+                        : "github-automation-cred-seg-btn"
+                    }
+                    aria-pressed={privateKeyMode === "paste"}
+                    disabled={credentialBusy}
+                    onClick={() => setPrivateKeyInputMode("paste")}
+                  >
+                    粘贴 PEM
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      privateKeyMode === "file"
+                        ? "github-automation-cred-seg-btn is-selected"
+                        : "github-automation-cred-seg-btn"
+                    }
+                    aria-pressed={privateKeyMode === "file"}
+                    disabled={credentialBusy}
+                    onClick={() => setPrivateKeyInputMode("file")}
+                  >
+                    选择本机文件
+                  </button>
+                </div>
+              </div>
+
+              {privateKeyMode === "paste" ? (
+                <label
+                  className="github-automation-field github-automation-field--full"
+                  htmlFor={credentialPemFieldId}
+                >
+                  粘贴本次私钥
+                  <textarea
+                    id={credentialPemFieldId}
+                    name="privateKeyPem"
+                    className="github-automation-cred-pem"
+                    spellCheck={false}
+                    autoComplete="off"
+                    disabled={credentialBusy}
+                    value={privateKeyPemDraft}
+                    onChange={(event) => setPrivateKeyPemDraft(event.target.value)}
+                    placeholder={
+                      keyConfigured || localPresent
+                        ? "留空则保留已配置 private key"
+                        : "-----BEGIN RSA PRIVATE KEY-----\n…\n-----END RSA PRIVATE KEY-----"
+                    }
+                    rows={6}
+                  />
+                  <span className="github-automation-field-hint">
+                    仅本次输入；保存成功、离开页面或切换方式后清空。不会下载或回显已保存 PEM。
+                  </span>
+                </label>
+              ) : (
+                <label
+                  className="github-automation-field github-automation-field--full"
+                  htmlFor={credentialFileFieldId}
+                >
+                  选择 GitHub App .pem 文件
+                  <div className="github-automation-cred-filebox">
+                    <input
+                      id={credentialFileFieldId}
+                      ref={privateKeyFileInputRef}
+                      name="privateKeyFile"
+                      type="file"
+                      accept=".pem,text/plain,application/x-pem-file"
+                      disabled={credentialBusy}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        setPrivateKeyFile(file);
+                        setPrivateKeyPemDraft("");
+                      }}
+                    />
+                    <p>
+                      {privateKeyFile
+                        ? "已选择文件（仅本次提交；文件名与原路径不会保存）。"
+                        : "文件内容直接提交给本机 ypi 服务端；文件名和原路径不会保存。"}
+                    </p>
+                  </div>
+                  <span className="github-automation-field-hint">
+                    不接受服务端绝对路径。已保存私钥不可下载或恢复到输入框。
+                  </span>
+                </label>
+              )}
+            </div>
+
+            <div className="github-automation-cred-form-actions">
+              <span className="github-automation-field-hint">
+                {firstSaveRequired
+                  ? "首次保存需要三项完整；以后留空表示保留已配置值。"
+                  : "轮换时只填写变更项；空白字段保留已保存本机值，不会从 env 导入。"}
+              </span>
+              <div className="github-automation-cred-form-actions-right">
+                {localPresent ? (
+                  <button
+                    type="button"
+                    className="github-automation-button github-automation-button--danger"
+                    disabled={credentialBusy}
+                    onClick={() => void onDeleteLocalCredentials()}
+                  >
+                    {credentialDeleting ? "移除中…" : "移除本机凭据"}
+                  </button>
+                ) : null}
+                <button
+                  type="submit"
+                  className="github-automation-button github-automation-button--primary"
+                  disabled={credentialBusy}
+                  aria-busy={credentialSaving}
+                >
+                  {credentialSaving ? "保存中…" : "保存到本机"}
+                </button>
+              </div>
+            </div>
+
+            {credentialError ? (
+              <p className="github-automation-cred-error" role="alert">
+                {credentialError}
+              </p>
+            ) : null}
+          </form>
+        </div>
+      </section>
 
       {/* ── Setup checklist (above status / jobs) ── */}
       <section className="github-automation-card" aria-label="Setup checklist">
@@ -1812,21 +2619,20 @@ export function GithubAutomationConfig() {
                     >
                       添加仓库
                     </button>
-                  ) : item.envNames.length > 0 ? (
+                  ) : item.code === "app_id" ||
+                    item.code === "private_key_file" ||
+                    item.code === "webhook_secret" ? (
                     <button
                       type="button"
                       className="github-automation-button"
                       onClick={() => {
-                        const name = item.envNames[0];
-                        void copyEnvName(name).then((ok) => {
-                          prompt.toast({
-                            message: ok ? `已复制 ${name}` : "无法复制，请手动选择 env 名",
-                            tone: ok ? "success" : "error",
-                          });
-                        });
+                        document
+                          .getElementById(credentialAppIdFieldId)
+                          ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+                        document.getElementById(credentialAppIdFieldId)?.focus();
                       }}
                     >
-                      复制 env 名
+                      配置本机凭据
                     </button>
                   ) : (
                     <button
@@ -1855,28 +2661,26 @@ export function GithubAutomationConfig() {
         </div>
       </section>
 
-      {/* ── App 配置方式 ── */}
-      <section className="github-automation-card" aria-label="App 配置方式">
+      {/* ── Advanced: env override (collapsed by default) ── */}
+      <section className="github-automation-card" aria-label="高级：环境变量覆盖">
         <div className="github-automation-card-head">
           <div>
-            <h4 className="github-automation-card-title">App 配置方式</h4>
+            <h4 className="github-automation-card-title">高级：环境变量覆盖</h4>
             <p className="github-automation-card-sub">
-              每位部署方需<strong>自行创建 GitHub App</strong>。密钥只放服务器环境变量；本页只展示环境变量名与操作说明，绝不接收
-              secret 内容。完整客户操作步骤点页头{" "}
-              <a href={GITHUB_AUTOMATION_HELP_HREF} target="_blank" rel="noopener noreferrer">
-                帮助
-              </a>
-              。
+              仅用于 CI、容器和专业部署。非空 env 按字段覆盖本机值（env &gt; 本机 &gt; 未配置）；普通本机用户无需设置。
             </p>
           </div>
-          <button
-            type="button"
-            className="github-automation-button"
-            aria-expanded={envGuideOpen}
-            onClick={() => setEnvGuideOpen((v) => !v)}
-          >
-            {envGuideOpen ? "收起说明" : "查看步骤"}
-          </button>
+          <div className="github-automation-card-actions">
+            <span className="github-automation-pill github-automation-pill--info">env &gt; 本机</span>
+            <button
+              type="button"
+              className="github-automation-button"
+              aria-expanded={envGuideOpen}
+              onClick={() => setEnvGuideOpen((v) => !v)}
+            >
+              {envGuideOpen ? "收起" : "展开"}
+            </button>
+          </div>
         </div>
         {envGuideOpen ? (
           <div className="github-automation-card-body">
@@ -1885,17 +2689,14 @@ export function GithubAutomationConfig() {
                 i
               </span>
               <span>
-                需要按步骤创建 App、安装到仓库、配置公网通知并在本页关联仓库时，请打开{" "}
-                <a href={GITHUB_AUTOMATION_HELP_HREF} target="_blank" rel="noopener noreferrer">
-                  配置帮助
-                </a>
-                。产品不托管共享 GitHub App，也不会在浏览器收集私钥。
+                环境变量不会写回本机凭据。若只覆盖部分字段，请确保 env 与本机 fallback 属于同一个 GitHub
+                App。页面不显示 env 值。
               </span>
             </div>
             <ul className="github-automation-env-guide">
               <li>
                 <code>{ENV_APP_ID}</code>
-                <span>GitHub App 数字 ID。设置后点「验证配置」。</span>
+                <span>覆盖 App ID（数字字符串）。</span>
                 <button
                   type="button"
                   className="github-automation-button"
@@ -1913,13 +2714,7 @@ export function GithubAutomationConfig() {
               </li>
               <li>
                 <code>{ENV_PRIVATE_KEY_FILE}</code>
-                <span>
-                  值为服务器上 0600 私钥文件路径，例如{" "}
-                  <code className="github-automation-inline-code">
-                    {ENV_PRIVATE_KEY_FILE}=/secure/path/app.pem
-                  </code>
-                  。浏览器不会上传、显示或回传 PEM。
-                </span>
+                <span>覆盖私钥：值为部署环境中的 0600 PEM 路径（不在页面输入路径）。</span>
                 <button
                   type="button"
                   className="github-automation-button"
@@ -1938,9 +2733,11 @@ export function GithubAutomationConfig() {
               <li>
                 <code>{ENV_WEBHOOK_SECRET}</code>
                 <span>
-                  仅在部署 secret manager / server env 设置，并与 GitHub App webhook secret 一致；公网
-                  HTTPS 指向 <code className="github-automation-inline-code">POST /api/github-automation/webhook</code>
-                  。页面不会提供 secret 输入框。
+                  覆盖 Webhook HMAC secret；公网 HTTPS 仍指向{" "}
+                  <code className="github-automation-inline-code">
+                    POST /api/github-automation/webhook
+                  </code>
+                  。
                 </span>
                 <button
                   type="button"
@@ -1949,6 +2746,24 @@ export function GithubAutomationConfig() {
                     void copyEnvName(ENV_WEBHOOK_SECRET).then((ok) => {
                       prompt.toast({
                         message: ok ? `已复制 ${ENV_WEBHOOK_SECRET}` : "无法复制",
+                        tone: ok ? "success" : "error",
+                      });
+                    });
+                  }}
+                >
+                  复制 env 名
+                </button>
+              </li>
+              <li>
+                <code>{ENV_APP_SLUG}</code>
+                <span>可选展示 slug（非 secret）。</span>
+                <button
+                  type="button"
+                  className="github-automation-button"
+                  onClick={() => {
+                    void copyEnvName(ENV_APP_SLUG).then((ok) => {
+                      prompt.toast({
+                        message: ok ? `已复制 ${ENV_APP_SLUG}` : "无法复制",
                         tone: ok ? "success" : "error",
                       });
                     });

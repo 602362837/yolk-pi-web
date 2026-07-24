@@ -1,10 +1,12 @@
 /**
  * GET /api/github-automation/status
  *
- * Safe App / assignee / full-agent policy / job projection (GHA-09).
+ * Safe App / assignee / full-agent policy / job projection (GHA-09 / GHCRED-04).
  * - Cache-Control: no-store
  * - Does not enqueue work or start the scheduler
  * - Never returns credentials, absolute paths, Issue/comment bodies, prompts
+ * - Consumes additive effective App credential projection (sources/local booleans only)
+ * - Read-only: no credential store mutation
  */
 
 import { NextResponse } from "next/server";
