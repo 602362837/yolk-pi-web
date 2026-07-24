@@ -1,10 +1,13 @@
 import { createHash } from "crypto";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { cleanupSessionResources } from "@earendil-works/pi-ai";
-import { cacheSessionPath, invalidateSessionListSnapshots } from "./session-reader";
+import { cacheSessionPath } from "./session-reader";
 
 import { readSessionHeaderFromFile, writeSessionProjectLink } from "./session-project-link";
-import { upsertProjectSessionIndexEntry } from "./project-session-index";
+import {
+  invalidateProjectSpaceSessionListCaches,
+  upsertProjectSpaceSessionFromFile,
+} from "./project-space-session-lifecycle";
 import { recordSessionFileChangeEvent } from "./session-file-changes";
 import { canonicalizeCwd } from "./cwd";
 import { recordObservedUsage } from "./llm-usage-recorder";
@@ -874,9 +877,19 @@ export class AgentSessionWrapper {
               status,
             });
           }
+          // Summary/fingerprint may change; drop global + project-space list snapshots.
+          // Space-local index relies on stat fingerprint as the durable fallback after TTL.
+          invalidateProjectSpaceSessionListCaches();
         }
       } catch {
         // Usage capture must never interrupt normal agent event delivery.
+      }
+      if (event.type === "agent_end") {
+        try {
+          invalidateProjectSpaceSessionListCaches();
+        } catch {
+          // Snapshot invalidation must never interrupt agent event delivery.
+        }
       }
       const deliveredEvent = event.type === "agent_end"
         ? { ...event, studioChildRunCount: countActiveYpiStudioChildRunsForSession(this.sessionId) }
@@ -1211,18 +1224,22 @@ export class AgentSessionWrapper {
         const sourceHeader = readSessionHeaderFromFile(currentSessionFile);
         if (sourceHeader?.projectId && sourceHeader.spaceId) {
           writeSessionProjectLink(newSessionFile, { projectId: sourceHeader.projectId, spaceId: sourceHeader.spaceId });
-          await upsertProjectSessionIndexEntry({
-            sessionId: newSessionId,
-            sessionFile: newSessionFile,
-            cwd: sessionManager.getCwd(),
+          // Space-local candidate index write-through (best-effort; never rolls back JSONL).
+          await upsertProjectSpaceSessionFromFile({
             projectId: sourceHeader.projectId,
             spaceId: sourceHeader.spaceId,
+            sessionId: newSessionId,
+            sessionFileAbsolute: newSessionFile,
+            cwd: sessionManager.getCwd(),
+            parentSessionId: this.sessionId,
+            parentSessionFileAbsolute: currentSessionFile,
           });
         }
         // Grok session pin is retired: forks no longer inherit/write
         // grokAccountStorageId. Historical headers remain readable but ignored.
         cacheSessionPath(newSessionId, newSessionFile);
-        invalidateSessionListSnapshots();
+        // Upsert already invalidates; keep an explicit clear for unlinked forks too.
+        invalidateProjectSpaceSessionListCaches();
         this.destroy();
         return { cancelled: false, newSessionId };
       }

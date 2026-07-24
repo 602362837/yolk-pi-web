@@ -30,6 +30,11 @@ export interface SessionListTimingSnapshot {
 
 const knownStages = [
   "registry",
+  "listSpace",
+  "listAll",
+  "indexRead",
+  "validate",
+  "recovery",
   "inventory",
   "header",
   "studioProjection",

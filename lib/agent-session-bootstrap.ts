@@ -5,7 +5,7 @@ import { startRpcSession, type AgentSessionWrapper } from "./rpc-manager";
 import { canonicalizeProjectPath, getProjectSpace } from "./project-registry";
 import { writeSessionProjectLink } from "./session-project-link";
 import type { SessionHeader } from "./types";
-import { upsertProjectSessionIndexEntry } from "./project-session-index";
+import { upsertProjectSpaceSessionFromFile } from "./project-space-session-lifecycle";
 import { invalidateSessionListSnapshots } from "./session-reader";
 
 export class AgentSessionBootstrapError extends Error {
@@ -97,12 +97,13 @@ export async function createConfiguredEmptyAgentSession({
 
   if (projectId && spaceId && session.sessionFile) {
     persistSessionHeaderProjectLink(session, projectId, spaceId);
-    await upsertProjectSessionIndexEntry({
-      sessionId: realSessionId,
-      sessionFile: session.sessionFile,
-      cwd: canonicalCwd,
+    // Space-local candidate index write-through (best-effort; never rolls back JSONL).
+    await upsertProjectSpaceSessionFromFile({
       projectId,
       spaceId,
+      sessionId: realSessionId,
+      sessionFileAbsolute: session.sessionFile,
+      cwd: canonicalCwd,
     });
   }
 

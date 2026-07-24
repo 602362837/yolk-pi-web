@@ -6,6 +6,8 @@ import {
 import { getRpcSession } from "@/lib/rpc-manager";
 import { canonicalizeCwd, expandCwd } from "@/lib/cwd";
 import { scanSessionInventory } from "@/lib/session-metadata-scanner";
+import { readSessionHeaderFromFile } from "@/lib/session-project-link";
+import { removeProjectSpaceSessionByHeader } from "@/lib/project-space-session-lifecycle";
 
 function cwdKeys(cwd: string | undefined): Set<string> {
   const keys = new Set<string>();
@@ -40,6 +42,12 @@ export async function POST(req: Request) {
 
     for (const session of targetSessions) {
       try {
+        let header: ReturnType<typeof readSessionHeaderFromFile> = null;
+        try {
+          header = readSessionHeaderFromFile(session.path);
+        } catch {
+          header = null;
+        }
         // Destroy active RPC session if alive
         const rpc = getRpcSession(session.id);
         if (rpc?.isAlive()) {
@@ -47,6 +55,10 @@ export async function POST(req: Request) {
         }
         const newPath = archiveSessionFile(session.path);
         invalidateSessionPathCache(session.id);
+        await removeProjectSpaceSessionByHeader({
+          sessionId: session.id,
+          header,
+        });
         archived.push({ id: session.id, path: newPath });
       } catch (error) {
         errors.push({ id: session.id, error: String(error) });

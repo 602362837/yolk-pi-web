@@ -58,6 +58,9 @@ update-pi-web.sh
 logs/
 .ypi/.runtime/
 
+# local per-space session candidate index (runtime only; never hide whole .ypi/)
+/.ypi/sessions/
+
 # Studio task runtime event logs (large, never commit)
 .ypi/tasks/**/events.jsonl
 

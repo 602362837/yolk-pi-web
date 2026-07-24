@@ -1,7 +1,7 @@
 import { SessionManager, buildSessionContext as piBuildSessionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
-import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage, StudioChildSessionInfo, StudioChildSessionDisplay } from "./types";
+import type { SessionEntry, SessionInfo, SessionContext, SessionTreeNode, AssistantMessage, StudioChildSessionInfo } from "./types";
 import type { SessionEntry as PiSessionEntry } from "@earendil-works/pi-coding-agent";
 import { normalizeToolCalls } from "./normalize";
 import { getGitMetadataForCwd } from "./git-worktree";
@@ -11,7 +11,6 @@ import {
   scanSessionInventory,
   type LightweightSessionMetadata,
 } from "./session-metadata-scanner";
-import { getYpiStudioTaskDetail, listYpiStudioTasks } from "./ypi-studio-tasks";
 import {
   isBudgetExpired,
   type CacheDiagnostic,
@@ -19,6 +18,12 @@ import {
   type DiagnosticLimits,
 } from "./memory-diagnostics-types";
 import { SessionListTimingCollector } from "./session-list-timing";
+import {
+  invalidateStudioChildDisplayProjection,
+  projectStudioChildDisplay,
+} from "./studio-child-display-projection";
+
+export { projectStudioChildDisplay } from "./studio-child-display-projection";
 
 export { getAgentDir };
 
@@ -81,6 +86,22 @@ function isDeletedWorktreeCwd(cwd: string | undefined): boolean {
 }
 
 function deleteSessionFile(session: Pick<LightweightSessionMetadata, "id" | "path" | "cwd">): DeletedSessionFile | null {
+  // Capture header link before unlink so space-local indexes can drop the entry.
+  let headerProjectId: string | undefined;
+  let headerSpaceId: string | undefined;
+  try {
+    if (existsSync(session.path)) {
+      const firstLine = readFirstLineSync(session.path);
+      const header = JSON.parse(firstLine) as { type?: string; projectId?: string; spaceId?: string };
+      if (header?.type === "session") {
+        if (typeof header.projectId === "string" && header.projectId.trim()) headerProjectId = header.projectId.trim();
+        if (typeof header.spaceId === "string" && header.spaceId.trim()) headerSpaceId = header.spaceId.trim();
+      }
+    }
+  } catch {
+    // best-effort
+  }
+
   try {
     unlinkSync(session.path);
   } catch (error) {
@@ -90,6 +111,22 @@ function deleteSessionFile(session: Pick<LightweightSessionMetadata, "id" | "pat
   invalidateSessionPathCache(session.id);
   invalidateSessionListSnapshots();
   try { rmdirSync(dirname(session.path)); } catch { /* keep non-empty session directories */ }
+
+  if (headerProjectId && headerSpaceId) {
+    // Fire-and-forget: cwd cleanup must not await index I/O on the hot path.
+    void import("./project-space-session-lifecycle")
+      .then(({ removeProjectSpaceSessionFromIndex }) =>
+        removeProjectSpaceSessionFromIndex({
+          projectId: headerProjectId!,
+          spaceId: headerSpaceId!,
+          sessionId: session.id,
+        }),
+      )
+      .catch(() => {
+        /* best-effort */
+      });
+  }
+
   return { id: session.id, path: session.path, cwd: session.cwd ?? "" };
 }
 
@@ -112,11 +149,52 @@ export async function deleteSessionsForCwd(cwd: string, aliases: string[] = []):
   const deleted: DeletedSessionFile[] = [];
   // Lightweight inventory only — never SessionManager.listAll() (retains allMessagesText).
   const sessions = await scanSessionInventory();
+  const indexRemovals: Array<{ sessionId: string; projectId: string; spaceId: string }> = [];
   for (const session of sessions) {
     if (!cwdMatchesAny(session.cwd, targets)) continue;
+    // Capture project/space before unlink so we can await space-local index removal.
+    try {
+      if (existsSync(session.path)) {
+        const firstLine = readFirstLineSync(session.path);
+        const header = JSON.parse(firstLine) as { type?: string; projectId?: string; spaceId?: string };
+        if (
+          header?.type === "session" &&
+          typeof header.projectId === "string" &&
+          header.projectId.trim() &&
+          typeof header.spaceId === "string" &&
+          header.spaceId.trim()
+        ) {
+          indexRemovals.push({
+            sessionId: session.id,
+            projectId: header.projectId.trim(),
+            spaceId: header.spaceId.trim(),
+          });
+        }
+      }
+    } catch {
+      // best-effort
+    }
     const deletedSession = deleteSessionFile(session);
     if (deletedSession) deleted.push(deletedSession);
   }
+
+  if (indexRemovals.length > 0) {
+    try {
+      const { removeProjectSpaceSessionFromIndex } = await import("./project-space-session-lifecycle");
+      await Promise.all(
+        indexRemovals.map((item) =>
+          removeProjectSpaceSessionFromIndex({
+            projectId: item.projectId,
+            spaceId: item.spaceId,
+            sessionId: item.sessionId,
+          }),
+        ),
+      );
+    } catch {
+      // Index maintenance must not fail cwd cleanup.
+    }
+  }
+
   return deleted;
 }
 
@@ -145,53 +223,6 @@ export interface ListAllSessionsOptions {
   timing?: SessionListTimingCollector;
 }
 
-function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
-  return values.map((value) => value?.trim()).find((value): value is string => Boolean(value));
-}
-
-const STUDIO_DISPLAY_CACHE_TTL_MS = 1000;
-const studioDisplayCache = new Map<string, { expiresAt: number; value?: StudioChildSessionDisplay }>();
-
-export function projectStudioChildDisplay(cwd: string, studioChild?: StudioChildSessionInfo): StudioChildSessionDisplay | undefined {
-  if (!studioChild?.taskId) return undefined;
-  // Isolate by subtask/run: title/summary depend on both, not only the parent task.
-  const cacheKey = `${canonicalizeCwd(cwd)}:${studioChild.taskId}:${studioChild.subtaskId ?? ""}:${studioChild.runId ?? ""}`;
-  const cached = studioDisplayCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const headerSubtaskId = firstNonEmpty(studioChild.subtaskId);
-  try {
-    let detail = getYpiStudioTaskDetail(cwd, studioChild.taskId);
-    if (!detail) {
-      const match = listYpiStudioTasks(cwd, { scope: "all" }).tasks.find((task) => task.id === studioChild.taskId);
-      if (match) detail = getYpiStudioTaskDetail(cwd, match.key);
-    }
-    if (!detail) {
-      // Header-only projection still exposes stable step id for legacy children.
-      const value = headerSubtaskId ? { subtaskId: headerSubtaskId } : undefined;
-      studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });
-      return value;
-    }
-    const run = detail.subagents.find((item) => item.id === studioChild.runId);
-    const subtaskTitle = studioChild.subtaskId
-      ? detail.implementationProjection?.subtasksWithStatus.find((item) => item.id === studioChild.subtaskId)?.title
-        ?? detail.implementationPlan?.subtasks.find((item) => item.id === studioChild.subtaskId)?.title
-      : undefined;
-    const runSummary = firstNonEmpty(run?.summary, run?.progress?.lastTextPreview);
-    const value: StudioChildSessionDisplay = {
-      taskTitle: firstNonEmpty(detail.title),
-      subtaskId: headerSubtaskId,
-      subtaskTitle,
-      runSummary,
-    };
-    studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });
-    return value;
-  } catch {
-    const value = headerSubtaskId ? { subtaskId: headerSubtaskId } : undefined;
-    studioDisplayCache.set(cacheKey, { expiresAt: Date.now() + STUDIO_DISPLAY_CACHE_TTL_MS, value });
-    return value;
-  }
-}
-
 export { parseSessionHeaderMetadata } from "./session-header-metadata";
 
 declare global {
@@ -213,7 +244,9 @@ function sessionListCacheKey(options: ListAllSessionsOptions): string {
 export function invalidateSessionListSnapshots(): void {
   getSessionListSnapshots().clear();
   archivedCwdsCache = undefined;
-  studioDisplayCache.clear();
+  // Clear Studio display projection caches so title/summary cannot go stale
+  // after create/rename/archive/Studio child mutations.
+  invalidateStudioChildDisplayProjection();
 }
 
 export async function listAllSessions(options: ListAllSessionsOptions = {}): Promise<SessionInfo[]> {
@@ -524,9 +557,10 @@ export function archiveSessionFile(sessionPath: string): string {
   const target = sessionPath.replace("/sessions/", "/sessions-archive/");
   mkdirSync(dirname(target), { recursive: true });
   renameSync(sessionPath, target);
-  // Update parentSession refs in sibling files
-  updateParentSessionRefs(dirname(sessionPath), sessionPath, target);
+  // Update parentSession refs in sibling files and refresh space-local parent pointers.
+  const rewritten = updateParentSessionRefs(dirname(sessionPath), sessionPath, target);
   invalidateSessionListSnapshots();
+  refreshSpaceIndexForRewrittenParents(rewritten);
   return target;
 }
 
@@ -538,18 +572,21 @@ export function unarchiveSessionFile(archivePath: string): string {
   const target = archivePath.replace("/sessions-archive/", "/sessions/");
   mkdirSync(dirname(target), { recursive: true });
   renameSync(archivePath, target);
-  // Update parentSession refs in sibling files
-  updateParentSessionRefs(dirname(archivePath), archivePath, target);
+  // Update parentSession refs in sibling files and refresh space-local parent pointers.
+  const rewritten = updateParentSessionRefs(dirname(archivePath), archivePath, target);
   invalidateSessionListSnapshots();
+  refreshSpaceIndexForRewrittenParents(rewritten);
   return target;
 }
 
 /**
  * Scan sibling files in a directory and update their parentSession header
  * if it points to oldPath → point to newPath instead.
+ * Returns absolute paths of rewritten siblings for index refresh.
  */
-function updateParentSessionRefs(dirPath: string, oldPath: string, newPath: string): void {
-  if (oldPath === newPath) return;
+function updateParentSessionRefs(dirPath: string, oldPath: string, newPath: string): string[] {
+  const rewritten: string[] = [];
+  if (oldPath === newPath) return rewritten;
   try {
     const files = readdirSync(dirPath).filter((f) => f.endsWith(".jsonl"));
     for (const file of files) {
@@ -563,6 +600,7 @@ function updateParentSessionRefs(dirPath: string, oldPath: string, newPath: stri
           header.parentSession = newPath;
           lines[0] = JSON.stringify(header);
           writeFileSync(filePath, lines.join("\n"));
+          rewritten.push(filePath);
         }
       } catch {
         // skip malformed files
@@ -571,6 +609,32 @@ function updateParentSessionRefs(dirPath: string, oldPath: string, newPath: stri
   } catch {
     // skip if dir unreadable
   }
+  return rewritten;
+}
+
+function refreshSpaceIndexForRewrittenParents(paths: string[]): void {
+  if (paths.length === 0) return;
+  void import("./project-space-session-lifecycle")
+    .then(async ({ refreshProjectSpaceSessionIndexEntry }) => {
+      for (const filePath of paths) {
+        try {
+          const firstLine = readFirstLineSync(filePath);
+          const header = JSON.parse(firstLine) as { type?: string; id?: string; cwd?: string };
+          if (header?.type === "session" && header.id) {
+            await refreshProjectSpaceSessionIndexEntry({
+              sessionId: header.id,
+              sessionFileAbsolute: filePath,
+              cwd: header.cwd,
+            });
+          }
+        } catch {
+          // best-effort
+        }
+      }
+    })
+    .catch(() => {
+      /* best-effort */
+    });
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   resolveSessionPath,
   unarchiveSessionFile,
 } from "@/lib/session-reader";
+import { upsertProjectSpaceSessionAfterUnarchive } from "@/lib/project-space-session-lifecycle";
 
 export async function POST(req: Request) {
   try {
@@ -28,6 +29,11 @@ export async function POST(req: Request) {
         }
         const newPath = unarchiveSessionFile(filePath);
         invalidateSessionPathCache(id);
+        // Re-insert into space-local active index from restored header link.
+        await upsertProjectSpaceSessionAfterUnarchive({
+          sessionId: id,
+          sessionFileAbsolute: newPath,
+        });
         unarchived.push({ id, path: newPath });
       } catch (error) {
         errors.push({ id, error: String(error) });

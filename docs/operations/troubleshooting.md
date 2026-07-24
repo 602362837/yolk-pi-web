@@ -4,8 +4,44 @@
 
 - Confirm the server is on port `30141` unless `--port` or `PORT` overrides it.
 - Confirm `PI_CODING_AGENT_DIR` when sessions or config appear missing.
-- Check `~/.pi/agent/sessions/` for raw session JSONL files.
+- Check `~/.pi/agent/sessions/` for raw session JSONL files (JSONL remains the only session content truth).
 - For PM2 deployments, inspect `logs/pi-web-out.log` and `logs/pi-web-error.log`.
+
+## Project-space session list / local index
+
+Sidebar space history uses a directed reader over a **space-local candidate index**, not a full active-inventory filter.
+
+### Where files live
+
+| Item | Location |
+| --- | --- |
+| Session JSONL (truth) | `<getAgentDir()>/sessions/<encoded-cwd>/*.jsonl` (default `~/.pi/agent/sessions/**`) |
+| Space candidate index | `<space-root>/.ypi/sessions/index.v1.json` (main project root **and** each worktree root own a file) |
+| Index dir ignore | `<space-root>/.ypi/sessions/.gitignore` content `*` |
+| Legacy global seed (read-only) | `~/.pi/agent/pi-web-session-index.json` (not deleted; no longer written by new mutations) |
+
+Never treat the local index as an exclusion list or as permission to delete JSONL. Worktree delete may remove the worktree’s `.ypi/sessions/` with the tree; JSONL under agentDir is unaffected.
+
+### Sidebar list is slow again / 503 rebuilding
+
+- **`503` with `code: "session_index_rebuilding"` and `Retry-After`:** cold recovery exceeded the 10s hard budget without a safe last-good result. Retry; do **not** interpret this as “all sessions deleted”. Check server logs for content-safe `[session-list-timing]` lines (stage ms + counts + opaque ids only).
+- **Corrupt / partial / wrong-identity index:** delete only the bad space file `<space-root>/.ypi/sessions/index.v1.json` (and any stale `.tmp` / `.index.lock` under that directory). The next list request rebuilds from headers + directed dirs. Do not delete `sessions/**` JSONL.
+- **Missing sessions that still exist on disk:** confirm JSONL headers still have the expected `projectId`/`spaceId`, or use `includeLegacy=1` for exact-cwd unlinked rows. Cross-cwd manual header links converge on first recovery / low-priority full reconcile, not every hot request.
+- **Rollback without data migration:** set env `PI_WEB_PROJECT_SPACE_SESSION_LIST=0` (or `false` / `off` / `legacy`) and restart so the route uses the previous `listAllSessions()` filter path. Leaving `.ypi/sessions/` in place is safe (gitignored runtime files).
+
+### Git ignore mistakes
+
+- Product rule is anchored `/.ypi/sessions/` only. **Do not** add `.ypi/` or `/.ypi/` broad ignores — that can hide Studio `tasks` / agents / workflows.
+- Verify: `git check-ignore -v --no-index .ypi/sessions/index.v1.json` should match; `.ypi/tasks/...` should remain trackable.
+
+### Benchmarks and focused tests
+
+```bash
+npm run test:project-space-session-index
+npm run bench:project-space-sessions
+```
+
+If Settings / Models still feel slow after session list is fast, measure isolation baselines for `/api/web-config`, `/api/models`, and `/api/models-config` separately — residual provider/ModelRuntime cold start is Phase 2, not another session-index rewrite.
 
 ## Development Safety
 
@@ -434,15 +470,29 @@ Run `node scripts/test-model-prices.mjs` for focused validation of price config,
 
 ## Links / GitHub OAuth Device Flow
 
+### Official path needs no Client ID export
+
+Normal `ypi` / `npm run start` without `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` uses the built-in server-only product default Client ID and should report GitHub authorization **configured**. Unset / empty / whitespace env is **not** a disable switch. There is no client secret, no `NEXT_PUBLIC_*` Client ID, no `pi-web.json` field, and no Settings Client ID form. Env overrides are process-lifetime cached — restart after changing them.
+
 ### Links shows "GitHub authorization is not configured"
 
-`YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` is not set in the server environment. The Links UI is designed to fail closed — it never falls back to PAT input.
+This should **not** be the normal official no-env path. Catalog `authorizationConfigured=false` and the existing warning/disabled UI are defensive / fail-closed surfaces. Typical causes:
 
-1. Confirm that `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` is exported in the shell running `ypi` / `npm run dev` / `npm run start`.
-2. This is a **server-only** variable; do not set `NEXT_PUBLIC_*` variants.
-3. The value must be a GitHub OAuth App client id with **Device Flow enabled**.
-4. No client secret is needed or accepted.
-5. For UAT/release, the product owner must provide the official OAuth App client id.
+1. **Older package build** still using env-only resolution — upgrade to a release that includes the product default Client ID.
+2. **Test-only forced null** / fault injection in focused tests or a custom harness that overrides the resolver to `null`.
+3. Unexpected process/module isolation that never loads the server-only Links OAuth module (rare ops fault).
+
+There is still **no PAT fallback**. Do not invent a production “empty env disable” switch. If you need a temporary stop-bleed on a broken product App, set a known-good non-empty `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` and **restart** (this is override, not the missing-config path).
+
+### Wrong env override / authorization fails after setting Client ID
+
+A non-empty `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` is an **explicit override** of the product default. Wrong values do **not** silently fall back.
+
+1. Confirm the value is the intended Device-Flow-enabled OAuth App client id (leading/trailing whitespace is trimmed once at resolve time).
+2. Restart the server after changing env (resolver cache is process-lifetime).
+3. Expect stable GitHub-side errors such as `github_client_invalid` or Device Flow disabled — not the defensive not-configured UI.
+4. To restore the product default: unset the env (or set it blank) and restart. Blank is fallback to default, not disable.
+5. This is a **server-only** variable; do not set `NEXT_PUBLIC_*` variants. No client secret is needed or accepted.
 
 ### Device Flow starts but the GitHub page says "device code is incorrect"
 
@@ -463,11 +513,13 @@ GitHub Device Flow codes are short-lived (typically 900 seconds). If the user do
 
 ### "Device Flow disabled" error
 
-The configured GitHub OAuth App must have **Device Flow** explicitly enabled in GitHub's OAuth App settings. Without it, `POST /login/device/code` returns an error.
+The OAuth App actually used for this process (product default, or non-empty env override) must have **Device Flow** explicitly enabled in GitHub's OAuth App settings. Without it, `POST /login/device/code` returns an error.
 
-1. Go to GitHub Settings → Developer settings → OAuth Apps.
-2. Open the app and confirm **Device Flow** is enabled.
-3. If the app was recently created/updated, wait a few minutes for propagation.
+1. If you set `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`, open **that** OAuth App and confirm Device Flow is enabled; fix the override or clear env and restart to use the product default App.
+2. If you did not set env, the product default App must still have Device Flow enabled on GitHub's side.
+3. Go to GitHub Settings → Developer settings → OAuth Apps, open the relevant app, and confirm **Device Flow** is enabled.
+4. If the app was recently created/updated, wait a few minutes for propagation.
+5. Ops stop-bleed: set a known-good Device-Flow-enabled `YPI_LINKS_GITHUB_OAUTH_CLIENT_ID` and restart.
 
 ### "Access denied" or authorization rejected
 

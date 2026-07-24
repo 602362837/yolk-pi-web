@@ -1,5 +1,4 @@
 import { readFileSync, writeFileSync } from "fs";
-import { canonicalizeProjectPath } from "./project-registry";
 import type { SessionHeader } from "./types";
 
 export interface SessionProjectLink {
@@ -46,6 +45,9 @@ export function writeSessionProjectLink(filePath: string, link: SessionProjectLi
 
 export async function sessionCwdMatchesPathKey(cwd: string | undefined, pathKey: string): Promise<boolean> {
   if (!cwd) return false;
+  // Dynamic import avoids pulling project-registry into strip-loader test graphs
+  // that only need header read/write helpers from this module.
+  const { canonicalizeProjectPath } = await import("./project-registry");
   const info = await canonicalizeProjectPath(cwd);
   return info.pathKey === pathKey;
 }

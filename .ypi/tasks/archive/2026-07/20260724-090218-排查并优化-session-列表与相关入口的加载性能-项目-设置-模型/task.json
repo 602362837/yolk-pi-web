@@ -1,0 +1,2250 @@
+{
+  "schemaVersion": 1,
+  "id": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+  "title": "排查并优化 session 列表与相关入口的加载性能（项目/设置/模型）",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-24T01:02:18.700Z",
+  "updatedAt": "2026-07-24T04:42:53.127Z",
+  "completedAt": "2026-07-24T04:42:53.107Z",
+  "contextIds": [
+    "pi_019f91a3-f496-78cc-87bd-7dd5360264f6"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-c080c0599954d3a4978fd725",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T01:02:36.800Z",
+      "finishedAt": "2026-07-24T01:46:07.753Z",
+      "runner": "sdk",
+      "childSessionId": "019f91a5-4b0d-7e23-b049-695e615537b8",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T01-02-36-813Z_019f91a5-4b0d-7e23-b049-695e615537b8.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f91a5-4b0d-7e23-b049-695e615537b8",
+        "model": "anyrouter/claude-fable-5",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "⏳ 429 — retrying (1/20)…⏳ 429 — retrying (2/20)…⏳ 429 — retrying (3/20)…⏳ 429 — retrying (4/20)…⏳ 429 — retrying (5/20)…⏳ 429 — retrying (6/20)…⏳ 524 — retrying (7/20)…⏳ 429 — retrying (8/20)…⏳ 429 — retrying (9/20)…⏳ 429 — retrying (10/20)…⏳ 429 — retrying (11/20)…⏳ 429 — retrying (12/20)…⏳ 429 — retrying (13/20)…⏳ 429 — retrying (14/20)…⏳ 429 — retrying (15/20)…⏳ 429 — retrying (16/20)…⏳ 429 — retrying (17/20)…⏳ 429 — retrying (18/20)…⏳ 429 — retrying (19/20)…⏳ 429 — retrying (20/20)…[anyrouter] AnyRouter request failed (claude-http, status=429, attempts=21)",
+      "model": "anyrouter/claude-fable-5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "anyrouter/claude-fable-5",
+          "arg": "anyrouter/claude-fable-5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T01:02:36.800Z",
+        "updatedAt": "2026-07-24T01:46:07.753Z",
+        "eventCount": 72,
+        "lastTextPreview": "⏳ 429 — retrying (1/20)…⏳ 429 — retrying (2/20)…⏳ 429 — retrying (3/20)…⏳ 429 — retrying (4/20)…⏳ 429 — retrying (5/20)…⏳ 429 — retrying (6/20)…⏳ 524 — retrying (7/20)…⏳ 429 — retrying (8/20)…⏳ 429 — retrying (9/20)…⏳ 429 — retrying (10/20)…⏳ 429 — retrying (11/20)…⏳ 429 — retrying (12/20)…⏳ 429 — retrying (13/20)…⏳ 429 — retrying (14/20)…⏳ 429 — retrying (15/20)…⏳ 429 — retrying (16/20)…⏳ 429 — retrying (17/20)…⏳ 429 — retrying (18/20)…⏳ 429 — retrying (19/20)…⏳ 429 — retrying (20/20)…[anyrouter] AnyRouter request failed (claude-http, status=429, attempts=21)",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-24T01:02:36.800Z",
+            "text": "SDK child session created: 019f91a5-4b0d-7e23-b049-695e615537b8",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T01:02:48.136Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T01:46:07.738Z",
+            "text": "⏳ 429 — retrying (1/20)…⏳ 429 — retrying (2/20)…⏳ 429 — retrying (3/20)…⏳ 429 — retrying (4/20)…⏳ 429 — retrying (5/20)…⏳ 429 — retrying (6/20)…⏳ 524 — retrying (7/20)…⏳ 429 — retrying (8/20)…⏳ 429 — retrying (9/20)…⏳ 429 — retrying (10/20)…⏳ 429 — retrying (11/20)…⏳ 429 — retrying (12/20)…⏳ 429 — retrying (13/20)…⏳ 429 — retrying (14/20)…⏳ 429 — retrying (15/20)…⏳ 429 — retrying (16/20)…⏳ 429 — retrying (17/20)…⏳ 429 — retrying (18/20)…⏳ 429 — retrying (19/20)…⏳ 429 — retrying (20/20)…[anyrouter] AnyRouter request failed (claude-http, status=429, attempts=21)",
+            "model": "anyrouter/claude-fable-5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T01:46:07.751Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 566,
+        "tokens": 0,
+        "tokenSource": "usage",
+        "tps": 0,
+        "firstTokenAt": "2026-07-24T01:06:09.768Z",
+        "lastTokenAt": "2026-07-24T01:46:07.738Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-c080c0599954d3a4978fd725",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/architect-c080c0599954d3a4978fd725.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T01:02:36.800Z",
+        "finishedAt": "2026-07-24T01:46:07.752Z",
+        "updatedAt": "2026-07-24T01:46:07.752Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 4056,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f91a5-4b0d-7e23-b049-695e615537b8",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T01-02-36-813Z_019f91a5-4b0d-7e23-b049-695e615537b8.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "architect-56fde6e2b2adedb1d4ba2431",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T01:46:37.937Z",
+      "finishedAt": "2026-07-24T02:28:10.355Z",
+      "runner": "sdk",
+      "childSessionId": "019f91cd-97ff-7817-b46d-7cb60d78cb42",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T01-46-37-951Z_019f91cd-97ff-7817-b46d-7cb60d78cb42.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f91cd-97ff-7817-b46d-7cb60d78cb42",
+        "model": "anyrouter/claude-fable-5",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "⏳ 429 — retrying (1/20)…⏳ 429 — retrying (2/20)…⏳ 429 — retrying (3/20)…⏳ 429 — retrying (4/20)…⏳ 429 — retrying (5/20)…⏳ 429 — retrying (6/20)…⏳ 524 — retrying (7/20)…⏳ 429 — retrying (8/20)…⏳ 524 — retrying (9/20)…⏳ 429 — retrying (10/20)…⏳ 429 — retrying (11/20)…⏳ 429 — retrying (12/20)…⏳ 429 — retrying (13/20)…⏳ 429 — retrying (14/20)…⏳ 429 — retrying (15/20)…⏳ 429 — retrying (16/20)…⏳ 429 — retrying (17/20)…⏳ 429 — retrying (18/20)…⏳ 429 — retrying (19/20)…⏳ 429 — retrying (20/20)…[anyrouter] AnyRouter request failed (claude-http, status=429, attempts=21)",
+      "model": "anyrouter/claude-fable-5",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "anyrouter/claude-fable-5",
+          "arg": "anyrouter/claude-fable-5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T01:46:37.937Z",
+        "updatedAt": "2026-07-24T02:28:10.355Z",
+        "eventCount": 72,
+        "lastTextPreview": "⏳ 429 — retrying (1/20)…⏳ 429 — retrying (2/20)…⏳ 429 — retrying (3/20)…⏳ 429 — retrying (4/20)…⏳ 429 — retrying (5/20)…⏳ 429 — retrying (6/20)…⏳ 524 — retrying (7/20)…⏳ 429 — retrying (8/20)…⏳ 524 — retrying (9/20)…⏳ 429 — retrying (10/20)…⏳ 429 — retrying (11/20)…⏳ 429 — retrying (12/20)…⏳ 429 — retrying (13/20)…⏳ 429 — retrying (14/20)…⏳ 429 — retrying (15/20)…⏳ 429 — retrying (16/20)…⏳ 429 — retrying (17/20)…⏳ 429 — retrying (18/20)…⏳ 429 — retrying (19/20)…⏳ 429 — retrying (20/20)…[anyrouter] AnyRouter request failed (claude-http, status=429, attempts=21)",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-24T01:46:37.937Z",
+            "text": "SDK child session created: 019f91cd-97ff-7817-b46d-7cb60d78cb42",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T01:46:38.144Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T02:28:10.341Z",
+            "text": "⏳ 429 — retrying (1/20)…⏳ 429 — retrying (2/20)…⏳ 429 — retrying (3/20)…⏳ 429 — retrying (4/20)…⏳ 429 — retrying (5/20)…⏳ 429 — retrying (6/20)…⏳ 524 — retrying (7/20)…⏳ 429 — retrying (8/20)…⏳ 524 — retrying (9/20)…⏳ 429 — retrying (10/20)…⏳ 429 — retrying (11/20)…⏳ 429 — retrying (12/20)…⏳ 429 — retrying (13/20)…⏳ 429 — retrying (14/20)…⏳ 429 — retrying (15/20)…⏳ 429 — retrying (16/20)…⏳ 429 — retrying (17/20)…⏳ 429 — retrying (18/20)…⏳ 429 — retrying (19/20)…⏳ 429 — retrying (20/20)…[anyrouter] AnyRouter request failed (claude-http, status=429, attempts=21)",
+            "model": "anyrouter/claude-fable-5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T02:28:10.353Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 566,
+        "tokens": 0,
+        "tokenSource": "usage",
+        "tps": 0,
+        "firstTokenAt": "2026-07-24T01:46:40.595Z",
+        "lastTokenAt": "2026-07-24T02:28:10.340Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-56fde6e2b2adedb1d4ba2431",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/architect-56fde6e2b2adedb1d4ba2431.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T01:46:37.937Z",
+        "finishedAt": "2026-07-24T02:28:10.353Z",
+        "updatedAt": "2026-07-24T02:28:10.353Z",
+        "itemCount": 5,
+        "messageCount": 1,
+        "toolCallCount": 0,
+        "stderrBytes": 0,
+        "bytes": 4041,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f91cd-97ff-7817-b46d-7cb60d78cb42",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T01-46-37-951Z_019f91cd-97ff-7817-b46d-7cb60d78cb42.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "architect-cfd22c6db6dc04831f2a107c",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T03:09:39.315Z",
+      "finishedAt": "2026-07-24T03:23:26.894Z",
+      "runner": "sdk",
+      "childSessionId": "019f9219-9a87-7b57-871b-1ed23df38071",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-09-39-335Z_019f9219-9a87-7b57-871b-1ed23df38071.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f9219-9a87-7b57-871b-1ed23df38071",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成完整 feature-dev 规划，任务已切换至 **`awaiting_approval`**，未修改生产代码，未 commit/push/merge。\n\n### 产出\n\n目录：`.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n\n已保存 7 项 Implementation DAG 子任务（PSI-01～PSI-07，最大并发 2）。\n\n### 架构结论\n\n- 根因：列表先全量扫描约 300 sessions，并在过滤前投影约 180 个 Studio children。\n- 索引落点：\n  - main：`<project-root>/.ypi/sessions/index.v1.json`\n  - worktree：`<worktree-root>/.ypi/sessions/index.v1.json`\n- JSONL 仍保留在 `getAgentDir()/sessions/**`。\n- 旧全局 sidecar仅作迁移 seed/fallback，停止长期双写。\n- 索引缺失或损坏时执行 header-only 完整恢复；禁止返回缺项 partial 200。\n- Studio child 在目标 space 筛选后按 unique task 批量投影。\n- 仅忽略 `/.ypi/sessions/`，不忽略整个 `.ypi/`。\n- 不改变 UI，**无需 HTML prototype**。\n\n### 验证\n\n- 验证 7 份产物无 TBD、相对链接完整。\n- Implementation Plan JSON 解析及依赖检查通过。\n- Studio API 已完成：\n  - `intake → planning`\n  - 保存 implementation plan\n  - `planning → awaiting_approval`\n- 当前状态：45%，owner=`main`，缺失产物为 0。\n- 未运行 lint/typecheck：本轮仅规划，无生产代码变更。\n\n### 待主会话请用户审批\n\n重点确认：\n\n1. worktree 索引放在 worktree 自身根目录。\n2. 冷恢复超时宁可返回可重试错误，也不返回可能缺项的列表。\n3. 旧全局 sidecar转为只读迁移来源。\n\n主审批入口：[`plan-review.md`](.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/plan-review.md)。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T03:09:39.315Z",
+        "updatedAt": "2026-07-24T03:23:26.894Z",
+        "eventCount": 12287,
+        "lastTextPreview": "已完成完整 feature-dev 规划，任务已切换至 **`awaiting_approval`**，未修改生产代码，未 commit/push/merge。\n\n### 产出\n\n目录：`.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n\n已保存 7 项 Implementation DAG 子任务（PSI-01～PSI-07，最大并发 2）。\n\n### 架构结论\n\n- 根因：列表先全量扫描约 300 sessions，并在过滤前投影约 180 个 Studio children。\n- 索引落点：\n  - main：`<project-root>/.ypi/sessions/index.v1.json`\n  - worktree：`<worktree-root>/.ypi/sessions/index.v1.json`\n- JSONL 仍保留在 `getAgentDir()/sessions/**`。\n- 旧全局 sidecar仅作迁移 seed/fallback，停止长期双写。\n- 索引缺失或损坏时执行 header-only 完整恢复；禁止返回缺项 partial 200。\n- Studio child 在目标 space 筛选后按 unique task 批量投影。\n- 仅忽略 `/.ypi/sessions/`，不忽略整个 `.ypi/`。\n- 不改变 UI，**无需 HTML prototype**。\n\n### 验证\n\n- 验证 7 份产物无 TBD、相对链接完整。\n- Implementation Plan JSON 解析及依赖检查通过。\n- Studio API 已完成：\n  - `intake → planning`\n  - 保存 implementation plan\n  - `planning → awaiting_approval`\n- 当前状态：45%，owner=`main`，缺失产物为 0。\n- 未运行 lint/typecheck：本轮仅规划，无生产代码变更。\n\n### 待主会话请用户审批\n\n重点确认：\n\n1. worktree 索引放在 worktree 自身根目录。\n2. 冷恢复超时宁可返回可重试错误，也不返回可能缺项的列表。\n3. 旧全局 sidecar转为只读迁移来源。\n\n主审批入口：[`plan-review.md`](.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/plan-review.md)。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T03:23:06.960Z",
+            "toolCallId": "call_vqCkWHvD1BrubVqWM8Xh163k|fc_0219ccbcedbf6bb2016a62da94c2bc819a8ee94adbea895750",
+            "toolName": "read",
+            "text": "{\n  \"schemaVersion\": 1,\n  \"id\": \"20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型\",\n  \"title\": \"排查并优化 session 列表与相关入口的加载性能（项目/设置/模型）\",\n  \"workflowId\": \"feature-dev\",\n  \"status\": \"awaiting_approval\",\n  \"cwd\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web\",\n  \"createdAt\": \"2026-07-24T01:02:18.700Z\",\n  \"updatedAt\": \"2026-07-24T03:22:45.343Z\",\n  \"completedAt\": null,\n  \"contextIds\": [\n    \"pi_019f91a3-f496-78cc-87bd-7dd5360264f6\"\n  ],\n  \"currentMember\": \"main\",\n  \"artifacts\": {\n    \"plan-review\": \"plan-review.md\",\n    \"brief\": \"brief.md\",\n    \"prd\": \"prd.md\",\n    \"ui\": \"ui.md\",\n    \"design\": \"design.md\",\n    \"implement\": \"implement.md\",\n    \"checks\": \"checks.md\",\n    \"handoff\": \"handoff.md\",\n    \"review\": \"review.md\",\n    \"summary\": \"summary.md\"\n  },\n  \"subagents\": [\n    {\n      \"id\": \"architect-c080c0599954d3a4978fd725\",\n      \"member\": \"architect\",\n      \"status\": \"succeeded\",\n      \"startedAt\": \"2026-07-24T01:02:36.800Z\",\n      \"finishedAt\": \"2026-07-24T01:46:07.753Z\",\n      \"runner\": \"sdk\",\n      \"childSessionId\": \"019f91a5-4b0d-7e23-b049-695e615537b8\",\n      \"childSessionFile\": \"/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T01-02-36-813Z_019f91a5-4b0d-7e23-b049-695e615537b8.jsonl\",\n      \"requestAffinity\": {\n        \"schemaVersion\": 1,\n        \"providerSessionIdSource\": \"childSessionId\",\n        \"parentSessionId\": \"019f91a3-f496-78cc-87bd-7dd5360264f6\",\n        \"childSessionId\": \"019f91a5-4b0d-7e23-b049-695e615537b8\",\n        \"model\": \"anyrouter/claude-fable-5\",\n        \"modelSource\": \"memberConfig\",\n        \"thinking\": \"xhigh\",\n        \"thinkingSource\": \"memberConfig\",\n        \"note\": \"Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id.\"\n      },\n      \"summary\": \"⏳ 429 — retrying (1/20)…⏳ 429 — retrying (2/20)…⏳ 429 — retrying (3/20)…⏳ 429 — retrying (4/20)…⏳ 429 — retrying (5/20)…⏳ 429 — retrying (6/20)…⏳ 524 — retrying (7/20)…⏳ 429 — retrying (8/20)…⏳ 429 — retrying (9/20)…⏳ 429 — retrying (10/20)…⏳ 429 — retrying (11/20)…⏳ 429 — retrying (12/20)…⏳ 429 — retrying (13/20)…⏳ 429 — retrying (14/20)…⏳ 429 — retrying (15/20)…⏳ 429 — retrying (16/20)…⏳ 429 — retrying (17/20)…⏳ 429 — retrying (18/20)…⏳ 429 — retrying (19/20)…⏳ 429 — retrying (20/20)…[anyrouter] AnyRouter request failed (claude-http, status=429, attempts=21)\",\n      \"model\": \"anyrouter/claude-fable-5\",\n      \"thinking\": \"xhigh\",\n      \"modelSource\": \"memberConfig\",\n      \"thinkingSource\": \"memberConfig\",\n      \"policy\": {\n        \"schemaVersion\": 1,\n        \"memberInput\": \"architect\",\n        \"member\": \"architect\",\n        \"memberPolicyFound\": true,\n        \"config\": {\n          \"exists\": true,\n          \"pathLabel\": \"~/.pi/agent/pi-web.json\"\n\n[928 more lines in file. Use offset=61 to continue.]",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T03:23:07.145Z",
+            "toolCallId": "call_FWCUpd4UEU5oUAST8S1o3nJi|fc_0219ccbcedbf6bb2016a62da94c2d0819abd56ea869bfd4c6e",
+            "toolName": "bash",
+            "text": "M docs/architecture/overview.md\n M docs/deployment/README.md\n M docs/integrations/README.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M docs/operations/troubleshooting.md\n M lib/github-link-oauth.ts\n?? \".ypi/tasks/20260724-090218-\\346\\216\\222\\346\\237\\245\\345\\271\\266\\344\\274\\230\\345\\214\\226-session-\\345\\210\\227\\350\\241\\250\\344\\270\\216\\347\\233\\270\\345\\205\\263\\345\\205\\245\\345\\217\\243\\347\\232\\204\\345\\212\\240\\350\\275\\275\\346\\200\\247\\350\\203\\275-\\351\\241\\271\\347\\233\\256-\\350\\256\\276\\347\\275\\256-\\346\\250\\241\\345\\236\\213/\"\nbrief.md: 2686 chars\nprd.md: 3772 chars\nui.md: 608 chars\ndesign.md: 12103 chars\nimplement.md: 15775 chars\nchecks.md: 4855 chars\nplan-review.md: 2293 chars",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T03:23:10.494Z",
+            "toolCallId": "call_euNdFLK1EWe6tmaRMHotCa9f|fc_0219ccbcedbf6bb2016a62da94c2dc819a9b14c6e1284be076",
+            "toolName": "bash",
+            "text": "{\"status\": \"awaiting_approval\", \"owner\": \"main\", \"progress\": 45, \"missing\": [], \"planSubtasks\": 7, \"planRevision\": null, \"approvalGate\": {\"enteredAt\": \"2026-07-24T03:22:45.343Z\", \"contextId\": \"pi_019f91a3-f496-78cc-87bd-7dd5360264f6\", \"from\": \"planning\", \"to\": \"awaiting_approval\"}}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T03:23:26.881Z",
+            "text": "已完成完整 feature-dev 规划，任务已切换至 **`awaiting_approval`**，未修改生产代码，未 commit/push/merge。\n\n### 产出\n\n目录：`.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n\n已保存 7 项 Implementation DAG 子任务（PSI-01～PSI-07，最大并发 2）。\n\n### 架构结论\n\n- 根因：列表先全量扫描约 300 sessions，并在过滤前投影约 180 个 Studio children。\n- 索引落点：\n  - main：`<project-root>/.ypi/sessions/index.v1.json`\n  - worktree：`<worktree-root>/.ypi/sessions/index.v1.json`\n- JSONL 仍保留在 `getAgentDir()/sessions/**`。\n- 旧全局 sidecar仅作迁移 seed/fallback，停止长期双写。\n- 索引缺失或损坏时执行 header-only 完整恢复；禁止返回缺项 partial 200。\n- Studio child 在目标 space 筛选后按 unique task 批量投影。\n- 仅忽略 `/.ypi/sessions/`，不忽略整个 `.ypi/`。\n- 不改变 UI，**无需 HTML prototype**。\n\n### 验证\n\n- 验证 7 份产物无 TBD、相对链接完整。\n- Implementation Plan JSON 解析及依赖检查通过。\n- Studio API 已完成：\n  - `intake → planning`\n  - 保存 implementation plan\n  - `planning → awaiting_approval`\n- 当前状态：45%，owner=`main`，缺失产物为 0。\n- 未运行 lint/typecheck：本轮仅规划，无生产代码变更。\n\n### 待主会话请用户审批\n\n重点确认：\n\n1. worktree 索引放在 worktree 自身根目录。\n2. 冷恢复超时宁可返回可重试错误，也不返回可能缺项的列表。\n3. 旧全局 sidecar转为只读迁移来源。\n\n主审批入口：[`plan-review.md`](.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/plan-review.md)。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T03:23:26.888Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1215,
+        "tokens": 688,
+        "tokenSource": "usage",
+        "tps": 106.4,
+        "firstTokenAt": "2026-07-24T03:23:20.147Z",
+        "lastTokenAt": "2026-07-24T03:23:26.613Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-cfd22c6db6dc04831f2a107c",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/architect-cfd22c6db6dc04831f2a107c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T03:09:39.315Z",
+        "finishedAt": "2026-07-24T03:23:26.888Z",
+        "updatedAt": "2026-07-24T03:23:26.888Z",
+        "itemCount": 151,
+        "messageCount": 1,
+        "toolCallCount": 72,
+        "stderrBytes": 0,
+        "bytes": 451092,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f9219-9a87-7b57-871b-1ed23df38071",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-09-39-335Z_019f9219-9a87-7b57-871b-1ed23df38071.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-ec06e3586ddc12adfe6c031b",
+      "subtaskId": "PSI-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T03:34:13.563Z",
+      "finishedAt": "2026-07-24T03:42:24.962Z",
+      "runner": "sdk",
+      "childSessionId": "019f9230-196d-722e-b796-8f30c5c3ebbf",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-34-13-613Z_019f9230-196d-722e-b796-8f30c5c3ebbf.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f9230-196d-722e-b796-8f30c5c3ebbf",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete (PSI-01)\n\n#### Files Changed\n- `lib/project-space-session-index.ts` — new schema-v1 space-local store (path resolve, bounds, gitignore, process queue, cross-process lock, atomic write, last-good, upsert/remove/mutate)\n- `lib/project-session-index.ts` — read-only migration adapter (`readProjectSessionIndex`, `listLegacyIndexedSessionsForSpace`); write path deprecated for PSI-03\n- `.gitignore` — `/.ypi/sessions/` only (not whole `.ypi/`)\n- `scripts/test-project-space-session-index.mjs` — store group tests\n- `package.json` — `test:project-space-session-index`\n- `.ypi/tasks/.../handoff.md` — evidence handoff for parent\n\n#### Verification\n- `npm run test:project-space-session-index -- --group store` — **15 passed**\n- `npx eslint lib/project-space-session-index.ts lib/project-session-index.ts --max-warnings=0` — clean\n- `node_modules/.bin/tsc --noEmit` — clean\n\n#### Notes / Risks\n- Child env cannot mutate `task.json` / no `ypi_studio_task` tool → **parent must mark PSI-01 done**\n- No PSI-02+ work (query/recovery/lifecycle/route)\n- Legacy sidecar writers still live until PSI-03\n- Local path canonicalize mirrors registry (avoid strip-loader import of `project-registry.ts`)\n- Next ready: **PSI-02 ∥ PSI-03**",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T03:34:13.563Z",
+        "updatedAt": "2026-07-24T03:42:24.962Z",
+        "eventCount": 1899,
+        "lastTextPreview": "### Implementation Complete (PSI-01)\n\n#### Files Changed\n- `lib/project-space-session-index.ts` — new schema-v1 space-local store (path resolve, bounds, gitignore, process queue, cross-process lock, atomic write, last-good, upsert/remove/mutate)\n- `lib/project-session-index.ts` — read-only migration adapter (`readProjectSessionIndex`, `listLegacyIndexedSessionsForSpace`); write path deprecated for PSI-03\n- `.gitignore` — `/.ypi/sessions/` only (not whole `.ypi/`)\n- `scripts/test-project-space-session-index.mjs` — store group tests\n- `package.json` — `test:project-space-session-index`\n- `.ypi/tasks/.../handoff.md` — evidence handoff for parent\n\n#### Verification\n- `npm run test:project-space-session-index -- --group store` — **15 passed**\n- `npx eslint lib/project-space-session-index.ts lib/project-session-index.ts --max-warnings=0` — clean\n- `node_modules/.bin/tsc --noEmit` — clean\n\n#### Notes / Risks\n- Child env cannot mutate `task.json` / no `ypi_studio_task` tool → **parent must mark PSI-01 done**\n- No PSI-02+ work (query/recovery/lifecycle/route)\n- Legacy sidecar writers still live until PSI-03\n- Local path canonicalize mirrors registry (avoid strip-loader import of `project-registry.ts`)\n- Next ready: **PSI-02 ∥ PSI-03**",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T03:42:16.702Z",
+            "text": "Child session can't mutate `task.json`; writing the handoff artifact for the parent to mark PSI-01 done.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T03:42:16.705Z",
+            "toolCallId": "call-29c8dbaf-e646-4dfd-b570-2e9293d2ca29-50|fc_212cfe07-d8eb-90c0-a74d-b95c73e35c97_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff.md\",\n  \"content\": \"# handoff — PSI-01 complete (await parent mark done)\\n\\n## Subtask\\n\\n- **id:** PSI-01\\n- **title:** 实现 space-local index 基础设施\\n- **status:** implementation complete (member cannot write task.json; parent must mark done)\\n\\n## Summary\\n\\nImplemented the project-space local session candidate index store foundation only. No route switch, no list query/recovery, no lifecycle hook migration beyond read-adapter prep on the legacy global sidecar.\\n\\nExact paths:\\n\\n- main: `<project-root>/.ypi/sessions/index.v1.json`\\n- worktree: `<worktree-root>/.ypi/sessions/index.v1.json`\\n\\nJSONL remains under `getAgentDir()/sessions/**` (unchanged).\\n\\n## Files Changed\\n\\n| Path | Change |\\n| --- | --- |\\n| `lib/project-space-session-index.ts` | **new** schema-v1 store: parse bounds, path resolve, gitignore, process queue, cross-process mkdir lock (live-PID safe), lock-time reread/merge, temp+rename, last-good retention, upsert/remove/mutate APIs |\\n| `lib/project-session-index.ts` | keep as **read migration adapter**; export `readProjectSessionIndex` / `listLegacyIndexedSessionsForSpace`; deprecate write path (PSI-03 will stop callers) |\\n| `.gitignore` | add anchored `/.ypi/sessions/` only (not whole `.ypi/`) |\\n| `scripts/test-project-space-session-index.mjs` | **new** focused store tests (`--group store`) |\\n| `package.json` | add `test:project-space-session-index` script |\\n\\n## Validation\\n\\n```bash\\nnpm run test:project-space-session-index -- --group store\\n# 15 passed, 0 failed\\n\\nnpx eslint lib/project-space-session-index.ts lib/project-session-index.ts --max-warnings=0\\n# clean\\n\\nnode_modules/.bin/tsc --noEmit\\n# EXIT 0\\n```\\n\\nStore acceptance covered:\\n\\n- main/worktree resolve to own roots + identity isolation\\n- illegal path / symlink / archive / future-malformed schema fail closed\\n- concurrent upsert/remove keeps all updates; failed write preserves last-good\\n- index/tmp/lock git-ignored; `.ypi/tasks` still trackable; non-git spaces work\\n- incompatible user `.ypi/sessions/.gitignore` not overwritten (git exclude fallback)\\n\\n## Explicitly NOT done (later subtasks)\\n\\n- PSI-02 query/recovery/`listSessionsForProjectSpace`\\n- PSI-03 lifecycle write-through / stop writing legacy sidecar\\n- PSI-04 Studio batch projection\\n- PSI-05 route feature-flag switch\\n- PSI-06 benchmarks\\n- PSI-07 docs\\n\\n## Risks / notes for checker & main session\\n\\n1. Path canonicalization is duplicated (registry-compatible local helper) so focused strip-loader tests do not import `project-registry.ts` parameter properties. Behavior mirrors `canonicalizeProjectPath` (realpath → pathKey).\\n2. Stale lock recovery never steals from a live PID (may time out waiters) — same safety posture as Grok provider lock.\\n3. If ignore cannot be verified in a git worktree, mutate fails closed and does **not** persist a new index (last-good retained).\\n4. Legacy global sidecar still has live write callers (`agent-session-bootstrap`, `rpc-manager`); PSI-03 must stop them. PSI-01 only prepared the read adapter.\\n5. Member environment blocked shell mutation of `task.json` and has no `ypi_studio_task` tool — **parent must** `update_implementation_subtask` / claim flow to mark PSI-01 done with the validation evidence above.\\n\\n## Decisions needed from main session\\n\\n1. Mark PSI-01 done with validation evidence.\\n2. Claim/select next ready subtasks: **PSI-02** and **PSI-03** can run in parallel after PSI-01.\\n3. No product decisions blocked.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T03:42:16.748Z",
+            "toolCallId": "call-29c8dbaf-e646-4dfd-b570-2e9293d2ca29-50|fc_212cfe07-d8eb-90c0-a74d-b95c73e35c97_0",
+            "toolName": "write",
+            "text": "Successfully wrote 3383 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T03:42:24.950Z",
+            "text": "### Implementation Complete (PSI-01)\n\n#### Files Changed\n- `lib/project-space-session-index.ts` — new schema-v1 space-local store (path resolve, bounds, gitignore, process queue, cross-process lock, atomic write, last-good, upsert/remove/mutate)\n- `lib/project-session-index.ts` — read-only migration adapter (`readProjectSessionIndex`, `listLegacyIndexedSessionsForSpace`); write path deprecated for PSI-03\n- `.gitignore` — `/.ypi/sessions/` only (not whole `.ypi/`)\n- `scripts/test-project-space-session-index.mjs` — store group tests\n- `package.json` — `test:project-space-session-index`\n- `.ypi/tasks/.../handoff.md` — evidence handoff for parent\n\n#### Verification\n- `npm run test:project-space-session-index -- --group store` — **15 passed**\n- `npx eslint lib/project-space-session-index.ts lib/project-session-index.ts --max-warnings=0` — clean\n- `node_modules/.bin/tsc --noEmit` — clean\n\n#### Notes / Risks\n- Child env cannot mutate `task.json` / no `ypi_studio_task` tool → **parent must mark PSI-01 done**\n- No PSI-02+ work (query/recovery/lifecycle/route)\n- Legacy sidecar writers still live until PSI-03\n- Local path canonicalize mirrors registry (avoid strip-loader import of `project-registry.ts`)\n- Next ready: **PSI-02 ∥ PSI-03**",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T03:42:24.952Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2312,
+        "tokens": 365,
+        "tokenSource": "usage",
+        "tps": 0.76,
+        "firstTokenAt": "2026-07-24T03:34:26.529Z",
+        "lastTokenAt": "2026-07-24T03:42:24.949Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-ec06e3586ddc12adfe6c031b",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/implementer-ec06e3586ddc12adfe6c031b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T03:34:13.563Z",
+        "finishedAt": "2026-07-24T03:42:24.952Z",
+        "updatedAt": "2026-07-24T03:42:24.952Z",
+        "itemCount": 117,
+        "messageCount": 11,
+        "toolCallCount": 51,
+        "stderrBytes": 0,
+        "bytes": 224874,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f9230-196d-722e-b796-8f30c5c3ebbf",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-34-13-613Z_019f9230-196d-722e-b796-8f30c5c3ebbf.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-d83bac0be4757a9607f9758f",
+      "subtaskId": "PSI-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T03:42:49.318Z",
+      "finishedAt": "2026-07-24T03:52:42.223Z",
+      "runner": "sdk",
+      "childSessionId": "019f9237-f7f3-7b90-b71d-2c4340377b56",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-42-49-331Z_019f9237-f7f3-7b90-b71d-2c4340377b56.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f9237-f7f3-7b90-b71d-2c4340377b56",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — PSI-03\n\n#### Files Changed\n\n- `lib/project-space-session-lifecycle.ts` — **new** lifecycle helpers (upsert/remove/relink/refresh/unarchive/batch + cache invalidation)\n- `lib/project-session-index.ts` — legacy global write is **no-op** (read migration only)\n- `lib/session-project-link.ts` — dynamic registry import for strip-loader safety\n- `lib/agent-session-bootstrap.ts` — create/bootstrap → space-local upsert\n- `lib/rpc-manager.ts` — fork upsert; `message_end`/`agent_end` list invalidation\n- `lib/ypi-studio-child-session-runner.ts` — child create + status refresh\n- `lib/session-reader.ts` — cwd/WorkTree delete remove; archive/unarchive parent-rewrite refresh\n- `app/api/sessions/[id]/route.ts` — rename refresh; delete remove + reparent refresh\n- `app/api/sessions/archive/route.ts` / `archive-all/route.ts` — remove active index entries\n- `app/api/sessions/unarchive/route.ts` — header-based re-upsert\n- `scripts/test-project-space-session-index.mjs` — `--group lifecycle`\n- `handoff-psi-03.md` — evidence for parent\n\n#### Verification\n\n- `npm run test:project-space-session-index -- --group lifecycle` — **9 passed**\n- `npm run test:project-space-session-index -- --group store` — **15 passed**\n- `npm run test:studio-child-sessions` — **all passed**\n- `npx eslint … --max-warnings=0` — clean\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n\n#### Notes / Risks\n\n- Index writes are best-effort; JSONL never rolled back. Missing/unwritable space root fails soft → PSI-02 reconciliation.\n- `relinkSessionProjectSpace` is ready; no user-facing relink API yet.\n- Member cannot mark Studio `task.json` done — **parent must mark PSI-03 done**.\n\n#### Decisions needed from main session\n\n1. Mark PSI-03 done with the validation evidence above.  \n2. Continue G2/G3: PSI-02 (if still open) → PSI-04.",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T03:42:49.318Z",
+        "updatedAt": "2026-07-24T03:52:42.223Z",
+        "eventCount": 2466,
+        "lastTextPreview": "### Implementation Complete — PSI-03\n\n#### Files Changed\n\n- `lib/project-space-session-lifecycle.ts` — **new** lifecycle helpers (upsert/remove/relink/refresh/unarchive/batch + cache invalidation)\n- `lib/project-session-index.ts` — legacy global write is **no-op** (read migration only)\n- `lib/session-project-link.ts` — dynamic registry import for strip-loader safety\n- `lib/agent-session-bootstrap.ts` — create/bootstrap → space-local upsert\n- `lib/rpc-manager.ts` — fork upsert; `message_end`/`agent_end` list invalidation\n- `lib/ypi-studio-child-session-runner.ts` — child create + status refresh\n- `lib/session-reader.ts` — cwd/WorkTree delete remove; archive/unarchive parent-rewrite refresh\n- `app/api/sessions/[id]/route.ts` — rename refresh; delete remove + reparent refresh\n- `app/api/sessions/archive/route.ts` / `archive-all/route.ts` — remove active index entries\n- `app/api/sessions/unarchive/route.ts` — header-based re-upsert\n- `scripts/test-project-space-session-index.mjs` — `--group lifecycle`\n- `handoff-psi-03.md` — evidence for parent\n\n#### Verification\n\n- `npm run test:project-space-session-index -- --group lifecycle` — **9 passed**\n- `npm run test:project-space-session-index -- --group store` — **15 passed**\n- `npm run test:studio-child-sessions` — **all passed**\n- `npx eslint … --max-warnings=0` — clean\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n\n#### Notes / Risks\n\n- Index writes are best-effort; JSONL never rolled back. Missing/unwritable space root fails soft → PSI-02 reconciliation.\n- `relinkSessionProjectSpace` is ready; no user-facing relink API yet.\n- Member cannot mark Studio `task.json` done — **parent must mark PSI-03 done**.\n\n#### Decisions needed from main session\n\n1. Mark PSI-03 done with the validation evidence above.  \n2. Continue G2/G3: PSI-02 (if still open) → PSI-04.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T03:52:20.784Z",
+            "toolCallId": "call-5652b12e-1b26-49a2-aae8-f01dfbdbb225-83|fc_aa3a8c98-8246-9a40-82ea-34938f3b6284_1",
+            "toolName": "bash",
+            "text": "(node:96488) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nsession-reader ok\nlifecycle ok",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T03:52:26.643Z",
+            "toolCallId": "call-b61b0928-4260-47d3-bf53-19188e131fa2-84|fc_7ed3ee7c-f6bf-9afe-b5a1-9c46f6afb8ae_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run test:project-space-session-index -- --group lifecycle 2>&1\",\n  \"timeout\": 60\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T03:52:33.170Z",
+            "toolCallId": "call-b61b0928-4260-47d3-bf53-19188e131fa2-84|fc_7ed3ee7c-f6bf-9afe-b5a1-9c46f6afb8ae_0",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.7.26 test:project-space-session-index\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-project-space-session-index.mjs --group lifecycle\n\n(node:96534) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n[lifecycle] create/fork/relink/archive/unarchive/delete maintenance\n\n  ✓ legacy global upsert is a no-op (no dual-write)\n  ✓ upsert after create writes space-local entry with summary\n  ✓ studio child create stores allowlisted pointer + parent\n  ✓ rename refresh updates name without waiting for TTL\n  ✓ archive remove drops active entry; never stores archive path\n  ✓ unarchive re-upserts from header link\n  ✓ relink moves entry from old space to new space (header first)\n  ✓ delete by header removes entry; missing header only invalidates caches\n  ✓ index write failure does not throw through upsert helper\n\n9 passed, 0 failed (group=lifecycle)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T03:52:42.211Z",
+            "text": "### Implementation Complete — PSI-03\n\n#### Files Changed\n\n- `lib/project-space-session-lifecycle.ts` — **new** lifecycle helpers (upsert/remove/relink/refresh/unarchive/batch + cache invalidation)\n- `lib/project-session-index.ts` — legacy global write is **no-op** (read migration only)\n- `lib/session-project-link.ts` — dynamic registry import for strip-loader safety\n- `lib/agent-session-bootstrap.ts` — create/bootstrap → space-local upsert\n- `lib/rpc-manager.ts` — fork upsert; `message_end`/`agent_end` list invalidation\n- `lib/ypi-studio-child-session-runner.ts` — child create + status refresh\n- `lib/session-reader.ts` — cwd/WorkTree delete remove; archive/unarchive parent-rewrite refresh\n- `app/api/sessions/[id]/route.ts` — rename refresh; delete remove + reparent refresh\n- `app/api/sessions/archive/route.ts` / `archive-all/route.ts` — remove active index entries\n- `app/api/sessions/unarchive/route.ts` — header-based re-upsert\n- `scripts/test-project-space-session-index.mjs` — `--group lifecycle`\n- `handoff-psi-03.md` — evidence for parent\n\n#### Verification\n\n- `npm run test:project-space-session-index -- --group lifecycle` — **9 passed**\n- `npm run test:project-space-session-index -- --group store` — **15 passed**\n- `npm run test:studio-child-sessions` — **all passed**\n- `npx eslint … --max-warnings=0` — clean\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n\n#### Notes / Risks\n\n- Index writes are best-effort; JSONL never rolled back. Missing/unwritable space root fails soft → PSI-02 reconciliation.\n- `relinkSessionProjectSpace` is ready; no user-facing relink API yet.\n- Member cannot mark Studio `task.json` done — **parent must mark PSI-03 done**.\n\n#### Decisions needed from main session\n\n1. Mark PSI-03 done with the validation evidence above.  \n2. Continue G2/G3: PSI-02 (if still open) → PSI-04.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T03:52:42.219Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2543,
+        "tokens": 545,
+        "tokenSource": "usage",
+        "tps": 0.94,
+        "firstTokenAt": "2026-07-24T03:43:03.683Z",
+        "lastTokenAt": "2026-07-24T03:52:42.030Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-d83bac0be4757a9607f9758f",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/implementer-d83bac0be4757a9607f9758f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T03:42:49.318Z",
+        "finishedAt": "2026-07-24T03:52:42.220Z",
+        "updatedAt": "2026-07-24T03:52:42.220Z",
+        "itemCount": 181,
+        "messageCount": 7,
+        "toolCallCount": 85,
+        "stderrBytes": 0,
+        "bytes": 311736,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f9237-f7f3-7b90-b71d-2c4340377b56",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-42-49-331Z_019f9237-f7f3-7b90-b71d-2c4340377b56.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-c02b5445198e8c1d87f35505",
+      "subtaskId": "PSI-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T03:42:43.122Z",
+      "finishedAt": "2026-07-24T03:53:36.901Z",
+      "runner": "sdk",
+      "childSessionId": "019f9237-dfc3-7970-900b-f1e74abeeb03",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-42-43-139Z_019f9237-dfc3-7970-900b-f1e74abeeb03.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f9237-dfc3-7970-900b-f1e74abeeb03",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete (PSI-02)\n\n#### Files Changed\n\n- `lib/project-space-session-list.ts` — directed space query + recovery: `listSessionsForProjectSpace`, encode-cwd dirs, bounded header, fingerprint reuse, legacy seed, header-only discovery, single-flight, 10s budget / last-good / 503\n- `scripts/test-project-space-session-index.mjs` — `--group query` + `--group recovery`\n- `handoff-psi-02.md` — full handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group query` | **7 passed** |\n| `npm run test:project-space-session-index -- --group recovery` | **8 passed** |\n| `npm run test:project-space-session-index -- --group store` | **15 passed** (regression) |\n| `eslint lib/project-space-session-list.ts` | clean |\n| `tsc --noEmit` | EXIT 0 |\n\n#### Notes / Risks\n\n- Hot path: `inventoryGlobalCalls=0`; no global body inventory\n- Missing/corrupt/partial: recover fully; no last-good + timeout → `503 session_index_rebuilding` (no partial 200)\n- **Not done:** route switch (PSI-05), Studio batch display (PSI-04), docs/bench\n- Parent must mark PSI-02 done (member cannot write `task.json`)",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T03:42:43.122Z",
+        "updatedAt": "2026-07-24T03:53:36.901Z",
+        "eventCount": 1901,
+        "lastTextPreview": "### Implementation Complete (PSI-02)\n\n#### Files Changed\n\n- `lib/project-space-session-list.ts` — directed space query + recovery: `listSessionsForProjectSpace`, encode-cwd dirs, bounded header, fingerprint reuse, legacy seed, header-only discovery, single-flight, 10s budget / last-good / 503\n- `scripts/test-project-space-session-index.mjs` — `--group query` + `--group recovery`\n- `handoff-psi-02.md` — full handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group query` | **7 passed** |\n| `npm run test:project-space-session-index -- --group recovery` | **8 passed** |\n| `npm run test:project-space-session-index -- --group store` | **15 passed** (regression) |\n| `eslint lib/project-space-session-list.ts` | clean |\n| `tsc --noEmit` | EXIT 0 |\n\n#### Notes / Risks\n\n- Hot path: `inventoryGlobalCalls=0`; no global body inventory\n- Missing/corrupt/partial: recover fully; no last-good + timeout → `503 session_index_rebuilding` (no partial 200)\n- **Not done:** route switch (PSI-05), Studio batch display (PSI-04), docs/bench\n- Parent must mark PSI-02 done (member cannot write `task.json`)",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T03:53:09.180Z",
+            "toolCallId": "call-647a2bdd-a1b4-47b7-801b-2cc229fc6ac4-56|fc_f1776342-126d-917b-b444-de13458abcff_0",
+            "toolName": "bash",
+            "text": "(node:97981) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n[query] directed candidates / fingerprint reuse / legacy\n\n  ✓ encodeSessionCwdDirName mirrors SDK layout\n  ✓ hot path lists linked sessions without global inventory\n  ✓ unchanged fingerprint reuses summary (no metadata rescan)\n  ✓ mtime/size change rescans only that file\n  ✓ same-cwd external file is discovered by directed dir; legacy only with includeLegacy\n  ✓ stale missing file is dropped from hot path result\n  ✓ studio child with visible parent is nested; orphan child excluded from roots\n\n7 passed, 0 failed (group=query)\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n[recovery] missing/corrupt/partial + single-flight + budget\n\n  ✓ missing index recovers via directed + header-only discovery\n  ✓ corrupt index triggers recovery and does not return empty partial 200\n  ✓ partial coverage index is not used as complete; recovers fully\n  ✓ legacy global seed is validated and merged during recovery\n  ✓ concurrent recovery shares single-flight\n  ✓ recovery timeout without last-good throws session_index_rebuilding (no partial 200)\n  ✓ timeout with last-good returns revalidated last-good, not unchecked partial\n  ✓ rejected recovery can be retried after flight clears\n\n8 passed, 0 failed (group=recovery)\nALL_DONE",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T03:53:30.980Z",
+            "toolCallId": "call-2ea95944-2abb-4097-8db7-789774d1d5bb-57|fc_f628422c-9fbb-9cd7-9a46-de926f1c1f08_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff-psi-02.md\",\n  \"content\": \"# handoff — PSI-02 complete (await parent mark done)\\n\\n## Subtask\\n\\n- **id:** PSI-02\\n- **title:** 实现定向查询与完整恢复\\n- **status:** implementation complete (member cannot write task.json; parent must mark done)\\n\\n## Summary\\n\\nImplemented `listSessionsForProjectSpace` with directed cwd candidates, fingerprint-aware validation, complete recovery (legacy seed + directed scan + header-only global discovery), keyed single-flight, and 10s hard budget. JSONL remains under `getAgentDir()/sessions/**`. Hot path does **not** call `scanSessionInventory` / `listAllSessions`. Route is **not** switched (PSI-05). Studio batch projection is not fully optimized (PSI-04); child nesting uses existing header pointers only.\\n\\n## Files Changed\\n\\n| Path | Change |\\n| --- | --- |\\n| `lib/project-space-session-list.ts` | **new** directed query + recovery API, counters, encode-cwd helpers, bounded header read, last-good + single-flight, `listSessionsForProjectSpace` |\\n| `scripts/test-project-space-session-index.mjs` | add `--group query` and `--group recovery` fixtures |\\n\\nNote: `lib/project-space-session-lifecycle.ts` already exists from parallel PSI-03 work; this subtask did not own those mutation hooks.\\n\\n## Validation\\n\\n```bash\\nnpm run test:project-space-session-index -- --group query\\n# 7 passed, 0 failed\\n\\nnpm run test:project-space-session-index -- --group recovery\\n# 8 passed, 0 failed\\n\\nnpm run test:project-space-session-index -- --group store\\n# 15 passed, 0 failed (regression)\\n\\nnpx eslint lib/project-space-session-list.ts --max-warnings=0\\n# clean\\n\\nnode_modules/.bin/tsc --noEmit\\n# EXIT 0\\n```\\n\\nAcceptance covered:\\n\\n- Hot complete index: `inventoryGlobalCalls=0`, no header-only discovery\\n- Fingerprint reuse: unchanged files → `metadataScans=0`; single changed file → `metadataScans=1`\\n- Directed discovery of same-cwd external files; legacy only with `includeLegacy`\\n- Missing/corrupt/partial → full recovery, no silent empty/partial success\\n- Header-only discovery finds cross-cwd explicit project/space links\\n- Concurrent recovery single-flight (`recoveryRuns` total 1)\\n- No last-good + timeout → `503 session_index_rebuilding`\\n- With last-good + timeout → revalidated last-good (`usedLastGood=true`)\\n- Rejected flight can be retried after clear\\n\\n## Explicitly NOT done (later subtasks)\\n\\n- PSI-03 lifecycle write-through completeness (partially present in tree from parallel work)\\n- PSI-04 Studio batch projection / task fingerprint cache\\n- PSI-05 route feature-flag switch + response snapshot TTL\\n- PSI-06 benchmarks\\n- PSI-07 docs\\n\\n## Risks / notes for checker & main session\\n\\n1. Encoded-cwd helper mirrors SDK `getDefaultSessionDirPath` locally (`--${resolved with /,: → -}--`). Drift risk if SDK encoding changes.\\n2. Header-only discovery enumerates all active JSONL names and reads first line only — not `scanSessionInventory` body streaming, but cold recovery still O(global files) by design.\\n3. Registry is dynamically imported only when `options.space` is omitted (strip-loader / focused tests inject space).\\n4. `studioChildDisplay` is not populated yet (PSI-04/05); API shape fields exist with `undefined` display.\\n5. Background 5min reconcile is fire-and-forget single-flight; no progress UI (by design).\\n6. Member cannot mark `task.json` done — **parent must** claim/update PSI-02 done with the evidence above.\\n\\n## Decisions needed from main session\\n\\n1. Mark PSI-02 done with validation evidence.\\n2. Continue PSI-03 (if not already complete in parallel) and/or PSI-04 after both G2 subtasks.\\n3. No product decisions blocked.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T03:53:30.996Z",
+            "toolCallId": "call-2ea95944-2abb-4097-8db7-789774d1d5bb-57|fc_f628422c-9fbb-9cd7-9a46-de926f1c1f08_0",
+            "toolName": "write",
+            "text": "Successfully wrote 3524 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff-psi-02.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T03:53:36.888Z",
+            "text": "### Implementation Complete (PSI-02)\n\n#### Files Changed\n\n- `lib/project-space-session-list.ts` — directed space query + recovery: `listSessionsForProjectSpace`, encode-cwd dirs, bounded header, fingerprint reuse, legacy seed, header-only discovery, single-flight, 10s budget / last-good / 503\n- `scripts/test-project-space-session-index.mjs` — `--group query` + `--group recovery`\n- `handoff-psi-02.md` — full handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group query` | **7 passed** |\n| `npm run test:project-space-session-index -- --group recovery` | **8 passed** |\n| `npm run test:project-space-session-index -- --group store` | **15 passed** (regression) |\n| `eslint lib/project-space-session-list.ts` | clean |\n| `tsc --noEmit` | EXIT 0 |\n\n#### Notes / Risks\n\n- Hot path: `inventoryGlobalCalls=0`; no global body inventory\n- Missing/corrupt/partial: recover fully; no last-good + timeout → `503 session_index_rebuilding` (no partial 200)\n- **Not done:** route switch (PSI-05), Studio batch display (PSI-04), docs/bench\n- Parent must mark PSI-02 done (member cannot write `task.json`)",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T03:53:36.889Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1673,
+        "tokens": 334,
+        "tokenSource": "usage",
+        "tps": 0.51,
+        "firstTokenAt": "2026-07-24T03:42:46.282Z",
+        "lastTokenAt": "2026-07-24T03:53:36.833Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-c02b5445198e8c1d87f35505",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/implementer-c02b5445198e8c1d87f35505.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T03:42:43.122Z",
+        "finishedAt": "2026-07-24T03:53:36.895Z",
+        "updatedAt": "2026-07-24T03:53:36.895Z",
+        "itemCount": 126,
+        "messageCount": 6,
+        "toolCallCount": 58,
+        "stderrBytes": 0,
+        "bytes": 293189,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f9237-dfc3-7970-900b-f1e74abeeb03",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-42-43-139Z_019f9237-dfc3-7970-900b-f1e74abeeb03.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-5584c69a39a83604158a2b37",
+      "subtaskId": "PSI-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T03:53:49.205Z",
+      "finishedAt": "2026-07-24T04:02:49.965Z",
+      "runner": "sdk",
+      "childSessionId": "019f9242-09ac-7760-af43-61cb28c10ca5",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-53-49-228Z_019f9242-09ac-7760-af43-61cb28c10ca5.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f9242-09ac-7760-af43-61cb28c10ca5",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — PSI-04\n\n#### Files Changed\n\n- `lib/studio-child-display-projection.ts` — **new** batch/single Studio display projection; `(cwdPathKey + taskId)` task detail cache with `task.json` mtime/size fingerprint, 30s TTL, LRU 256; per-child run/subtask derivation; invalidate API; counters\n- `lib/session-reader.ts` — re-export `projectStudioChildDisplay`; clear display caches from `invalidateSessionListSnapshots`\n- `lib/project-space-session-list.ts` — after parent-visible filter, `attachStudioChildDisplays`; diagnostics: `studioProjectionCalls` / `uniqueLinkedTasks` / `studioListTasksCalls`\n- `scripts/test-project-space-session-index.mjs` — `--group studio` (5 tests)\n- `.ypi/tasks/.../handoff-psi-04.md` — handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group studio` | **5 passed** |\n| `npm run test:project-space-session-index -- --group query` | **7 passed** (regression) |\n| `npm run test:session-title` | **passed** |\n| `npm run test:studio-child-sessions` | **passed** |\n| `npx eslint … --max-warnings=0` | **clean** |\n| `node_modules/.bin/tsc --noEmit` | **EXIT 0** |\n\nAcceptance: 100 children / 1 task → `studioProjectionCalls=1`; space list only parent-visible children; missing task → header-only, list OK; display not written into index; different cwd same taskId → separate keys.\n\n#### Notes / Risks\n\n1. Residual global `listAllSessions(...includeStudioChildDisplay)` still calls projection per child, but shared task cache already collapses same-task N+1; **route switch remains PSI-05**.\n2. Single-child TTL 1s→30s + fingerprint; mutations via `invalidateSessionListSnapshots` clear caches.\n3. **Parent must mark PSI-04 done** (member cannot write `task.json`). Next: **PSI-05**.",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T03:53:49.205Z",
+        "updatedAt": "2026-07-24T04:02:49.965Z",
+        "eventCount": 2081,
+        "lastTextPreview": "### Implementation Complete — PSI-04\n\n#### Files Changed\n\n- `lib/studio-child-display-projection.ts` — **new** batch/single Studio display projection; `(cwdPathKey + taskId)` task detail cache with `task.json` mtime/size fingerprint, 30s TTL, LRU 256; per-child run/subtask derivation; invalidate API; counters\n- `lib/session-reader.ts` — re-export `projectStudioChildDisplay`; clear display caches from `invalidateSessionListSnapshots`\n- `lib/project-space-session-list.ts` — after parent-visible filter, `attachStudioChildDisplays`; diagnostics: `studioProjectionCalls` / `uniqueLinkedTasks` / `studioListTasksCalls`\n- `scripts/test-project-space-session-index.mjs` — `--group studio` (5 tests)\n- `.ypi/tasks/.../handoff-psi-04.md` — handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group studio` | **5 passed** |\n| `npm run test:project-space-session-index -- --group query` | **7 passed** (regression) |\n| `npm run test:session-title` | **passed** |\n| `npm run test:studio-child-sessions` | **passed** |\n| `npx eslint … --max-warnings=0` | **clean** |\n| `node_modules/.bin/tsc --noEmit` | **EXIT 0** |\n\nAcceptance: 100 children / 1 task → `studioProjectionCalls=1`; space list only parent-visible children; missing task → header-only, list OK; display not written into index; different cwd same taskId → separate keys.\n\n#### Notes / Risks\n\n1. Residual global `listAllSessions(...includeStudioChildDisplay)` still calls projection per child, but shared task cache already collapses same-task N+1; **route switch remains PSI-05**.\n2. Single-child TTL 1s→30s + fingerprint; mutations via `invalidateSessionListSnapshots` clear caches.\n3. **Parent must mark PSI-04 done** (member cannot write `task.json`). Next: **PSI-05**.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T04:02:38.904Z",
+            "toolCallId": "call-66946bbf-63cf-495f-8856-3447645b4db3-70|fc_9b068ba4-15ac-9911-802a-0c6db7b8b582_1",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff-psi-04.md\",\n  \"content\": \"# handoff — PSI-04 complete (await parent mark done)\\n\\n## Subtask\\n\\n- **id:** PSI-04\\n- **title:** 实现筛选后的 Studio 批量投影\\n- **status:** implementation complete (member cannot write task.json; parent must mark done)\\n\\n## Summary\\n\\nImplemented filtered Studio child display batch projection for the project-space session list path.\\n\\n- Parent-visible children are selected first (`toApiShape` root-id gate).\\n- Display is projected only for those children via `projectStudioChildDisplaysBatch` / `attachStudioChildDisplays`.\\n- Task detail is loaded once per unique `(cwdPathKey + taskId)` with task.json `mtimeMs:size` fingerprint cache (TTL 30s, LRU 256).\\n- Run/subtask-specific fields are derived per child so same-task different runs do not cross-contaminate.\\n- `listYpiStudioTasks(scope:all)` fallback is memoized per cwd (at most once per batch / TTL window).\\n- Display is **not** persisted into the space index; only allowlisted `studioChild` pointers remain.\\n- Task I/O failures degrade to header-only `{ subtaskId }` and never fail the session list.\\n- Existing `projectStudioChildDisplay` callers keep working via re-export; single-child path now also uses the shared task cache (TTL raised from 1s to 30s with fingerprint invalidation).\\n\\n## Files Changed\\n\\n| Path | Change |\\n| --- | --- |\\n| `lib/studio-child-display-projection.ts` | **new** batch + single projection, fingerprint cache, invalidate API, counters |\\n| `lib/session-reader.ts` | re-export `projectStudioChildDisplay`; invalidate display cache from `invalidateSessionListSnapshots` |\\n| `lib/project-space-session-list.ts` | after parent-visible filter, batch-attach displays; content-safe counters/diagnostics |\\n| `scripts/test-project-space-session-index.mjs` | implement `--group studio` (5 tests) |\\n\\n## Validation\\n\\n```bash\\nnpm run test:project-space-session-index -- --group studio\\n# 5 passed, 0 failed\\n\\nnpm run test:project-space-session-index -- --group query\\n# 7 passed, 0 failed (regression)\\n\\nnpm run test:session-title\\n# session-title tests passed\\n\\nnpm run test:studio-child-sessions\\n# all passed\\n\\nnpx eslint lib/studio-child-display-projection.ts lib/session-reader.ts lib/project-space-session-list.ts --max-warnings=0\\n# clean\\n\\nnode_modules/.bin/tsc --noEmit\\n# EXIT 0\\n```\\n\\nAcceptance covered:\\n\\n- 100 children / 1 task → `studioProjectionCalls=1`, run A/B titles & summaries isolated\\n- space list projects only parent-visible children; orphan / missing-parent children excluded\\n- `studioProjectionCalls <= uniqueLinkedTasks`\\n- missing task → header-only display; list still succeeds\\n- index entry has pointer only (`studioChildDisplay` not persisted)\\n- different cwd + same taskId → separate cache keys / two loads\\n\\n## Explicitly NOT done (later subtasks)\\n\\n- PSI-05 route feature-flag switch + 5s response snapshot / 503 mapping\\n- PSI-06 300/180 benchmark + settings/models concurrency\\n- PSI-07 docs\\n\\n## Risks / notes for checker & main session\\n\\n1. `listAllSessions(... includeStudioChildDisplay)` still projects per child call-site, but each call now hits the shared task-detail cache, so same-task N+1 is already mitigated for residual global paths; space route switch remains PSI-05.\\n2. Single-child display TTL moved 1s → 30s with fingerprint; mutations that call `invalidateSessionListSnapshots` clear the new caches. External task.json edits rely on fingerprint, not TTL alone.\\n3. Archive task keys are not fingerprint-statted under `.ypi/tasks/<id>/task.json`; missing stat uses fingerprint `absent` and still loads via `getYpiStudioTaskDetail` (including archive key forms when provided).\\n4. Member cannot mark `task.json` done — **parent must** update PSI-04 status with the evidence above.\\n\\n## Decisions needed from main session\\n\\n1. Mark PSI-04 done with validation evidence.\\n2. Claim/select **PSI-05** (route integration) next.\\n3. No product decisions blocked.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T04:02:38.948Z",
+            "toolCallId": "call-66946bbf-63cf-495f-8856-3447645b4db3-70|fc_9b068ba4-15ac-9911-802a-0c6db7b8b582_1",
+            "toolName": "write",
+            "text": "Successfully wrote 3839 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff-psi-04.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T04:02:41.475Z",
+            "toolCallId": "call-66946bbf-63cf-495f-8856-3447645b4db3-69|fc_9b068ba4-15ac-9911-802a-0c6db7b8b582_0",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T04:02:49.955Z",
+            "text": "### Implementation Complete — PSI-04\n\n#### Files Changed\n\n- `lib/studio-child-display-projection.ts` — **new** batch/single Studio display projection; `(cwdPathKey + taskId)` task detail cache with `task.json` mtime/size fingerprint, 30s TTL, LRU 256; per-child run/subtask derivation; invalidate API; counters\n- `lib/session-reader.ts` — re-export `projectStudioChildDisplay`; clear display caches from `invalidateSessionListSnapshots`\n- `lib/project-space-session-list.ts` — after parent-visible filter, `attachStudioChildDisplays`; diagnostics: `studioProjectionCalls` / `uniqueLinkedTasks` / `studioListTasksCalls`\n- `scripts/test-project-space-session-index.mjs` — `--group studio` (5 tests)\n- `.ypi/tasks/.../handoff-psi-04.md` — handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group studio` | **5 passed** |\n| `npm run test:project-space-session-index -- --group query` | **7 passed** (regression) |\n| `npm run test:session-title` | **passed** |\n| `npm run test:studio-child-sessions` | **passed** |\n| `npx eslint … --max-warnings=0` | **clean** |\n| `node_modules/.bin/tsc --noEmit` | **EXIT 0** |\n\nAcceptance: 100 children / 1 task → `studioProjectionCalls=1`; space list only parent-visible children; missing task → header-only, list OK; display not written into index; different cwd same taskId → separate keys.\n\n#### Notes / Risks\n\n1. Residual global `listAllSessions(...includeStudioChildDisplay)` still calls projection per child, but shared task cache already collapses same-task N+1; **route switch remains PSI-05**.\n2. Single-child TTL 1s→30s + fingerprint; mutations via `invalidateSessionListSnapshots` clear caches.\n3. **Parent must mark PSI-04 done** (member cannot write `task.json`). Next: **PSI-05**.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T04:02:49.962Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2158,
+        "tokens": 535,
+        "tokenSource": "usage",
+        "tps": 1,
+        "firstTokenAt": "2026-07-24T03:53:52.573Z",
+        "lastTokenAt": "2026-07-24T04:02:49.936Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-5584c69a39a83604158a2b37",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/implementer-5584c69a39a83604158a2b37.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T03:53:49.205Z",
+        "finishedAt": "2026-07-24T04:02:49.962Z",
+        "updatedAt": "2026-07-24T04:02:49.962Z",
+        "itemCount": 150,
+        "messageCount": 4,
+        "toolCallCount": 71,
+        "stderrBytes": 0,
+        "bytes": 246942,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f9242-09ac-7760-af43-61cb28c10ca5",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T03-53-49-228Z_019f9242-09ac-7760-af43-61cb28c10ca5.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-134bb6c85f0aea9fe15e5d84",
+      "subtaskId": "PSI-05",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T04:03:04.828Z",
+      "finishedAt": "2026-07-24T04:08:40.012Z",
+      "runner": "sdk",
+      "childSessionId": "019f924a-840c-7fa3-8914-164fe70c2d6b",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T04-03-04-844Z_019f924a-840c-7fa3-8914-164fe70c2d6b.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f924a-840c-7fa3-8914-164fe70c2d6b",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete (PSI-05)\n\n#### Files Changed\n\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — 热路径改用 `listSessionsForProjectSpace`；成功 body 仍为 `sessions` / `legacyUnassigned` / `studioChildrenByParentSessionId`；503 `session_index_rebuilding` + `Retry-After` + `Cache-Control: no-store`；`forceValidate=1`；`PI_WEB_PROJECT_SPACE_SESSION_LIST` 回滚到 `listAllSessions`\n- `lib/project-space-session-list.ts` — 5s 有界 response snapshot（容量 32）、`forceValidate` 绕过、mutation 可 `invalidateProjectSpaceSessionListSnapshots`、feature flag helper、recovery stage timing\n- `lib/project-space-session-lifecycle.ts` — 注释对齐：mutation 清 shared snapshot map\n- `lib/session-list-timing.ts` — 增加 `listSpace` / `listAll` / `indexRead` / `validate` / `recovery` stages\n- `scripts/test-project-space-session-index.mjs` — `--group route` 实装（flag / snapshot / 源码契约 / timing / 503）\n\n#### Verification\n\n- `npm run test:project-space-session-index -- --group route` — **5 passed**\n- `npm run test:project-space-session-index -- --group query|recovery|studio|lifecycle` — all passed\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n- `eslint` on touched files — clean\n\n#### Notes / Risks\n\n- 回滚：`PI_WEB_PROJECT_SPACE_SESSION_LIST=0|false|off|legacy` → 旧 `listAllSessions` 路径；`listAllSessions` 未删除\n- Snapshot TTL 5s；`forceValidate=1` 与 lifecycle `invalidateProjectSpaceSessionListCaches()` 会立刻失效\n- **未**改 `SessionSidebar` UI；**未**做 PSI-06 300/180 bench\n- 浏览器 main/worktree smoke 仍建议人工点一次 Network 确认 body 等价\n\n#### Decisions needed from main session\n\n1. Mark **PSI-05 done** with evidence above  \n2. Claim **PSI-06** next（bench + full checks）",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T04:03:04.828Z",
+        "updatedAt": "2026-07-24T04:08:40.012Z",
+        "eventCount": 1415,
+        "lastTextPreview": "### Implementation Complete (PSI-05)\n\n#### Files Changed\n\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — 热路径改用 `listSessionsForProjectSpace`；成功 body 仍为 `sessions` / `legacyUnassigned` / `studioChildrenByParentSessionId`；503 `session_index_rebuilding` + `Retry-After` + `Cache-Control: no-store`；`forceValidate=1`；`PI_WEB_PROJECT_SPACE_SESSION_LIST` 回滚到 `listAllSessions`\n- `lib/project-space-session-list.ts` — 5s 有界 response snapshot（容量 32）、`forceValidate` 绕过、mutation 可 `invalidateProjectSpaceSessionListSnapshots`、feature flag helper、recovery stage timing\n- `lib/project-space-session-lifecycle.ts` — 注释对齐：mutation 清 shared snapshot map\n- `lib/session-list-timing.ts` — 增加 `listSpace` / `listAll` / `indexRead` / `validate` / `recovery` stages\n- `scripts/test-project-space-session-index.mjs` — `--group route` 实装（flag / snapshot / 源码契约 / timing / 503）\n\n#### Verification\n\n- `npm run test:project-space-session-index -- --group route` — **5 passed**\n- `npm run test:project-space-session-index -- --group query|recovery|studio|lifecycle` — all passed\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n- `eslint` on touched files — clean\n\n#### Notes / Risks\n\n- 回滚：`PI_WEB_PROJECT_SPACE_SESSION_LIST=0|false|off|legacy` → 旧 `listAllSessions` 路径；`listAllSessions` 未删除\n- Snapshot TTL 5s；`forceValidate=1` 与 lifecycle `invalidateProjectSpaceSessionListCaches()` 会立刻失效\n- **未**改 `SessionSidebar` UI；**未**做 PSI-06 300/180 bench\n- 浏览器 main/worktree smoke 仍建议人工点一次 Network 确认 body 等价\n\n#### Decisions needed from main session\n\n1. Mark **PSI-05 done** with evidence above  \n2. Claim **PSI-06** next（bench + full checks）",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T04:08:12.573Z",
+            "toolCallId": "call-06734f02-999f-446c-a9b7-e51811ff22a5-34|fc_787976e0-be83-9210-a12b-365b51c3bd71_0",
+            "toolName": "bash",
+            "text": "EXIT:0\n\n> @alan-zhao/yolk-pi-web@0.7.26 test:project-space-session-index\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-project-space-session-index.mjs --group query\n\n(node:2796) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n[query] directed candidates / fingerprint reuse / legacy\n\n  ✓ encodeSessionCwdDirName mirrors SDK layout\n  ✓ hot path lists linked sessions without global inventory\n  ✓ unchanged fingerprint reuses summary (no metadata rescan)\n  ✓ mtime/size change rescans only that file\n  ✓ same-cwd external file is discovered by directed dir; legacy only with includeLegacy\n  ✓ stale missing file is dropped from hot path result\n  ✓ studio child with visible parent is nested; orphan child excluded from roots\n\n7 passed, 0 failed (group=query)\n\n> @alan-zhao/yolk-pi-web@0.7.26 test:project-space-session-index\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-project-space-session-index.mjs --group recovery\n\n(node:3046) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n[recovery] missing/corrupt/partial + single-flight + budget\n\n  ✓ missing index recovers via directed + header-only discovery\n  ✓ corrupt index triggers recovery and does not return empty partial 200\n  ✓ partial coverage index is not used as complete; recovers fully\n  ✓ legacy global seed is validated and merged during recovery\n  ✓ concurrent recovery shares single-flight\n  ✓ recovery timeout without last-good throws session_index_rebuilding (no partial 200)\n  ✓ timeout with last-good returns revalidated last-good, not unchecked partial\n  ✓ rejected recovery can be retried after flight clears\n\n8 passed, 0 failed (group=recovery)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T04:08:20.245Z",
+            "toolCallId": "call-df9b47d5-d03d-40ad-b516-3293a2a01aa0-35|fc_47bcb143-2126-9b37-9b5c-df393caa945f_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npx eslint app/api/projects/\\\\[projectId\\\\]/spaces/\\\\[spaceId\\\\]/sessions/route.ts lib/project-space-session-list.ts lib/project-space-session-lifecycle.ts lib/session-list-timing.ts --max-warnings=0; echo ESLINT:$?; npm run test:project-space-session-index -- --group studio 2>&1 | tail -30; npm run test:project-space-session-index -- --group lifecycle 2>&1 | tail -30\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T04:08:25.418Z",
+            "toolCallId": "call-df9b47d5-d03d-40ad-b516-3293a2a01aa0-35|fc_47bcb143-2126-9b37-9b5c-df393caa945f_0",
+            "toolName": "bash",
+            "text": "ESLINT:0\n\n> @alan-zhao/yolk-pi-web@0.7.26 test:project-space-session-index\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-project-space-session-index.mjs --group studio\n\n(node:3346) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n[studio] filtered batch projection / unique task bounds\n\n  ✓ batch: 100 children on one task => studioProjectionCalls=1 and run titles do not cross\n  ✓ listSessionsForProjectSpace projects only parent-visible children and bounds task I/O\n  ✓ task lookup failure degrades to header-only display; list does not fail\n  ✓ display is not persisted into space index entries\n  ✓ different cwdPathKey with same taskId do not share task cache key\n\n5 passed, 0 failed (group=studio)\n\n> @alan-zhao/yolk-pi-web@0.7.26 test:project-space-session-index\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-project-space-session-index.mjs --group lifecycle\n\n(node:3429) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n\n[lifecycle] create/fork/relink/archive/unarchive/delete maintenance\n\n  ✓ legacy global upsert is a no-op (no dual-write)\n  ✓ upsert after create writes space-local entry with summary\n  ✓ studio child create stores allowlisted pointer + parent\n  ✓ rename refresh updates name without waiting for TTL\n  ✓ archive remove drops active entry; never stores archive path\n  ✓ unarchive re-upserts from header link\n  ✓ relink moves entry from old space to new space (header first)\n  ✓ delete by header removes entry; missing header only invalidates caches\n  ✓ index write failure does not throw through upsert helper\n\n9 passed, 0 failed (group=lifecycle)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T04:08:39.999Z",
+            "text": "### Implementation Complete (PSI-05)\n\n#### Files Changed\n\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — 热路径改用 `listSessionsForProjectSpace`；成功 body 仍为 `sessions` / `legacyUnassigned` / `studioChildrenByParentSessionId`；503 `session_index_rebuilding` + `Retry-After` + `Cache-Control: no-store`；`forceValidate=1`；`PI_WEB_PROJECT_SPACE_SESSION_LIST` 回滚到 `listAllSessions`\n- `lib/project-space-session-list.ts` — 5s 有界 response snapshot（容量 32）、`forceValidate` 绕过、mutation 可 `invalidateProjectSpaceSessionListSnapshots`、feature flag helper、recovery stage timing\n- `lib/project-space-session-lifecycle.ts` — 注释对齐：mutation 清 shared snapshot map\n- `lib/session-list-timing.ts` — 增加 `listSpace` / `listAll` / `indexRead` / `validate` / `recovery` stages\n- `scripts/test-project-space-session-index.mjs` — `--group route` 实装（flag / snapshot / 源码契约 / timing / 503）\n\n#### Verification\n\n- `npm run test:project-space-session-index -- --group route` — **5 passed**\n- `npm run test:project-space-session-index -- --group query|recovery|studio|lifecycle` — all passed\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n- `eslint` on touched files — clean\n\n#### Notes / Risks\n\n- 回滚：`PI_WEB_PROJECT_SPACE_SESSION_LIST=0|false|off|legacy` → 旧 `listAllSessions` 路径；`listAllSessions` 未删除\n- Snapshot TTL 5s；`forceValidate=1` 与 lifecycle `invalidateProjectSpaceSessionListCaches()` 会立刻失效\n- **未**改 `SessionSidebar` UI；**未**做 PSI-06 300/180 bench\n- 浏览器 main/worktree smoke 仍建议人工点一次 Network 确认 body 等价\n\n#### Decisions needed from main session\n\n1. Mark **PSI-05 done** with evidence above  \n2. Claim **PSI-06** next（bench + full checks）",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T04:08:40.006Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1769,
+        "tokens": 820,
+        "tokenSource": "usage",
+        "tps": 2.75,
+        "firstTokenAt": "2026-07-24T04:03:42.006Z",
+        "lastTokenAt": "2026-07-24T04:08:39.884Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-134bb6c85f0aea9fe15e5d84",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/implementer-134bb6c85f0aea9fe15e5d84.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T04:03:04.828Z",
+        "finishedAt": "2026-07-24T04:08:40.008Z",
+        "updatedAt": "2026-07-24T04:08:40.008Z",
+        "itemCount": 78,
+        "messageCount": 2,
+        "toolCallCount": 36,
+        "stderrBytes": 0,
+        "bytes": 172292,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f924a-840c-7fa3-8914-164fe70c2d6b",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T04-03-04-844Z_019f924a-840c-7fa3-8914-164fe70c2d6b.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-ff058939e66f1a049f5f90c7",
+      "subtaskId": "PSI-06",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T04:08:53.768Z",
+      "finishedAt": "2026-07-24T04:19:04.391Z",
+      "runner": "sdk",
+      "childSessionId": "019f924f-d758-7226-b69e-17a9c7a3e1ef",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T04-08-53-848Z_019f924f-d758-7226-b69e-17a9c7a3e1ef.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f924f-d758-7226-b69e-17a9c7a3e1ef",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — PSI-06\n\n#### Files Changed\n- `scripts/test-project-space-session-index.mjs` — added `--group scale` (~300/180 fixture, missing/corrupt recovery, single-flight, 1/22/100 candidates, I/O bounds)\n- `scripts/bench-project-space-sessions.mjs` — **new** cold/warm P50/P95, candidate sizes, single-flight, related-entry concurrency probe, gates + JSON report\n- `package.json` — `bench:project-space-sessions`\n- `.ypi/tasks/.../handoff-psi-06.md` — validation evidence\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group all` | **54 passed** |\n| `npm run test:session-title` | pass |\n| `npm run test:studio-child-sessions` | pass |\n| `npm run lint` | 0 errors (11 pre-existing warnings) |\n| `tsc --noEmit` | EXIT 0 |\n| `npm run bench:project-space-sessions -- --samples 30` | **all hard gates PASS** |\n\n**Bench (320 sessions / 180 children, target 22 roots + 60 children / 3 tasks):**  \nwarm P50 **40.8ms** / P95 **46.2ms** · cold P95 **73.3ms** · `inventoryGlobalCalls=0` · studio projections **≤ unique tasks** · single-flight recoveryRuns=1 · web-config/models-config added P95 ≈ 0ms\n\n#### Notes / Risks\n- Models baseline is noisy (provider cold-start / anyrouter jiti under harness); concurrent session list does **not** add 10s waits. Residual models cost → optional Phase 2.\n- Docs left for **PSI-07**.\n- Parent must mark PSI-06 done and claim PSI-07 (member cannot write `task.json`).",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T04:08:53.768Z",
+        "updatedAt": "2026-07-24T04:19:04.391Z",
+        "eventCount": 1742,
+        "lastTextPreview": "### Implementation Complete — PSI-06\n\n#### Files Changed\n- `scripts/test-project-space-session-index.mjs` — added `--group scale` (~300/180 fixture, missing/corrupt recovery, single-flight, 1/22/100 candidates, I/O bounds)\n- `scripts/bench-project-space-sessions.mjs` — **new** cold/warm P50/P95, candidate sizes, single-flight, related-entry concurrency probe, gates + JSON report\n- `package.json` — `bench:project-space-sessions`\n- `.ypi/tasks/.../handoff-psi-06.md` — validation evidence\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group all` | **54 passed** |\n| `npm run test:session-title` | pass |\n| `npm run test:studio-child-sessions` | pass |\n| `npm run lint` | 0 errors (11 pre-existing warnings) |\n| `tsc --noEmit` | EXIT 0 |\n| `npm run bench:project-space-sessions -- --samples 30` | **all hard gates PASS** |\n\n**Bench (320 sessions / 180 children, target 22 roots + 60 children / 3 tasks):**  \nwarm P50 **40.8ms** / P95 **46.2ms** · cold P95 **73.3ms** · `inventoryGlobalCalls=0` · studio projections **≤ unique tasks** · single-flight recoveryRuns=1 · web-config/models-config added P95 ≈ 0ms\n\n#### Notes / Risks\n- Models baseline is noisy (provider cold-start / anyrouter jiti under harness); concurrent session list does **not** add 10s waits. Residual models cost → optional Phase 2.\n- Docs left for **PSI-07**.\n- Parent must mark PSI-06 done and claim PSI-07 (member cannot write `task.json`).",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T04:18:34.918Z",
+            "toolCallId": "call-dc1e9316-5364-4677-9d04-49dc83a11d5e-39|fc_1fd5ca53-0bac-93e8-aa77-7c294fa36a63_0",
+            "toolName": "bash",
+            "text": "agentDir fixture root: (opaque temp; not printed)\nsamples=30 warmup=1\nmachine=darwin arm64 node=v26.0.0\ncwd disk note: external/volume timing may vary\nfixture: totalSessions=320 totalChildren=180 targetRoots=22 targetChildren=60 uniqueTasks=3\n\n[cold recovery] missing index → complete rebuild\n  cold: n=30 min=39.1ms p50=47.7ms p95=73.3ms mean=50.7ms max=88.2ms\n  counters: inventoryGlobalCalls=0 recoveryRuns=30 studioProjectionCalls/uniqueTasks sum=90/90\n\n[warm directed] complete index + forceValidate (no snapshot short-circuit)\n  warm: n=30 min=37.2ms p50=40.8ms p95=46.2ms mean=41.2ms max=49.3ms\n  counters: inventoryGlobalCalls=0 headerOnlyDiscoveryFiles=0 metadataScans=0 studioProjectionCalls/uniqueTasks sum=90/90\n\n[candidate sizes] warm P50/P95 for 1 / 22 / 100 roots\n  roots=1: n=15 min=13.1ms p50=17.3ms p95=35.1ms mean=20.4ms max=36.7ms\n  roots=22: n=15 min=38.7ms p50=47.1ms p95=75.5ms mean=52.8ms max=77.5ms\n  roots=100: n=15 min=58.3ms p50=66.5ms p95=99.8ms mean=74.1ms max=127.8ms\n\n[single-flight] 3 concurrent cold recoveries\n  wall=62.9ms recoveryRuns=1 inventoryGlobalCalls=0\n\n[related entries] isolation baseline vs concurrent with warm session list\n[pi-web] failed to load anyrouter provider: Cannot find module '@/lib/anyrouter-config'\nRequire stack:\n- /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/anyrouter-runtime-bridge.ts\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n[pi-web] failed to load anyrouter provider: Cannot access 'ACCOUNT_STORE_DIR' before initialization\n  web-config baseline: n=15 min=0.1ms p50=0.3ms p95=1.6ms mean=0.5ms max=2.3ms\n  web-config concurrent: n=15 min=0.1ms p50=0.2ms p95=1.6ms mean=0.4ms max=2.0ms\n  models-config baseline: n=15 min=0.0ms p50=0.0ms p95=0.2ms mean=0.1ms max=0.3ms\n  models-config concurrent: n=15 min=0.0ms p50=0.1ms p95=0.3ms mean=0.1ms max=0.5ms\n  models baseline: n=15 min=53.5ms p50=124.9ms p95=1059.7ms mean=315.3ms max=2901.9ms\n  models concurrent: n=15 min=72.3ms p50=127.3ms p95=442.0ms mean=198.3ms max=475.1ms\n  session concurrent: n=15 min=63.3ms p50=107.1ms p95=244.9ms mean=133.6ms max=260.0ms\n  added p95 web-config=0.0ms models-config=0.1ms models=-617.7ms\n\n=== gates ===\n  PASS  warm P50 ≤ 500ms  (p50=40.8ms)\n  PASS  warm P95 ≤ 1.5s  (p95=46.2ms)\n  PASS  cold P95 ≤ 5s  (p95=73.3ms)\n  PASS  cold max < 10s hard budget  (max=88.2ms)\n  PASS  warm inventoryGlobalCalls=0  (sum=0)\n  PASS  cold inventoryGlobalCalls=0  (sum=0)\n  PASS  studioProjectionCalls ≤ uniqueLinkedTasks (warm sum)  (90≤90)\n  PASS  concurrent recovery single-flight  (recoveryRuns=1 inventory=0)\n  PASS  related entries no 10s-class added wait (web-config/models-config)  (addedP95 web=0.0ms models-config=0.1ms)\n  PASS  related models no 10s-class added wait  (addedP95 models=-617.7ms)\n  PASS  related added P95 ≤ 500ms (stretch; provider cold-start may dominate models)  (addedP95 web=0.0ms models-config=0.1ms models=-617.7ms)\n\nwrote JSON report: /tmp/psi06-bench.json\n\nAll gates passed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T04:18:56.073Z",
+            "toolCallId": "call-e0fe197f-dc1f-4897-8275-59da4cb72b62-40|fc_8407570c-98d6-9b93-b48c-9788ede2db9d_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff-psi-06.md\",\n  \"content\": \"# handoff — PSI-06 complete (await parent mark done)\\n\\n## Subtask\\n\\n- **id:** PSI-06\\n- **title:** 完成正确性、安全与性能基准\\n- **status:** implementation complete (member cannot write task.json; parent must mark done)\\n\\n## Summary\\n\\nAdded scale correctness fixtures (~300 sessions / ~180 Studio children) and a fixed-sample performance benchmark with hard gates. Ran lint/tsc/focused tests/bench. All hard gates passed on this machine; related-entry stretch target also passed (models baseline is noisy due to provider cold-start / anyrouter jiti warnings — not session inventory contention).\\n\\n## Files Changed\\n\\n| Path | Change |\\n| --- | --- |\\n| `scripts/test-project-space-session-index.mjs` | new `--group scale` (~300/180 fixture, missing/corrupt recovery, single-flight, 1/22/100 candidates, inventoryGlobalCalls=0, studioProjectionCalls≤unique tasks) |\\n| `scripts/bench-project-space-sessions.mjs` | **new** cold/warm P50/P95, candidate sizes, single-flight, web-config/models-config/models related concurrency probe, JSON report, hard+stretch gates |\\n| `package.json` | add `bench:project-space-sessions` script |\\n\\n## Validation\\n\\n```bash\\nnpm run test:project-space-session-index -- --group all\\n# 54 passed, 0 failed\\n\\nnpm run test:session-title\\n# passed\\n\\nnpm run test:studio-child-sessions\\n# all passed\\n\\nnpm run lint\\n# 0 errors (11 pre-existing warnings unrelated)\\n\\nnode_modules/.bin/tsc --noEmit\\n# EXIT 0\\n\\nnpm run bench:project-space-sessions -- --samples 30 --warmup 1 --json /tmp/psi06-bench.json\\n# All gates passed.\\n```\\n\\n### Benchmark evidence (darwin arm64, node v26, samples=30)\\n\\nFixture: `totalSessions=320`, `totalChildren=180`, `targetRoots=22`, `targetChildren=60`, `uniqueTasks=3`\\n\\n| Metric | Result | Gate |\\n| --- | --- | --- |\\n| warm P50 | **40.8ms** | ≤ 500ms PASS |\\n| warm P95 | **46.2ms** | ≤ 1.5s PASS |\\n| cold P95 | **73.3ms** | ≤ 5s PASS |\\n| cold max | **88.2ms** | < 10s PASS |\\n| inventoryGlobalCalls (warm/cold) | **0** | =0 PASS |\\n| studioProjectionCalls ≤ uniqueLinkedTasks | **90≤90** | PASS |\\n| concurrent recovery single-flight | **recoveryRuns=1** | PASS |\\n| web-config added P95 | **0.0ms** | no 10s-class / ≤500ms PASS |\\n| models-config added P95 | **0.1ms** | PASS |\\n| models added P95 | **−617.7ms** (baseline colder than concurrent) | no 10s-class PASS; stretch PASS |\\n\\nCandidate sizes warm P95: roots=1 → 35.1ms; 22 → 75.5ms; 100 → 99.8ms.\\n\\nModels probe notes: jiti-loaded `createWebAgentSessionServices`; anyrouter provider fails to load under bench harness (`@/lib/anyrouter-config` / ACCOUNT_STORE_DIR). Models isolation baseline shows independent cold-start noise (max ~2.9s on first samples). Session list concurrency does **not** add 10s waits; residual models latency is provider/runtime Phase 2 territory, not inventory scan.\\n\\n## Explicitly NOT done (PSI-07)\\n\\n- Architecture / API / library / troubleshooting docs\\n- AGENTS.md navigation updates\\n- Final checker cross-file review\\n\\n## Risks / notes for checker & main session\\n\\n1. Absolute timings measured on local external volume; absolute numbers may vary, but gates cleared with large margin on this host.\\n2. Models related probe uses jiti (Node strip-only cannot load parameter properties). Production Next path is unaffected.\\n3. Scale tests clear `agentDir/sessions` between fixtures to avoid cross-case pollution in shared `PI_CODING_AGENT_DIR`.\\n4. Member cannot mutate Studio `task.json` — **parent must** mark PSI-06 done and claim PSI-07.\\n\\n## Decisions needed from main session\\n\\n1. Mark PSI-06 done with the validation evidence above.\\n2. Claim/select **PSI-07** (docs only).\\n3. Optional: open Phase 2 if product wants `/api/models` provider cold-start isolation (outside this task).\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T04:18:56.106Z",
+            "toolCallId": "call-e0fe197f-dc1f-4897-8275-59da4cb72b62-40|fc_8407570c-98d6-9b93-b48c-9788ede2db9d_0",
+            "toolName": "write",
+            "text": "Successfully wrote 3669 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff-psi-06.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T04:19:04.381Z",
+            "text": "### Implementation Complete — PSI-06\n\n#### Files Changed\n- `scripts/test-project-space-session-index.mjs` — added `--group scale` (~300/180 fixture, missing/corrupt recovery, single-flight, 1/22/100 candidates, I/O bounds)\n- `scripts/bench-project-space-sessions.mjs` — **new** cold/warm P50/P95, candidate sizes, single-flight, related-entry concurrency probe, gates + JSON report\n- `package.json` — `bench:project-space-sessions`\n- `.ypi/tasks/.../handoff-psi-06.md` — validation evidence\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group all` | **54 passed** |\n| `npm run test:session-title` | pass |\n| `npm run test:studio-child-sessions` | pass |\n| `npm run lint` | 0 errors (11 pre-existing warnings) |\n| `tsc --noEmit` | EXIT 0 |\n| `npm run bench:project-space-sessions -- --samples 30` | **all hard gates PASS** |\n\n**Bench (320 sessions / 180 children, target 22 roots + 60 children / 3 tasks):**  \nwarm P50 **40.8ms** / P95 **46.2ms** · cold P95 **73.3ms** · `inventoryGlobalCalls=0` · studio projections **≤ unique tasks** · single-flight recoveryRuns=1 · web-config/models-config added P95 ≈ 0ms\n\n#### Notes / Risks\n- Models baseline is noisy (provider cold-start / anyrouter jiti under harness); concurrent session list does **not** add 10s waits. Residual models cost → optional Phase 2.\n- Docs left for **PSI-07**.\n- Parent must mark PSI-06 done and claim PSI-07 (member cannot write `task.json`).",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T04:19:04.386Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2283,
+        "tokens": 448,
+        "tokenSource": "usage",
+        "tps": 0.75,
+        "firstTokenAt": "2026-07-24T04:09:04.009Z",
+        "lastTokenAt": "2026-07-24T04:19:04.265Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-ff058939e66f1a049f5f90c7",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/implementer-ff058939e66f1a049f5f90c7.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T04:08:53.768Z",
+        "finishedAt": "2026-07-24T04:19:04.387Z",
+        "updatedAt": "2026-07-24T04:19:04.387Z",
+        "itemCount": 95,
+        "messageCount": 9,
+        "toolCallCount": 41,
+        "stderrBytes": 0,
+        "bytes": 242934,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f924f-d758-7226-b69e-17a9c7a3e1ef",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T04-08-53-848Z_019f924f-d758-7226-b69e-17a9c7a3e1ef.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-4617f23802254a427745c80f",
+      "subtaskId": "PSI-07",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T04:19:17.238Z",
+      "finishedAt": "2026-07-24T04:23:23.371Z",
+      "runner": "sdk",
+      "childSessionId": "019f9259-5a9b-7537-8357-4539c412a73c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T04-19-17-275Z_019f9259-5a9b-7537-8357-4539c412a73c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f9259-5a9b-7537-8357-4539c412a73c",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — space-local index invariants (path, JSONL truth, hot path, recovery/503, lifecycle, legacy migration, gitignore, rollback, timing)\n- `docs/modules/api.md` — directed route contract, inventory table split, 503/flag, pointers\n- `docs/modules/library.md` — new store/list/lifecycle/display/timing modules; dual-boundary performance\n- `docs/modules/frontend.md` — success body + existing error channel for 503 (no UI change)\n- `docs/operations/troubleshooting.md` — rebuild/delete index, gitignore, rollback env, bench commands\n- `AGENTS.md` — minimal module entry + data locations only\n- `.ypi/tasks/.../handoff-psi-07.md` — handoff artifact\n\n#### Verification\n\n- `rg` — obsolete “project-space still uses global `listAllSessions` filter” claims removed; new contracts present\n- `npm run lint` — 0 errors (11 pre-existing warnings)\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n\n#### Notes / Risks\n\n- Chat top-bar `studio-children` still uses global inventory by design\n- Checker still required for final docs/impl consistency\n- Parent must mark PSI-07 done (member cannot write `task.json`)",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T04:19:17.238Z",
+        "updatedAt": "2026-07-24T04:23:23.371Z",
+        "eventCount": 960,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — space-local index invariants (path, JSONL truth, hot path, recovery/503, lifecycle, legacy migration, gitignore, rollback, timing)\n- `docs/modules/api.md` — directed route contract, inventory table split, 503/flag, pointers\n- `docs/modules/library.md` — new store/list/lifecycle/display/timing modules; dual-boundary performance\n- `docs/modules/frontend.md` — success body + existing error channel for 503 (no UI change)\n- `docs/operations/troubleshooting.md` — rebuild/delete index, gitignore, rollback env, bench commands\n- `AGENTS.md` — minimal module entry + data locations only\n- `.ypi/tasks/.../handoff-psi-07.md` — handoff artifact\n\n#### Verification\n\n- `rg` — obsolete “project-space still uses global `listAllSessions` filter” claims removed; new contracts present\n- `npm run lint` — 0 errors (11 pre-existing warnings)\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n\n#### Notes / Risks\n\n- Chat top-bar `studio-children` still uses global inventory by design\n- Checker still required for final docs/impl consistency\n- Parent must mark PSI-07 done (member cannot write `task.json`)",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T04:23:11.863Z",
+            "toolCallId": "call-e0265a55-a9a2-4b15-b839-744aac1c0610-24|fc_88e6ea47-88d4-9ebb-b076-f44d05003c15_1",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff-psi-07.md\",\n  \"content\": \"# handoff — PSI-07 complete (await parent mark done)\\n\\n## Subtask\\n\\n- **id:** PSI-07\\n- **title:** 更新架构与模块文档\\n- **status:** implementation complete (member cannot write task.json; parent must mark done)\\n\\n## Summary\\n\\nDocumented the shipped project-space directed session index (PSI-01…06) without claiming local index is JSONL truth. Removed stale “project-space still uses global `listAllSessions()`” architecture notes. AGENTS kept navigational (module entry + data table only).\\n\\n## Files Changed\\n\\n| Path | Change |\\n| --- | --- |\\n| `docs/architecture/overview.md` | New “Project-space session candidate index” invariants: space-local path, JSONL truth, hot path, recovery/503, lifecycle, legacy global migration, gitignore, env rollback, timing privacy; updated session header / archive / inventory sections |\\n| `docs/modules/api.md` | Project-space route contract (`listSessionsForProjectSpace`, query flags, 503, feature flag); inventory source table split directed vs global; implementation pointers |\\n| `docs/modules/library.md` | New modules: space index/list/lifecycle, studio display batch, timing; legacy global adapter; dual-boundary performance section |\\n| `docs/modules/frontend.md` | Sidebar contract note: same success body; 503 uses existing error channel; no new partial/stale UI |\\n| `docs/operations/troubleshooting.md` | Ops section: paths, rebuild 503, safe index delete/rebuild, gitignore, rollback env, bench commands, Phase 2 models note |\\n| `AGENTS.md` | Module entry for directed list; data table for space-local index + legacy seed |\\n\\n## Validation\\n\\n```bash\\n# stale “still global filter” claims removed from architecture/api performance docs\\nrg -n \\\"project-space listing still calls global|directed per-space inventory / project-session index redesign is out of scope|Best-effort \\\\`~/.pi/agent/pi-web-session-index.json\\\\` maintenance\\\" docs/ AGENTS.md\\n# no hits on those obsolete phrases\\n\\nrg -n \\\"listSessionsForProjectSpace|session_index_rebuilding|PI_WEB_PROJECT_SPACE_SESSION_LIST|\\\\.ypi/sessions/index\\\\.v1\\\\.json\\\" docs/ AGENTS.md\\n# present across overview/api/library/frontend/troubleshooting/AGENTS\\n\\nnpm run lint\\n# 0 errors (11 pre-existing warnings unrelated)\\n\\nnode_modules/.bin/tsc --noEmit\\n# EXIT 0\\n```\\n\\n## Acceptance checklist (docs)\\n\\n- [x] Docs no longer claim project-space hot path is full `listAllSessions()` filter\\n- [x] Local index is candidate/summary only; JSONL under `getAgentDir()/sessions` remains truth\\n- [x] Legacy global sidecar is migration seed / stop-write, not hot authority\\n- [x] Ops can delete/rebuild index and roll back via env without touching JSONL\\n- [x] AGENTS stays navigational; details live under `docs/`\\n\\n## Explicitly NOT done\\n\\n- Production code changes (docs-only subtask)\\n- git commit / push / merge\\n- Checker final cross-file pass (required by implement plan)\\n\\n## Risks / notes for checker & main session\\n\\n1. Chat top-bar `GET /api/sessions/:id/studio-children` still documents global `listAllSessions` — intentional, not the project-space route.\\n2. Absolute bench numbers remain in PSI-06 handoff; docs point at `npm run bench:project-space-sessions` rather than freezing host timings.\\n3. Member cannot mutate Studio `task.json` — **parent must** mark PSI-07 done and close the implementation plan.\\n\\n## Decisions needed from main session\\n\\n1. Mark PSI-07 done with the validation evidence above.\\n2. Dispatch checker for docs/implementation consistency per `checks.md` §11.\\n3. No further product decisions blocked for this task.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T04:23:11.865Z",
+            "toolCallId": "call-e0265a55-a9a2-4b15-b839-744aac1c0610-24|fc_88e6ea47-88d4-9ebb-b076-f44d05003c15_1",
+            "toolName": "write",
+            "text": "Successfully wrote 3488 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/handoff-psi-07.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T04:23:14.301Z",
+            "toolCallId": "call-e0265a55-a9a2-4b15-b839-744aac1c0610-23|fc_88e6ea47-88d4-9ebb-b076-f44d05003c15_0",
+            "toolName": "bash",
+            "text": "EXIT:0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T04:23:23.358Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — space-local index invariants (path, JSONL truth, hot path, recovery/503, lifecycle, legacy migration, gitignore, rollback, timing)\n- `docs/modules/api.md` — directed route contract, inventory table split, 503/flag, pointers\n- `docs/modules/library.md` — new store/list/lifecycle/display/timing modules; dual-boundary performance\n- `docs/modules/frontend.md` — success body + existing error channel for 503 (no UI change)\n- `docs/operations/troubleshooting.md` — rebuild/delete index, gitignore, rollback env, bench commands\n- `AGENTS.md` — minimal module entry + data locations only\n- `.ypi/tasks/.../handoff-psi-07.md` — handoff artifact\n\n#### Verification\n\n- `rg` — obsolete “project-space still uses global `listAllSessions` filter” claims removed; new contracts present\n- `npm run lint` — 0 errors (11 pre-existing warnings)\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n\n#### Notes / Risks\n\n- Chat top-bar `studio-children` still uses global inventory by design\n- Checker still required for final docs/impl consistency\n- Parent must mark PSI-07 done (member cannot write `task.json`)",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T04:23:23.360Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1678,
+        "tokens": 314,
+        "tokenSource": "usage",
+        "tps": 1.3,
+        "firstTokenAt": "2026-07-24T04:19:21.189Z",
+        "lastTokenAt": "2026-07-24T04:23:23.354Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-4617f23802254a427745c80f",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/implementer-4617f23802254a427745c80f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T04:19:17.238Z",
+        "finishedAt": "2026-07-24T04:23:23.360Z",
+        "updatedAt": "2026-07-24T04:23:23.360Z",
+        "itemCount": 59,
+        "messageCount": 5,
+        "toolCallCount": 25,
+        "stderrBytes": 0,
+        "bytes": 234240,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f9259-5a9b-7537-8357-4539c412a73c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T04-19-17-275Z_019f9259-5a9b-7537-8357-4539c412a73c.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-2711904d4732b4496c8e8af3",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T04:23:52.323Z",
+      "finishedAt": "2026-07-24T04:29:05.652Z",
+      "runner": "sdk",
+      "childSessionId": "019f925d-8d5c-7931-b181-ec9f3d0f4307",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T04-23-52-412Z_019f925d-8d5c-7931-b181-ec9f3d0f4307.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "childSessionId": "019f925d-8d5c-7931-b181-ec9f3d0f4307",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- `lib/rpc-manager.ts`：`message_end` / `agent_end` / fork 后改为 `invalidateProjectSpaceSessionListCaches()`，同时清全局 1s 与 project-space 5s snapshot（原先只清全局缓存，热列表可能 5s 内看到旧摘要）。\n\n#### Remaining Findings\n- **None blocking**\n- 非阻塞：跨 space 改绑不主动 upsert 对方 index（当前 space drop + reconcile 仍安全）；未做真实浏览器 smoke；工作区有无关 Links OAuth diff，提交时应拆开；`/api/models` 冷启动属 Phase 2。\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `test:project-space-session-index --group all` | 54/54 pass |\n| `test:session-title` / `test:studio-child-sessions` | pass |\n| `lint` / `tsc --noEmit` | 0 errors / EXIT 0 |\n| `bench:project-space-sessions` (30 samples) | warm P50 **40.5ms**, P95 **57.4ms**; cold P95 **44.3ms**; `inventoryGlobalCalls=0`; studio **90≤90**; related entries 无 10s 级增量 |\n\n#### Verdict\n**Pass** — 方案 B 完整落地（定向 route、space-local index、完整性优先、lifecycle、Studio batch、文档）。\n\n---\n\n### Handoff（主会话）\n\n**Artifacts:** `.ypi/tasks/.../review.md`  \n**Code fix:** `lib/project-space-session-index.ts` 等实现已齐；检查员仅改 `lib/rpc-manager.ts`  \n**未 commit / push / merge**\n\n**主会话决策：**\n1. 将任务标为检查通过并收尾（7/7 + review 已齐）。\n2. 提交时**排除** Links OAuth 无关改动（`github-link-oauth` / deployment Links 文档 / `test-links`）。\n3. 可选：合并前人工 Sidebar smoke；跨 space best-effort upsert 可开 follow-up。",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T04:23:52.323Z",
+        "updatedAt": "2026-07-24T04:29:05.652Z",
+        "eventCount": 1642,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- `lib/rpc-manager.ts`：`message_end` / `agent_end` / fork 后改为 `invalidateProjectSpaceSessionListCaches()`，同时清全局 1s 与 project-space 5s snapshot（原先只清全局缓存，热列表可能 5s 内看到旧摘要）。\n\n#### Remaining Findings\n- **None blocking**\n- 非阻塞：跨 space 改绑不主动 upsert 对方 index（当前 space drop + reconcile 仍安全）；未做真实浏览器 smoke；工作区有无关 Links OAuth diff，提交时应拆开；`/api/models` 冷启动属 Phase 2。\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `test:project-space-session-index --group all` | 54/54 pass |\n| `test:session-title` / `test:studio-child-sessions` | pass |\n| `lint` / `tsc --noEmit` | 0 errors / EXIT 0 |\n| `bench:project-space-sessions` (30 samples) | warm P50 **40.5ms**, P95 **57.4ms**; cold P95 **44.3ms**; `inventoryGlobalCalls=0`; studio **90≤90**; related entries 无 10s 级增量 |\n\n#### Verdict\n**Pass** — 方案 B 完整落地（定向 route、space-local index、完整性优先、lifecycle、Studio batch、文档）。\n\n---\n\n### Handoff（主会话）\n\n**Artifacts:** `.ypi/tasks/.../review.md`  \n**Code fix:** `lib/project-space-session-index.ts` 等实现已齐；检查员仅改 `lib/rpc-manager.ts`  \n**未 commit / push / merge**\n\n**主会话决策：**\n1. 将任务标为检查通过并收尾（7/7 + review 已齐）。\n2. 提交时**排除** Links OAuth 无关改动（`github-link-oauth` / deployment Links 文档 / `test-links`）。\n3. 可选：合并前人工 Sidebar smoke；跨 space best-effort upsert 可开 follow-up。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T04:28:55.941Z",
+            "text": "验证已通过；正在撰写 `review.md` 并给出最终结论。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T04:28:55.942Z",
+            "toolCallId": "call-4bb520d4-1da4-4417-a037-653e71074278-42|fc_c3ff8345-d484-929a-a4a7-daa4859e1b06_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/review.md\",\n  \"content\": \"# review — project/space session 列表性能优化\\n\\n**Task:** `20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型`  \\n**Reviewer:** checker（检查员）  \\n**Verdict:** **Pass**  \\n**Date:** 2026-07-24\\n\\n## Scope reviewed\\n\\n对照 `plan-review.md` / `prd.md` / `design.md` / `implement.md` / `checks.md`、用户批准的方案 B，以及实现员 PSI-01…07 交付物与当前工作区 diff。\\n\\n本任务**不触发 UI HTML 原型门禁**（`ui.md`）：无 Sidebar 结构/字段/loading/stale/partial 变更。\\n\\n## Check Complete\\n\\n### Findings Fixed\\n\\n1. **`message_end` / `agent_end` / fork 后只清全局 1s 缓存，未清 project-space 5s response snapshot**\\n   - 现象：`lib/rpc-manager.ts` 在摘要变化点调用 `invalidateSessionListSnapshots()`，而 space route 的 5s snapshot 挂在 `globalThis.__piProjectSpaceSessionListSnapshots`，仅由 `invalidateProjectSpaceSessionListCaches()` 清理。\\n   - 风险：热路径在 5s TTL 内可能返回旧 `messageCount/firstMessage/name`（stat fingerprint 仅在 snapshot 未命中时兜底）。\\n   - 修复：rpc-manager 改为调用 `invalidateProjectSpaceSessionListCaches()`（同时清全局 + space snapshot），并移除未再使用的 `invalidateSessionListSnapshots` 导入。\\n   - 文件：`lib/rpc-manager.ts`\\n\\n### Remaining Findings\\n\\n#### 阻塞\\n\\nNone.\\n\\n#### 非阻塞 / 残余风险\\n\\n1. **跨 space header 改绑的“对方 index best-effort upsert”未做**\\n   - 设计 §6.1：header 链接到其他 space 时，当前 index 移除 + 对方 best-effort upsert。\\n   - 实现：`validateCandidate` 对 `relinked_elsewhere` 仅 drop；重建后当前 space 的 complete index 不再含该项（正确），但不会主动写对方 index。\\n   - 影响：对方 space 通常仍可由 directed cwd / 低频 full reconcile / 下次 recovery 收敛；不会在当前 space 静默漏项或串 space。\\n   - 建议：可选 follow-up；不阻塞本任务验收。\\n\\n2. **未做真实浏览器 main/worktree 切换 smoke**\\n   - 自动化覆盖 route 契约、lifecycle、scale fixture 与 bench；Sidebar 成功 body 未改。\\n   - 建议：合并前由主会话或人工做一次 Sidebar 切换/新建/fork/rename/archive 轻量 smoke。\\n\\n3. **工作区混入无关 diff（Links GitHub OAuth 默认 Client ID）**\\n   - `lib/github-link-oauth.ts`、`docs/deployment/README.md`、`docs/integrations/README.md`、`scripts/test-links.mjs` 等与本任务无关。\\n   - 不计入本功能失败；提交/PR 时应拆分或排除，避免污染本任务变更集。\\n\\n4. **`/api/models` 仍有 provider/runtime 冷启动噪声**\\n   - bench 已证明 session 列表并发不再带来 10s 级等待；models 隔离波动属 Phase 2（任务范围已声明）。\\n\\n### Verification\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:project-space-session-index -- --group all` | **54 passed, 0 failed** |\\n| `npm run test:session-title` | **passed** |\\n| `npm run test:studio-child-sessions` | **all passed** |\\n| `npm run lint` | **0 errors**（11 既有 warnings，与本任务无关） |\\n| `node_modules/.bin/tsc --noEmit` | **EXIT 0** |\\n| `npm run bench:project-space-sessions -- --samples 30 --warmup 1` | **All hard gates passed** |\\n\\n#### Bench evidence（本机复跑）\\n\\nFixture: `totalSessions=320`, `totalChildren=180`, `targetRoots=22`, `targetChildren=60`, `uniqueTasks=3`  \\nMachine: darwin arm64, node v26.0.0\\n\\n| Metric | Result | Gate |\\n| --- | --- | --- |\\n| warm P50 | 40.5ms | ≤ 500ms PASS |\\n| warm P95 | 57.4ms | ≤ 1.5s PASS |\\n| cold P95 | 44.3ms | ≤ 5s PASS |\\n| cold max | 48.9ms | < 10s PASS |\\n| inventoryGlobalCalls (warm/cold) | 0 | =0 PASS |\\n| studioProjectionCalls ≤ uniqueLinkedTasks | 90≤90 | PASS |\\n| concurrent recovery single-flight | recoveryRuns=1 | PASS |\\n| related web-config / models-config added P95 | ~0ms | no 10s-class PASS |\\n| related models added P95 | 负值（基线更冷） | no 10s-class PASS |\\n\\n### Requirements coverage（checks.md 摘要）\\n\\n| 项 | 结论 |\\n| --- | --- |\\n| R1 space 独立落点 main/worktree 各自 `.ypi/sessions/index.v1.json` | **Pass** — store + tests |\\n| R2 JSONL 真相不变、未迁移/重写 | **Pass** |\\n| R3 热路径定向读取，非全局 inventory | **Pass** — route 默认 `listSessionsForProjectSpace`；`inventoryGlobalCalls=0` |\\n| R4 完整性优先；无 partial 200；503 rebuilding | **Pass** — recovery tests + route mapping |\\n| R5 外部同 cwd 发现；legacy 仅 `includeLegacy=1` | **Pass** |\\n| R6 生命周期 create/fork/child/rename/archive/unarchive/delete/cwd cleanup/relink | **Pass** — hooks + lifecycle tests；message/agent end 已补 space snapshot 失效 |\\n| R7 Studio child 筛选后 batch、unique task 界 | **Pass** |\\n| R8 gitignore 仅 `/.ypi/sessions/` + 目录内 `*` | **Pass** |\\n| R9 single-flight / 锁 / 原子写 / 缓存失效 | **Pass**（含本轮 rpc-manager 修复） |\\n| R10 性能与 content-safe timing | **Pass** |\\n| R11 设置/模型无 10s 级间接阻塞 | **Pass**（models 独立冷启动 → Phase 2） |\\n| R12 旧 sidecar 只读停写 + feature flag 回滚 | **Pass** — `upsertProjectSessionIndexEntry` no-op；`PI_WEB_PROJECT_SPACE_SESSION_LIST` |\\n| UI 门禁 | **Pass** — 无可见结构/状态变更，无需 HTML 原型 |\\n| 文档 PSI-07 | **Pass** — overview/api/library/frontend/troubleshooting/AGENTS 已更新 |\\n\\n### Architecture / safety notes\\n\\n- Index 仅候选/摘要；每个返回项经 active-root containment、regular file、header id/project/space 校验。\\n- `sessionFile` 仅允许 agentDir-relative `sessions/.../*.jsonl`；拒绝 absolute / `..` / URL / archive。\\n- 旧 `pi-web-session-index.json` 只作 migration seed；新 mutation 不再双写。\\n- 回滚：`PI_WEB_PROJECT_SPACE_SESSION_LIST=0|false|off|legacy` → 旧 `listAllSessions()` 过滤路径；JSONL 无迁移。\\n- Chat top-bar `GET /api/sessions/:id/studio-children` 仍可用全局路径 — 与本 route 解耦，文档已区分。\\n\\n## Verdict\\n\\n**Pass**\\n\\n方案 B 已完整落地：space-local index、定向热路径、完整性优先恢复、lifecycle 维护、筛选后 Studio batch projection、测试/基准与文档均满足验收门禁。检查员修复了一处低风险 snapshot 失效遗漏；无阻塞项。主会话可收尾任务（勿将无关 Links OAuth diff 一并混入本功能提交）。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T04:28:55.961Z",
+            "toolCallId": "call-4bb520d4-1da4-4417-a037-653e71074278-42|fc_c3ff8345-d484-929a-a4a7-daa4859e1b06_0",
+            "toolName": "write",
+            "text": "Successfully wrote 4873 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T04:29:05.643Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- `lib/rpc-manager.ts`：`message_end` / `agent_end` / fork 后改为 `invalidateProjectSpaceSessionListCaches()`，同时清全局 1s 与 project-space 5s snapshot（原先只清全局缓存，热列表可能 5s 内看到旧摘要）。\n\n#### Remaining Findings\n- **None blocking**\n- 非阻塞：跨 space 改绑不主动 upsert 对方 index（当前 space drop + reconcile 仍安全）；未做真实浏览器 smoke；工作区有无关 Links OAuth diff，提交时应拆开；`/api/models` 冷启动属 Phase 2。\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `test:project-space-session-index --group all` | 54/54 pass |\n| `test:session-title` / `test:studio-child-sessions` | pass |\n| `lint` / `tsc --noEmit` | 0 errors / EXIT 0 |\n| `bench:project-space-sessions` (30 samples) | warm P50 **40.5ms**, P95 **57.4ms**; cold P95 **44.3ms**; `inventoryGlobalCalls=0`; studio **90≤90**; related entries 无 10s 级增量 |\n\n#### Verdict\n**Pass** — 方案 B 完整落地（定向 route、space-local index、完整性优先、lifecycle、Studio batch、文档）。\n\n---\n\n### Handoff（主会话）\n\n**Artifacts:** `.ypi/tasks/.../review.md`  \n**Code fix:** `lib/project-space-session-index.ts` 等实现已齐；检查员仅改 `lib/rpc-manager.ts`  \n**未 commit / push / merge**\n\n**主会话决策：**\n1. 将任务标为检查通过并收尾（7/7 + review 已齐）。\n2. 提交时**排除** Links OAuth 无关改动（`github-link-oauth` / deployment Links 文档 / `test-links`）。\n3. 可选：合并前人工 Sidebar smoke；跨 space best-effort upsert 可开 follow-up。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T04:29:05.650Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1474,
+        "tokens": 498,
+        "tokenSource": "usage",
+        "tps": 1.77,
+        "firstTokenAt": "2026-07-24T04:24:24.850Z",
+        "lastTokenAt": "2026-07-24T04:29:05.416Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-2711904d4732b4496c8e8af3",
+        "taskId": "20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-090218-_-session-_-_-_-/checker-2711904d4732b4496c8e8af3.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T04:23:52.323Z",
+        "finishedAt": "2026-07-24T04:29:05.650Z",
+        "updatedAt": "2026-07-24T04:29:05.650Z",
+        "itemCount": 95,
+        "messageCount": 5,
+        "toolCallCount": 43,
+        "stderrBytes": 0,
+        "bytes": 248426,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f925d-8d5c-7931-b181-ec9f3d0f4307",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T04-23-52-412Z_019f925d-8d5c-7931-b181-ec9f3d0f4307.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-24T03:22:45.343Z",
+      "contextId": "pi_019f91a3-f496-78cc-87bd-7dd5360264f6",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-24T03:33:37.302Z",
+      "contextId": "pi_019f91a3-f496-78cc-87bd-7dd5360264f6",
+      "inputHash": "6bd27e68f72abeb984a906cb",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-24T04:42:53.127Z",
+    "archiveReason": "Accepted and archived from session widget",
+    "knowledgeEntryId": "20260724-124253-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型",
+    "knowledgePath": ".ypi/knowledge/20260724-124253-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-24T03:22:45.337Z",
+    "sourceArtifact": "implement.md",
+    "summary": "为每个Project Registry space建立自身根目录下的候选索引，project-space列表改用定向校验和安全恢复，并在筛选后批量投影Studio child；不移动JSONL、不改UI。",
+    "strategy": "先建立安全且可恢复的space-local store，再并行完成读路径和mutation维护，之后接入route并用完整性/性能fixture验收。",
+    "maxConcurrency": 2,
+    "scheduler": {
+      "mode": "dag",
+      "strategy": "ready_fifo",
+      "failFast": true,
+      "defaultFailurePolicy": "block_dependents"
+    },
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "G1",
+          "title": "索引基础",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "PSI-01"
+          ]
+        },
+        {
+          "id": "G2",
+          "title": "查询与生命周期",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "PSI-02",
+            "PSI-03"
+          ]
+        },
+        {
+          "id": "G3",
+          "title": "Studio投影",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "PSI-04"
+          ]
+        },
+        {
+          "id": "G4",
+          "title": "接入与验证",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "PSI-05",
+            "PSI-06",
+            "PSI-07"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "PSI-01",
+        "title": "实现space-local index基础设施",
+        "phase": "foundation",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/project-space-session-index.ts",
+          "lib/project-session-index.ts",
+          "lib/project-registry.ts",
+          "lib/project-registry-types.ts",
+          ".gitignore",
+          "scripts/test-project-space-session-index.mjs",
+          "package.json"
+        ],
+        "instructions": [
+          "定义schema-v1及严格有界解析：top-level身份/coverage和entry的agentDir-relative sessionFile、cwdPathKey、fingerprint、摘要、parent及allowlisted studioChild pointer。",
+          "由registry space.path/realPath/pathKey解析<space-root>/.ypi/sessions/index.v1.json；拒绝symlink/越界/身份不匹配。",
+          "实现目录内.gitignore内容*、仓库精确/.ypi/sessions/规则与git check-ignore验证；绝不忽略整个.ypi。",
+          "实现process queue、跨进程mkdir lock、lock-time merge、temp+rename和last-good保留；写失败不得损坏JSONL或旧index。",
+          "保留旧lib/project-session-index.ts读取能力作为migration adapter，不将其作为新热路径。"
+        ],
+        "acceptance": [
+          "main/worktree各自解析到自身根目录且身份隔离",
+          "非法路径、symlink、archive路径、future/malformed schema fail closed",
+          "并发upsert/remove不丢更新，失败保留上个有效文件",
+          "index/tmp/lock被Git忽略而.ypi/tasks仍可跟踪"
+        ],
+        "validation": [
+          "npm run test:project-space-session-index -- --group store",
+          "临时Git仓库运行git status --short --ignored",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "覆盖用户已有.ypi/sessions/.gitignore",
+          "lock stale recovery误抢活进程",
+          "pathKey与display path混用"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 100,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 2
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "PSI-02",
+        "title": "实现定向查询与完整恢复",
+        "phase": "query",
+        "order": 2,
+        "dependsOn": [
+          "PSI-01"
+        ],
+        "dependencies": [
+          "PSI-01"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/project-space-session-list.ts",
+          "lib/project-space-session-index.ts",
+          "lib/session-metadata-scanner.ts",
+          "lib/session-header-metadata.ts",
+          "lib/session-reader.ts",
+          "scripts/test-project-space-session-index.mjs"
+        ],
+        "instructions": [
+          "实现listSessionsForProjectSpace：local entries与registry-known cwd/realPath encoded目录候选合并，只枚举目标space目录。",
+          "每个候选执行active-root containment、regular-file stat、bounded header id/link校验；fingerprint未变复用摘要，变化仅scanSessionMetadata该文件。",
+          "missing/corrupt/partial时合并旧global seed、directed scan和global header-only discovery；只为匹配文件扫描摘要。",
+          "实现keyed single-flight、5s目标/10s硬预算：无last-good超时返回可重试错误，禁止partial 200；有last-good也必须重新校验文件/header。",
+          "complete index超过5min仅触发后台低优先级header reconcile，不把全局扫描放回每次request主路径。"
+        ],
+        "acceptance": [
+          "完整热index不调用scanSessionInventory/listAllSessions",
+          "index缺失、损坏、部分覆盖不会静默漏合法session",
+          "同cwd外部新文件由定向目录发现，legacy只在includeLegacy时返回",
+          "并发恢复只运行一次且rejected promise可重试"
+        ],
+        "validation": [
+          "npm run test:project-space-session-index -- --group query",
+          "npm run test:project-space-session-index -- --group recovery",
+          "受控I/O计数断言只重扫变化文件"
+        ],
+        "risks": [
+          "复制SDK encoded-cwd规则后版本漂移",
+          "header-only discovery仍被错误实现成全文件流扫描",
+          "last-good包含已删除或改绑entry"
+        ],
+        "parallelGroup": "G2",
+        "parallelizable": true,
+        "member": "implementer",
+        "priority": 90,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 2
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "PSI-03",
+        "title": "接入session生命周期维护",
+        "phase": "lifecycle",
+        "order": 2,
+        "dependsOn": [
+          "PSI-01"
+        ],
+        "dependencies": [
+          "PSI-01"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/agent-session-bootstrap.ts",
+          "lib/rpc-manager.ts",
+          "lib/ypi-studio-child-session-runner.ts",
+          "lib/session-project-link.ts",
+          "lib/session-reader.ts",
+          "app/api/sessions/[id]/route.ts",
+          "app/api/sessions/archive/route.ts",
+          "app/api/sessions/archive-all/route.ts",
+          "app/api/sessions/unarchive/route.ts",
+          "app/api/git/worktrees/route.ts",
+          "app/api/git/worktrees/archive/route.ts"
+        ],
+        "instructions": [
+          "将create/bootstrap、fork、Studio child header创建迁移到local upsert，停止新写旧global sidecar。",
+          "为rename、archive、unarchive、delete、delete-by-cwd/WorkTree cleanup、cascade parent rewrite补remove/upsert/refresh/invalidate。",
+          "把project-space header写收口为可复用relink helper：先header真相，再old remove/new upsert；失败由reconciliation修复，不回滚已成功JSONL。",
+          "在message/agent end等已知摘要变化点失效space snapshot；stat fingerprint继续作为漏通知兜底。",
+          "审计所有writeSessionProjectLink、unlink/rename session file调用方并补focused lifecycle tests。"
+        ],
+        "acceptance": [
+          "所有已知本进程mutation后列表立即正确，不依赖TTL",
+          "Studio child创建后进入对应space候选并保持parent关联",
+          "archive index不含sessions-archive路径，unarchive按header恢复",
+          "旧global sidecar不再新增写入但文件不删除"
+        ],
+        "validation": [
+          "npm run test:project-space-session-index -- --group lifecycle",
+          "npm run test:studio-child-sessions",
+          "rg审计所有session写/移/删和writeSessionProjectLink调用"
+        ],
+        "risks": [
+          "漏掉隐蔽mutation导致短暂陈旧",
+          "删除/归档部分成功时index与API结果不一致",
+          "child状态更新造成过度写放大"
+        ],
+        "parallelGroup": "G2",
+        "parallelizable": true,
+        "member": "implementer",
+        "priority": 90,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 2
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "PSI-04",
+        "title": "实现筛选后的Studio批量投影",
+        "phase": "projection",
+        "order": 3,
+        "dependsOn": [
+          "PSI-02"
+        ],
+        "dependencies": [
+          "PSI-02"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/project-space-session-list.ts",
+          "lib/session-reader.ts",
+          "lib/studio-child-session-list.ts",
+          "lib/session-title.ts",
+          "scripts/test-project-space-session-index.mjs",
+          "scripts/test-studio-child-sessions.mjs"
+        ],
+        "instructions": [
+          "先筛当前space roots和parent可见children，再按cwdPathKey+taskId分组读取task detail。",
+          "每个cwd的listYpiStudioTasks(scope:all) fallback最多一次；每个unique task detail最多一次。",
+          "task detail可共享，但run/subtask-specific display逐child派生；cache key使用task.json mtime+size，TTL30s且有界single-flight。",
+          "保持header-only subtaskId降级和现有studioChildrenByParentSessionId/child row语义。"
+        ],
+        "acceptance": [
+          "全局180 children不再被当前space route投影",
+          "studioProjectionCalls不超过目标space unique linked task数",
+          "同task不同run/subtask标题与summary不串",
+          "task读取失败不使session列表失败"
+        ],
+        "validation": [
+          "npm run test:studio-child-sessions",
+          "npm run test:session-title",
+          "npm run test:project-space-session-index -- --group studio"
+        ],
+        "risks": [
+          "只按taskId缓存导致不同cwd串任务",
+          "持久化display造成task更新后陈旧",
+          "遗漏parent可见门禁"
+        ],
+        "parallelizable": true,
+        "member": "implementer",
+        "priority": 80,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 2
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "PSI-05",
+        "title": "接入project-space route与缓存/timing契约",
+        "phase": "integration",
+        "order": 4,
+        "dependsOn": [
+          "PSI-02",
+          "PSI-03",
+          "PSI-04"
+        ],
+        "dependencies": [
+          "PSI-02",
+          "PSI-03",
+          "PSI-04"
+        ],
+        "relation": "barrier",
+        "files": [
+          "app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts",
+          "lib/project-space-session-list.ts",
+          "lib/session-list-timing.ts",
+          "lib/types.ts",
+          "components/SessionSidebar.tsx"
+        ],
+        "instructions": [
+          "route改用专用reader，成功body严格保持sessions/legacyUnassigned/studioChildrenByParentSessionId。",
+          "增加5s有界snapshot、mutation失效和forceValidate；不重复修改Sidebar已存在AbortController/generation逻辑。",
+          "恢复超预算映射为503 session_index_rebuilding + Retry-After，不把内部路径/候选投影到browser。",
+          "扩展content-safe timing计数：index/read/validate/rescan/recovery/studio unique tasks/response，不记录标题、正文、路径或凭据。",
+          "提供单一feature flag/reader开关作为代码回滚，不删除旧listAllSessions。"
+        ],
+        "acceptance": [
+          "API success深度等价且Sidebar无需UI改动",
+          "热request inventoryGlobalCalls=0",
+          "known mutation后snapshot立即失效",
+          "慢日志和503均满足隐私边界"
+        ],
+        "validation": [
+          "npm run test:project-space-session-index -- --group route",
+          "浏览器main/worktree切换及生命周期smoke",
+          "检查Network响应与旧contract等价"
+        ],
+        "risks": [
+          "feature flag两路径结果漂移",
+          "snapshot隐藏刚完成mutation",
+          "错误将恢复诊断暴露到API"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 70,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 2
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "PSI-06",
+        "title": "完成正确性、安全与性能基准",
+        "phase": "verification",
+        "order": 5,
+        "dependsOn": [
+          "PSI-05"
+        ],
+        "dependencies": [
+          "PSI-05"
+        ],
+        "relation": "serial",
+        "files": [
+          "scripts/test-project-space-session-index.mjs",
+          "scripts/bench-project-space-sessions.mjs",
+          "package.json",
+          ".ypi/tasks/20260724-090218-排查并优化-session-列表与相关入口的加载性能-项目-设置-模型/checks.md"
+        ],
+        "instructions": [
+          "实现约300 sessions/180 Studio children固定fixture，覆盖目标space 1/22/100 candidates及missing/corrupt/partial/alias/lock竞态。",
+          "采样cold/warm P50/P95、I/O计数、Studio unique task calls和并发single-flight。",
+          "同时测/web-config、/models、/models-config隔离基线与session并发加载，区分session争用和provider/runtime独立冷启动。",
+          "执行lint/typecheck/focused tests；未达到目标必须报告stage证据，不能放宽完整性门禁或伪造达标。"
+        ],
+        "acceptance": [
+          "热route P50<=500ms、P95<=1.5s",
+          "冷恢复P95<=5s且10s硬预算正确",
+          "索引损坏/缺失不返回缺项partial 200",
+          "设置/模型不再因session扫描新增10s级延迟，新增P95目标<=500ms",
+          "所有最低验证通过"
+        ],
+        "validation": [
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run test:project-space-session-index",
+          "npm run test:session-title",
+          "npm run test:studio-child-sessions",
+          "npm run bench:project-space-sessions"
+        ],
+        "risks": [
+          "机器/外置磁盘波动影响绝对数据",
+          "fixture未覆盖真实大JSONL",
+          "并发模型接口有独立网络冷启动噪声"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 60,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "PSI-07",
+        "title": "更新架构与模块文档",
+        "phase": "docs",
+        "order": 6,
+        "dependsOn": [
+          "PSI-06"
+        ],
+        "dependencies": [
+          "PSI-06"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/architecture/overview.md",
+          "docs/modules/api.md",
+          "docs/modules/library.md",
+          "docs/modules/frontend.md",
+          "docs/operations/troubleshooting.md",
+          "AGENTS.md"
+        ],
+        "instructions": [
+          "记录space-local落点、JSONL真相、热读/恢复/503、旧global migration与mutation失效不变量。",
+          "更新route和新library模块说明；frontend无行为变化则只校准调用契约，不扩写AGENTS细节。",
+          "记录benchmark命令、content-safe timing和索引损坏排查/回滚步骤。",
+          "最终对照checks逐项留证，交由checker进行跨文件审查。"
+        ],
+        "acceptance": [
+          "文档不再声称project-space热路径全量listAllSessions",
+          "明确local index不是JSONL真相且旧global仅migration",
+          "运维可安全删除/重建index并回滚代码",
+          "AGENTS保持导航性而非堆积实现细节"
+        ],
+        "validation": [
+          "rg检查旧架构描述",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "checker文档/实现一致性审查"
+        ],
+        "risks": [
+          "文档与最终实现常量不一致",
+          "把运行时index误写成数据真相",
+          "误更新用户无关改动"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 50,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-24T04:42:53.127Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 7,
+      "skipped": 0
+    },
+    "subtasks": {
+      "PSI-01": {
+        "id": "PSI-01",
+        "status": "done",
+        "updatedAt": "2026-07-24T03:42:24.964Z",
+        "startedAt": "2026-07-24T03:34:01.437Z",
+        "finishedAt": "2026-07-24T03:42:24.962Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ec06e3586ddc12adfe6c031b"
+        ],
+        "lastRunId": "implementer-ec06e3586ddc12adfe6c031b",
+        "claimedAt": "2026-07-24T03:34:01.437Z",
+        "claimedByContextId": "pi_019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "summary": "### Implementation Complete (PSI-01)\n\n#### Files Changed\n- `lib/project-space-session-index.ts` — new schema-v1 space-local store (path resolve, bounds, gitignore, process queue, cross-process lock, atomic write, last-good, upsert/remove/mutate)\n- `lib/project-session-index.ts` — read-only migration adapter (`readProjectSessionIndex`, `listLegacyIndexedSessionsForSpace`); write path deprecated for PSI-03\n- `.gitignore` — `/.ypi/sessions/` only (not whole `.ypi/`)\n- `scripts/test-project-space-session-index.mjs` — store group tests\n- `package.json` — `test:project-space-session-index`\n- `.ypi/tasks/.../handoff.md` — evidence handoff for parent\n\n#### Verification\n- `npm run test:project-space-session-index -- --group store` — **15 passed**\n- `npx eslint lib/project-space-session-index.ts lib/project-session-index.ts --max-warnings=0` — clean\n- `node_modules/.bin/tsc --noEmit` — clean\n\n#### Notes / Risks\n- Child env cannot mutate `task.json` / no `ypi_studio_task` tool → **parent must mark PSI-01 done**\n- No PSI-02+ work (query/recovery/lifecycle/route)\n- Legacy sidecar writers still live until PSI-03\n- Local path canonicalize mirrors registry (avoid strip-loader import of `project-registry.ts`)\n- Next ready: **PSI-02 ∥ PSI-03**"
+      },
+      "PSI-02": {
+        "id": "PSI-02",
+        "status": "done",
+        "updatedAt": "2026-07-24T03:53:36.902Z",
+        "startedAt": "2026-07-24T03:42:33.412Z",
+        "finishedAt": "2026-07-24T03:53:36.901Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-c02b5445198e8c1d87f35505"
+        ],
+        "lastRunId": "implementer-c02b5445198e8c1d87f35505",
+        "claimedAt": "2026-07-24T03:42:33.412Z",
+        "claimedByContextId": "pi_019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "summary": "### Implementation Complete (PSI-02)\n\n#### Files Changed\n\n- `lib/project-space-session-list.ts` — directed space query + recovery: `listSessionsForProjectSpace`, encode-cwd dirs, bounded header, fingerprint reuse, legacy seed, header-only discovery, single-flight, 10s budget / last-good / 503\n- `scripts/test-project-space-session-index.mjs` — `--group query` + `--group recovery`\n- `handoff-psi-02.md` — full handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group query` | **7 passed** |\n| `npm run test:project-space-session-index -- --group recovery` | **8 passed** |\n| `npm run test:project-space-session-index -- --group store` | **15 passed** (regression) |\n| `eslint lib/project-space-session-list.ts` | clean |\n| `tsc --noEmit` | EXIT 0 |\n\n#### Notes / Risks\n\n- Hot path: `inventoryGlobalCalls=0`; no global body inventory\n- Missing/corrupt/partial: recover fully; no last-good + timeout → `503 session_index_rebuilding` (no partial 200)\n- **Not done:** route switch (PSI-05), Studio batch display (PSI-04), docs/bench\n- Parent must mark PSI-02 done (member cannot write `task.json`)"
+      },
+      "PSI-03": {
+        "id": "PSI-03",
+        "status": "done",
+        "updatedAt": "2026-07-24T03:52:42.224Z",
+        "startedAt": "2026-07-24T03:42:33.412Z",
+        "finishedAt": "2026-07-24T03:52:42.223Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-d83bac0be4757a9607f9758f"
+        ],
+        "lastRunId": "implementer-d83bac0be4757a9607f9758f",
+        "claimedAt": "2026-07-24T03:42:33.412Z",
+        "claimedByContextId": "pi_019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "summary": "### Implementation Complete — PSI-03\n\n#### Files Changed\n\n- `lib/project-space-session-lifecycle.ts` — **new** lifecycle helpers (upsert/remove/relink/refresh/unarchive/batch + cache invalidation)\n- `lib/project-session-index.ts` — legacy global write is **no-op** (read migration only)\n- `lib/session-project-link.ts` — dynamic registry import for strip-loader safety\n- `lib/agent-session-bootstrap.ts` — create/bootstrap → space-local upsert\n- `lib/rpc-manager.ts` — fork upsert; `message_end`/`agent_end` list invalidation\n- `lib/ypi-studio-child-session-runner.ts` — child create + status refresh\n- `lib/session-reader.ts` — cwd/WorkTree delete remove; archive/unarchive parent-rewrite refresh\n- `app/api/sessions/[id]/route.ts` — rename refresh; delete remove + reparent refresh\n- `app/api/sessions/archive/route.ts` / `archive-all/route.ts` — remove active index entries\n- `app/api/sessions/unarchive/route.ts` — header-based re-upsert\n- `scripts/test-project-space-session-index.mjs` — `--group lifecycle`\n- `handoff-psi-03.md` — evidence for parent\n\n#### Verification\n\n- `npm run test:project-space-session-index -- --group lifecycle` — **9 passed**\n- `npm run test:project-space-session-index -- --group store` — **15 passed**\n- `npm run test:studio-child-sessions` — **all passed**\n- `npx eslint … --max-warnings=0` — clean\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n\n#### Notes / Risks\n\n- Index writes are best-effort; JSONL never rolled back. Missing/unwritable space root fails soft → PSI-02 reconciliation.\n- `relinkSessionProjectSpace` is ready; no user-facing relink API yet.\n- Member cannot mark Studio `task.json` done — **parent must mark PSI-03 done**.\n\n#### Decisions needed from main session\n\n1. Mark PSI-03 done with the validation evidence above.  \n2. Continue G2/G3: PSI-02 (if still open) → PSI-04."
+      },
+      "PSI-04": {
+        "id": "PSI-04",
+        "status": "done",
+        "updatedAt": "2026-07-24T04:02:49.966Z",
+        "startedAt": "2026-07-24T03:53:42.630Z",
+        "finishedAt": "2026-07-24T04:02:49.965Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-5584c69a39a83604158a2b37"
+        ],
+        "lastRunId": "implementer-5584c69a39a83604158a2b37",
+        "claimedAt": "2026-07-24T03:53:42.630Z",
+        "claimedByContextId": "pi_019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "summary": "### Implementation Complete — PSI-04\n\n#### Files Changed\n\n- `lib/studio-child-display-projection.ts` — **new** batch/single Studio display projection; `(cwdPathKey + taskId)` task detail cache with `task.json` mtime/size fingerprint, 30s TTL, LRU 256; per-child run/subtask derivation; invalidate API; counters\n- `lib/session-reader.ts` — re-export `projectStudioChildDisplay`; clear display caches from `invalidateSessionListSnapshots`\n- `lib/project-space-session-list.ts` — after parent-visible filter, `attachStudioChildDisplays`; diagnostics: `studioProjectionCalls` / `uniqueLinkedTasks` / `studioListTasksCalls`\n- `scripts/test-project-space-session-index.mjs` — `--group studio` (5 tests)\n- `.ypi/tasks/.../handoff-psi-04.md` — handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group studio` | **5 passed** |\n| `npm run test:project-space-session-index -- --group query` | **7 passed** (regression) |\n| `npm run test:session-title` | **passed** |\n| `npm run test:studio-child-sessions` | **passed** |\n| `npx eslint … --max-warnings=0` | **clean** |\n| `node_modules/.bin/tsc --noEmit` | **EXIT 0** |\n\nAcceptance: 100 children / 1 task → `studioProjectionCalls=1`; space list only parent-visible children; missing task → header-only, list OK; display not written into index; different cwd same taskId → separate keys.\n\n#### Notes / Risks\n\n1. Residual global `listAllSessions(...includeStudioChildDisplay)` still calls projection per child, but shared task cache already collapses same-task N+1; **route switch remains PSI-05**.\n2. Single-child TTL 1s→30s + fingerprint; mutations via `invalidateSessionListSnapshots` clear caches.\n3. **Parent must mark PSI-04 done** (member cannot write `task.json`). Next: **PSI-05**."
+      },
+      "PSI-05": {
+        "id": "PSI-05",
+        "status": "done",
+        "updatedAt": "2026-07-24T04:08:40.014Z",
+        "startedAt": "2026-07-24T04:02:56.997Z",
+        "finishedAt": "2026-07-24T04:08:40.012Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-134bb6c85f0aea9fe15e5d84"
+        ],
+        "lastRunId": "implementer-134bb6c85f0aea9fe15e5d84",
+        "claimedAt": "2026-07-24T04:02:56.997Z",
+        "claimedByContextId": "pi_019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "summary": "### Implementation Complete (PSI-05)\n\n#### Files Changed\n\n- `app/api/projects/[projectId]/spaces/[spaceId]/sessions/route.ts` — 热路径改用 `listSessionsForProjectSpace`；成功 body 仍为 `sessions` / `legacyUnassigned` / `studioChildrenByParentSessionId`；503 `session_index_rebuilding` + `Retry-After` + `Cache-Control: no-store`；`forceValidate=1`；`PI_WEB_PROJECT_SPACE_SESSION_LIST` 回滚到 `listAllSessions`\n- `lib/project-space-session-list.ts` — 5s 有界 response snapshot（容量 32）、`forceValidate` 绕过、mutation 可 `invalidateProjectSpaceSessionListSnapshots`、feature flag helper、recovery stage timing\n- `lib/project-space-session-lifecycle.ts` — 注释对齐：mutation 清 shared snapshot map\n- `lib/session-list-timing.ts` — 增加 `listSpace` / `listAll` / `indexRead` / `validate` / `recovery` stages\n- `scripts/test-project-space-session-index.mjs` — `--group route` 实装（flag / snapshot / 源码契约 / timing / 503）\n\n#### Verification\n\n- `npm run test:project-space-session-index -- --group route` — **5 passed**\n- `npm run test:project-space-session-index -- --group query|recovery|studio|lifecycle` — all passed\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n- `eslint` on touched files — clean\n\n#### Notes / Risks\n\n- 回滚：`PI_WEB_PROJECT_SPACE_SESSION_LIST=0|false|off|legacy` → 旧 `listAllSessions` 路径；`listAllSessions` 未删除\n- Snapshot TTL 5s；`forceValidate=1` 与 lifecycle `invalidateProjectSpaceSessionListCaches()` 会立刻失效\n- **未**改 `SessionSidebar` UI；**未**做 PSI-06 300/180 bench\n- 浏览器 main/worktree smoke 仍建议人工点一次 Network 确认 body 等价\n\n#### Decisions needed from main session\n\n1. Mark **PSI-05 done** with evidence above  \n2. Claim **PSI-06** next（bench + full checks）"
+      },
+      "PSI-06": {
+        "id": "PSI-06",
+        "status": "done",
+        "updatedAt": "2026-07-24T04:19:04.392Z",
+        "startedAt": "2026-07-24T04:08:46.786Z",
+        "finishedAt": "2026-07-24T04:19:04.391Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ff058939e66f1a049f5f90c7"
+        ],
+        "lastRunId": "implementer-ff058939e66f1a049f5f90c7",
+        "claimedAt": "2026-07-24T04:08:46.786Z",
+        "claimedByContextId": "pi_019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "summary": "### Implementation Complete — PSI-06\n\n#### Files Changed\n- `scripts/test-project-space-session-index.mjs` — added `--group scale` (~300/180 fixture, missing/corrupt recovery, single-flight, 1/22/100 candidates, I/O bounds)\n- `scripts/bench-project-space-sessions.mjs` — **new** cold/warm P50/P95, candidate sizes, single-flight, related-entry concurrency probe, gates + JSON report\n- `package.json` — `bench:project-space-sessions`\n- `.ypi/tasks/.../handoff-psi-06.md` — validation evidence\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:project-space-session-index -- --group all` | **54 passed** |\n| `npm run test:session-title` | pass |\n| `npm run test:studio-child-sessions` | pass |\n| `npm run lint` | 0 errors (11 pre-existing warnings) |\n| `tsc --noEmit` | EXIT 0 |\n| `npm run bench:project-space-sessions -- --samples 30` | **all hard gates PASS** |\n\n**Bench (320 sessions / 180 children, target 22 roots + 60 children / 3 tasks):**  \nwarm P50 **40.8ms** / P95 **46.2ms** · cold P95 **73.3ms** · `inventoryGlobalCalls=0` · studio projections **≤ unique tasks** · single-flight recoveryRuns=1 · web-config/models-config added P95 ≈ 0ms\n\n#### Notes / Risks\n- Models baseline is noisy (provider cold-start / anyrouter jiti under harness); concurrent session list does **not** add 10s waits. Residual models cost → optional Phase 2.\n- Docs left for **PSI-07**.\n- Parent must mark PSI-06 done and claim PSI-07 (member cannot write `task.json`)."
+      },
+      "PSI-07": {
+        "id": "PSI-07",
+        "status": "done",
+        "updatedAt": "2026-07-24T04:23:23.373Z",
+        "startedAt": "2026-07-24T04:19:11.627Z",
+        "finishedAt": "2026-07-24T04:23:23.371Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-4617f23802254a427745c80f"
+        ],
+        "lastRunId": "implementer-4617f23802254a427745c80f",
+        "claimedAt": "2026-07-24T04:19:11.627Z",
+        "claimedByContextId": "pi_019f91a3-f496-78cc-87bd-7dd5360264f6",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — space-local index invariants (path, JSONL truth, hot path, recovery/503, lifecycle, legacy migration, gitignore, rollback, timing)\n- `docs/modules/api.md` — directed route contract, inventory table split, 503/flag, pointers\n- `docs/modules/library.md` — new store/list/lifecycle/display/timing modules; dual-boundary performance\n- `docs/modules/frontend.md` — success body + existing error channel for 503 (no UI change)\n- `docs/operations/troubleshooting.md` — rebuild/delete index, gitignore, rollback env, bench commands\n- `AGENTS.md` — minimal module entry + data locations only\n- `.ypi/tasks/.../handoff-psi-07.md` — handoff artifact\n\n#### Verification\n\n- `rg` — obsolete “project-space still uses global `listAllSessions` filter” claims removed; new contracts present\n- `npm run lint` — 0 errors (11 pre-existing warnings)\n- `node_modules/.bin/tsc --noEmit` — EXIT 0\n\n#### Notes / Risks\n\n- Chat top-bar `studio-children` still uses global inventory by design\n- Checker still required for final docs/impl consistency\n- Parent must mark PSI-07 done (member cannot write `task.json`)"
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-24T03:34:01.437Z",
+        "subtaskId": "PSI-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-24T03:42:33.412Z",
+        "subtaskId": "PSI-02",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-24T03:42:33.412Z",
+        "subtaskId": "PSI-03",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-24T03:53:42.630Z",
+        "subtaskId": "PSI-04",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-24T04:02:56.997Z",
+        "subtaskId": "PSI-05",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-24T04:08:46.786Z",
+        "subtaskId": "PSI-06",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-24T04:19:11.627Z",
+        "subtaskId": "PSI-07",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

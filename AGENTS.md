@@ -56,6 +56,7 @@ npm run dev     # http://localhost:30141
 | Area | Source entry | Documentation |
 | --- | --- | --- |
 | Session browsing/parsing | `lib/session-reader.ts`, `app/api/sessions/**` | `docs/architecture/overview.md`, `docs/modules/api.md` |
+| Project-space session list (directed index) | `lib/project-space-session-list.ts`, `lib/project-space-session-index.ts`, `lib/project-space-session-lifecycle.ts`, `app/api/projects/[projectId]/spaces/[spaceId]/sessions/**` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/library.md` |
 | Session changed-file sidecar (no Chat floating UI) | `lib/session-file-changes.ts`, `app/api/sessions/[id]/changes/**` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/library.md` |
 | Project registry and project spaces | `lib/project-registry.ts`, `app/api/projects/**`, `components/SessionSidebar.tsx` | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md` |
 | Auth / ModelRuntime foundation (CredentialStore, provider-aware services) | `lib/web-credential-store.ts`, `lib/web-model-runtime.ts`, `lib/web-auth-config-value.ts`, `lib/pi-provider-extensions.ts` | `docs/integrations/README.md`, `docs/architecture/overview.md`, `docs/modules/library.md` |
@@ -128,7 +129,8 @@ node_modules/.bin/tsc --noEmit
 | Data dir override | `PI_CODING_AGENT_DIR` |
 | Session files | `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl` |
 | Project registry | `~/.pi/agent/pi-web-projects.json` |
-| Project-session index sidecar | `~/.pi/agent/pi-web-session-index.json` |
+| Project-space session candidate index (runtime) | `<space-root>/.ypi/sessions/index.v1.json` (main/worktree each own root; not JSONL truth) |
+| Legacy project-session index (migration seed only) | `~/.pi/agent/pi-web-session-index.json` |
 | Model config | `~/.pi/agent/models.json` |
 | Settings/default model | `~/.pi/agent/settings.json` |
 | Web UI settings (Yolk Pi chat defaults, WorkTree, Usage, Web Terminal, ChatGPT panel, Editor) | `~/.pi/agent/pi-web.json` |

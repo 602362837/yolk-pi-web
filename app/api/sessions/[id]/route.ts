@@ -10,7 +10,11 @@ import {
 } from "@/lib/session-reader";
 import { getRpcSession } from "@/lib/rpc-manager";
 import { deleteSessionChangesSidecar } from "@/lib/session-file-changes";
-import { getSessionProjectLink } from "@/lib/session-project-link";
+import { getSessionProjectLink, readSessionHeaderFromFile } from "@/lib/session-project-link";
+import {
+  refreshProjectSpaceSessionIndexEntry,
+  removeProjectSpaceSessionByHeader,
+} from "@/lib/project-space-session-lifecycle";
 import type { StudioChildSessionInfo } from "@/lib/types";
 
 // Keep the response tree shallow; clients may still walk it for leaf/context projection.
@@ -207,6 +211,12 @@ export async function PATCH(
     }
     const sm = SessionManager.open(filePath);
     sm.appendSessionInfo(name.trim());
+    // Refresh space-local name summary immediately (best-effort).
+    await refreshProjectSpaceSessionIndexEntry({
+      sessionId: id,
+      sessionFileAbsolute: filePath,
+      name: name.trim(),
+    });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
@@ -225,17 +235,28 @@ export async function DELETE(
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
-    // Read header before deleting to get parentSession path
+    // Read header before deleting to get parentSession path + project/space link.
     const firstLine = readFileSync(filePath, "utf8").split("\n")[0];
     let parentSessionPath: string | undefined;
+    let deletedHeader: { type?: string; parentSession?: string; projectId?: string; spaceId?: string; id?: string } | null = null;
     try {
-      const header = JSON.parse(firstLine) as { type?: string; parentSession?: string };
-      if (header.type === "session") parentSessionPath = header.parentSession;
+      const header = JSON.parse(firstLine) as {
+        type?: string;
+        parentSession?: string;
+        projectId?: string;
+        spaceId?: string;
+        id?: string;
+      };
+      if (header.type === "session") {
+        parentSessionPath = header.parentSession;
+        deletedHeader = header;
+      }
     } catch { /* ignore */ }
 
     // Re-attach all direct children to this session's parent (cascade re-parent)
     // Scan sibling files in the same directory
     const dir = filePath.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
+    const reparentedChildPaths: string[] = [];
     try {
       const files = readdirSync(dir).filter((f) => f.endsWith(".jsonl") && join(dir, f) !== filePath);
       for (const file of files) {
@@ -249,6 +270,7 @@ export async function DELETE(
             header.parentSession = parentSessionPath;
             lines[0] = JSON.stringify(header);
             writeFileSync(childPath, lines.join("\n"));
+            reparentedChildPaths.push(childPath);
           }
         } catch { /* skip malformed */ }
       }
@@ -258,6 +280,28 @@ export async function DELETE(
     unlinkSync(filePath);
     deleteSessionChangesSidecar(id);
     invalidateSessionPathCache(id);
+
+    // Space-local index: remove deleted session; refresh reparented siblings.
+    await removeProjectSpaceSessionByHeader({
+      sessionId: id,
+      header: deletedHeader as never,
+    });
+    for (const childPath of reparentedChildPaths) {
+      try {
+        const childHeader = readSessionHeaderFromFile(childPath);
+        const childId = childHeader?.id;
+        if (childId) {
+          await refreshProjectSpaceSessionIndexEntry({
+            sessionId: childId,
+            sessionFileAbsolute: childPath,
+            cwd: childHeader?.cwd,
+          });
+        }
+      } catch {
+        // best-effort
+      }
+    }
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });

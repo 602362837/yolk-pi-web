@@ -1,6 +1,11 @@
 import type { ResolvedYpiStudioMemberPolicy } from "./ypi-studio-policy";
 import { readSessionHeaderFromFile } from "./session-project-link";
 import { writeSessionHeader } from "./ypi-studio-child-session-header";
+import {
+  invalidateProjectSpaceSessionListCaches,
+  refreshProjectSpaceSessionIndexEntry,
+  upsertProjectSpaceSessionFromFile,
+} from "./project-space-session-lifecycle";
 import { createYpiStudioChildGuardExtension } from "./ypi-studio-child-guard";
 import { createWebAgentSessionServices } from "./web-model-runtime";
 import {
@@ -215,6 +220,19 @@ function updateStudioChildHeader(filePath: string | undefined, patch: Partial<St
     const header = readSessionHeaderFromFile(filePath);
     if (!header?.studioChild) return;
     writeSessionHeader(filePath, { studioChild: { ...header.studioChild, ...patch } });
+    // Fingerprint/status change: refresh space-local entry + drop list snapshots.
+    const sessionId = header.id;
+    if (sessionId) {
+      void refreshProjectSpaceSessionIndexEntry({
+        sessionId,
+        sessionFileAbsolute: filePath,
+        cwd: header.cwd,
+      }).catch(() => {
+        invalidateProjectSpaceSessionListCaches();
+      });
+    } else {
+      invalidateProjectSpaceSessionListCaches();
+    }
   } catch {
     // Header updates are audit-only; task.json remains the status source of truth.
   }
@@ -593,6 +611,20 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
         parentSession: meta.parentSessionFile,
       });
       if (header) markSessionManagerHeaderFlushed(sessionManager, header);
+      // Space-local candidate index: child inherits parent project/space link.
+      if (header?.projectId && header.spaceId && childSessionId) {
+        void upsertProjectSpaceSessionFromFile({
+          projectId: header.projectId,
+          spaceId: header.spaceId,
+          sessionId: childSessionId,
+          sessionFileAbsolute: childSessionFile,
+          cwd: root,
+          parentSessionId: meta.parentSessionId,
+          parentSessionFileAbsolute: meta.parentSessionFile,
+        }).catch(() => {
+          invalidateProjectSpaceSessionListCaches();
+        });
+      }
     }
     try { sessionManager.appendSessionInfo(studioChildSessionInfoName(root, meta)); } catch {}
     if (writer) {
