@@ -31,6 +31,7 @@ npm run dev     # http://localhost:30141
 | Change Grok/Kiro/Antigravity OAuth, accounts, quota, failover, or top-bar compact/aggregate usage | `docs/integrations/README.md` | `lib/pi-provider-extensions.ts`, `lib/grok-*.ts`, `lib/kiro-*.ts`, `lib/antigravity-*.ts`, `lib/oauth-account-providers.ts`, `app/api/auth/quota/[provider]/route.ts`, `components/*UsagePanel.tsx`, `components/ProviderUsageTrigger.tsx`, `components/ProviderUsageAggregatePanel.tsx` |
 | Change AnyRouter provider, managed API keys, Base URL override, retry config, or runtime bridge | `docs/integrations/README.md` | `lib/pi-provider-extensions.ts`, `lib/anyrouter-config.ts`, `lib/anyrouter-runtime-bridge.ts`, `lib/api-key-accounts.ts`, `app/api/auth/api-key/**`, `components/ModelsConfig.tsx`, `patches/pi-anyrouter+0.3.2.patch`, `scripts/verify-pi-anyrouter-patch.mjs` |
 | Change Links / GitHub OAuth connections | `docs/integrations/README.md` | `lib/links-*.ts`, `lib/github-link-oauth.ts`, `app/api/links/**`, `components/LinksConfig.tsx` |
+| Change GitHub App automation (webhook, claim/assignee, triage, durable jobs, P1 full-agent/publish, setup checklist/verify, user-managed allowlist) | `docs/integrations/github-app-automation-setup.md`（客户自建 App 指南）, `docs/integrations/README.md`, `docs/architecture/overview.md`, `docs/deployment/README.md` | `lib/github-automation-*.ts`, `lib/github-automation-setup-verify.ts`, `lib/github-app-*.ts`, `lib/github-machine-assignee.ts`, `lib/github-issue-triage-runner.ts`, `lib/github-full-agent-profile.ts`, `lib/github-automation-runner.ts`, `lib/github-git-publisher.ts`, `app/api/github-automation/**`, `components/GithubAutomationConfig.tsx`, `scripts/test-github-automation.mjs`, `scripts/test-github-unattended.mjs`, `scripts/test-github-publish-policy.mjs` |
 | Change session lifecycle, branching, JSONL, or SSE | `docs/architecture/overview.md` | `lib/rpc-manager.ts`, `lib/session-reader.ts`, `hooks/useAgentSession.ts` |
 | Change code/comment/test conventions | `docs/standards/code-style.md` | Existing nearby code |
 | Deploy, publish, or debug runtime | `docs/deployment/README.md` | `docs/operations/troubleshooting.md`, `ecosystem.config.cjs`, proxy scripts |
@@ -41,7 +42,7 @@ npm run dev     # http://localhost:30141
 | Path | Purpose | Details |
 | --- | --- | --- |
 | `app/` | Next.js app routes, layout, global styles. | `README.md`, `docs/modules/api.md` |
-| `app/api/` | API route handlers for sessions, agent RPC/SSE, files, models, skills, auth, usage, model prices, Git/worktrees, Links, and config. | `docs/modules/api.md` |
+| `app/api/` | API route handlers for sessions, agent RPC/SSE, files, models, skills, auth, usage, model prices, Git/worktrees, Links, GitHub automation webhook, and config. | `docs/modules/api.md` |
 | `components/` | React UI components. | `docs/modules/frontend.md` |
 | `hooks/` | Client hooks for session state, theme, drag/drop, audio. | `docs/modules/frontend.md` |
 | `lib/` | Shared server/client utilities, parsing, lifecycle, config, provider helpers, Grok/Kiro/Antigravity OAuth/accounts/quota modules, and AnyRouter config/runtime-bridge helpers. | `docs/modules/library.md` |
@@ -65,6 +66,7 @@ npm run dev     # http://localhost:30141
 | Tool-call normalization | `lib/normalize.ts` | `docs/architecture/overview.md`, `docs/modules/library.md` |
 | Workspace files and Git context | `app/api/files/**`, `app/api/git/**`, `lib/file-paths.ts`, `lib/git-worktree.ts`, `lib/workspace-title.ts` | `docs/modules/api.md`, `docs/modules/library.md` |
 | Links / GitHub OAuth Device Flow connections | `app/api/links/**`, `lib/links-*.ts`, `lib/github-link-oauth.ts`, `components/LinksConfig.tsx` | `docs/integrations/README.md`, `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md`, `docs/deployment/README.md`, `docs/operations/troubleshooting.md` |
+| GitHub App automation (P0 triage claim = `ypi:claimed` + machine assignee; empty-default user-managed allowlist + setup verify; P1 default-off full-agent + App publisher) | `app/api/github-automation/**`, `lib/github-automation-*.ts`, `lib/github-automation-setup-verify.ts`, `lib/github-app-*.ts`, `lib/github-machine-assignee.ts`, `lib/github-issue-triage-runner.ts`, `lib/github-full-agent-profile.ts`, `lib/github-automation-runner.ts`, `lib/github-git-publisher.ts`, `components/GithubAutomationConfig.tsx` | `docs/integrations/github-app-automation-setup.md`, `docs/architecture/overview.md`, `docs/integrations/README.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md`, `docs/deployment/README.md`, `docs/operations/troubleshooting.md` |
 | YPI Studio members/workflows/tasks | `components/YpiStudioPanel.tsx`, `app/api/studio/**`, `lib/ypi-studio-*`, `lib/rpc-manager.ts` | `docs/modules/frontend.md`, `docs/modules/api.md`, `docs/modules/library.md` |
 | Models, skills, auth, usage | `app/api/models*`, `app/api/skills/**`, `app/api/auth/**`, `app/api/usage/**` | `docs/modules/api.md`, `docs/integrations/README.md` |
 | AnyRouter fixed provider + managed API keys | `lib/anyrouter-config.ts`, `lib/anyrouter-runtime-bridge.ts`, `lib/api-key-accounts.ts`, `lib/pi-provider-extensions.ts`, `app/api/auth/api-key/**`, `components/ModelsConfig.tsx` | `docs/integrations/README.md`, `docs/modules/api.md`, `docs/modules/frontend.md`, `docs/modules/library.md`, `docs/operations/troubleshooting.md` |
@@ -138,6 +140,7 @@ node_modules/.bin/tsc --noEmit
 | Managed API-key accounts (OpenCode Go / xAI / AnyRouter) | `~/.pi/agent/auth-api-key-accounts/<provider>/` |
 | AnyRouter Active runtime bridge (0600, derived) | `~/.pi/agent/auth-api-key-accounts/anyrouter/.runtime/provider.json` |
 | Links storage (GitHub OAuth connections) | `~/.pi/agent/links/` |
+| GitHub automation non-secret state | `~/.pi/agent/github-automation/` |
 
 ## Archive Rules
 
@@ -166,6 +169,7 @@ Current docs index:
 - `docs/standards/code-style.md` — code, comment, validation, and testing entry point.
 - `docs/deployment/README.md` — local, production, PM2, proxy, npm package, and data config.
 - `docs/integrations/README.md` — dependency and pi SDK integration entry point.
+- `docs/integrations/github-app-automation-setup.md` — customer/operator guide to create and install a self-owned GitHub App for issue automation.
 - `docs/operations/troubleshooting.md` — runtime and development troubleshooting.
 - `docs/research/README.md` — archive location for investigation notes and future research.
 - `docs/SKILL_find_skills.md` — instructions for discovering/installing agent skills.

@@ -119,6 +119,8 @@ function state(
 const BASE_TRANSITIONS: YpiStudioWorkflowTransition[] = [
   { from: "intake", to: "planning" },
   { from: "planning", to: "awaiting_approval" },
+  // Interactive: requires user-input/user-widget approvalGrant.
+  // github_unattended: same edge, but authorization is internal policyGrant + complete claim (not interactive grant; override still cannot bypass).
   { from: "awaiting_approval", to: "implementing", requiresUserApproval: true },
   { from: "implementing", to: "checking" },
   { from: "checking", to: "ready" },

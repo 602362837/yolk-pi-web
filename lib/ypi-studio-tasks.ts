@@ -78,6 +78,14 @@ import type {
   YpiStudioImprovementSubtaskClaimBody,
   YpiStudioImprovementSubtaskUpdateBody,
   YpiStudioApprovalGrantSource,
+  YpiStudioExecutionMode,
+  YpiStudioOwnerAuthorization,
+  YpiStudioPolicyGrant,
+  YpiStudioUnattendedCompletionEvidence,
+  YpiStudioAutomationBinding,
+  YpiStudioUnattendedRiskProfile,
+  YpiStudioUnattendedExecutionProfile,
+  YpiStudioUnattendedUiGate,
   YpiStudioWidgetApprovePlanBody,
   YpiStudioWidgetRequestPlanChangesBody,
   YpiStudioWidgetApproveImprovementPlanBody,
@@ -1102,6 +1110,139 @@ function isApprovalGrant(value: unknown): value is YpiStudioApprovalGrant {
     && isApprovalGrantSource(value.source);
 }
 
+function isExecutionMode(value: unknown): value is YpiStudioExecutionMode {
+  return value === "interactive" || value === "github_unattended";
+}
+
+function isPositiveInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && Math.floor(value) === value && value > 0;
+}
+
+function isNonNegInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && Math.floor(value) === value && value >= 0;
+}
+
+function isOwnerAuthorization(value: unknown): value is YpiStudioOwnerAuthorization {
+  return isRecord(value)
+    && optionalString(value.authorizedAt) !== undefined
+    && value.source === "github-owner-intent"
+    && isPositiveInt(value.repositoryId)
+    && isNonNegInt(value.issueNumber)
+    && isPositiveInt(value.ownerActorId)
+    && isPositiveInt(value.ownerCommentId)
+    && optionalString(value.ownerCommentHash) !== undefined
+    && value.claimStatus === "complete"
+    && value.recommendation === "yes"
+    && (value.matchedPhrase === undefined || typeof value.matchedPhrase === "string");
+}
+
+function isRiskProfile(value: unknown): value is YpiStudioUnattendedRiskProfile {
+  return value === "docs-and-small-bugfix";
+}
+
+function isExecutionProfile(value: unknown): value is YpiStudioUnattendedExecutionProfile {
+  return value === "full-agent";
+}
+
+function isUiGate(value: unknown): value is YpiStudioUnattendedUiGate {
+  return value === "pass" || value === "blocked_manual_ui_approval";
+}
+
+function isPolicyGrant(value: unknown): value is YpiStudioPolicyGrant {
+  return isRecord(value)
+    && value.source === "policy-engine"
+    && optionalString(value.grantedAt) !== undefined
+    && optionalString(value.expiresAt) !== undefined
+    && optionalString(value.policyId) !== undefined
+    && optionalString(value.policyVersion) !== undefined
+    && optionalString(value.policyHash) !== undefined
+    && isPositiveInt(value.planRevision)
+    && optionalString(value.planHash) !== undefined
+    && optionalString(value.scopeFingerprint) !== undefined
+    && isRiskProfile(value.riskProfile)
+    && isExecutionProfile(value.executionProfile)
+    && isPositiveInt(value.repositoryId)
+    && isNonNegInt(value.issueNumber)
+    && isPositiveInt(value.ownerActorId)
+    && isPositiveInt(value.ownerCommentId)
+    && value.claimStatus === "complete"
+    && isUiGate(value.uiGate);
+}
+
+function isCompletionEvidence(value: unknown): value is YpiStudioUnattendedCompletionEvidence {
+  return isRecord(value)
+    && optionalString(value.recordedAt) !== undefined
+    && isPositiveInt(value.planRevision)
+    && optionalString(value.planHash) !== undefined
+    && optionalString(value.scopeFingerprint) !== undefined
+    && isRiskProfile(value.riskProfile)
+    && value.checkerPassed === true
+    && value.validationPassed === true
+    && value.finalDiffAllowed === true
+    && (value.notesHash === undefined || typeof value.notesHash === "string");
+}
+
+function isAutomationBinding(value: unknown): value is YpiStudioAutomationBinding {
+  return isRecord(value)
+    && isPositiveInt(value.repositoryId)
+    && isNonNegInt(value.issueNumber)
+    && optionalString(value.scopeFingerprint) !== undefined
+    && (value.jobId === undefined || typeof value.jobId === "string");
+}
+
+/** Historical tasks without executionMode are interactive. */
+export function getYpiStudioTaskExecutionMode(task: Pick<YpiStudioTaskRecord, "meta">): YpiStudioExecutionMode {
+  return isExecutionMode(task.meta.executionMode) ? task.meta.executionMode : "interactive";
+}
+
+export function isYpiStudioGithubUnattendedTask(task: Pick<YpiStudioTaskRecord, "meta">): boolean {
+  return getYpiStudioTaskExecutionMode(task) === "github_unattended";
+}
+
+/** Stable plan hash for grant binding. Uses subtask ids/titles/dependsOn only (no secrets). */
+export function hashYpiStudioImplementationPlan(plan: YpiStudioImplementationPlan | undefined | null): string {
+  if (!plan?.subtasks?.length) return hashText("empty-plan");
+  const payload = plan.subtasks.map((subtask) => ({
+    id: subtask.id,
+    title: subtask.title,
+    dependsOn: [...(subtask.dependsOn ?? [])].sort(),
+    relation: subtask.relation ?? null,
+  }));
+  return hashText(JSON.stringify(payload));
+}
+
+export function buildYpiStudioUnattendedScopeFingerprint(input: {
+  repositoryId: number;
+  issueNumber: number;
+  riskProfile?: YpiStudioUnattendedRiskProfile;
+  executionProfile?: YpiStudioUnattendedExecutionProfile;
+  projectRootKey?: string;
+}): string {
+  return hashText(JSON.stringify({
+    repositoryId: input.repositoryId,
+    issueNumber: input.issueNumber,
+    riskProfile: input.riskProfile ?? "docs-and-small-bugfix",
+    executionProfile: input.executionProfile ?? "full-agent",
+    projectRootKey: input.projectRootKey ?? "",
+  }));
+}
+
+function clearUnattendedAuthorizationMeta(
+  meta: YpiStudioTaskRecord["meta"],
+  options: { bumpPlanRevision?: boolean; keepOwnerAuthorization?: boolean } = {},
+): YpiStudioTaskRecord["meta"] {
+  const nextRevision = options.bumpPlanRevision
+    ? (meta.planRevision ?? 1) + 1
+    : meta.planRevision;
+  return {
+    ...meta,
+    planRevision: nextRevision,
+    policyGrant: undefined,
+    completionEvidence: undefined,
+    ownerAuthorization: options.keepOwnerAuthorization ? meta.ownerAuthorization : undefined,
+  };
+}
+
 function isAfterIso(candidate: string, baseline: string): boolean {
   const candidateMs = Date.parse(candidate);
   const baselineMs = Date.parse(baseline);
@@ -1146,9 +1287,24 @@ function isApprovalImplementationEdge(from: string, to: string): boolean {
   return from === "awaiting_approval" && to === "implementing";
 }
 
+/**
+ * Interactive path: requires user-input/user-widget approvalGrant bound to this context.
+ * GitHub unattended path: requires internal policyGrant (policy-engine) + complete claim ownerAuthorization;
+ * interactive approvalGrant cannot authorize unattended implementing and vice versa.
+ * override never bypasses either gate.
+ */
 export function assertYpiStudioImplementationApproved(task: YpiStudioTaskRecord, contextId: string | undefined): void {
+  if (isYpiStudioGithubUnattendedTask(task)) {
+    assertYpiStudioUnattendedImplementationAuthorized(task);
+    return;
+  }
+
   const grant = isApprovalGrant(task.meta.approvalGrant) ? task.meta.approvalGrant : null;
   const gate = isApprovalGate(task.meta.approvalGate) ? task.meta.approvalGate : null;
+  // Reject forged policy-engine material masquerading as interactive approval.
+  if (isPolicyGrant(task.meta.policyGrant) || isOwnerAuthorization(task.meta.ownerAuthorization)) {
+    throw new Error("Transition awaiting_approval -> implementing rejects automation policyGrant/ownerAuthorization on interactive tasks. Interactive implementing requires a user-input or user-widget approvalGrant.");
+  }
   if (!contextId) {
     throw new Error("Transition awaiting_approval -> implementing requires this chat to be bound to the Studio task context before approval can be recorded. Bind/resume the task, then ask the user to reply 确认/批准.");
   }
@@ -1164,6 +1320,489 @@ export function assertYpiStudioImplementationApproved(task: YpiStudioTaskRecord,
   if (gate && !isAfterIso(grant.approvedAt, gate.enteredAt)) {
     throw new Error("Transition awaiting_approval -> implementing requires approval after the task entered awaiting_approval.");
   }
+}
+
+/**
+ * Evaluate whether a github_unattended task may enter implementing.
+ * Does not mutate state. Public tools/routes must not call the grant writers.
+ */
+export function evaluateYpiStudioUnattendedImplementationAuthorization(task: YpiStudioTaskRecord): {
+  authorized: boolean;
+  reasonCode: string;
+  message: string;
+} {
+  if (!isYpiStudioGithubUnattendedTask(task)) {
+    return {
+      authorized: false,
+      reasonCode: "not_github_unattended",
+      message: "Unattended authorization only applies to executionMode=github_unattended tasks.",
+    };
+  }
+  const owner = isOwnerAuthorization(task.meta.ownerAuthorization) ? task.meta.ownerAuthorization : null;
+  if (!owner || owner.claimStatus !== "complete") {
+    return {
+      authorized: false,
+      reasonCode: "missing_or_incomplete_owner_authorization",
+      message: "GitHub unattended implementing requires complete-claim ownerAuthorization recorded by the automation runner.",
+    };
+  }
+  const policy = isPolicyGrant(task.meta.policyGrant) ? task.meta.policyGrant : null;
+  if (!policy) {
+    return {
+      authorized: false,
+      reasonCode: "missing_policy_grant",
+      message: "GitHub unattended implementing requires an internal policyGrant(source=policy-engine). Interactive approvalGrant cannot substitute.",
+    };
+  }
+  if (policy.uiGate === "blocked_manual_ui_approval") {
+    return {
+      authorized: false,
+      reasonCode: "blocked_manual_ui_approval",
+      message: "UI/user-visible work is fail-closed: unattended implementing is blocked and must return to interactive HTML approval.",
+    };
+  }
+  if (policy.riskProfile !== "docs-and-small-bugfix") {
+    return {
+      authorized: false,
+      reasonCode: "risk_profile_not_allowed",
+      message: "Unattended policy only allows riskProfile=docs-and-small-bugfix.",
+    };
+  }
+  if (policy.claimStatus !== "complete") {
+    return {
+      authorized: false,
+      reasonCode: "policy_claim_incomplete",
+      message: "policyGrant claimStatus must be complete.",
+    };
+  }
+  const expiresMs = Date.parse(policy.expiresAt);
+  if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) {
+    return {
+      authorized: false,
+      reasonCode: "policy_grant_expired",
+      message: "policyGrant has expired; re-evaluate policy before implementing.",
+    };
+  }
+  const planRevision = task.meta.planRevision ?? 1;
+  if (policy.planRevision !== planRevision) {
+    return {
+      authorized: false,
+      reasonCode: "stale_plan_revision",
+      message: `policyGrant planRevision ${policy.planRevision} does not match current planRevision ${planRevision}.`,
+    };
+  }
+  const planHash = hashYpiStudioImplementationPlan(task.implementationPlan);
+  if (policy.planHash !== planHash) {
+    return {
+      authorized: false,
+      reasonCode: "stale_plan_hash",
+      message: "policyGrant planHash does not match the current implementation plan; plan changes invalidate the grant.",
+    };
+  }
+  const binding = isAutomationBinding(task.meta.automationBinding) ? task.meta.automationBinding : null;
+  if (!binding) {
+    return {
+      authorized: false,
+      reasonCode: "missing_automation_binding",
+      message: "GitHub unattended tasks require automationBinding (repositoryId/issueNumber/scopeFingerprint).",
+    };
+  }
+  if (
+    policy.repositoryId !== owner.repositoryId
+    || policy.issueNumber !== owner.issueNumber
+    || policy.ownerActorId !== owner.ownerActorId
+    || policy.ownerCommentId !== owner.ownerCommentId
+    || policy.repositoryId !== binding.repositoryId
+    || policy.issueNumber !== binding.issueNumber
+    || policy.scopeFingerprint !== binding.scopeFingerprint
+  ) {
+    return {
+      authorized: false,
+      reasonCode: "authorization_binding_mismatch",
+      message: "ownerAuthorization, policyGrant, and automationBinding must refer to the same repo/issue/owner comment/scope.",
+    };
+  }
+  // Interactive grants must never authorize unattended implementing.
+  if (isApprovalGrant(task.meta.approvalGrant)) {
+    return {
+      authorized: false,
+      reasonCode: "interactive_grant_on_unattended_task",
+      message: "Interactive approvalGrant cannot authorize github_unattended implementing; use internal policyGrant only.",
+    };
+  }
+  return {
+    authorized: true,
+    reasonCode: "authorized",
+    message: "Unattended implementation is authorized by complete claim + owner authorization + valid policyGrant.",
+  };
+}
+
+export function assertYpiStudioUnattendedImplementationAuthorized(task: YpiStudioTaskRecord): void {
+  const result = evaluateYpiStudioUnattendedImplementationAuthorization(task);
+  if (!result.authorized) {
+    throw new Error(
+      `Transition awaiting_approval -> implementing is blocked for github_unattended (${result.reasonCode}): ${result.message} override cannot bypass this policy gate.`,
+    );
+  }
+}
+
+/** Evaluate whether unattended completion evidence is present and still bound to the current plan/scope. */
+export function evaluateYpiStudioUnattendedCompletionEvidence(task: YpiStudioTaskRecord): {
+  complete: boolean;
+  reasonCode: string;
+  message: string;
+} {
+  if (!isYpiStudioGithubUnattendedTask(task)) {
+    return { complete: false, reasonCode: "not_github_unattended", message: "Completion evidence is only required for github_unattended tasks." };
+  }
+  const auth = evaluateYpiStudioUnattendedImplementationAuthorization(task);
+  if (!auth.authorized) {
+    return { complete: false, reasonCode: auth.reasonCode, message: auth.message };
+  }
+  const evidence = isCompletionEvidence(task.meta.completionEvidence) ? task.meta.completionEvidence : null;
+  if (!evidence) {
+    return {
+      complete: false,
+      reasonCode: "missing_completion_evidence",
+      message: "Unattended completion requires checker + validation + final-diff evidence recorded by the internal completion helper.",
+    };
+  }
+  const planRevision = task.meta.planRevision ?? 1;
+  const planHash = hashYpiStudioImplementationPlan(task.implementationPlan);
+  const binding = isAutomationBinding(task.meta.automationBinding) ? task.meta.automationBinding : null;
+  if (
+    evidence.planRevision !== planRevision
+    || evidence.planHash !== planHash
+    || !binding
+    || evidence.scopeFingerprint !== binding.scopeFingerprint
+    || evidence.riskProfile !== "docs-and-small-bugfix"
+    || !evidence.checkerPassed
+    || !evidence.validationPassed
+    || !evidence.finalDiffAllowed
+  ) {
+    return {
+      complete: false,
+      reasonCode: "stale_or_incomplete_completion_evidence",
+      message: "completionEvidence must match current plan/scope and record checkerPassed, validationPassed, and finalDiffAllowed.",
+    };
+  }
+  return { complete: true, reasonCode: "complete", message: "Unattended completion evidence is valid." };
+}
+
+export function assertYpiStudioUnattendedCompletionEvidence(task: YpiStudioTaskRecord): void {
+  const result = evaluateYpiStudioUnattendedCompletionEvidence(task);
+  if (!result.complete) {
+    throw new Error(`Unattended completion blocked (${result.reasonCode}): ${result.message}`);
+  }
+}
+
+export interface YpiStudioUnattendedTaskCreateInput {
+  cwd: string;
+  title: string;
+  workflowId?: string;
+  contextId?: string;
+  repositoryId: number;
+  issueNumber: number;
+  scopeFingerprint: string;
+  jobId?: string;
+}
+
+/**
+ * Internal create for GitHub unattended Studio tasks.
+ * Not reachable from public Studio tool/widget body parsers.
+ */
+export function createYpiStudioGithubUnattendedTask(input: YpiStudioUnattendedTaskCreateInput): YpiStudioTaskDetail {
+  if (!isPositiveInt(input.repositoryId) || !isNonNegInt(input.issueNumber) || !optionalString(input.scopeFingerprint)) {
+    throw new Error("createYpiStudioGithubUnattendedTask requires repositoryId, issueNumber, and scopeFingerprint.");
+  }
+  const detail = createYpiStudioTask({
+    cwd: input.cwd,
+    title: input.title,
+    workflowId: input.workflowId,
+    contextId: input.contextId,
+  });
+  const ctx = createContext(input.cwd);
+  return withTaskMutationLock(ctx, detail.id, () => {
+    const record = loadTaskRecord(ctx, detail.id);
+    if (!record?.raw) throw new Error("Created unattended task could not be reloaded");
+    const updatedAt = nowIso();
+    record.raw.meta = {
+      ...record.raw.meta,
+      executionMode: "github_unattended",
+      automationBinding: {
+        repositoryId: input.repositoryId,
+        issueNumber: input.issueNumber,
+        scopeFingerprint: input.scopeFingerprint,
+        jobId: input.jobId,
+      },
+      // Never seed interactive approvalGrant for unattended tasks.
+      approvalGrant: undefined,
+      policyGrant: undefined,
+      completionEvidence: undefined,
+      ownerAuthorization: undefined,
+    };
+    record.raw.updatedAt = updatedAt;
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "note",
+      at: updatedAt,
+      taskId: record.raw.id,
+      message: "Created github_unattended Studio task",
+      data: {
+        executionMode: "github_unattended",
+        repositoryId: input.repositoryId,
+        issueNumber: input.issueNumber,
+        jobId: input.jobId,
+      },
+    });
+    const next = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!next) throw new Error("Created unattended task could not be read");
+    return next;
+  });
+}
+
+export interface YpiStudioOwnerAuthorizationInput {
+  cwd: string;
+  taskId: string;
+  repositoryId: number;
+  issueNumber: number;
+  ownerActorId: number;
+  ownerCommentId: number;
+  ownerCommentHash: string;
+  claimStatus: "complete";
+  recommendation: "yes";
+  matchedPhrase?: string;
+  authorizedAt?: string;
+}
+
+/** Internal writer for owner adoption evidence. Public API/tool cannot write this field. */
+export function recordYpiStudioOwnerAuthorization(input: YpiStudioOwnerAuthorizationInput): YpiStudioTaskDetail {
+  const ctx = createContext(input.cwd);
+  return withTaskMutationLock(ctx, input.taskId, () => {
+    const record = loadTaskRecord(ctx, input.taskId);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot record owner authorization");
+    if (!isYpiStudioGithubUnattendedTask(record.raw)) {
+      throw new Error("ownerAuthorization can only be recorded on executionMode=github_unattended tasks.");
+    }
+    if (input.claimStatus !== "complete" || input.recommendation !== "yes") {
+      throw new Error("ownerAuthorization requires complete claim and recommendation=yes.");
+    }
+    const binding = isAutomationBinding(record.raw.meta.automationBinding) ? record.raw.meta.automationBinding : null;
+    if (!binding || binding.repositoryId !== input.repositoryId || binding.issueNumber !== input.issueNumber) {
+      throw new Error("ownerAuthorization must match task automationBinding repositoryId/issueNumber.");
+    }
+    const authorizedAt = input.authorizedAt ?? nowIso();
+    const ownerAuthorization: YpiStudioOwnerAuthorization = {
+      authorizedAt,
+      source: "github-owner-intent",
+      repositoryId: input.repositoryId,
+      issueNumber: input.issueNumber,
+      ownerActorId: input.ownerActorId,
+      ownerCommentId: input.ownerCommentId,
+      ownerCommentHash: input.ownerCommentHash,
+      claimStatus: "complete",
+      recommendation: "yes",
+      matchedPhrase: input.matchedPhrase,
+    };
+    if (!isOwnerAuthorization(ownerAuthorization)) {
+      throw new Error("Invalid ownerAuthorization payload.");
+    }
+    // Recording owner auth clears any previous policy/completion so they must be re-evaluated.
+    record.raw.meta = {
+      ...record.raw.meta,
+      ownerAuthorization,
+      policyGrant: undefined,
+      completionEvidence: undefined,
+      approvalGrant: undefined,
+    };
+    record.raw.updatedAt = authorizedAt;
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "note",
+      at: authorizedAt,
+      taskId: record.raw.id,
+      message: "Recorded GitHub owner authorization for unattended implementation",
+      data: {
+        repositoryId: input.repositoryId,
+        issueNumber: input.issueNumber,
+        ownerActorId: input.ownerActorId,
+        ownerCommentId: input.ownerCommentId,
+        claimStatus: "complete",
+      },
+    });
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after owner authorization");
+    return detail;
+  });
+}
+
+export interface YpiStudioPolicyGrantInput {
+  cwd: string;
+  taskId: string;
+  policyId: string;
+  policyVersion: string;
+  policyHash: string;
+  riskProfile?: YpiStudioUnattendedRiskProfile;
+  executionProfile?: YpiStudioUnattendedExecutionProfile;
+  uiGate: YpiStudioUnattendedUiGate;
+  expiresAt: string;
+  grantedAt?: string;
+}
+
+/**
+ * Internal policy-engine grant writer.
+ * Binds to current plan revision/hash, complete ownerAuthorization, and automationBinding.
+ * UI gate fail-closed: blocked_manual_ui_approval is stored but cannot authorize implementing.
+ */
+export function recordYpiStudioPolicyGrant(input: YpiStudioPolicyGrantInput): YpiStudioTaskDetail {
+  const ctx = createContext(input.cwd);
+  return withTaskMutationLock(ctx, input.taskId, () => {
+    const record = loadTaskRecord(ctx, input.taskId);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot record policy grants");
+    if (!isYpiStudioGithubUnattendedTask(record.raw)) {
+      throw new Error("policyGrant can only be recorded on executionMode=github_unattended tasks.");
+    }
+    const owner = isOwnerAuthorization(record.raw.meta.ownerAuthorization) ? record.raw.meta.ownerAuthorization : null;
+    if (!owner || owner.claimStatus !== "complete") {
+      throw new Error("policyGrant requires complete-claim ownerAuthorization first.");
+    }
+    const binding = isAutomationBinding(record.raw.meta.automationBinding) ? record.raw.meta.automationBinding : null;
+    if (!binding) throw new Error("policyGrant requires automationBinding.");
+    if (owner.repositoryId !== binding.repositoryId || owner.issueNumber !== binding.issueNumber) {
+      throw new Error("ownerAuthorization and automationBinding repository/issue mismatch.");
+    }
+    if (!optionalString(input.policyId) || !optionalString(input.policyVersion) || !optionalString(input.policyHash)) {
+      throw new Error("policyGrant requires policyId, policyVersion, and policyHash.");
+    }
+    if (!isUiGate(input.uiGate)) throw new Error("policyGrant uiGate must be pass or blocked_manual_ui_approval.");
+    const expiresMs = Date.parse(input.expiresAt);
+    if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) {
+      throw new Error("policyGrant expiresAt must be a future ISO timestamp.");
+    }
+    const riskProfile: YpiStudioUnattendedRiskProfile = input.riskProfile ?? "docs-and-small-bugfix";
+    if (!isRiskProfile(riskProfile)) {
+      throw new Error("policyGrant riskProfile must be docs-and-small-bugfix.");
+    }
+    const executionProfile: YpiStudioUnattendedExecutionProfile = input.executionProfile ?? "full-agent";
+    if (!isExecutionProfile(executionProfile)) {
+      throw new Error("policyGrant executionProfile must be full-agent.");
+    }
+    const grantedAt = input.grantedAt ?? nowIso();
+    const planRevision = record.raw.meta.planRevision ?? 1;
+    const planHash = hashYpiStudioImplementationPlan(record.raw.implementationPlan);
+    const policyGrant: YpiStudioPolicyGrant = {
+      source: "policy-engine",
+      grantedAt,
+      expiresAt: input.expiresAt,
+      policyId: input.policyId,
+      policyVersion: input.policyVersion,
+      policyHash: input.policyHash,
+      planRevision,
+      planHash,
+      scopeFingerprint: binding.scopeFingerprint,
+      riskProfile,
+      executionProfile,
+      repositoryId: owner.repositoryId,
+      issueNumber: owner.issueNumber,
+      ownerActorId: owner.ownerActorId,
+      ownerCommentId: owner.ownerCommentId,
+      claimStatus: "complete",
+      uiGate: input.uiGate,
+    };
+    if (!isPolicyGrant(policyGrant)) throw new Error("Invalid policyGrant payload.");
+    record.raw.meta = {
+      ...record.raw.meta,
+      policyGrant,
+      completionEvidence: undefined,
+      // Never copy interactive grants into unattended authorization.
+      approvalGrant: undefined,
+    };
+    record.raw.updatedAt = grantedAt;
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "note",
+      at: grantedAt,
+      taskId: record.raw.id,
+      message: "Recorded internal policyGrant for github_unattended",
+      data: {
+        source: "policy-engine",
+        policyId: policyGrant.policyId,
+        policyVersion: policyGrant.policyVersion,
+        planRevision: policyGrant.planRevision,
+        uiGate: policyGrant.uiGate,
+        riskProfile: policyGrant.riskProfile,
+        repositoryId: policyGrant.repositoryId,
+        issueNumber: policyGrant.issueNumber,
+      },
+    });
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after policy grant");
+    return detail;
+  });
+}
+
+export interface YpiStudioUnattendedCompletionEvidenceInput {
+  cwd: string;
+  taskId: string;
+  checkerPassed: boolean;
+  validationPassed: boolean;
+  finalDiffAllowed: boolean;
+  notesHash?: string;
+  recordedAt?: string;
+}
+
+/** Internal completion evidence writer. Rejects partial/false gates. */
+export function recordYpiStudioUnattendedCompletionEvidence(
+  input: YpiStudioUnattendedCompletionEvidenceInput,
+): YpiStudioTaskDetail {
+  const ctx = createContext(input.cwd);
+  return withTaskMutationLock(ctx, input.taskId, () => {
+    const record = loadTaskRecord(ctx, input.taskId);
+    if (!record?.raw) throw new Error("Task not found");
+    if (record.archived) throw new Error("Archived tasks cannot record completion evidence");
+    assertYpiStudioUnattendedImplementationAuthorized(record.raw);
+    if (!input.checkerPassed || !input.validationPassed || !input.finalDiffAllowed) {
+      throw new Error("completionEvidence requires checkerPassed, validationPassed, and finalDiffAllowed all true.");
+    }
+    const binding = isAutomationBinding(record.raw.meta.automationBinding) ? record.raw.meta.automationBinding : null;
+    if (!binding) throw new Error("completionEvidence requires automationBinding.");
+    const recordedAt = input.recordedAt ?? nowIso();
+    const evidence: YpiStudioUnattendedCompletionEvidence = {
+      recordedAt,
+      planRevision: record.raw.meta.planRevision ?? 1,
+      planHash: hashYpiStudioImplementationPlan(record.raw.implementationPlan),
+      scopeFingerprint: binding.scopeFingerprint,
+      riskProfile: "docs-and-small-bugfix",
+      checkerPassed: true,
+      validationPassed: true,
+      finalDiffAllowed: true,
+      notesHash: input.notesHash,
+    };
+    if (!isCompletionEvidence(evidence)) throw new Error("Invalid completionEvidence payload.");
+    record.raw.meta = {
+      ...record.raw.meta,
+      completionEvidence: evidence,
+    };
+    record.raw.updatedAt = recordedAt;
+    writeTaskJson(record.dirPath, record.raw);
+    appendTaskEvent(record.dirPath, {
+      type: "note",
+      at: recordedAt,
+      taskId: record.raw.id,
+      message: "Recorded unattended completion evidence",
+      data: {
+        planRevision: evidence.planRevision,
+        checkerPassed: true,
+        validationPassed: true,
+        finalDiffAllowed: true,
+      },
+    });
+    const detail = getYpiStudioTaskDetail(ctx.cwd, record.raw.id);
+    if (!detail) throw new Error("Task not found after completion evidence");
+    return detail;
+  });
 }
 
 function approvalGate(enteredAt: string, from: string, contextId?: string): YpiStudioApprovalGate {
@@ -1451,6 +2090,14 @@ function normalizeTaskRecord(value: unknown, fallbackId: string, ctx: TaskContex
       ? {
           ...value.meta,
           planRevision: typeof value.meta.planRevision === "number" && Number.isFinite(value.meta.planRevision) ? Math.max(1, Math.floor(value.meta.planRevision)) : undefined,
+          // Additive unattended fields: only accept well-formed values so public forgeries cannot invent grants via loose meta passthrough.
+          executionMode: isExecutionMode(value.meta.executionMode) ? value.meta.executionMode : undefined,
+          ownerAuthorization: isOwnerAuthorization(value.meta.ownerAuthorization) ? value.meta.ownerAuthorization : undefined,
+          policyGrant: isPolicyGrant(value.meta.policyGrant) ? value.meta.policyGrant : undefined,
+          completionEvidence: isCompletionEvidence(value.meta.completionEvidence) ? value.meta.completionEvidence : undefined,
+          automationBinding: isAutomationBinding(value.meta.automationBinding) ? value.meta.automationBinding : undefined,
+          // Interactive grant still validated only at use-time via isApprovalGrant; drop non-allowlisted sources on load.
+          approvalGrant: isApprovalGrant(value.meta.approvalGrant) ? value.meta.approvalGrant : undefined,
         }
       : {},
     implementationPlan,
@@ -3002,6 +3649,8 @@ export function recordYpiStudioUserApproval(cwd: string, contextId: string, inpu
     const record = findAwaitingApprovalTaskForContext(ctx, contextId);
     if (!record?.raw || record.archived || record.raw.status !== "awaiting_approval") return null;
     assertTaskBoundToContext(record.raw, contextId);
+    // Interactive chat approval must never mint grants on github_unattended tasks.
+    if (isYpiStudioGithubUnattendedTask(record.raw)) return null;
     const existingGate = isApprovalGate(record.raw.meta.approvalGate) ? record.raw.meta.approvalGate : approvalGate(record.raw.updatedAt, "unknown", contextId);
     const approvedAt = isoAfter(existingGate.enteredAt);
     record.raw.meta = {
@@ -3038,6 +3687,9 @@ export function approveYpiStudioPlanFromWidget(taskIdOrKey: string, body: YpiStu
       throw new Error(`approve_plan requires status awaiting_approval. Current status: ${record.raw.status}`);
     }
     assertTaskBoundToContext(record.raw, body.contextId);
+    if (isYpiStudioGithubUnattendedTask(record.raw)) {
+      throw new Error("approve_plan is interactive-only. github_unattended tasks require internal policyGrant authorization, not user-widget approval.");
+    }
     const revision = record.raw.meta.planRevision ?? 1;
     assertExpectedRevision(revision, body.expectedRevision, "approve_plan");
     assertPlanReviewReadyForApproval(record, ctx.workspaceRoot);
@@ -3451,12 +4103,21 @@ export function transitionYpiStudioTask(taskIdOrKey: string, body: YpiStudioTask
       ...record.raw.meta,
       approvalGate: approvalGate(updatedAt, from, body.contextId),
       approvalGrant: undefined,
+      // Entering approval clears prior unattended policy/completion so they must be re-evaluated against the current plan.
+      policyGrant: undefined,
+      completionEvidence: undefined,
     };
   } else if (from === "awaiting_approval" && (body.to === "planning" || body.to === "changes_requested")) {
     // Leaving the approval state without going forward to implementing: clear the old grant
-    // so the user must re-approve after any revisions.
+    // so the user must re-approve after any revisions. Same for unattended policy evidence.
     const revision = (record.raw.meta.planRevision ?? 1) + 1;
-    record.raw.meta = { ...record.raw.meta, approvalGrant: undefined, planRevision: revision };
+    record.raw.meta = {
+      ...record.raw.meta,
+      approvalGrant: undefined,
+      planRevision: revision,
+      policyGrant: undefined,
+      completionEvidence: undefined,
+    };
   }
   writeTaskJson(record.dirPath, record.raw);
   appendTaskEvent(record.dirPath, { type: "transition", at: updatedAt, taskId: record.raw.id, from, to: body.to, message: body.reason, data: { override: body.override === true, approvalGate: body.to === "awaiting_approval" } });
@@ -3475,9 +4136,18 @@ export function updateYpiStudioTaskArtifact(taskIdOrKey: string, body: YpiStudio
   if (record.archived) throw new Error("Archived tasks cannot update artifacts");
   if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);
   if (record.raw.status === "awaiting_approval") {
-    // Any artifact change during approval invalidates the old approval grant and bumps the plan revision.
+    // Any artifact change during approval invalidates interactive and unattended grants and bumps the plan revision.
     const revision = (record.raw.meta.planRevision ?? 1) + 1;
-    record.raw.meta = { ...record.raw.meta, approvalGrant: undefined, planRevision: revision };
+    record.raw.meta = {
+      ...record.raw.meta,
+      approvalGrant: undefined,
+      planRevision: revision,
+      policyGrant: undefined,
+      completionEvidence: undefined,
+    };
+  } else if (isYpiStudioGithubUnattendedTask(record.raw) && (record.raw.meta.policyGrant || record.raw.meta.completionEvidence)) {
+    // Plan/artifact scope changes outside awaiting_approval still invalidate unattended grants.
+    record.raw.meta = clearUnattendedAuthorizationMeta(record.raw.meta, { keepOwnerAuthorization: true });
   }
   const filePath = artifactPath(record.dirPath, record.raw, body.artifact);
   safeRealPath(record.dirPath, ctx.workspaceRoot);
@@ -3704,7 +4374,23 @@ export function updateYpiStudioImplementationPlan(taskIdOrKey: string, body: Ypi
   record.raw.implementationProgress = rebuildImplementationProgress(normalizedPlan, record.raw.implementationProgress);
   if (record.raw.status === "awaiting_approval") {
     const revision = (record.raw.meta.planRevision ?? 1) + 1;
-    record.raw.meta = { ...record.raw.meta, approvalGate: approvalGate(updatedAt, record.raw.status, body.contextId), approvalGrant: undefined, planRevision: revision };
+    record.raw.meta = {
+      ...record.raw.meta,
+      approvalGate: approvalGate(updatedAt, record.raw.status, body.contextId),
+      approvalGrant: undefined,
+      planRevision: revision,
+      policyGrant: undefined,
+      completionEvidence: undefined,
+    };
+  } else if (isYpiStudioGithubUnattendedTask(record.raw) && (record.raw.meta.policyGrant || record.raw.meta.completionEvidence)) {
+    // Implementation plan changes invalidate planHash-bound unattended grants even outside awaiting_approval.
+    const revision = (record.raw.meta.planRevision ?? 1) + 1;
+    record.raw.meta = {
+      ...record.raw.meta,
+      planRevision: revision,
+      policyGrant: undefined,
+      completionEvidence: undefined,
+    };
   }
   record.raw.updatedAt = updatedAt;
   if (body.contextId) assertTaskBoundToContext(record.raw, body.contextId);

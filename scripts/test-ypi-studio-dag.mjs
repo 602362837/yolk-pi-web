@@ -9,8 +9,10 @@ import {
   bindYpiStudioTaskToContext,
   claimYpiStudioImprovementSubtask,
   claimYpiStudioImplementationSubtask,
+  createYpiStudioGithubUnattendedTask,
   createYpiStudioImprovement,
   createYpiStudioTask,
+  buildYpiStudioUnattendedScopeFingerprint,
   getNextYpiStudioImplementationSubtask,
   getYpiStudioTaskDetail,
   implementationCounts,
@@ -22,6 +24,8 @@ import {
   reconcileYpiStudioImprovements,
   reconcileYpiStudioRuntimeLostSubagentRun,
   recordYpiStudioImprovementApproval,
+  recordYpiStudioOwnerAuthorization,
+  recordYpiStudioPolicyGrant,
   recordYpiStudioSubagentRun,
   recordYpiStudioUserApproval,
   refreshDerivedImplementationDAG,
@@ -2764,6 +2768,67 @@ function assertBoundedQuickPreviews(projection) {
     const link = resolveYpiStudioTaskForSession({ cwd, sessionId, sessionFilePath, entries: [] });
     assert.equal(link.task?.status, "awaiting_approval");
     assert.equal(resolveYpiStudioSessionAutocontinueCommand({ cwd, primaryTask: link.task }), null);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+{
+  // GHA-05: github_unattended implementing requires policyGrant; override cannot bypass; interactive path unchanged.
+  const cwd = mkdtempSync(join(tmpdir(), "ypi-studio-gha05-unattended-"));
+  try {
+    const contextId = "pi_gha05_unattended";
+    const scope = buildYpiStudioUnattendedScopeFingerprint({ repositoryId: 602362837, issueNumber: 99 });
+    const task = createYpiStudioGithubUnattendedTask({
+      cwd,
+      title: "GHA-05 unattended",
+      workflowId: "feature-dev",
+      contextId,
+      repositoryId: 602362837,
+      issueNumber: 99,
+      scopeFingerprint: scope,
+    });
+    transitionYpiStudioTask(task.id, { cwd, to: "planning", override: true, contextId });
+    writePlanReview(cwd, task.id, contextId);
+    updateYpiStudioImplementationPlan(task.id, {
+      cwd,
+      action: "update_implementation_plan",
+      contextId,
+      implementationPlan: {
+        schemaVersion: 2,
+        summary: "docs",
+        subtasks: [{ id: "DOC-01", title: "Docs", dependsOn: [], relation: "serial" }],
+      },
+    });
+    transitionYpiStudioTask(task.id, { cwd, to: "awaiting_approval", override: true, contextId });
+    assert.throws(
+      () => transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId }),
+      /override cannot bypass this policy gate|missing_or_incomplete|policyGrant/,
+    );
+    recordYpiStudioOwnerAuthorization({
+      cwd,
+      taskId: task.id,
+      repositoryId: 602362837,
+      issueNumber: 99,
+      ownerActorId: 7,
+      ownerCommentId: 8,
+      ownerCommentHash: "hash",
+      claimStatus: "complete",
+      recommendation: "yes",
+    });
+    recordYpiStudioPolicyGrant({
+      cwd,
+      taskId: task.id,
+      policyId: "docs-and-small-bugfix",
+      policyVersion: "1",
+      policyHash: "ph",
+      uiGate: "pass",
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+    });
+    assert.equal(
+      transitionYpiStudioTask(task.id, { cwd, to: "implementing", override: true, contextId }).status,
+      "implementing",
+    );
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
