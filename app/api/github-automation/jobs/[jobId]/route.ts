@@ -40,11 +40,11 @@ const ALLOWED_ACTIONS = new Set<GithubAutomationJobActionName>([
 ]);
 
 interface RouteContext {
-  params: Promise<{ jobId: string }> | { jobId: string };
+  params: Promise<{ jobId: string }>;
 }
 
 async function resolveJobId(context: RouteContext): Promise<string | null> {
-  const params = await Promise.resolve(context.params);
+  const params = await context.params;
   const jobId = typeof params.jobId === "string" ? params.jobId.trim() : "";
   if (!jobId || jobId.length > 200) return null;
   if (jobId.includes("..") || jobId.includes("/") || jobId.includes("\\")) {
