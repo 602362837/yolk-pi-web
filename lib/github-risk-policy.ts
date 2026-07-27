@@ -395,9 +395,10 @@ export function evaluateGithubRiskPolicy(
     };
   }
 
-  // pre stage with no files yet is allowed only if plan text is not blocked
-  // (caller may run pre with intent only).
-  if (files.length === 0 && stage === "pre") {
+  // pre/plan with no files yet is allowed only if plan-text hints are not blocked.
+  // Runner uses stage=plan before the full agent creates any diff; final gate still
+  // fail-closes empty/uncertain/out-of-policy changes after implementation.
+  if (files.length === 0 && (stage === "pre" || stage === "plan")) {
     return {
       decision: "allow",
       classification: "docs",
@@ -409,7 +410,7 @@ export function evaluateGithubRiskPolicy(
       maxFiles,
       maxChangedLines,
       blockedPaths: [],
-      message: `Stage pre: no files yet; deferred to plan/final gates under ${riskProfile}.`,
+      message: `Stage ${stage}: no files yet; deferred to final gate under ${riskProfile}.`,
     };
   }
 

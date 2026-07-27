@@ -1582,15 +1582,104 @@ export async function requestGithubUnattendedJobPause(
 /**
  * Clear pause flag and mark job queued so scheduler can resume same generation.
  * Comment "@bot 重试" should call this (or queue path) — never inject comment text as agent command.
+ *
+ * When the job/runner is parked at `blocked`, roll the durable checkpoint back to the last
+ * safe advance point (worktree / Studio task / implementing / checking / publish). Otherwise a
+ * plan-policy false positive leaves checkpoint=blocked and plain re-queue never starts a session.
  */
+function resolveGithubUnattendedRetryResume(input: {
+  job: GithubAutomationJobRecord;
+  state: GithubAutomationRunnerStateV1 | null;
+}): {
+  phase: GithubAutomationJobRecord["phase"];
+  checkpoint: GithubAutomationRunnerCheckpoint;
+} {
+  const state = input.state;
+  const phase = input.job.phase;
+  const checkpoint =
+    state?.checkpoint ??
+    (input.job.checkpoint as GithubAutomationRunnerCheckpoint | null) ??
+    null;
+
+  if (
+    checkpoint === "awaiting_publish" ||
+    checkpoint === "publishing" ||
+    phase === "final_policy" ||
+    phase === "publishing"
+  ) {
+    return { phase: "final_policy", checkpoint: "awaiting_publish" };
+  }
+
+  if (
+    checkpoint === "blocked" ||
+    phase === "blocked" ||
+    input.job.status === "blocked"
+  ) {
+    if (state?.lastMember === "checker" || checkpoint === "checking") {
+      return { phase: "checking", checkpoint: "checking" };
+    }
+    if (
+      state?.lastMember === "implementer" ||
+      state?.sessionId ||
+      checkpoint === "implementing" ||
+      phase === "implementing"
+    ) {
+      return { phase: "implementing", checkpoint: "implementing" };
+    }
+    if (state?.taskId) {
+      return { phase: "planning", checkpoint: "studio_task_ready" };
+    }
+    if (state?.worktreePath) {
+      return {
+        phase: "implementation_queued",
+        checkpoint: "worktree_ready",
+      };
+    }
+    return {
+      phase: "implementation_queued",
+      checkpoint: "implementation_queued",
+    };
+  }
+
+  if (phase === "paused") {
+    if (checkpoint === "checking") {
+      return { phase: "checking", checkpoint: "checking" };
+    }
+    if (checkpoint === "studio_task_ready" || checkpoint === "planning") {
+      return { phase: "planning", checkpoint: "studio_task_ready" };
+    }
+    if (
+      checkpoint === "worktree_ready" ||
+      checkpoint === "implementation_queued"
+    ) {
+      return {
+        phase: "implementation_queued",
+        checkpoint: checkpoint ?? "worktree_ready",
+      };
+    }
+    return { phase: "implementing", checkpoint: "implementing" };
+  }
+
+  // retry_due / other non-blocked phases keep their durable phase and checkpoint.
+  return {
+    phase,
+    checkpoint: checkpoint ?? "implementation_queued",
+  };
+}
+
 export async function wakeGithubUnattendedJobForRetry(input: {
   job: GithubAutomationJobRecord;
   clearPause?: boolean;
 }): Promise<GithubAutomationJobRecord> {
   let state = readGithubAutomationRunnerState(input.job.jobId);
+  const resume = resolveGithubUnattendedRetryResume({
+    job: input.job,
+    state,
+  });
   if (state) {
     state = writeGithubAutomationRunnerState({
       ...state,
+      checkpoint: resume.checkpoint,
       pauseRequested: input.clearPause === false ? state.pauseRequested : false,
       reasonCode: "retry_wake",
     });
@@ -1598,14 +1687,8 @@ export async function wakeGithubUnattendedJobForRetry(input: {
   const job = await persistJob({
     ...input.job,
     status: "queued",
-    phase:
-      input.job.phase === "paused" || input.job.phase === "retry_due"
-        ? state?.checkpoint === "awaiting_publish"
-          ? "final_policy"
-          : input.job.phase === "paused"
-            ? "implementing"
-            : input.job.phase
-        : input.job.phase,
+    phase: resume.phase,
+    checkpoint: resume.checkpoint,
     reasonCode: "retry_wake",
     nextRetryAt: null,
     leaseOwner: null,
@@ -1624,6 +1707,7 @@ export async function wakeGithubUnattendedJobForRetry(input: {
     meta: {
       // Explicit: retry does not inject comment command text into agent.
       injectsCommentText: false,
+      resumeCheckpoint: resume.checkpoint,
     },
   });
   return job;

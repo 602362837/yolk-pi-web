@@ -210,6 +210,22 @@ await test("empty final diff is blocked", () => {
   assert.equal(result.reasonCode, "blocked_empty_diff");
 });
 
+await test("empty plan/pre stages allow and defer to final (no session-blocking false positive)", () => {
+  for (const stage of ["pre", "plan"]) {
+    const result = risk.evaluateGithubRiskPolicy({
+      stage,
+      limits,
+      files: [],
+      riskProfile: "docs-and-small-bugfix",
+      issueTitlePreview: "chat打开底部模型性能问题",
+      planText: "chat打开底部模型性能问题",
+    });
+    assert.equal(result.decision, "allow", stage);
+    assert.equal(result.classification, "docs", stage);
+    assert.equal(result.reasonCode, "allowed_docs", stage);
+  }
+});
+
 await test("wrong riskProfile is blocked", () => {
   const result = risk.evaluateGithubRiskPolicy({
     stage: "final",

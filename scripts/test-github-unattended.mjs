@@ -1315,6 +1315,56 @@ await test("pause at checkpoint does not inject comment text; wake resumes same 
   assertNoSentinel(woken, "woken job");
 });
 
+await test("retry from plan-policy blocked rolls back to studio_task_ready so session can start", async () => {
+  await store.ensureGithubAutomationStoreLayout();
+  const job = await createJob(852, "chat打开底部模型性能问题");
+  const blockedJob = {
+    ...job,
+    phase: "blocked",
+    status: "blocked",
+    checkpoint: "blocked",
+    reasonCode: "blocked_uncertain",
+  };
+  await store.writeGithubAutomationJob(blockedJob);
+  runner.writeGithubAutomationRunnerState({
+    schemaVersion: 1,
+    jobId: job.jobId,
+    repositoryId: job.repositoryId,
+    issueNumber: job.issueNumber,
+    generation: job.generation,
+    checkpoint: "blocked",
+    worktreePath: "/tmp/ypi-gha-issue-852",
+    branchName: "ypi/gha/852/issue-852/g1",
+    baseRef: "main",
+    projectId: "prj_test",
+    taskId: "20260727-task-github-852",
+    sessionId: null,
+    contextId: null,
+    sessionFile: null,
+    scopeFingerprint: "scope-fp",
+    ownerActorId: 99,
+    ownerCommentId: 1,
+    ownerCommentHash: "h".repeat(64),
+    lastMember: null,
+    lastRunId: null,
+    pauseRequested: false,
+    updatedAt: new Date().toISOString(),
+    reasonCode: "blocked_uncertain",
+  });
+
+  const woken = await runner.wakeGithubUnattendedJobForRetry({ job: blockedJob });
+  assert.equal(woken.status, "queued");
+  assert.equal(woken.phase, "planning");
+  assert.equal(woken.checkpoint, "studio_task_ready");
+  assert.equal(woken.reasonCode, "retry_wake");
+
+  const state = runner.readGithubAutomationRunnerState(job.jobId);
+  assert.equal(state?.checkpoint, "studio_task_ready");
+  assert.equal(state?.sessionId, null);
+  assert.equal(state?.taskId, "20260727-task-github-852");
+  assertNoSentinel(woken, "blocked retry wake");
+});
+
 await test("TEST-04 owner comment free text never enters prompt/task/runner/validation", async () => {
   await store.ensureGithubAutomationStoreLayout();
   const freeText =
