@@ -226,8 +226,9 @@ gh auth switch
 该用户需要对目标仓库有可被指派的权限（通常是可写协作者）。
 
 > **身份隔离**：App Bot 负责 webhook 验签、标签、评论、指派 API 与后续 PR 发布；  
-> 本机 `gh` / git 凭据用户 **只作为 Assignee 展示身份**，不会变成 Bot 或 publisher 回退。  
-> Links 里的 GitHub OAuth 连接与本功能无关。
+> 本机 `gh` / git 凭据用户 **只作为 Assignee 展示身份**，不会变成 Bot 或 publisher 回退，也 **不是** Owner 指令目标（不要用 `@机器Assignee` 触发自动化，以免劫持真人沟通）。  
+> Links 里的 GitHub OAuth 连接与本功能无关。  
+> App/Bot 自己产生的 label/assign/评论创建与编辑 webhook **只记审计、不建 job、不唤醒调度**，避免 Bot 编辑 triage 评论形成自循环。
 
 ---
 
@@ -298,8 +299,27 @@ GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 3. 再考虑打开无人值守  
 
 无人值守默认使用完整 agent 能力，可以执行命令和访问网络，因此只应在你明确接受风险后开启。  
-只有 **仓库所有者** 明确表示采纳时才会开始自动实现。  
-产品保证不会把 App 私钥 / JWT / installation token、Webhook secret、本机个人凭据**主动注入** agent 上下文；这不等于 OS 级沙箱。生产建议使用独立低权限系统用户或容器。
+只有 **仓库所有者** 通过受支持指令明确采纳时才会开始自动实现。  
+产品保证不会把 App 私钥 / JWT / installation token、Webhook secret、本机个人凭据**主动注入** agent 上下文，也 **不会** 把 Issue/评论自由文本注入 agent 提示词、validation、分支/remote 或 publisher；这不等于 OS 级沙箱。生产建议使用独立低权限系统用户或容器。
+
+### 7.4 Owner 指令（Issue 评论协议）
+
+Triage 结论评论会附带开发者指令说明。请用 **仓库 Owner** 账号、**人类** 账号发送：
+
+| 写法 | 说明 |
+| --- | --- |
+| `@AppBot 状态` 或 `/ypi 状态` | 只读查询当前阶段 / 阻塞 / 下一步 |
+| `@AppBot 重新评估` 或 `/ypi 重新评估` | 仅根据最新 Issue title/body 再 triage；**不**把评论自由文本当需求补丁 |
+| `@AppBot 采纳` 或 `/ypi 采纳`（等待采纳阶段也兼容「可以做」「开始实现」等肯定语） | 结构化采纳；需认领完整、recommendation=yes、Issue 未关闭、策略门禁通过 |
+| `@AppBot 暂停` / `@AppBot 继续` | **仅**控制当前 job；**不能**解除设置页全局「暂停自动化」 |
+
+规则摘要：
+
+- 命令绑定**本条**评论 id/版本；编辑同一条评论会更新回执，不会扫描历史「采纳」评论误触发。  
+- 每条受支持命令会有可更新的 **command receipt**；长流程用**单条** status 评论，仅语义变化时更新。  
+- 非 Owner、Bot、全局 paused、认领不完整、Issue 已关闭等 fail closed；非定向闲聊默认不刷拒绝评论。  
+- Issue 关闭时 active job 进入 blocked/paused（`issue_closed`），**保留** WorkTree；reopen 后需 Owner **显式继续**。  
+- **全局 paused** 只能在设置 / config 管理面操作；评论永远不能改 validation、allowlist、凭据或 publisher。
 
 ---
 
@@ -319,17 +339,17 @@ GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 
 - 议题被认领到你的 GitHub 用户  
 - 出现处理相关标签  
-- Bot 发布一条中文结论评论  
+- Bot 发布**一条**中文结论评论（含 Owner 指令说明）；之后至少观察 1–2 分钟：**不应**因 Bot 自己编辑评论而不断产生新 generation / 重复 PATCH  
 
-### 8.2 所有者采纳
+### 8.2 所有者指令与采纳
 
-用仓库所有者账号在议题下明确回复，例如：
+用仓库所有者账号在议题下发送定向指令，例如：
 
-- 采纳  
-- 可以做  
-- 开始实现  
+- `@AppBot 状态` 或 `/ypi 状态` → 应出现 receipt，且为只读  
+- `@AppBot 采纳`（或等待采纳阶段的「可以做」「开始实现」）→ 一次状态推进 + receipt  
 
-非所有者、疑问句、否定句不会触发自动实现。
+非所有者、Bot、疑问句、否定句、引用/代码块中的伪命令不会触发自动实现。  
+若全局 paused 开启，delivery 只记审计/paused，命令不执行。
 
 ### 8.3 可选：自动开 PR
 
@@ -382,7 +402,10 @@ export YPI_GITHUB_APP_SLUG="your-app-slug"
 | Assignee 失败 | 执行 `gh auth status`；确认该用户可被指派到仓库 |
 | 允许仓库是空的 | 正常，需要你手动关联，不会默认塞任何仓库 |
 | 无人值守按钮不可用 | 先完成 checklist；若要自动 PR，还需 Contents / Pull requests 权限 |
-| 想立刻停掉 | 在设置里关闭自动化，或改回「仅 Triage」；不必删除本机凭据 |
+| 想立刻停掉 | 在设置里打开全局 **paused**，或 `enabled=false` / 改回「仅 Triage」；**不要**指望 Issue 评论解除/设置全局暂停；不必删除本机凭据与历史 delivery/job |
+| Bot 评论反复编辑 / generation 暴涨 | 确认已部署含 self/Bot 入口过滤的版本；打开全局 paused 止血；检查 deliveries 忽略原因为 `self_app_event`/`bot_actor_event`；**不要**批量删除 g1–gN 审计来“修复” |
+| 发了「采纳」无 receipt | 需 `@AppBot` 或 `/ypi` 定向（等待采纳阶段的裸肯定语除外）；确认是 Owner 人类账号、非 Bot；确认非全局 paused |
+| `@机器Assignee` 无反应 | 预期：默认不把机器 Assignee 当自动化目标 |
 | 删除本机后仍显示已配置 | 进程 env 仍提供完整字段时属预期；去掉 env 后会变为未配置 |
 
 ---
@@ -412,6 +435,8 @@ export YPI_GITHUB_APP_SLUG="your-app-slug"
 | 在设置页安全写入本机 App 凭据并重启复用 | 替客户托管一个共用 GitHub App |
 | 显示配置状态与来源（本机 / env / 未配置） | 回显、复制或下载已保存 secret / PEM / 路径 / 指纹 |
 | 按你关联的仓库工作 | 默认锁死只能处理某一个固定仓库 |
+| 审计并忽略 App/Bot 自事件，避免评论自循环 | 把任意 `issue_comment` 都当成新 claim/generation |
+| Owner `@AppBot` / `/ypi` 指令 + receipt/status | 扫描历史任意肯定评论；把评论自由文本注入 agent / 改全局 paused |
 | 所有者采纳后可选自动开 PR | 自动合并 PR、自动发布版本 |
 | 公网 webhook 验签与 durable job | 把管理 UI/凭据 API 设计为可安全裸奔公网 |
 

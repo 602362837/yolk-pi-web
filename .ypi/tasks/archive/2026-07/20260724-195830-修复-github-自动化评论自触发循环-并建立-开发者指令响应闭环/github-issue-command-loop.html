@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Issue Command Loop Prototype</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background-color: #f6f8fa; color: #24292f; margin: 0; padding: 20px; }
+        .timeline { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+        .comment { border: 1px solid #d0d7de; border-radius: 6px; background: #fff; overflow: hidden; position: relative; }
+        .comment-header { background-color: #f6f8fa; border-bottom: 1px solid #d0d7de; padding: 10px 16px; font-size: 14px; color: #57606a; display: flex; justify-content: space-between; align-items: center;}
+        .comment-header strong { color: #24292f; }
+        .comment-body { padding: 16px; font-size: 14px; line-height: 1.5; }
+        .comment-body code { background: rgba(175, 184, 193, 0.2); padding: 0.2em 0.4em; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 85%; }
+        .badge { display: inline-block; padding: 2px 7px; font-size: 12px; font-weight: 500; line-height: 18px; border-radius: 2em; border: 1px solid transparent; }
+        .badge-bot { color: #57606a; border-color: #d0d7de; }
+        .badge-success { color: #1a7f37; border-color: #1a7f37; background: #dafeef; }
+        .badge-error { color: #cf222e; border-color: #cf222e; background: #ffebe9; }
+        .badge-warning { color: #9a6700; border-color: #d4a72c; background: #fff8c5; }
+        .quote { border-left: 4px solid #d0d7de; padding-left: 16px; color: #57606a; margin: 0 0 16px 0; }
+        .receipt-box { border: 1px solid #d0d7de; border-radius: 6px; padding: 12px; background: #f6f8fa; margin-top: 12px; }
+        .receipt-box table { border-collapse: collapse; width: 100%; font-size: 13px; }
+        .receipt-box th, .receipt-box td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #d0d7de; vertical-align: top; }
+        .receipt-box th { width: 100px; color: #57606a; font-weight: normal; }
+        .receipt-box tr:last-child th, .receipt-box tr:last-child td { border-bottom: none; }
+        .markdown-h3 { margin-top: 0; font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+    <div class="timeline">
+        <!-- 初始 Triage 评论 -->
+        <div class="comment">
+            <div class="comment-header">
+                <span><strong>AppBot</strong> <span class="badge badge-bot">bot</span> 评论于 2 分钟前</span>
+            </div>
+            <div class="comment-body">
+                <div class="markdown-h3">✅ YPI 自动化已认领</div>
+                <p>我已对该 Issue 进行了初步评估。需求清晰，可以开始实现。</p>
+                <div class="receipt-box">
+                    <p><strong>开发者指令 (Owner Commands)</strong></p>
+                    <p>请作为仓库 Owner，通过评论 <code>@AppBot &lt;指令&gt;</code> 来管理任务：</p>
+                    <ul>
+                        <li><code>@AppBot 采纳</code>：批准方案并开始自动实现</li>
+                        <li><code>@AppBot 状态</code>：查看当前实现进度</li>
+                        <li><code>@AppBot 重新评估</code>：修改 Issue 内容后重新生成方案</li>
+                        <li><code>@AppBot 暂停</code> / <code>@AppBot 继续</code>：控制当前任务（不影响全局暂停状态）</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 开发者指令 -->
+        <div class="comment">
+            <div class="comment-header">
+                <span><strong>owner_developer</strong> 评论于 1 分钟前</span>
+            </div>
+            <div class="comment-body">
+                <p>方案没问题。</p>
+                <p>@AppBot 采纳</p>
+            </div>
+        </div>
+
+        <!-- 机器人的 Receipt (已受理) -->
+        <div class="comment">
+            <div class="comment-header">
+                <span><strong>AppBot</strong> <span class="badge badge-bot">bot</span> 评论于 1 分钟前</span>
+            </div>
+            <div class="comment-body">
+                <div class="quote">@owner_developer: @AppBot 采纳</div>
+                <div class="receipt-box">
+                    <table>
+                        <tr><th>状态</th><td><span class="badge badge-success">已受理 (Accepted)</span></td></tr>
+                        <tr><th>当前阶段</th><td>Awaiting Implementation</td></tr>
+                        <tr><th>下一步</th><td>系统将分配实现员开始编写代码并提交 PR。</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 聚合的单一 Status 评论 -->
+        <div class="comment">
+            <div class="comment-header">
+                <span><strong>AppBot</strong> <span class="badge badge-bot">bot</span> 评论于 刚刚 (此评论将随进度更新)</span>
+            </div>
+            <div class="comment-body">
+                <div class="markdown-h3">🚀 实施状态更新</div>
+                <div class="receipt-box">
+                    <table>
+                        <tr><th>阶段</th><td>Implementing</td></tr>
+                        <tr><th>最近检查点</th><td>已切出分支，开始编写业务代码</td></tr>
+                        <tr><th>阻塞项</th><td>无</td></tr>
+                        <tr><th>下一步</th><td>运行测试用例与验证</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 非 Owner 尝试发起指令 -->
+        <div class="comment">
+            <div class="comment-header">
+                <span><strong>random_user</strong> 评论于 刚刚</span>
+            </div>
+            <div class="comment-body">
+                <p>@AppBot 暂停</p>
+            </div>
+        </div>
+
+        <!-- 机器人的 Receipt (已拒绝) -->
+        <div class="comment">
+            <div class="comment-header">
+                <span><strong>AppBot</strong> <span class="badge badge-bot">bot</span> 评论于 刚刚</span>
+            </div>
+            <div class="comment-body">
+                <div class="quote">@random_user: @AppBot 暂停</div>
+                <div class="receipt-box">
+                    <table>
+                        <tr><th>状态</th><td><span class="badge badge-error">已拒绝 (Rejected)</span></td></tr>
+                        <tr><th>原因</th><td><code>non_owner</code>：此命令仅限仓库 Owner 执行。</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 处于全局暂停时，Owner 的指令也被阻断 -->
+        <div class="comment">
+            <div class="comment-header">
+                <span><strong>owner_developer</strong> 评论于 刚刚</span>
+            </div>
+            <div class="comment-body">
+                <p>@AppBot 状态</p>
+            </div>
+        </div>
+
+        <!-- 机器人的 Receipt (被忽略) -->
+        <div class="comment">
+            <div class="comment-header">
+                <span><strong>AppBot</strong> <span class="badge badge-bot">bot</span> 评论于 刚刚</span>
+            </div>
+            <div class="comment-body">
+                <div class="quote">@owner_developer: @AppBot 状态</div>
+                <div class="receipt-box">
+                    <table>
+                        <tr><th>状态</th><td><span class="badge badge-warning">被忽略 (Ignored)</span></td></tr>
+                        <tr><th>原因</th><td><code>global_paused</code>：目前 YPI 自动化处于全局暂停状态。Issue 评论无法解除全局暂停，请在管理面（Settings UI）恢复后再试。</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

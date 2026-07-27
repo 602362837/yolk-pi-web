@@ -25,10 +25,16 @@
 import { findRepositoryConfigById } from "./github-automation-config";
 import {
   buildAcceptedWaitingAutomationCommentBody,
+  buildAutomationStatusCommentBody,
   buildClaimBlockedCommentBody,
+  buildCommandReceiptCommentBody,
   buildGithubAutomationCommentMarker,
   buildTriageConclusionCommentBody,
+  getGithubIssueComment,
   upsertGithubAutomationComment,
+  verifyExactGithubCommentVersion,
+  type GithubExactIssueComment,
+  type GithubOwnerCommandDisplay,
   type GithubTriageRecommendation,
 } from "./github-automation-comments";
 import {
@@ -87,15 +93,22 @@ import {
   resolveMachineGithubAssigneeIdentity,
 } from "./github-machine-assignee";
 import {
+  buildGithubOwnerCommandKey,
   buildOwnerActorContextFromRepoConfig,
-  commentMayExpressOwnerDecision,
   evaluateGithubOwnerAuthorization,
+  githubOwnerCommandLabel,
+  isBotSenderType,
+  isGithubRepositoryOwnerActor,
+  parseGithubOwnerCommand,
   stripUntrustedCommentDecorations,
-  type GithubOwnerAuthorizationResult,
+  type GithubOwnerCommandKind,
+  type GithubOwnerCommandParseResult,
 } from "./github-owner-intent";
 import {
   continueGithubUnattendedJob,
   handleGithubUnattendedAfterOwnerAdoption,
+  requestGithubUnattendedJobPause,
+  wakeGithubUnattendedJobForRetry,
 } from "./github-automation-runner";
 
 // ─── Untrusted Issue snapshot ────────────────────────────────────────────────
@@ -364,7 +377,7 @@ export function analyzeUntrustedGithubIssue(
 
   if (recommendation === "yes") {
     nextActions.push(
-      "Owner 可用自然语言明确肯定（如「采纳」「可以做」「go ahead」）授权后续自动化",
+      "Owner 可评论 @AppBot 采纳（或 /ypi 采纳；等待采纳阶段也兼容「可以做」等肯定语）",
     );
   }
 
@@ -725,11 +738,11 @@ async function runClaimAndTriage(
     });
   }
 
+  // IDEMP-02: stable v2 marker (no trace in identity). Trace stays local audit only.
   const marker = buildGithubAutomationCommentMarker({
     kind: "triage",
     repositoryId: job.repositoryId,
     issueNumber: job.issueNumber,
-    traceId: job.traceId,
   });
 
   const commentBody = buildTriageConclusionCommentBody({
@@ -760,10 +773,12 @@ async function runClaimAndTriage(
       owner: ctx.owner,
       repo: ctx.repo,
       issueNumber: job.issueNumber,
+      repositoryId: job.repositoryId,
       kind: "triage",
       body: commentBody,
     });
     commentId = upserted.id;
+    // No-op / remote_confirmed still counts as remote presence for claim completeness.
   } catch (err) {
     const permission =
       isGithubAutomationError(err) && err.code === "permission_missing";
@@ -938,7 +953,6 @@ async function blockClaimAssignee(
         kind: "claim_blocked",
         repositoryId: job.repositoryId,
         issueNumber: job.issueNumber,
-        traceId: job.traceId,
       });
       const body = buildClaimBlockedCommentBody({
         marker,
@@ -956,6 +970,7 @@ async function blockClaimAssignee(
         owner: ctx.owner,
         repo: ctx.repo,
         issueNumber: job.issueNumber,
+        repositoryId: job.repositoryId,
         kind: "claim_blocked",
         body,
       });
@@ -1018,56 +1033,231 @@ async function blockClaimAssignee(
   return { job, wakeAgain: false };
 }
 
-// ─── Owner adoption (P0 → accepted_waiting_automation) ───────────────────────
+// ─── CMD-03: exact owner command path ────────────────────────────────────────
 
-async function runOwnerIntentIfPresent(
-  ctx: ClaimContext,
-): Promise<GithubAutomationJobHandlerResult | null> {
-  let job = ctx.job;
-  if (job.phase !== "awaiting_owner" && job.phase !== "accepted_waiting_automation") {
+const UNATTENDED_CONTROL_PHASES = new Set([
+  "implementation_queued",
+  "planning",
+  "policy_check",
+  "implementing",
+  "checking",
+  "final_policy",
+  "publishing",
+  "pr_open",
+  "paused",
+  "retry_due",
+  "accepted_waiting_automation",
+  "blocked",
+]);
+
+function commandToDisplay(
+  command: GithubOwnerCommandKind | null,
+  unsupported: boolean,
+): GithubOwnerCommandDisplay {
+  if (unsupported) return "unsupported";
+  if (!command) return "none";
+  return command;
+}
+
+function findOwnerCommandEffect(
+  effects: GithubAutomationEffectMarker[],
+  commandKey: string,
+): GithubAutomationEffectMarker | null {
+  return (
+    effects.find(
+      (e) =>
+        e.name === "owner_command" &&
+        e.remoteId === commandKey &&
+        (e.status === "remote_confirmed" || e.status === "intended"),
+    ) ?? null
+  );
+}
+
+async function writeCommandReceipt(options: {
+  ctx: ClaimContext;
+  job: GithubAutomationJobRecord;
+  commentId: number;
+  actorLogin: string | null;
+  command: GithubOwnerCommandDisplay;
+  receiptStatus: "accepted" | "rejected" | "ignored" | "superseded";
+  reasonCode: string | null;
+  currentPhase: string | null;
+  nextAction: string;
+  note?: string | null;
+}): Promise<number | null> {
+  const marker = buildGithubAutomationCommentMarker({
+    kind: "command_receipt",
+    repositoryId: options.job.repositoryId,
+    issueNumber: options.job.issueNumber,
+    commentId: options.commentId,
+  });
+  const body = buildCommandReceiptCommentBody({
+    marker,
+    actorLogin: options.actorLogin,
+    command: options.command,
+    receiptStatus: options.receiptStatus,
+    reasonCode: options.reasonCode,
+    currentPhase: options.currentPhase,
+    nextAction: options.nextAction,
+    note: options.note ?? null,
+  });
+  try {
+    const upserted = await upsertGithubAutomationComment({
+      installationId: options.ctx.installationId,
+      owner: options.ctx.owner,
+      repo: options.ctx.repo,
+      issueNumber: options.job.issueNumber,
+      repositoryId: options.job.repositoryId,
+      kind: "command_receipt",
+      commentId: options.commentId,
+      body,
+    });
+    return upserted.id;
+  } catch {
     return null;
   }
+}
 
-  // Need delivery to inspect comment sender — load safe delivery metadata only.
-  // Comment body is re-fetched via App API when needed; delivery store has no body.
-  if (!job.deliveryId) {
-    return {
-      job: await persistJob({
-        ...job,
-        status: "paused",
-        reasonCode: "awaiting_owner_comment",
-        leaseOwner: null,
-        leaseExpiresAt: null,
-      }),
-      wakeAgain: false,
-    };
+async function writeAutomationStatus(options: {
+  ctx: ClaimContext;
+  job: GithubAutomationJobRecord;
+  nextAction: string;
+  blockedSummary?: string | null;
+  prUrl?: string | null;
+}): Promise<void> {
+  const marker = buildGithubAutomationCommentMarker({
+    kind: "automation_status",
+    repositoryId: options.job.repositoryId,
+    issueNumber: options.job.issueNumber,
+  });
+  const body = buildAutomationStatusCommentBody({
+    marker,
+    phase: options.job.phase,
+    checkpoint: options.job.checkpoint,
+    reasonCode: options.job.reasonCode,
+    blockedSummary: options.blockedSummary ?? null,
+    prUrl: options.prUrl ?? null,
+    nextAction: options.nextAction,
+  });
+  try {
+    await upsertGithubAutomationComment({
+      installationId: options.ctx.installationId,
+      owner: options.ctx.owner,
+      repo: options.ctx.repo,
+      issueNumber: options.job.issueNumber,
+      repositoryId: options.job.repositoryId,
+      kind: "automation_status",
+      body,
+    });
+  } catch {
+    // non-fatal; reconcile later
+  }
+}
+
+async function reEvaluateTriageFromIssueBody(
+  ctx: ClaimContext,
+  job: GithubAutomationJobRecord,
+  issue: UntrustedGithubIssueSnapshot,
+): Promise<GithubAutomationJobRecord> {
+  // Re-triage only: never re-claim assignee. Uses latest title/body only.
+  const analysis = analyzeUntrustedGithubIssue(issue);
+  try {
+    await ensureTriageClassificationLabels({
+      installationId: ctx.installationId,
+      owner: ctx.owner,
+      repo: ctx.repo,
+      issueNumber: job.issueNumber,
+      currentLabels: issue.rawLabels,
+      decision: analysis.decisionLabel,
+      risk: analysis.riskLabel,
+      type: analysis.typeLabel,
+      lifecycle:
+        analysis.recommendation === "yes"
+          ? [YPI_LABEL_TRIAGED, YPI_LABEL_AWAITING_OWNER]
+          : [YPI_LABEL_TRIAGED],
+    });
+  } catch {
+    // best-effort labels
   }
 
-  const delivery = await readGithubAutomationDelivery(job.deliveryId);
-  if (!delivery || delivery.eventName !== "issue_comment") {
-    // issues event while awaiting owner — keep waiting.
-    return {
-      job: await persistJob({
-        ...job,
-        phase: "awaiting_owner",
-        status: "paused",
-        reasonCode: "awaiting_owner_comment",
-        leaseOwner: null,
-        leaseExpiresAt: null,
-      }),
-      wakeAgain: false,
-    };
-  }
+  const assigneeLogin =
+    issue.assignees[0]?.login ??
+    (await resolveMachineGithubAssigneeIdentity().then((r) =>
+      r.ok ? r.identity.login : "unknown",
+    ));
 
-  // Fetch the latest comments and evaluate owner intent on recent human comments.
-  // We only authorize when claim is still complete.
-  const issue = await fetchUntrustedGithubIssue({
-    installationId: ctx.installationId,
-    owner: ctx.owner,
-    repo: ctx.repo,
+  const marker = buildGithubAutomationCommentMarker({
+    kind: "triage",
+    repositoryId: job.repositoryId,
     issueNumber: job.issueNumber,
   });
+  const commentBody = buildTriageConclusionCommentBody({
+    marker,
+    appBotLogin: null,
+    assigneeLogin:
+      typeof assigneeLogin === "string" && assigneeLogin
+        ? assigneeLogin
+        : "unknown",
+    recommendation: analysis.recommendation,
+    reasons: analysis.reasons,
+    nextActions: analysis.nextActions,
+    issueTitlePreview: job.issueTitlePreview ?? issue.title,
+  });
+  try {
+    await upsertGithubAutomationComment({
+      installationId: ctx.installationId,
+      owner: ctx.owner,
+      repo: ctx.repo,
+      issueNumber: job.issueNumber,
+      repositoryId: job.repositoryId,
+      kind: "triage",
+      body: commentBody,
+    });
+  } catch {
+    // non-fatal
+  }
 
+  if (analysis.recommendation === "yes") {
+    return persistJob({
+      ...job,
+      phase: "awaiting_owner",
+      status: "paused",
+      checkpoint: "awaiting_owner",
+      reasonCode: "awaiting_owner_comment",
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      nextRetryAt: null,
+    });
+  }
+  return persistJob({
+    ...job,
+    phase: "not_adopted",
+    status: "completed",
+    checkpoint: "not_adopted",
+    reasonCode:
+      analysis.recommendation === "no"
+        ? "triage_not_recommended"
+        : "triage_needs_info",
+    leaseOwner: null,
+    leaseExpiresAt: null,
+  });
+}
+
+async function applyAdoptCommand(options: {
+  ctx: ClaimContext;
+  job: GithubAutomationJobRecord;
+  issue: UntrustedGithubIssueSnapshot;
+  comment: GithubExactIssueComment;
+  claimComplete: boolean;
+  expectedLogin: string | null;
+  matchedPhrase: string | null;
+}): Promise<GithubAutomationJobHandlerResult> {
+  const { ctx, issue, comment } = options;
+  let job = options.job;
+  const recommendation = recommendationFromLabels(issue.labels);
+  const issueOpen = (issue.state ?? "").toLowerCase() === "open";
+
+  // Gate via existing authorization helper using adopt-compatible body.
   const repoConfig = findRepositoryConfigById(ctx.config, job.repositoryId);
   if (!repoConfig) {
     return {
@@ -1076,55 +1266,6 @@ async function runOwnerIntentIfPresent(
         status: "blocked",
         phase: "blocked",
         reasonCode: "repository_not_allowlisted",
-      }),
-      wakeAgain: false,
-    };
-  }
-
-  // Verify claim still complete before any authorization.
-  const assigneeLogin = issue.assignees[0]?.login ?? null;
-  // Prefer machine identity re-check for login match
-  const resolved = await resolveMachineGithubAssigneeIdentity();
-  const expectedLogin = resolved.ok ? resolved.identity.login : null;
-  const assigneeOk =
-    expectedLogin !== null &&
-    issueAssigneesIncludeLogin(issue.rawAssignees, expectedLogin);
-  const labelOk = issueHasLabel(issue.rawLabels, YPI_LABEL_CLAIMED);
-
-  // Load comments — find non-bot comment matching delivery sender when possible
-  const { listGithubIssueComments } = await import("./github-automation-comments");
-  const comments = await listGithubIssueComments({
-    installationId: ctx.installationId,
-    owner: ctx.owner,
-    repo: ctx.repo,
-    issueNumber: job.issueNumber,
-  });
-
-  // Prefer comment from delivery.senderId
-  const candidates = comments
-    .filter((c) => !commentContainsBotMarker(c.body))
-    .slice()
-    .reverse(); // newest first
-
-  let chosen = candidates.find(
-    (c) =>
-      delivery.senderId !== null &&
-      c.userId === delivery.senderId &&
-      commentMayExpressOwnerDecision(c.body),
-  );
-  if (!chosen) {
-    chosen = candidates.find((c) => commentMayExpressOwnerDecision(c.body));
-  }
-
-  if (!chosen) {
-    return {
-      job: await persistJob({
-        ...job,
-        phase: "awaiting_owner",
-        status: "paused",
-        reasonCode: "awaiting_owner_comment",
-        leaseOwner: null,
-        leaseExpiresAt: null,
       }),
       wakeAgain: false,
     };
@@ -1144,23 +1285,21 @@ async function runOwnerIntentIfPresent(
     repositoryOwnerType = ownerInfo.type;
   }
 
-  // Re-read triage recommendation from labels
-  const recommendation = recommendationFromLabels(issue.labels);
-
   const actor = buildOwnerActorContextFromRepoConfig(repoConfig, {
-    senderId: chosen.userId,
-    senderLogin: chosen.userLogin,
-    senderType: chosen.userType,
+    senderId: comment.userId,
+    senderLogin: comment.userLogin,
+    senderType: comment.userType,
     repositoryOwnerId,
     repositoryOwnerLogin,
     repositoryOwnerType,
   });
 
-  const auth: GithubOwnerAuthorizationResult = evaluateGithubOwnerAuthorization({
+  const auth = evaluateGithubOwnerAuthorization({
     actor,
-    commentBody: chosen.body,
-    claimComplete: assigneeOk && labelOk,
-    issueOpen: (issue.state ?? "").toLowerCase() === "open",
+    // Use matched phrase only — never pass free-form remainder as agent text later.
+    commentBody: options.matchedPhrase ?? "采纳",
+    claimComplete: options.claimComplete,
+    issueOpen,
     recommendation,
   });
 
@@ -1179,26 +1318,37 @@ async function runOwnerIntentIfPresent(
       decision: auth.decision,
       intent: auth.intent.kind,
       isOwner: auth.isOwner,
-      claimComplete: assigneeOk && labelOk,
+      claimComplete: options.claimComplete,
+      command: "adopt",
     },
   });
 
   if (!auth.authorized) {
-    // Non-owner / incomplete claim / unclear — stay awaiting_owner (or keep blocked claim).
     if (auth.decision === "incomplete_claim") {
+      const resolved = await resolveMachineGithubAssigneeIdentity();
       return blockClaimAssignee(ctx, {
-        readiness: expectedLogin ? "readback_failed" : "gh_unavailable",
+        readiness: options.expectedLogin ? "readback_failed" : "gh_unavailable",
         identity: resolved.ok ? resolved.identity : null,
         canMutateGithub: true,
         extraReason: "incomplete_claim_on_owner_intent",
       });
     }
-
+    await writeCommandReceipt({
+      ctx,
+      job,
+      commentId: comment.id,
+      actorLogin: comment.userLogin,
+      command: "adopt",
+      receiptStatus: "rejected",
+      reasonCode: auth.reasonCode,
+      currentPhase: job.phase,
+      nextAction: "满足认领/建议/Issue open 等门禁后再发送采纳指令。",
+    });
     return {
       job: await persistJob({
         ...job,
-        phase: "awaiting_owner",
-        status: "paused",
+        phase: job.phase === "awaiting_owner" ? "awaiting_owner" : job.phase,
+        status: job.phase === "awaiting_owner" ? "paused" : job.status,
         reasonCode: auth.reasonCode,
         leaseOwner: null,
         leaseExpiresAt: null,
@@ -1207,36 +1357,53 @@ async function runOwnerIntentIfPresent(
     };
   }
 
-  // P0: unattended off → accepted_waiting_automation only (never WorkTree).
-  // P1: mode=unattended + enabled → durable full-agent runner (GHA-06).
   const unattendedEnabled =
     ctx.config.mode === "unattended" && ctx.config.unattended.enabled;
 
   if (unattendedEnabled) {
-    // Best-effort comment before handing off to runner (non-fatal).
     try {
       const marker = buildGithubAutomationCommentMarker({
         kind: "accepted_waiting_automation",
         repositoryId: job.repositoryId,
         issueNumber: job.issueNumber,
-        traceId: job.traceId,
       });
       const body = buildAcceptedWaitingAutomationCommentBody({
         marker,
-        ownerLogin: chosen.userLogin,
-        assigneeLogin: expectedLogin ?? assigneeLogin ?? "unknown",
+        ownerLogin: comment.userLogin,
+        assigneeLogin:
+          options.expectedLogin ??
+          issue.assignees[0]?.login ??
+          "unknown",
       });
       await upsertGithubAutomationComment({
         installationId: ctx.installationId,
         owner: ctx.owner,
         repo: ctx.repo,
         issueNumber: job.issueNumber,
+        repositoryId: job.repositoryId,
         kind: "accepted_waiting_automation",
         body,
       });
     } catch {
       // non-fatal
     }
+
+    await writeCommandReceipt({
+      ctx,
+      job,
+      commentId: comment.id,
+      actorLogin: comment.userLogin,
+      command: "adopt",
+      receiptStatus: "accepted",
+      reasonCode: "owner_authorized",
+      currentPhase: "implementation_queued",
+      nextAction: "系统将排队实现员编写代码并提交 PR（不注入评论文本）。",
+    });
+    await writeAutomationStatus({
+      ctx,
+      job: { ...job, phase: "implementation_queued", checkpoint: "implementation_queued" },
+      nextAction: "等待 unattended runner 在门禁通过后推进。",
+    });
 
     await appendGithubAutomationSafeEvent({
       at: new Date().toISOString(),
@@ -1249,14 +1416,14 @@ async function runOwnerIntentIfPresent(
       reasonCode: "owner_authorized_unattended",
       traceId: job.traceId,
       meta: {
-        ownerLogin: chosen.userLogin,
-        assigneeLogin: expectedLogin,
+        ownerLogin: comment.userLogin,
+        assigneeLogin: options.expectedLogin,
         unattended: true,
+        injectsCommentText: false,
       },
     });
 
-    // Comment retry / owner adoption wakes durable job — never inject comment text as agent command.
-    if (chosen.userId === null) {
+    if (comment.userId === null) {
       return {
         job: await persistJob({
           ...job,
@@ -1270,14 +1437,18 @@ async function runOwnerIntentIfPresent(
       };
     }
 
+    // Hash only matched phrase / enum — never full free-text body for agent path.
+    const strippedForHash = stripUntrustedCommentDecorations(
+      options.matchedPhrase ?? "采纳",
+    );
     return handleGithubUnattendedAfterOwnerAdoption({
       job,
       config: ctx.config,
-      ownerActorId: chosen.userId,
-      ownerCommentId: chosen.id,
-      ownerCommentStrippedText: stripUntrustedCommentDecorations(chosen.body),
-      matchedPhrase: auth.intent.matchedPhrase,
-      claimComplete: assigneeOk && labelOk,
+      ownerActorId: comment.userId,
+      ownerCommentId: comment.id,
+      ownerCommentStrippedText: strippedForHash,
+      matchedPhrase: options.matchedPhrase,
+      claimComplete: options.claimComplete,
     });
   }
 
@@ -1291,30 +1462,48 @@ async function runOwnerIntentIfPresent(
     leaseExpiresAt: null,
   });
 
-  // Best-effort owner-waiting comment
   try {
     const marker = buildGithubAutomationCommentMarker({
       kind: "accepted_waiting_automation",
       repositoryId: job.repositoryId,
       issueNumber: job.issueNumber,
-      traceId: job.traceId,
     });
     const body = buildAcceptedWaitingAutomationCommentBody({
       marker,
-      ownerLogin: chosen.userLogin,
-      assigneeLogin: expectedLogin ?? assigneeLogin ?? "unknown",
+      ownerLogin: comment.userLogin,
+      assigneeLogin:
+        options.expectedLogin ?? issue.assignees[0]?.login ?? "unknown",
     });
     await upsertGithubAutomationComment({
       installationId: ctx.installationId,
       owner: ctx.owner,
       repo: ctx.repo,
       issueNumber: job.issueNumber,
+      repositoryId: job.repositoryId,
       kind: "accepted_waiting_automation",
       body,
     });
   } catch {
     // non-fatal
   }
+
+  await writeCommandReceipt({
+    ctx,
+    job,
+    commentId: comment.id,
+    actorLogin: comment.userLogin,
+    command: "adopt",
+    receiptStatus: "accepted",
+    reasonCode: "accepted_waiting_automation",
+    currentPhase: job.phase,
+    nextAction:
+      "P1 无人值守未开启：已记录采纳，等待 automation 能力开启后继续。",
+  });
+  await writeAutomationStatus({
+    ctx,
+    job,
+    nextAction: "在 Settings 开启 unattended 后由同一 durable job 继续。",
+  });
 
   await appendGithubAutomationSafeEvent({
     at: new Date().toISOString(),
@@ -1327,16 +1516,918 @@ async function runOwnerIntentIfPresent(
     reasonCode: job.reasonCode,
     traceId: job.traceId,
     meta: {
-      ownerLogin: chosen.userLogin,
-      assigneeLogin: expectedLogin,
+      ownerLogin: comment.userLogin,
+      assigneeLogin: options.expectedLogin,
+      injectsCommentText: false,
     },
   });
 
   return { job, wakeAgain: false };
 }
 
-function commentContainsBotMarker(body: string): boolean {
-  return body.includes("<!-- ypi-github-automation:");
+/**
+ * Exact-comment owner command dispatcher (CMD-03).
+ * Binds delivery commentId/version; never scans arbitrary recent affirmatives.
+ */
+async function runOwnerIntentIfPresent(
+  ctx: ClaimContext,
+): Promise<GithubAutomationJobHandlerResult | null> {
+  let job = ctx.job;
+
+  // Need delivery to inspect comment sender — load safe delivery metadata only.
+  if (!job.deliveryId) {
+    if (job.phase === "awaiting_owner") {
+      return {
+        job: await persistJob({
+          ...job,
+          status: "paused",
+          reasonCode: "awaiting_owner_comment",
+          leaseOwner: null,
+          leaseExpiresAt: null,
+        }),
+        wakeAgain: false,
+      };
+    }
+    return null;
+  }
+
+  const delivery = await readGithubAutomationDelivery(job.deliveryId);
+  if (!delivery || delivery.eventName !== "issue_comment") {
+    if (job.phase === "awaiting_owner") {
+      return {
+        job: await persistJob({
+          ...job,
+          phase: "awaiting_owner",
+          status: "paused",
+          reasonCode: "awaiting_owner_comment",
+          leaseOwner: null,
+          leaseExpiresAt: null,
+        }),
+        wakeAgain: false,
+      };
+    }
+    return null;
+  }
+
+  const action = (delivery.action ?? "").toLowerCase();
+  if (action !== "created" && action !== "edited") {
+    return {
+      job: await persistJob({
+        ...job,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        reasonCode: job.reasonCode ?? "comment_action_ignored",
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  const commentId = delivery.commentId ?? null;
+  if (commentId === null || commentId <= 0) {
+    return {
+      job: await persistJob({
+        ...job,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        reasonCode: "missing_comment_id",
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  // Global paused: record + ignored receipt for owners; never clear paused; no side effects.
+  if (ctx.config.paused) {
+    // Still GET exact comment so we can emit a receipt when targeted.
+    let comment: GithubExactIssueComment | null = null;
+    try {
+      comment = await getGithubIssueComment({
+        installationId: ctx.installationId,
+        owner: ctx.owner,
+        repo: ctx.repo,
+        commentId,
+      });
+    } catch {
+      comment = null;
+    }
+    const parsed = comment
+      ? parseGithubOwnerCommand(comment.body, {
+          allowLegacyAdoption: job.phase === "awaiting_owner",
+        })
+      : null;
+    const shouldReceipt =
+      parsed &&
+      (parsed.disposition === "command" ||
+        parsed.disposition === "unsupported" ||
+        (parsed.disposition === "no_command" && parsed.target !== "none"));
+    if (shouldReceipt && comment) {
+      await writeCommandReceipt({
+        ctx,
+        job,
+        commentId: comment.id,
+        actorLogin: comment.userLogin,
+        command: commandToDisplay(
+          parsed.command,
+          parsed.unsupportedTargeted,
+        ),
+        receiptStatus: "ignored",
+        reasonCode: "global_paused",
+        currentPhase: job.phase,
+        nextAction:
+          "请在管理面（Settings）恢复全局自动化后再试；Issue 评论无法解除 global paused。",
+      });
+    }
+    return {
+      job: await persistJob({
+        ...job,
+        status:
+          job.phase === "awaiting_owner"
+            ? "paused"
+            : job.status === "running"
+              ? job.status
+              : job.status,
+        reasonCode: "automation_paused",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  const repoConfig = findRepositoryConfigById(ctx.config, job.repositoryId);
+  if (!repoConfig) {
+    return {
+      job: await persistJob({
+        ...job,
+        status: "blocked",
+        phase: "blocked",
+        reasonCode: "repository_not_allowlisted",
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  // Exact GET — never list-and-pick recent affirmatives.
+  let comment: GithubExactIssueComment | null = null;
+  try {
+    comment = await getGithubIssueComment({
+      installationId: ctx.installationId,
+      owner: ctx.owner,
+      repo: ctx.repo,
+      commentId,
+    });
+  } catch (err) {
+    const permission =
+      isGithubAutomationError(err) && err.code === "permission_missing";
+    return {
+      job: await persistJob({
+        ...job,
+        status: permission ? "blocked" : "retry_due",
+        reasonCode: permission ? "permission_missing" : "comment_fetch_failed",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        nextRetryAt: permission
+          ? null
+          : new Date(Date.now() + 30_000).toISOString(),
+      }),
+      wakeAgain: !permission,
+    };
+  }
+
+  const version = verifyExactGithubCommentVersion({
+    expectedCommentId: commentId,
+    expectedSenderId: delivery.senderId,
+    expectedSenderType: delivery.senderType ?? null,
+    expectedUpdatedAt: delivery.commentUpdatedAt ?? null,
+    expectedBodySha256: delivery.commentBodySha256 ?? null,
+    comment,
+  });
+
+  if (!version.ok) {
+    if (
+      version.status === "updated_at_mismatch" ||
+      version.status === "body_hash_mismatch"
+    ) {
+      // Superseded: wait for the newer delivery; optional receipt on this id.
+      if (comment) {
+        await writeCommandReceipt({
+          ctx,
+          job,
+          commentId: comment.id,
+          actorLogin: comment.userLogin,
+          command: "none",
+          receiptStatus: "superseded",
+          reasonCode: version.reasonCode,
+          currentPhase: job.phase,
+          nextAction: "请以最新编辑后的评论版本为准；本 delivery 不执行 side effect。",
+        });
+      }
+      return {
+        job: await persistJob({
+          ...job,
+          reasonCode: "comment_superseded",
+          leaseOwner: null,
+          leaseExpiresAt: null,
+          status: job.phase === "awaiting_owner" ? "paused" : job.status,
+        }),
+        wakeAgain: false,
+      };
+    }
+
+    // Author/bot/missing — fail closed, no authorization.
+    if (comment && version.status !== "missing_comment") {
+      await writeCommandReceipt({
+        ctx,
+        job,
+        commentId: comment.id,
+        actorLogin: comment.userLogin,
+        command: "none",
+        receiptStatus: "rejected",
+        reasonCode: version.reasonCode,
+        currentPhase: job.phase,
+        nextAction: "请使用本人账号发送明确的 @AppBot / /ypi 指令。",
+      });
+    }
+    return {
+      job: await persistJob({
+        ...job,
+        reasonCode: version.reasonCode,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        status: job.phase === "awaiting_owner" ? "paused" : job.status,
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  // comment is non-null on version match
+  const exact = comment!;
+
+  // Bot never authorizes / never public-spams non-targeted noise.
+  if (isBotSenderType(exact.userType) || isBotSenderType(delivery.senderType)) {
+    return {
+      job: await persistJob({
+        ...job,
+        reasonCode: "bot_sender",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        status: job.phase === "awaiting_owner" ? "paused" : job.status,
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  const issue = await fetchUntrustedGithubIssue({
+    installationId: ctx.installationId,
+    owner: ctx.owner,
+    repo: ctx.repo,
+    issueNumber: job.issueNumber,
+  });
+
+  const resolved = await resolveMachineGithubAssigneeIdentity();
+  const expectedLogin = resolved.ok ? resolved.identity.login : null;
+  const assigneeOk =
+    expectedLogin !== null &&
+    issueAssigneesIncludeLogin(issue.rawAssignees, expectedLogin);
+  const labelOk = issueHasLabel(issue.rawLabels, YPI_LABEL_CLAIMED);
+  const claimComplete = assigneeOk && labelOk;
+
+  let repositoryOwnerId = issue.repositoryOwnerId;
+  let repositoryOwnerLogin = issue.repositoryOwnerLogin;
+  let repositoryOwnerType = issue.repositoryOwnerType;
+  if (repositoryOwnerId === null) {
+    const ownerInfo = await fetchRepositoryOwner({
+      installationId: ctx.installationId,
+      owner: ctx.owner,
+      repo: ctx.repo,
+    });
+    repositoryOwnerId = ownerInfo.id;
+    repositoryOwnerLogin = ownerInfo.login;
+    repositoryOwnerType = ownerInfo.type;
+  }
+
+  const actor = buildOwnerActorContextFromRepoConfig(repoConfig, {
+    senderId: exact.userId,
+    senderLogin: exact.userLogin,
+    senderType: exact.userType,
+    repositoryOwnerId,
+    repositoryOwnerLogin,
+    repositoryOwnerType,
+  });
+  const isOwner = isGithubRepositoryOwnerActor(actor);
+
+  const parsed: GithubOwnerCommandParseResult = parseGithubOwnerCommand(
+    exact.body,
+    {
+      allowLegacyAdoption: job.phase === "awaiting_owner",
+    },
+  );
+
+  // Silence: non-owner with no targeted command → audit only (no spam).
+  if (
+    !isOwner &&
+    parsed.disposition !== "command" &&
+    parsed.disposition !== "unsupported"
+  ) {
+    return {
+      job: await persistJob({
+        ...job,
+        reasonCode:
+          job.phase === "awaiting_owner"
+            ? "awaiting_owner_comment"
+            : job.reasonCode,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        status: job.phase === "awaiting_owner" ? "paused" : job.status,
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  // Non-owner targeted command → explicit rejected receipt, no side effects.
+  if (!isOwner) {
+    await writeCommandReceipt({
+      ctx,
+      job,
+      commentId: exact.id,
+      actorLogin: exact.userLogin,
+      command: commandToDisplay(parsed.command, parsed.unsupportedTargeted),
+      receiptStatus: "rejected",
+      reasonCode: "not_owner",
+      currentPhase: job.phase,
+      nextAction: "请仓库 Owner 发送指令；第三方评论不会改变自动化状态。",
+    });
+    return {
+      job: await persistJob({
+        ...job,
+        reasonCode: "not_owner",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        status: job.phase === "awaiting_owner" ? "paused" : job.status,
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  if (parsed.disposition === "empty" || parsed.disposition === "no_command") {
+    return {
+      job: await persistJob({
+        ...job,
+        reasonCode:
+          job.phase === "awaiting_owner"
+            ? "awaiting_owner_comment"
+            : job.reasonCode,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        status: job.phase === "awaiting_owner" ? "paused" : job.status,
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  if (parsed.disposition === "unsupported" || !parsed.command) {
+    await writeCommandReceipt({
+      ctx,
+      job,
+      commentId: exact.id,
+      actorLogin: exact.userLogin,
+      command: "unsupported",
+      receiptStatus: "rejected",
+      reasonCode: "unsupported_command",
+      currentPhase: job.phase,
+      nextAction:
+        "请使用：状态 / 重新评估 / 采纳 / 暂停 / 继续（@AppBot 或 /ypi）。",
+    });
+    return {
+      job: await persistJob({
+        ...job,
+        reasonCode: "unsupported_command",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        status: job.phase === "awaiting_owner" ? "paused" : job.status,
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  const command = parsed.command;
+  const bodySha256 =
+    delivery.commentBodySha256 ?? exact.bodySha256;
+  const commandKey = buildGithubOwnerCommandKey({
+    repositoryId: job.repositoryId,
+    issueNumber: job.issueNumber,
+    generation: job.generation,
+    commentId: exact.id,
+    bodySha256,
+    command,
+  });
+
+  // Durable idempotency: same comment version + command executes once.
+  const prior = findOwnerCommandEffect(job.effects, commandKey);
+  if (prior && prior.status === "remote_confirmed") {
+    // Re-issue receipt upsert (no-op if body same) without re-running side effects.
+    await writeCommandReceipt({
+      ctx,
+      job,
+      commentId: exact.id,
+      actorLogin: exact.userLogin,
+      command,
+      receiptStatus: "accepted",
+      reasonCode: prior.reasonCode ?? "command_idempotent_replay",
+      currentPhase: job.phase,
+      nextAction: "该评论版本的指令已处理；未重复执行 side effect。",
+    });
+    return {
+      job: await persistJob({
+        ...job,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        reasonCode: prior.reasonCode ?? job.reasonCode,
+        status: job.phase === "awaiting_owner" ? "paused" : job.status,
+      }),
+      wakeAgain: false,
+    };
+  }
+
+  job = await persistJob({
+    ...job,
+    effects: upsertEffectMarker(job.effects, {
+      name: "owner_command",
+      status: "intended",
+      remoteId: commandKey,
+      generation: job.generation,
+      reasonCode: command,
+    }),
+  });
+
+  // ── Dispatch structured commands (no free text injection) ──────────────────
+
+  if (command === "status") {
+    await writeCommandReceipt({
+      ctx,
+      job,
+      commentId: exact.id,
+      actorLogin: exact.userLogin,
+      command: "status",
+      receiptStatus: "accepted",
+      reasonCode: "status_only",
+      currentPhase: job.phase,
+      nextAction: describeStatusNextAction(job),
+    });
+    await writeAutomationStatus({
+      ctx,
+      job,
+      nextAction: describeStatusNextAction(job),
+      blockedSummary:
+        job.status === "blocked" || job.phase === "blocked"
+          ? job.reasonCode
+          : null,
+    });
+    job = await persistJob({
+      ...job,
+      effects: upsertEffectMarker(job.effects, {
+        name: "owner_command",
+        status: "remote_confirmed",
+        remoteId: commandKey,
+        generation: job.generation,
+        reasonCode: "status_only",
+      }),
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      status: job.phase === "awaiting_owner" ? "paused" : job.status,
+      reasonCode:
+        job.phase === "awaiting_owner"
+          ? "awaiting_owner_comment"
+          : job.reasonCode,
+    });
+    await appendGithubAutomationSafeEvent({
+      at: new Date().toISOString(),
+      kind: "owner_command_status",
+      repositoryId: job.repositoryId,
+      issueNumber: job.issueNumber,
+      jobId: job.jobId,
+      deliveryId: job.deliveryId,
+      phase: job.phase,
+      reasonCode: "status_only",
+      traceId: job.traceId,
+      meta: {
+        command: "status",
+        commentId: exact.id,
+        injectsCommentText: false,
+      },
+    });
+    return { job, wakeAgain: false };
+  }
+
+  if (command === "re_evaluate") {
+    if (!claimComplete) {
+      await writeCommandReceipt({
+        ctx,
+        job,
+        commentId: exact.id,
+        actorLogin: exact.userLogin,
+        command: "re_evaluate",
+        receiptStatus: "rejected",
+        reasonCode: "incomplete_claim",
+        currentPhase: job.phase,
+        nextAction: "先修复完整认领后再重新评估。",
+      });
+      job = await persistJob({
+        ...job,
+        effects: upsertEffectMarker(job.effects, {
+          name: "owner_command",
+          status: "failed",
+          remoteId: commandKey,
+          generation: job.generation,
+          reasonCode: "incomplete_claim",
+        }),
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+      return { job, wakeAgain: false };
+    }
+    if ((issue.state ?? "").toLowerCase() !== "open") {
+      await writeCommandReceipt({
+        ctx,
+        job,
+        commentId: exact.id,
+        actorLogin: exact.userLogin,
+        command: "re_evaluate",
+        receiptStatus: "rejected",
+        reasonCode: "issue_not_open",
+        currentPhase: job.phase,
+        nextAction: "请 reopen Issue 后再重新评估。",
+      });
+      job = await persistJob({
+        ...job,
+        effects: upsertEffectMarker(job.effects, {
+          name: "owner_command",
+          status: "failed",
+          remoteId: commandKey,
+          generation: job.generation,
+          reasonCode: "issue_not_open",
+        }),
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+      return { job, wakeAgain: false };
+    }
+
+    job = await reEvaluateTriageFromIssueBody(ctx, job, issue);
+    await writeCommandReceipt({
+      ctx,
+      job,
+      commentId: exact.id,
+      actorLogin: exact.userLogin,
+      command: "re_evaluate",
+      receiptStatus: "accepted",
+      reasonCode: "re_evaluated",
+      currentPhase: job.phase,
+      nextAction:
+        job.phase === "awaiting_owner"
+          ? "请 Owner 发送 @AppBot 采纳 以继续。"
+          : "当前建议非采纳；可更新 Issue 正文后再次重新评估。",
+    });
+    await writeAutomationStatus({
+      ctx,
+      job,
+      nextAction: describeStatusNextAction(job),
+    });
+    job = await persistJob({
+      ...job,
+      effects: upsertEffectMarker(job.effects, {
+        name: "owner_command",
+        status: "remote_confirmed",
+        remoteId: commandKey,
+        generation: job.generation,
+        reasonCode: "re_evaluated",
+      }),
+      leaseOwner: null,
+      leaseExpiresAt: null,
+    });
+    await appendGithubAutomationSafeEvent({
+      at: new Date().toISOString(),
+      kind: "owner_command_re_evaluate",
+      repositoryId: job.repositoryId,
+      issueNumber: job.issueNumber,
+      jobId: job.jobId,
+      deliveryId: job.deliveryId,
+      phase: job.phase,
+      reasonCode: "re_evaluated",
+      traceId: job.traceId,
+      meta: {
+        command: "re_evaluate",
+        commentId: exact.id,
+        injectsCommentText: false,
+      },
+    });
+    return { job, wakeAgain: false };
+  }
+
+  if (command === "adopt") {
+    const result = await applyAdoptCommand({
+      ctx,
+      job,
+      issue,
+      comment: exact,
+      claimComplete,
+      expectedLogin,
+      matchedPhrase: parsed.matchedPhrase,
+    });
+    // Mark command effect confirmed on the returned job when still same generation.
+    const nextJob = await persistJob({
+      ...result.job,
+      effects: upsertEffectMarker(result.job.effects, {
+        name: "owner_command",
+        status: result.job.reasonCode === "incomplete_claim_on_owner_intent"
+          ? "failed"
+          : result.job.phase === "awaiting_owner" &&
+              result.job.reasonCode &&
+              result.job.reasonCode !== "awaiting_owner_comment" &&
+              result.job.reasonCode !== "accepted_waiting_automation" &&
+              result.job.reasonCode !== "owner_authorized_unattended"
+            ? "failed"
+            : "remote_confirmed",
+        remoteId: commandKey,
+        generation: result.job.generation,
+        reasonCode: result.job.reasonCode,
+      }),
+    });
+    return { job: nextJob, wakeAgain: result.wakeAgain };
+  }
+
+  if (command === "pause") {
+    if (!UNATTENDED_CONTROL_PHASES.has(job.phase) && job.phase !== "awaiting_owner") {
+      await writeCommandReceipt({
+        ctx,
+        job,
+        commentId: exact.id,
+        actorLogin: exact.userLogin,
+        command: "pause",
+        receiptStatus: "rejected",
+        reasonCode: "job_not_pausable",
+        currentPhase: job.phase,
+        nextAction: "当前阶段无需/无法暂停。",
+      });
+      job = await persistJob({
+        ...job,
+        effects: upsertEffectMarker(job.effects, {
+          name: "owner_command",
+          status: "failed",
+          remoteId: commandKey,
+          generation: job.generation,
+          reasonCode: "job_not_pausable",
+        }),
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+      return { job, wakeAgain: false };
+    }
+
+    // Per-job pause only — never touches config.paused.
+    await requestGithubUnattendedJobPause(job.jobId);
+    job = await persistJob({
+      ...job,
+      status: "paused",
+      phase: job.phase === "awaiting_owner" ? "awaiting_owner" : "paused",
+      checkpoint: job.checkpoint ?? "paused",
+      reasonCode: "pause_requested",
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      effects: upsertEffectMarker(job.effects, {
+        name: "owner_command",
+        status: "remote_confirmed",
+        remoteId: commandKey,
+        generation: job.generation,
+        reasonCode: "pause_requested",
+      }),
+    });
+    await writeCommandReceipt({
+      ctx,
+      job,
+      commentId: exact.id,
+      actorLogin: exact.userLogin,
+      command: "pause",
+      receiptStatus: "accepted",
+      reasonCode: "pause_requested",
+      currentPhase: job.phase,
+      nextAction:
+        "本 job 将在下一检查点暂停。全局 paused 不受影响；使用 @AppBot 继续 恢复本 job。",
+      note: "此操作不能解除或设置全局暂停。",
+    });
+    await writeAutomationStatus({
+      ctx,
+      job,
+      nextAction: "等待 Owner @AppBot 继续（全局 paused 仍优先）。",
+      blockedSummary: "per-job pause_requested",
+    });
+    await appendGithubAutomationSafeEvent({
+      at: new Date().toISOString(),
+      kind: "owner_command_pause",
+      repositoryId: job.repositoryId,
+      issueNumber: job.issueNumber,
+      jobId: job.jobId,
+      deliveryId: job.deliveryId,
+      phase: job.phase,
+      reasonCode: "pause_requested",
+      traceId: job.traceId,
+      meta: {
+        command: "pause",
+        commentId: exact.id,
+        injectsCommentText: false,
+        clearsGlobalPaused: false,
+      },
+    });
+    return { job, wakeAgain: false };
+  }
+
+  if (command === "continue") {
+    // Continue never clears global paused (already gated above).
+    const continuable =
+      job.status === "paused" ||
+      job.status === "retry_due" ||
+      job.status === "blocked" ||
+      job.phase === "paused" ||
+      job.phase === "retry_due" ||
+      job.phase === "blocked" ||
+      job.reasonCode === "pause_requested" ||
+      job.reasonCode === "issue_closed";
+
+    if (!continuable && job.phase !== "awaiting_owner") {
+      await writeCommandReceipt({
+        ctx,
+        job,
+        commentId: exact.id,
+        actorLogin: exact.userLogin,
+        command: "continue",
+        receiptStatus: "rejected",
+        reasonCode: "job_not_continuable",
+        currentPhase: job.phase,
+        nextAction: "当前 job 不在可恢复状态。",
+      });
+      job = await persistJob({
+        ...job,
+        effects: upsertEffectMarker(job.effects, {
+          name: "owner_command",
+          status: "failed",
+          remoteId: commandKey,
+          generation: job.generation,
+          reasonCode: "job_not_continuable",
+        }),
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+      return { job, wakeAgain: false };
+    }
+
+    if (job.phase === "awaiting_owner") {
+      // Nothing to resume in pure wait; point owner to adopt/status.
+      await writeCommandReceipt({
+        ctx,
+        job,
+        commentId: exact.id,
+        actorLogin: exact.userLogin,
+        command: "continue",
+        receiptStatus: "rejected",
+        reasonCode: "phase_not_applicable",
+        currentPhase: job.phase,
+        nextAction: "当前在等待采纳；请发送 @AppBot 采纳 或 状态。",
+      });
+      job = await persistJob({
+        ...job,
+        effects: upsertEffectMarker(job.effects, {
+          name: "owner_command",
+          status: "failed",
+          remoteId: commandKey,
+          generation: job.generation,
+          reasonCode: "phase_not_applicable",
+        }),
+        status: "paused",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+      return { job, wakeAgain: false };
+    }
+
+    if ((issue.state ?? "").toLowerCase() !== "open") {
+      await writeCommandReceipt({
+        ctx,
+        job,
+        commentId: exact.id,
+        actorLogin: exact.userLogin,
+        command: "continue",
+        receiptStatus: "rejected",
+        reasonCode: "issue_not_open",
+        currentPhase: job.phase,
+        nextAction: "请先 reopen Issue，再发送继续。",
+      });
+      job = await persistJob({
+        ...job,
+        effects: upsertEffectMarker(job.effects, {
+          name: "owner_command",
+          status: "failed",
+          remoteId: commandKey,
+          generation: job.generation,
+          reasonCode: "issue_not_open",
+        }),
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+      return { job, wakeAgain: false };
+    }
+
+    job = await wakeGithubUnattendedJobForRetry({
+      job,
+      clearPause: true,
+    });
+    job = await persistJob({
+      ...job,
+      effects: upsertEffectMarker(job.effects, {
+        name: "owner_command",
+        status: "remote_confirmed",
+        remoteId: commandKey,
+        generation: job.generation,
+        reasonCode: "continue_requested",
+      }),
+    });
+    await writeCommandReceipt({
+      ctx,
+      job,
+      commentId: exact.id,
+      actorLogin: exact.userLogin,
+      command: "continue",
+      receiptStatus: "accepted",
+      reasonCode: "continue_requested",
+      currentPhase: job.phase,
+      nextAction: "本 job 已排队继续；若全局暂停仍生效则不会执行。",
+      note: "继续不会修改 global paused。",
+    });
+    await writeAutomationStatus({
+      ctx,
+      job,
+      nextAction: describeStatusNextAction(job),
+    });
+    await appendGithubAutomationSafeEvent({
+      at: new Date().toISOString(),
+      kind: "owner_command_continue",
+      repositoryId: job.repositoryId,
+      issueNumber: job.issueNumber,
+      jobId: job.jobId,
+      deliveryId: job.deliveryId,
+      phase: job.phase,
+      reasonCode: "continue_requested",
+      traceId: job.traceId,
+      meta: {
+        command: "continue",
+        commentId: exact.id,
+        injectsCommentText: false,
+        clearsGlobalPaused: false,
+      },
+    });
+    return { job, wakeAgain: true };
+  }
+
+  // Exhaustiveness fallback
+  void githubOwnerCommandLabel;
+  return {
+    job: await persistJob({
+      ...job,
+      leaseOwner: null,
+      leaseExpiresAt: null,
+    }),
+    wakeAgain: false,
+  };
+}
+
+function describeStatusNextAction(job: GithubAutomationJobRecord): string {
+  switch (job.phase) {
+    case "awaiting_owner":
+      return "等待 Owner 发送 @AppBot 采纳（或 /ypi 采纳）。";
+    case "accepted_waiting_automation":
+      return "已采纳，等待 unattended 能力/门禁开启后继续。";
+    case "implementation_queued":
+    case "planning":
+    case "policy_check":
+    case "implementing":
+    case "checking":
+    case "final_policy":
+    case "publishing":
+      return "自动化推进中；可用 @AppBot 暂停 在检查点停住本 job。";
+    case "pr_open":
+      return "PR 已打开；请人工 review / merge。";
+    case "paused":
+      return "本 job 已暂停；Owner 可 @AppBot 继续（不能解除全局暂停）。";
+    case "blocked":
+    case "blocked_claim_assignee":
+      return "存在阻塞；修复原因后可 @AppBot 继续 或 重新评估。";
+    case "not_adopted":
+      return "当前不建议/信息不足；可更新 Issue 后 @AppBot 重新评估。";
+    case "completed":
+      return "本 generation 已完成。";
+    default:
+      return job.reasonCode
+        ? `查看原因码 ${job.reasonCode}；必要时联系 operator。`
+        : "查看 Settings 中的 job 详情。";
+  }
 }
 
 function recommendationFromLabels(
@@ -1415,10 +2506,25 @@ export const githubIssueTriageJobHandler: GithubAutomationJobHandler = async (
     repo: split.repo,
   };
 
-  // Owner intent path when already claimed / awaiting
+  // CMD-03: exact owner commands on any active job when delivery is issue_comment.
+  // Covers awaiting_owner adoption + status/re-evaluate/pause/continue on later phases.
   if (
-    job.phase === "awaiting_owner" ||
-    job.phase === "accepted_waiting_automation"
+    job.deliveryId &&
+    (job.phase === "awaiting_owner" ||
+      job.phase === "accepted_waiting_automation" ||
+      job.phase === "not_adopted" ||
+      job.phase === "implementation_queued" ||
+      job.phase === "planning" ||
+      job.phase === "policy_check" ||
+      job.phase === "implementing" ||
+      job.phase === "checking" ||
+      job.phase === "final_policy" ||
+      job.phase === "publishing" ||
+      job.phase === "pr_open" ||
+      job.phase === "paused" ||
+      job.phase === "retry_due" ||
+      job.phase === "blocked" ||
+      job.phase === "blocked_claim_assignee")
   ) {
     const ownerResult = await runOwnerIntentIfPresent(ctx);
     if (ownerResult) return ownerResult;

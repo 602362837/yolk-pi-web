@@ -622,10 +622,15 @@ Common safe ignore reasons:
 
 - repository not in allowlist (immutable `repository.id`)
 - `enabled=false` (`automation_disabled`) or `mode=off` (`mode_off`)
-- unknown/unsupported event
+- global `paused=true` (delivery disposition `paused`; command/runner not executed)
+- **self App event** (`self_app_event`): `performed_via_github_app.id` matches effective App ID (Bot label/assign/comment create/edit)
+- **Bot/App actor fallback** (`bot_actor_event`): sender type Bot/App without definite self match — still non-actionable
+- non-actionable human Issue actions (`assigned` / `labeled` / …) and `issue_comment.deleted`
+- unknown/unsupported event or `unknown_actor` (fail closed)
 - installation id mismatch for a configured repo
+- terminal job + non-generation-eligible event (no automatic generation++)
 
-Deliveries still leave an audit record under `~/.pi/agent/github-automation/deliveries/` without Issue body text.
+Deliveries still leave an audit record under `~/.pi/agent/github-automation/deliveries/` without Issue body text. **Ignored self/Bot traffic with zero jobs is healthy**, not a misconfiguration — it is the permanent anti-loop layer.
 
 ### Claim shows incomplete / `blocked_claim_assignee`
 
@@ -646,32 +651,56 @@ Operator actions: `gh auth login` / `gh auth switch`, ensure collaborator access
 
 ### Owner commented “采纳” but nothing implements
 
-Expected when **P1 is off** (`mode=triage` or `unattended.enabled=false`, the default): complete claim + owner actor + affirmative intent only records `accepted_waiting_automation` — no WorkTree/PR.
+**Command targeting (Phase 1):** prefer `@AppBot 采纳` or `/ypi 采纳`. While the job is awaiting owner, bare affirmative phrases (`采纳` / `可以做` / `开始实现` / …) remain compatible. Mentioning the **machine Assignee** alone does **not** invoke automation.
 
-If P1 is on but still no implement:
+Expected when **P1 is off** (`mode=triage` or `unattended.enabled=false`, the default): complete claim + owner actor + affirmative intent only records `accepted_waiting_automation` — no WorkTree/PR. You should still see a **command receipt** when the comment is a recognized Owner command.
 
-1. Claim incomplete (`blocked_claim_assignee` / missing machine assignee read-back).
-2. Non-owner / bot / quote/code / negation / question comment.
-3. Policy blocked (UI, workflow/release, secret/auth, lockfile, over-limit, uncertain).
-4. Global `paused=true` or job `pauseRequested` at a checkpoint.
-5. `installation_missing` / `permission_missing` (App uninstalled or Contents/PR scopes missing).
-6. Job is `retry_due` after 429/`github_rate_limited` or network — wait for nextRetryAt or operator retry.
+If still no implement / no receipt:
 
-Non-owner, incomplete claims, and high-risk final diffs must never open a PR.
+1. Comment not bound as actionable: missing `@AppBot`/`/ypi` outside awaiting-owner bare adopt; quote/code/HTML-commented command; negation/question wins.
+2. Not the exact delivery comment path: worker only GET/processes the webhook’s comment id/version; historical “采纳” is **not** re-scanned on unrelated events.
+3. Non-owner / Bot / `unknown_actor` (Bot never authorizes).
+4. Claim incomplete (`blocked_claim_assignee` / missing machine assignee read-back) or recommendation ≠ yes / Issue closed.
+5. Policy blocked (UI, workflow/release, secret/auth, lockfile, over-limit, uncertain).
+6. Global `paused=true` (commands do not run; Settings/`PATCH config` only can clear) or per-job `pauseRequested` at a checkpoint.
+7. `installation_missing` / `permission_missing` (App uninstalled or Contents/PR scopes missing).
+8. Job is `retry_due` after 429/`github_rate_limited` or network — wait for nextRetryAt or operator/Settings retry (or `@AppBot 继续` when state allows; continue never clears global paused).
+
+Non-owner, incomplete claims, and high-risk final diffs must never open a PR. Free-text comments never set validation/branch/remote/publisher.
 
 ### Full agent residual risk (not a sandbox)
 
 P1 uses the **standard full agent** (file/bash/network). Owner gate, WorkTree, and final diff gate are publish/business controls only. The agent may still run arbitrary commands, access the network, or read same-OS-user files outside the WorkTree before any publish gate runs. Product code scrubs App/machine automation secrets from child env and refuses secret markers in runner state/prompts; **sentinel tests do not prove host isolation**. Prefer a dedicated low-privilege OS account/container.
 
-### Pause / resume / retry
+### Pause / resume / retry (per-job vs global)
 
-- Pause records a checkpoint flag; it does **not** force-kill an in-flight OS command.
+| Control | Scope | Clears global `paused`? |
+| --- | --- | --- |
+| Settings / `POST .../jobs/{id}` `pause`/`resume`/`retry` | Single durable job | No |
+| Owner `@AppBot 暂停` / `继续` (or `/ypi …`) | Single durable job | No |
+| `config.paused` / Settings global pause | All new business execution | N/A (this **is** the kill switch) |
+
+- Per-job pause records a checkpoint flag; it does **not** force-kill an in-flight OS command.
 - Resume/retry wakes the **same** durable job/generation and reconciles remote effects (labels/comment/worktree/PR); it must not inject comment text as an agent shell command.
+- After `issues.closed`, active jobs park as `issue_closed` (blocked/paused); WorkTree is kept; reopen + explicit Owner/Settings continue is required.
 - Unknown push/PR outcomes must list existing head/base PRs before creating another.
+
+### Generation storm / Bot comment loop
+
+Symptoms: many deliveries for the same `repo#issue` with rising generation (historical g1–g80), sender App Bot, actions `issue_comment.edited` / `issues.labeled` / `assigned`, Settings recent jobs growing without new human opens.
+
+Stop-bleed (in order):
+
+1. **Do not** unpause if already paused. Set global `paused=true` via Settings/config if not already (user/operator only).
+2. Confirm running build includes ingress self/Bot audit-only filter + generation gate + stable markers (no trace in marker identity).
+3. Inspect safe delivery audit for ignore reasons `self_app_event` / `bot_actor_event` and **job/generation counts not increasing** on further Bot edits.
+4. **Do not** bulk-delete `deliveries/` / `jobs/` / events or rewrite historical generations; retain for forensics.
+5. Optional: stop public receipt/status updates if command UX is noisy; **never** remove self-event filtering as a “fix”.
+6. Only after user decision: clear global paused and watch a single test Issue for ≥2 minutes with no self-loop.
 
 ### Disable without losing audit
 
-Set `enabled=false` or `mode=off`. Set `unattended.enabled=false` to return to P0 adoption parking. Historical deliveries/jobs/events/worktrees/PRs remain; do not bulk-delete `github-automation/` unless intentionally wiping operator data. Disable must not rewrite blocked claims into `complete`.
+Set `paused=true` and/or `enabled=false` or `mode=off`. Set `unattended.enabled=false` to return to P0 adoption parking. Historical deliveries/jobs/events/worktrees/PRs remain; do not bulk-delete `github-automation/` unless intentionally wiping operator data. Disable must not rewrite blocked claims into `complete`. Issue comments cannot change these knobs.
 
 ### Tests
 

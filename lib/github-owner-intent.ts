@@ -1,5 +1,5 @@
 /**
- * github-owner-intent — authenticate owner actor, then parse affirmative adoption (GHA-03).
+ * github-owner-intent — owner actor gates + Phase 1 exact command grammar (GHA-03 / CMD-03).
  *
  * Product rules:
  * - Owner identity is checked BEFORE broad natural-language parsing.
@@ -7,11 +7,14 @@
  * - Org-owned repos: sender id must be in explicit ownerActorIds.
  * - Bots never authorize.
  * - Strip quote / fenced code / HTML comments before intent matching.
- * - Only clear affirmative language authorizes; negation / defer / question do not.
+ * - Phase 1 commands target @AppBot or leading /ypi (not machine assignee).
+ * - Parser returns only enum commands — never free text for agent/task/config.
+ * - Awaiting-owner adoption remains compatible without mention (historical).
  * - Incomplete claim must never produce ownerAuthorization for implementation.
  * - P0 records accepted_waiting_automation only — never creates WorkTree here.
  */
 
+import { createHash } from "node:crypto";
 import type { GithubAutomationRepositoryConfig } from "./github-automation-types";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -23,6 +26,37 @@ export type GithubOwnerIntentKind =
   | "question"
   | "unclear"
   | "empty";
+
+/** Phase 1 owner commands (CMD-03). Enum only — never free text. */
+export type GithubOwnerCommandKind =
+  | "status"
+  | "re_evaluate"
+  | "adopt"
+  | "pause"
+  | "continue";
+
+export type GithubOwnerCommandTargetKind =
+  | "app_bot_mention"
+  | "ypi_slash"
+  | "legacy_awaiting_owner"
+  | "none";
+
+export type GithubOwnerCommandParseDisposition =
+  | "command"
+  | "unsupported"
+  | "no_command"
+  | "empty";
+
+export interface GithubOwnerCommandParseResult {
+  disposition: GithubOwnerCommandParseDisposition;
+  command: GithubOwnerCommandKind | null;
+  target: GithubOwnerCommandTargetKind;
+  /** Safe matched phrase only (enum-side), never full free text. */
+  matchedPhrase: string | null;
+  normalizedText: string;
+  /** True when a target was present but the residual text is not a known command. */
+  unsupportedTargeted: boolean;
+}
 
 export type GithubOwnerAuthorizationDecision =
   | "authorized"
@@ -442,4 +476,276 @@ export function commentMayExpressOwnerDecision(rawBody: string | null | undefine
     intent.kind === "defer" ||
     intent.kind === "question"
   );
+}
+
+// ─── Phase 1 exact command grammar (CMD-03) ──────────────────────────────────
+
+const COMMAND_PHRASES: Array<{
+  command: GithubOwnerCommandKind;
+  re: RegExp;
+  phrase: string;
+}> = [
+  // Longer / multi-word first.
+  { command: "re_evaluate", re: /^重新评估$/, phrase: "重新评估" },
+  { command: "re_evaluate", re: /^重新评估[。.!！]?$/, phrase: "重新评估" },
+  { command: "re_evaluate", re: /^re[-_]?evaluate$/i, phrase: "re-evaluate" },
+  { command: "re_evaluate", re: /^reevaluate$/i, phrase: "reevaluate" },
+  { command: "status", re: /^状态$/, phrase: "状态" },
+  { command: "status", re: /^状态[。.!！]?$/, phrase: "状态" },
+  { command: "status", re: /^status$/i, phrase: "status" },
+  { command: "pause", re: /^暂停$/, phrase: "暂停" },
+  { command: "pause", re: /^暂停[。.!！]?$/, phrase: "暂停" },
+  { command: "pause", re: /^pause$/i, phrase: "pause" },
+  { command: "continue", re: /^继续$/, phrase: "继续" },
+  { command: "continue", re: /^继续[。.!！]?$/, phrase: "继续" },
+  { command: "continue", re: /^continue$/i, phrase: "continue" },
+  { command: "continue", re: /^resume$/i, phrase: "resume" },
+  { command: "adopt", re: /^采纳$/, phrase: "采纳" },
+  { command: "adopt", re: /^采纳[。.!！]?$/, phrase: "采纳" },
+  { command: "adopt", re: /^开始实现$/, phrase: "开始实现" },
+  { command: "adopt", re: /^可以做$/, phrase: "可以做" },
+  { command: "adopt", re: /^批准$/, phrase: "批准" },
+  { command: "adopt", re: /^go\s*ahead$/i, phrase: "go ahead" },
+  { command: "adopt", re: /^lgtm$/i, phrase: "lgtm" },
+  { command: "adopt", re: /^approved?$/i, phrase: "approve" },
+  { command: "adopt", re: /^accept(?:ed)?$/i, phrase: "accept" },
+];
+
+function matchAnchoredCommand(
+  residual: string,
+): { command: GithubOwnerCommandKind; phrase: string } | null {
+  const text = residual.trim().replace(/[。.!！]+$/u, "").trim();
+  if (!text) return null;
+  // Single-token / short phrase only — reject free-form tails.
+  if (/\s/.test(text) && !/^(go\s+ahead)$/i.test(text)) {
+    // Allow short multi-word adopt phrases only.
+    if (!/^(go\s+ahead|please\s+implement|ship\s+it)$/i.test(text)) {
+      // Still allow Chinese commands that are exact single phrases without spaces.
+      // Multi-word with spaces: only the English allowlist above.
+      return null;
+    }
+  }
+  for (const item of COMMAND_PHRASES) {
+    if (item.re.test(text) || item.re.test(residual.trim())) {
+      return { command: item.command, phrase: item.phrase };
+    }
+  }
+  // Fallback: bare affirmative adopt words via existing intent (no target required path).
+  return null;
+}
+
+function stripCommandTarget(
+  normalized: string,
+  appBotLogin: string | null | undefined,
+): {
+  residual: string;
+  target: GithubOwnerCommandTargetKind;
+} {
+  const lines = normalized
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) {
+    return { residual: "", target: "none" };
+  }
+
+  // Prefer first non-empty line for slash / mention targeting.
+  const first = lines[0] ?? "";
+
+  // Leading /ypi (case-insensitive)
+  const slash = first.match(/^\/ypi(?:@[^\s]+)?(?:\s+|$)(.*)$/i);
+  if (slash) {
+    const restFirst = (slash[1] ?? "").trim();
+    const residual = [restFirst, ...lines.slice(1)].join("\n").trim();
+    return { residual, target: "ypi_slash" };
+  }
+
+  // @AppBot mention — optional configured login, else generic @...[bot] or literal @AppBot.
+  const login =
+    typeof appBotLogin === "string" && appBotLogin.trim()
+      ? appBotLogin.trim().replace(/^@/, "")
+      : null;
+  const mentionPattern = login
+    ? new RegExp(
+        `^@${login.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b(?:\\s+|$)([\\s\\S]*)$`,
+        "i",
+      )
+    : /^@(?:AppBot|[A-Za-z0-9_-]+\[bot\])\b(?:\s+|$)([\s\S]*)$/i;
+
+  // Mention may appear on any line (prototype allows prose then @AppBot 采纳).
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const m = line.match(mentionPattern);
+    if (m) {
+      const restThis = (m[1] ?? "").trim();
+      const residual = [restThis, ...lines.slice(i + 1)].join("\n").trim();
+      return { residual, target: "app_bot_mention" };
+    }
+  }
+
+  return { residual: normalized.trim(), target: "none" };
+}
+
+/**
+ * Pure Phase 1 command parser over stripped text.
+ * Returns enum command only — never residual free text for agent injection.
+ *
+ * Targeting:
+ * - @AppBot / configured app bot login
+ * - leading /ypi
+ * - legacy awaiting-owner adoption without mention (allowLegacyAdoption)
+ */
+export function parseGithubOwnerCommand(
+  rawBody: string | null | undefined,
+  options?: {
+    appBotLogin?: string | null;
+    /** When true, bare affirmative adoption is accepted without @AppBot//ypi. */
+    allowLegacyAdoption?: boolean;
+  },
+): GithubOwnerCommandParseResult {
+  if (typeof rawBody !== "string" || !rawBody.trim()) {
+    return {
+      disposition: "empty",
+      command: null,
+      target: "none",
+      matchedPhrase: null,
+      normalizedText: "",
+      unsupportedTargeted: false,
+    };
+  }
+
+  const normalizedText = stripUntrustedCommentDecorations(rawBody);
+  if (!normalizedText) {
+    return {
+      disposition: "empty",
+      command: null,
+      target: "none",
+      matchedPhrase: null,
+      normalizedText: "",
+      unsupportedTargeted: false,
+    };
+  }
+
+  // Negation / question on full text win before command matching.
+  const negative = firstMatch(normalizedText, NEGATIVE_PHRASES);
+  if (negative) {
+    return {
+      disposition: "no_command",
+      command: null,
+      target: "none",
+      matchedPhrase: negative,
+      normalizedText,
+      unsupportedTargeted: false,
+    };
+  }
+  if (looksLikeQuestion(normalizedText)) {
+    return {
+      disposition: "no_command",
+      command: null,
+      target: "none",
+      matchedPhrase: null,
+      normalizedText,
+      unsupportedTargeted: false,
+    };
+  }
+
+  const stripped = stripCommandTarget(normalizedText, options?.appBotLogin);
+  if (stripped.target !== "none") {
+    const matched = matchAnchoredCommand(stripped.residual);
+    if (matched) {
+      return {
+        disposition: "command",
+        command: matched.command,
+        target: stripped.target,
+        matchedPhrase: matched.phrase,
+        normalizedText,
+        unsupportedTargeted: false,
+      };
+    }
+    // Targeted but residual empty or unknown → unsupported (owner gets receipt).
+    if (!stripped.residual.trim()) {
+      return {
+        disposition: "unsupported",
+        command: null,
+        target: stripped.target,
+        matchedPhrase: null,
+        normalizedText,
+        unsupportedTargeted: true,
+      };
+    }
+    return {
+      disposition: "unsupported",
+      command: null,
+      target: stripped.target,
+      matchedPhrase: null,
+      normalizedText,
+      unsupportedTargeted: true,
+    };
+  }
+
+  // No target: legacy awaiting-owner adoption only when enabled.
+  if (options?.allowLegacyAdoption) {
+    const intent = parseGithubOwnerIntent(rawBody);
+    if (intent.isAffirmative) {
+      return {
+        disposition: "command",
+        command: "adopt",
+        target: "legacy_awaiting_owner",
+        matchedPhrase: intent.matchedPhrase,
+        normalizedText,
+        unsupportedTargeted: false,
+      };
+    }
+  }
+
+  return {
+    disposition: "no_command",
+    command: null,
+    target: "none",
+    matchedPhrase: null,
+    normalizedText,
+    unsupportedTargeted: false,
+  };
+}
+
+/**
+ * Durable opaque command key for one comment version + command enum.
+ * Never includes body text — only ids + opaque hash + command.
+ */
+export function buildGithubOwnerCommandKey(parts: {
+  repositoryId: number;
+  issueNumber: number;
+  generation: number;
+  commentId: number;
+  bodySha256: string;
+  command: GithubOwnerCommandKind | "unsupported";
+}): string {
+  const material = [
+    String(parts.repositoryId),
+    String(parts.issueNumber),
+    String(parts.generation),
+    String(parts.commentId),
+    parts.bodySha256,
+    parts.command,
+  ].join("|");
+  return createHash("sha256").update(material, "utf8").digest("hex");
+}
+
+export function githubOwnerCommandLabel(
+  command: GithubOwnerCommandKind | null,
+): string {
+  switch (command) {
+    case "status":
+      return "状态";
+    case "re_evaluate":
+      return "重新评估";
+    case "adopt":
+      return "采纳";
+    case "pause":
+      return "暂停";
+    case "continue":
+      return "继续";
+    default:
+      return "（未识别）";
+  }
 }

@@ -63,7 +63,26 @@ export type GithubAutomationDeliveryIgnoreReason =
   | "mode_off"
   | "missing_issue"
   | "malformed_envelope"
-  | "installation_mismatch";
+  | "installation_mismatch"
+  /** Definite self: performed_via_github_app.id matches effective App ID. */
+  | "self_app_event"
+  /** Conservative Bot/App sender fallback (never owner-authorize). */
+  | "bot_actor_event"
+  /** Missing/invalid actor metadata — fail closed. */
+  | "unknown_actor"
+  /** Event/action is not business-actionable (e.g. labeled/assigned). */
+  | "non_actionable_action"
+  /** Human event observed but does not authorize new generation/job. */
+  | "lifecycle_only"
+  /** Comment deleted — audit/supersede only. */
+  | "comment_deleted";
+
+/** Safe actor source classification for webhook deliveries (LOOP-01). */
+export type GithubAutomationActorSource =
+  | "self_app"
+  | "bot_actor"
+  | "human_actor"
+  | "unknown_actor";
 
 /** Allowlisted webhook event names we may act on (P0). */
 export type GithubAutomationWebhookEventName =
@@ -112,6 +131,9 @@ export type GithubAutomationEffectName =
   | "claim_label"
   | "triage_comment"
   | "blocked_comment"
+  | "command_receipt"
+  | "automation_status"
+  | "owner_command"
   | "worktree"
   | "branch"
   | "pull_request";
@@ -136,6 +158,21 @@ export interface GithubAutomationDeliveryRecord {
   issueTitlePreview: string | null;
   senderLogin: string | null;
   senderId: number | null;
+  /**
+   * Additive (LOOP-01): sender.type from verified payload. Missing on v1 records.
+   * Never used alone as authorization when Bot/App.
+   */
+  senderType?: string | null;
+  /** Exact issue comment id when event is issue_comment; never body. */
+  commentId?: number | null;
+  /** Comment updated_at from payload (ISO); version gate only. */
+  commentUpdatedAt?: string | null;
+  /** Opaque full SHA-256 of comment body; never the body itself. */
+  commentBodySha256?: string | null;
+  /** performed_via_github_app.id when present on issue/comment. */
+  performedViaAppId?: number | null;
+  /** Classified actor source; missing on historical v1 deliveries. */
+  actorSource?: GithubAutomationActorSource | null;
   disposition: GithubAutomationDeliveryDisposition;
   ignoreReason: GithubAutomationDeliveryIgnoreReason | null;
   jobId: string | null;
@@ -219,6 +256,16 @@ export interface GithubWebhookEnvelope {
   issueState: string | null;
   senderLogin: string | null;
   senderId: number | null;
+  /**
+   * Additive safe actor/comment metadata (LOOP-01).
+   * Never includes Issue/comment body text.
+   */
+  senderType: string | null;
+  commentId: number | null;
+  commentUpdatedAt: string | null;
+  /** Opaque full SHA-256 of comment body when present; never body. */
+  commentBodySha256: string | null;
+  performedViaAppId: number | null;
   /** Whether this event name is in the allowlisted set for automation. */
   knownEvent: boolean;
 }
@@ -438,6 +485,16 @@ export function hashWebhookBodyPrefix(rawBody: Buffer | Uint8Array): string {
   return createHash("sha256").update(rawBody).digest("hex").slice(0, 16);
 }
 
+/**
+ * Opaque full SHA-256 of a comment body for version/idempotency keys.
+ * Returns null when body is absent; never stores or returns the body text.
+ */
+export function hashGithubCommentBodySha256(body: unknown): string | null {
+  if (typeof body !== "string") return null;
+  // Hash even empty string so edited-empty remains a stable version key.
+  return createHash("sha256").update(body, "utf8").digest("hex");
+}
+
 // ─── Envelope parsing (safe; no body/comment text retained) ──────────────────
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -530,11 +587,48 @@ export function parseGithubWebhookEnvelope(options: {
 
   let senderLogin: string | null = null;
   let senderId: number | null = null;
+  let senderType: string | null = null;
   if (isRecord(payload.sender)) {
     if (typeof payload.sender.login === "string") {
       senderLogin = payload.sender.login.trim() || null;
     }
     senderId = asPositiveInt(payload.sender.id);
+    if (typeof payload.sender.type === "string" && payload.sender.type.trim()) {
+      senderType = payload.sender.type.trim();
+    }
+  }
+
+  // Exact comment identity/version — never retain body text.
+  let commentId: number | null = null;
+  let commentUpdatedAt: string | null = null;
+  let commentBodySha256: string | null = null;
+  if (isRecord(payload.comment)) {
+    commentId = asPositiveInt(payload.comment.id);
+    if (typeof payload.comment.updated_at === "string" && payload.comment.updated_at.trim()) {
+      commentUpdatedAt = payload.comment.updated_at.trim();
+    } else if (
+      typeof payload.comment.created_at === "string" &&
+      payload.comment.created_at.trim()
+    ) {
+      commentUpdatedAt = payload.comment.created_at.trim();
+    }
+    commentBodySha256 = hashGithubCommentBodySha256(payload.comment.body);
+  }
+
+  // Prefer comment/issue performed_via_github_app; fall back to top-level.
+  let performedViaAppId: number | null = null;
+  if (isRecord(payload.comment) && isRecord(payload.comment.performed_via_github_app)) {
+    performedViaAppId = asPositiveInt(payload.comment.performed_via_github_app.id);
+  }
+  if (
+    performedViaAppId === null &&
+    isRecord(payload.issue) &&
+    isRecord(payload.issue.performed_via_github_app)
+  ) {
+    performedViaAppId = asPositiveInt(payload.issue.performed_via_github_app.id);
+  }
+  if (performedViaAppId === null && isRecord(payload.performed_via_github_app)) {
+    performedViaAppId = asPositiveInt(payload.performed_via_github_app.id);
   }
 
   return {
@@ -549,6 +643,11 @@ export function parseGithubWebhookEnvelope(options: {
     issueState,
     senderLogin,
     senderId,
+    senderType,
+    commentId,
+    commentUpdatedAt,
+    commentBodySha256,
+    performedViaAppId,
     knownEvent,
   };
 }
@@ -562,6 +661,8 @@ export interface CreateDeliveryInput {
   jobId?: string | null;
   bodySha256Prefix: string;
   receivedAt?: string;
+  /** Classified actor source at accept time (LOOP-01). */
+  actorSource?: GithubAutomationActorSource | null;
 }
 
 export interface CreateDeliveryResult {
@@ -589,6 +690,12 @@ export async function createGithubAutomationDelivery(
     issueTitlePreview: input.envelope.issueTitlePreview,
     senderLogin: input.envelope.senderLogin,
     senderId: input.envelope.senderId,
+    senderType: input.envelope.senderType,
+    commentId: input.envelope.commentId,
+    commentUpdatedAt: input.envelope.commentUpdatedAt,
+    commentBodySha256: input.envelope.commentBodySha256,
+    performedViaAppId: input.envelope.performedViaAppId,
+    actorSource: input.actorSource ?? null,
     disposition: input.disposition,
     ignoreReason: input.ignoreReason ?? null,
     jobId: input.jobId ?? null,

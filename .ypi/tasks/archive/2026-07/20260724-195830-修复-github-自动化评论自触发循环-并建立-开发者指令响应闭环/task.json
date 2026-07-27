@@ -1,0 +1,1869 @@
+{
+  "schemaVersion": 1,
+  "id": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+  "title": "修复 GitHub 自动化评论自触发循环，并建立 @ 开发者指令响应闭环",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-24T11:58:30.217Z",
+  "updatedAt": "2026-07-27T01:30:07.547Z",
+  "completedAt": "2026-07-27T01:30:07.531Z",
+  "contextIds": [
+    "pi_019f93f1-287d-78af-bc46-33373ab92e0e"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-d71de40077aeccc26f8d085a",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T11:58:37.168Z",
+      "finishedAt": "2026-07-24T12:08:53.397Z",
+      "runner": "sdk",
+      "childSessionId": "019f93fd-e27f-757c-a9da-5ee70eeba485",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T11-58-37-183Z_019f93fd-e27f-757c-a9da-5ee70eeba485.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f93f1-287d-78af-bc46-33373ab92e0e",
+        "childSessionId": "019f93fd-e27f-757c-a9da-5ee70eeba485",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请完成 intake、调研和架构设计。重点分析 Issue #21 的 Bot 自身 issue_comment.edited 反馈循环（应如何可靠忽略 App 自己的 webhook、避免无效编辑/重复 side effect，并保留必要事件），以及 owner 对 @/评论的沟通协议和可观察的 Issue 响应闭环。判断是否涉及用户可见 UI/信息结构；若涉及，按规则先提出并安排 ui-designer HTML 原型。输出 PRD、design、implementat…",
+      "summary": "架构规划已完成，未实施生产代码，未修改全局 `paused`，未 commit/push/merge。 ### 已产出 任务目录： `.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/` - `brief.md` - `prd.md` - `ui.md` - `design.md` - `implement.md` - `checks.md` - `plan-review.md` - `handoff.md` ### 核心结论 Issue #21 的循环由以下链路共同导致： 1. 所有 `issues` / `issue_comment` action 均可入队； 2. terminal job 遇到新 delivery 自动创建 generation； 3. comment marker 含新 `traceId`，导致无业务变化也执行 PATCH； 4. PATCH 触发 Bot 自身 `issue_comment.edited`，形成 g1–g80 循环。 规划采用入口 self/Bot 隔离、action matrix、generation gate、稳定 marker、exact-comment owner 指令及 receipt/status 闭环。 ### 验证 - Implementation Plan JSON 已通过 `json.loads`。 - 7 个子任务 ID、依赖和必需字段校验通过。 - 所有规划产物非空且无 TBD 占位。 - 未运行 lint/tsc：本轮仅修改 task-local Markdown。 ### 剩余阻塞 - 触发了用户可见交互 UI 门禁，但当前环境无法派发 Studio `ui-designer`；HTML 原型尚未产出。 - 主会话需确认： 1. 使用 `@AppBot` / `/ypi`，还是拦截 `@machine-assignee`； 2. 是否开放 per-job `暂停/继续`； 3. Owner 自由文本能否补充需求； 4. Issue closed 时 active job 采用 blocked/paused 还是取消。 - Implementation Plan 尚未保存到 task state。 详见 `handoff.…",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T11:58:37.168Z",
+        "updatedAt": "2026-07-24T12:08:53.397Z",
+        "eventCount": 7349,
+        "lastTextPreview": "架构规划已完成，未实施生产代码，未修改全局 `paused`，未 commit/push/merge。\n\n### 已产出\n\n任务目录：\n\n`.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 核心结论\n\nIssue #21 的循环由以下链路共同导致：\n\n1. 所有 `issues` / `issue_comment` action 均可入队；\n2. terminal job 遇到新 delivery 自动创建 generation；\n3. comment marker 含新 `traceId`，导致无业务变化也执行 PATCH；\n4. PATCH 触发 Bot 自身 `issue_comment.edited`，形成 g1–g80 循环。\n\n规划采用入口 self/Bot 隔离、action matrix、generation gate、稳定 marker、exact-comment owner 指令及 receipt/status 闭环。\n\n### 验证\n\n- Implementation Plan JSON 已通过 `json.loads`。\n- 7 个子任务 ID、依赖和必需字段校验通过。\n- 所有规划产物非空且无 TBD 占位。\n- 未运行 lint/tsc：本轮仅修改 task-local Markdown。\n\n### 剩余阻塞\n\n- 触发了用户可见交互 UI 门禁，但当前环境无法派发 Studio `ui-designer`；HTML 原型尚未产出。\n- 主会话需确认：\n  1. 使用 `@AppBot` / `/ypi`，还是拦截 `@machine-assignee`；\n  2. 是否开放 per-job `暂停/继续`；\n  3. Owner 自由文本能否补充需求；\n  4. Issue closed 时 active job 采用 blocked/paused 还是取消。\n- Implementation Plan 尚未保存到 task state。\n\n详见 `handoff.md` 与 `plan-review.md`。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T12:08:17.621Z",
+            "toolCallId": "call_uS8zAiNJYvJZZ3pfTuXCxgOQ|fc_0f54ccf53741f8a2016a6355b15e38819bb6e081173960b21b",
+            "toolName": "bash",
+            "text": "implementation-plan JSON valid: UI-00, LOOP-01, IDEMP-02, CMD-03, TEST-04, DOC-05, CHECK-06\nartifacts non-placeholder: ok",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T12:08:37.113Z",
+            "toolCallId": "call_yCykFEIbxgte8FkYrbb3HZ5K|fc_0f54ccf53741f8a2016a6355b62670819bb9e037fdd473020d",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff.md\",\n  \"content\": \"# Handoff：架构规划完成，等待 UI 门禁与产品决策\\n\\n## 已产出\\n\\n- `brief.md`：Issue #21 现场证据、g1–g80 根因链、范围与决策点。\\n- `prd.md`：R1–R9、事件动作矩阵、Owner 命令建议、验收标准与范围外。\\n- `ui.md`：确认触发 GitHub Issue timeline 用户可见交互门禁；列出 HTML 原型状态。\\n- `design.md`：safe envelope、self/Bot classifier、generation、exact comment、stable marker、receipt/status、兼容/回滚。\\n- `implement.md`：UI-00 → LOOP-01 → IDEMP-02 → CMD-03 → TEST-04/DOC-05 → CHECK-06 的 schemaVersion 2 DAG。\\n- `checks.md`：100 次 self-edited 零 side-effect、exact comment、remote reconcile、paused-safe 与人工验收。\\n- `plan-review.md`：用户审批入口、产物链接、关键决策与下一步。\\n\\n未修改生产代码、task state、全局 paused；未 commit/push/merge。\\n\\n## 关键结论\\n\\n- 循环不是单一 `edited` bug：所有 `issues` / `issue_comment` action 均可入队，terminal job 会新建 generation，且新 trace 改变 canonical comment body，导致 PATCH → self edited → 新 generation。\\n- 必须在 webhook ingestion 做 source/action audit-only 分流；只在 runner 末端忽略不够。\\n- Owner 命令必须绑定 exact comment id/author/version/hash，不得扫描任意最近肯定评论。\\n- canonical marker 必须稳定，语义同 body 零 PATCH；self webhook仍保留 safe delivery audit。\\n- 自由文本评论不应进入 agent/policy/validation/branch/remote/publisher/global config。\\n\\n## 已运行验证\\n\\n- `implement.md` fenced `json ypi-implementation-plan` 已用 Python `json.loads` 校验。\\n- 7 个 subtask id 唯一，`dependsOn` 均指向已定义 id；每项 required 字段完整。\\n- brief/prd/ui/design/implement/checks/plan-review 均非空、无 Studio TBD placeholder。\\n- 未运行 lint/tsc/focused suites：本轮只改 task-local Markdown 规划，无生产代码。\\n\\n## 阻塞\\n\\n1. **UI HTML 原型缺失**：当前 delegated architect 没有 Studio 派发工具，不能用普通 subagent 替代 ui-designer。\\n2. **用户决策缺失**：\\n   - command target：推荐 `@AppBot` 或 `/ypi`，是否拦截 `@machine-assignee`；\\n   - Phase 1 是否包含 per-job `暂停/继续`；\\n   - owner 自由文本是否可补充需求（推荐否）；\\n   - Issue closed 时 active job 推荐 blocked/paused 而非取消。\\n3. implementationPlan 尚未通过 Studio tool 保存到 task state；不要手改 `task.json`。\\n\\n## 主会话下一步\\n\\n1. 派发 Studio `ui-designer` 产出 `github-issue-command-loop.html`。\\n2. 展示 HTML 与 `plan-review.md`，请用户确认上述决策。\\n3. 把审批记录补入 `ui.md` / `plan-review.md`，再通过 Studio 工具保存 implementationPlan。\\n4. 门禁齐全后才可进入 awaiting_approval；用户最终批准后才实现。\\n5. 不要替用户解除 global paused。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T12:08:37.114Z",
+            "toolCallId": "call_yCykFEIbxgte8FkYrbb3HZ5K|fc_0f54ccf53741f8a2016a6355b62670819bb9e037fdd473020d",
+            "toolName": "write",
+            "text": "Successfully wrote 1991 bytes to .ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T12:08:53.384Z",
+            "text": "架构规划已完成，未实施生产代码，未修改全局 `paused`，未 commit/push/merge。\n\n### 已产出\n\n任务目录：\n\n`.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 核心结论\n\nIssue #21 的循环由以下链路共同导致：\n\n1. 所有 `issues` / `issue_comment` action 均可入队；\n2. terminal job 遇到新 delivery 自动创建 generation；\n3. comment marker 含新 `traceId`，导致无业务变化也执行 PATCH；\n4. PATCH 触发 Bot 自身 `issue_comment.edited`，形成 g1–g80 循环。\n\n规划采用入口 self/Bot 隔离、action matrix、generation gate、稳定 marker、exact-comment owner 指令及 receipt/status 闭环。\n\n### 验证\n\n- Implementation Plan JSON 已通过 `json.loads`。\n- 7 个子任务 ID、依赖和必需字段校验通过。\n- 所有规划产物非空且无 TBD 占位。\n- 未运行 lint/tsc：本轮仅修改 task-local Markdown。\n\n### 剩余阻塞\n\n- 触发了用户可见交互 UI 门禁，但当前环境无法派发 Studio `ui-designer`；HTML 原型尚未产出。\n- 主会话需确认：\n  1. 使用 `@AppBot` / `/ypi`，还是拦截 `@machine-assignee`；\n  2. 是否开放 per-job `暂停/继续`；\n  3. Owner 自由文本能否补充需求；\n  4. Issue closed 时 active job 采用 blocked/paused 还是取消。\n- Implementation Plan 尚未保存到 task state。\n\n详见 `handoff.md` 与 `plan-review.md`。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T12:08:53.384Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1043,
+        "tokens": 548,
+        "tokenSource": "usage",
+        "tps": 45.07,
+        "firstTokenAt": "2026-07-24T12:08:41.133Z",
+        "lastTokenAt": "2026-07-24T12:08:53.292Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-d71de40077aeccc26f8d085a",
+        "taskId": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-195830-_-github-_-_-/architect-d71de40077aeccc26f8d085a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T11:58:37.168Z",
+        "finishedAt": "2026-07-24T12:08:53.389Z",
+        "updatedAt": "2026-07-24T12:08:53.389Z",
+        "itemCount": 95,
+        "messageCount": 1,
+        "toolCallCount": 45,
+        "stderrBytes": 0,
+        "bytes": 451349,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f93fd-e27f-757c-a9da-5ee70eeba485",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T11-58-37-183Z_019f93fd-e27f-757c-a9da-5ee70eeba485.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-81cc66db54ca593766f9f411",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T12:09:01.576Z",
+      "finishedAt": "2026-07-24T12:11:33.473Z",
+      "runner": "sdk",
+      "childSessionId": "019f9407-699a-76d9-aa2f-1651bde37783",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T12-09-01-594Z_019f9407-699a-76d9-aa2f-1651bde37783.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f93f1-287d-78af-bc46-33373ab92e0e",
+        "childSessionId": "019f9407-699a-76d9-aa2f-1651bde37783",
+        "model": "google-antigravity/gemini-3.1-pro",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "该任务新增 owner 在 GitHub Issue 评论中与 YPI 的沟通/回执信息结构，属于用户可见交互。请基于现有项目与 architect 产物，设计一个 HTML 原型，聚焦 GitHub Issue 中 Bot 回复卡的交互协议（@AppBot / 命令、已受理/需澄清/已采纳/排队/暂停/拒绝与下一步），并说明与现有 Settings/GitHub Automation 页面关系。把可直接审阅的 HTML 文件和 ui.md 写入任务目录；不要改生产代码、不…",
+      "summary": "### Handoff: UI Prototype for GitHub Issue Command Loop **Files Changed / Artifacts Produced:** - `github-issue-command-loop.html` (Created): A self-contained HTML prototype demonstrating the user-visible GitHub Issue timeline (Triage, Command Receipt, Status Comment, Rejection, and Global Paused states). - `ui.md` (Updated): Updated the document to reflect the prototype's completion, outline covered scenarios, and highlight required product decisions. **Validation Run:** - Confirmed task context constraints: No production code modified, no global configurations unpaused, and no git operations (`commit`/`push`) were executed. - Verified task-local files were successfully updated and appropriately localized. **Remaining Risks:** - **Mention Hijacking**: If the system ultimately decides to intercept the `@machine-assignee`, it may accidentally convert casual developer-to-developer issue conversation into bot commands. - **Paused State Confusion**: Users might assume sending `@AppBot 继续`…",
+      "model": "google-antigravity/gemini-3.1-pro",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "google-antigravity/gemini-3.1-pro",
+          "arg": "google-antigravity/gemini-3.1-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T12:09:01.576Z",
+        "updatedAt": "2026-07-24T12:11:33.473Z",
+        "eventCount": 74,
+        "lastTextPreview": "### Handoff: UI Prototype for GitHub Issue Command Loop\n\n**Files Changed / Artifacts Produced:**\n- `github-issue-command-loop.html` (Created): A self-contained HTML prototype demonstrating the user-visible GitHub Issue timeline (Triage, Command Receipt, Status Comment, Rejection, and Global Paused states).\n- `ui.md` (Updated): Updated the document to reflect the prototype's completion, outline covered scenarios, and highlight required product decisions.\n\n**Validation Run:**\n- Confirmed task context constraints: No production code modified, no global configurations unpaused, and no git operations (`commit`/`push`) were executed.\n- Verified task-local files were successfully updated and appropriately localized.\n\n**Remaining Risks:**\n- **Mention Hijacking**: If the system ultimately decides to intercept the `@machine-assignee`, it may accidentally convert casual developer-to-developer issue conversation into bot commands.\n- **Paused State Confusion**: Users might assume sending `@AppBot 继续` in an Issue can override a Settings UI `global_paused` state. The prototype explicitly warns against this, but the risk remains if operators don't read the Bot receipt carefully.\n\n**Decisions Needed from the Main Session:**\nPlease review `github-issue-command-loop.html` (e.g., using the Studio preview API) and confirm the following:\n1. **Command Target Syntax**: Approve using `@AppBot` (or `/ypi`) instead of intercepting `@machine-assignee`.\n2. **Command Set**: Approve the Phase 1 commands: `采纳`, `状态`, `重新评估`, `暂停`, and `继续`.\n3. **Issue Closed Behavior**: Approve the recommendation that an active job enters a `blocked/paused` state (preserving the WorkTree) when its Issue is closed, requiring manual resume if reopened.\n4. **Overall Interaction Flow**: Final approval of the receipts, status aggregation (single comment), and error copy designed in the HTML prototype.\n\nOnce approved, please record the decision in `plan-review.md`/`ui.md` and transition the task to `awaiting_approval`.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T12:10:33.225Z",
+            "toolCallId": "vtzvlfj3",
+            "toolName": "write",
+            "text": "Successfully wrote 7329 bytes to .ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/github-issue-command-loop.html",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T12:11:06.436Z",
+            "toolCallId": "kfmkoo33",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/ui.md\",\n  \"content\": \"# UI：GitHub Issue 指令与状态反馈\\n\\n## 门禁判断\\n\\n**触发 UI 原型门禁。**\\n\\n本任务改变了 GitHub Issue timeline 中用户可见的信息结构、命令入口、拒绝/确认体验和状态推进方式，符合“已有交互变化 / 用户可见信息结构变化”。\\n\\n## 原型产出状态\\n\\n- HTML 原型：**已产出** (`github-issue-command-loop.html`)\\n- 用户 UI 审批：**待取得**\\n\\n## 原型覆盖场景\\n\\n1. **初始 triage comment**：明确认领事实、给出建议，并提供支持的命令 target（如 `@AppBot`）及命令示例。\\n2. **Owner 发出定向命令后的 receipt**：\\n   - `accepted`：展示受理确认信息、当前状态与下一步操作。\\n   - `rejected`：例如非 owner 尝试执行指令时，明确指出 `non_owner` 原因并说明安全边界。\\n   - `ignored`：例如系统触发全局 paused 时，提示 `global_paused` 并明确引导操作人员去系统设置面恢复，不允许 Issue 评论越权解锁。\\n3. **聚合的单一 status comment**：集中展示任务在自动化处理流程中当前所处的阶段（如 Implementing、Blocked 等），明确标示“此评论将随进度更新”，避免过程刷屏。\\n4. **权限与全局控制隔离**：直观展示了 Issue 上的操作受限于 owner 权限，且清晰区分了单 job 暂停与全局暂停的关系，全局暂停不可在 GitHub 端撤销。\\n\\n## 推荐交互原则与决策项\\n\\n请用户审查 HTML 原型并确认以下 4 个核心产品决策：\\n\\n1. **Command Target**：原型中推荐使用 `@AppBot`，请确认是否采用此方式，或使用 `/ypi`；**不建议默认截获 `@machine-assignee`**，以避免误判真人的 @ 沟通。\\n2. **Phase 1 命令集**：确认开放 `状态`、`重新评估`、`采纳`、`暂停`、`继续` 等指令（暂停/继续仅作用于单 job）。\\n3. **Issue 关闭时行为**：推荐 active job 自动进入 `blocked/paused`（保留 WorkTree，等重新开启后 owner 手工通过继续指令恢复）。\\n4. **回执信息层级呈现**：采用中文主导文案，附带错误状态码（如 `non_owner` 等）作为次级技术信息，并且不在此回显可能暴露敏感信息的内容（如正文 Hash、工作树路径或 Token）。\\n\\n## 主会话下一步\\n\\n1. 请用户打开并预览 `github-issue-command-loop.html`。\\n2. 对上述交互原则、文案及产品决策项做出确认或提出调整意见。\\n3. 若无异议并完成审批，请记录批准结论，将本任务流转至 `awaiting_approval`。\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T12:11:06.437Z",
+            "toolCallId": "kfmkoo33",
+            "toolName": "write",
+            "text": "Successfully wrote 1275 bytes to .ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/ui.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T12:11:33.468Z",
+            "text": "### Handoff: UI Prototype for GitHub Issue Command Loop\n\n**Files Changed / Artifacts Produced:**\n- `github-issue-command-loop.html` (Created): A self-contained HTML prototype demonstrating the user-visible GitHub Issue timeline (Triage, Command Receipt, Status Comment, Rejection, and Global Paused states).\n- `ui.md` (Updated): Updated the document to reflect the prototype's completion, outline covered scenarios, and highlight required product decisions.\n\n**Validation Run:**\n- Confirmed task context constraints: No production code modified, no global configurations unpaused, and no git operations (`commit`/`push`) were executed.\n- Verified task-local files were successfully updated and appropriately localized.\n\n**Remaining Risks:**\n- **Mention Hijacking**: If the system ultimately decides to intercept the `@machine-assignee`, it may accidentally convert casual developer-to-developer issue conversation into bot commands.\n- **Paused State Confusion**: Users might assume sending `@AppBot 继续` in an Issue can override a Settings UI `global_paused` state. The prototype explicitly warns against this, but the risk remains if operators don't read the Bot receipt carefully.\n\n**Decisions Needed from the Main Session:**\nPlease review `github-issue-command-loop.html` (e.g., using the Studio preview API) and confirm the following:\n1. **Command Target Syntax**: Approve using `@AppBot` (or `/ypi`) instead of intercepting `@machine-assignee`.\n2. **Command Set**: Approve the Phase 1 commands: `采纳`, `状态`, `重新评估`, `暂停`, and `继续`.\n3. **Issue Closed Behavior**: Approve the recommendation that an active job enters a `blocked/paused` state (preserving the WorkTree) when its Issue is closed, requiring manual resume if reopened.\n4. **Overall Interaction Flow**: Final approval of the receipts, status aggregation (single comment), and error copy designed in the HTML prototype.\n\nOnce approved, please record the decision in `plan-review.md`/`ui.md` and transition the task to `awaiting_approval`.",
+            "model": "google-antigravity/gemini-3.1-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T12:11:33.469Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1999,
+        "tokens": 735,
+        "tokenSource": "usage",
+        "tps": 234.15,
+        "firstTokenAt": "2026-07-24T12:11:30.261Z",
+        "lastTokenAt": "2026-07-24T12:11:33.400Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-81cc66db54ca593766f9f411",
+        "taskId": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-195830-_-github-_-_-/ui-designer-81cc66db54ca593766f9f411.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T12:09:01.576Z",
+        "finishedAt": "2026-07-24T12:11:33.471Z",
+        "updatedAt": "2026-07-24T12:11:33.471Z",
+        "itemCount": 11,
+        "messageCount": 1,
+        "toolCallCount": 3,
+        "stderrBytes": 0,
+        "bytes": 16806,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019f9407-699a-76d9-aa2f-1651bde37783",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T12-09-01-594Z_019f9407-699a-76d9-aa2f-1651bde37783.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-7b634811cba7e0f59b0d8647",
+      "subtaskId": "LOOP-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T00:42:38.859Z",
+      "finishedAt": "2026-07-27T00:50:19.448Z",
+      "runner": "sdk",
+      "childSessionId": "019fa106-179e-7c79-816f-c54d0d3fc2ed",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T00-42-38-878Z_019fa106-179e-7c79-816f-c54d0d3fc2ed.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f93f1-287d-78af-bc46-33373ab92e0e",
+        "childSessionId": "019fa106-179e-7c79-816f-c54d0d3fc2ed",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — LOOP-01\n\n#### Files Changed\n\n- `lib/github-automation-store.ts` — Additive safe envelope/delivery fields (`senderType`, `commentId`, `commentUpdatedAt`, `commentBodySha256`, `performedViaAppId`, `actorSource`); new ignore reasons; opaque comment body hash helper; never persists comment text.\n- `lib/github-automation-runtime.ts` — Actor source classifier (`self_app` / `bot_actor` / `human_actor` / `unknown_actor`); issues/issue_comment action matrix; generation eligibility (`opened`/`reopened` only); audit-only self/Bot path (zero job / zero wake / zero mutation); closed lifecycle park (`blocked` + `issue_closed`); global paused still authoritative.\n- `scripts/test-github-automation.mjs` — LOOP-01 focused coverage: metadata strip, classifier, 100× self-edited audit-only chain, action matrix, reopen generation, paused hold.\n\n`lib/github-automation-types.ts` / `lib/github-issue-triage-runner.ts` — no code changes needed for LOOP-01; contracts live on the store envelope and ingress path.\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** — `passed=81 failed=0` |\n| `npx eslint` on changed files | **pass** |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n\n#### Acceptance mapped\n\n- App/Bot comment create/edit + assign/label → durable `ignored` delivery, fixed reason (`self_app_event` / `bot_actor_event`), no job/generation/wake.\n- Human `issues.opened` → one job g1; duplicate delivery still no-op.\n- `labeled` / terminal + non-generation events → no claim, no gen++.\n- `closed` → one lifecycle reconcile parks active job; no new generation.\n- `reopened` → may open g2; global `paused` holds actionable opens without enqueue.\n- Historical v1 deliveries without new fields remain readable; missing actor fields fail closed as `unknown_actor`.\n\n#### Notes / Risks\n\n- Conservative Bot handling intentionally drops third-party bot issue/comment business actions (documented product safety).\n- Closed reconcile is skipped while `config.paused` (zero business side effects under kill switch).\n- Exact-comment command protocol, stable marker v2, receipt/status are **out of scope** (IDEMP-02 / CMD-03).\n- Global paused left unchanged; no commit/push/merge.\n\n#### Main session next\n\n1. Mark LOOP-01 done; claim **IDEMP-02** (stable marker / no-op PATCH / comment version keys).\n2. No product decision blockers for LOOP-01 after UI approval.",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T00:42:38.859Z",
+        "updatedAt": "2026-07-27T00:50:19.448Z",
+        "eventCount": 1620,
+        "lastTextPreview": "### Implementation Complete — LOOP-01\n\n#### Files Changed\n\n- `lib/github-automation-store.ts` — Additive safe envelope/delivery fields (`senderType`, `commentId`, `commentUpdatedAt`, `commentBodySha256`, `performedViaAppId`, `actorSource`); new ignore reasons; opaque comment body hash helper; never persists comment text.\n- `lib/github-automation-runtime.ts` — Actor source classifier (`self_app` / `bot_actor` / `human_actor` / `unknown_actor`); issues/issue_comment action matrix; generation eligibility (`opened`/`reopened` only); audit-only self/Bot path (zero job / zero wake / zero mutation); closed lifecycle park (`blocked` + `issue_closed`); global paused still authoritative.\n- `scripts/test-github-automation.mjs` — LOOP-01 focused coverage: metadata strip, classifier, 100× self-edited audit-only chain, action matrix, reopen generation, paused hold.\n\n`lib/github-automation-types.ts` / `lib/github-issue-triage-runner.ts` — no code changes needed for LOOP-01; contracts live on the store envelope and ingress path.\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** — `passed=81 failed=0` |\n| `npx eslint` on changed files | **pass** |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n\n#### Acceptance mapped\n\n- App/Bot comment create/edit + assign/label → durable `ignored` delivery, fixed reason (`self_app_event` / `bot_actor_event`), no job/generation/wake.\n- Human `issues.opened` → one job g1; duplicate delivery still no-op.\n- `labeled` / terminal + non-generation events → no claim, no gen++.\n- `closed` → one lifecycle reconcile parks active job; no new generation.\n- `reopened` → may open g2; global `paused` holds actionable opens without enqueue.\n- Historical v1 deliveries without new fields remain readable; missing actor fields fail closed as `unknown_actor`.\n\n#### Notes / Risks\n\n- Conservative Bot handling intentionally drops third-party bot issue/comment business actions (documented product safety).\n- Closed reconcile is skipped while `config.paused` (zero business side effects under kill switch).\n- Exact-comment command protocol, stable marker v2, receipt/status are **out of scope** (IDEMP-02 / CMD-03).\n- Global paused left unchanged; no commit/push/merge.\n\n#### Main session next\n\n1. Mark LOOP-01 done; claim **IDEMP-02** (stable marker / no-op PATCH / comment version keys).\n2. No product decision blockers for LOOP-01 after UI approval.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T00:49:47.818Z",
+            "toolCallId": "call-a48413a5-06f5-412c-8b80-64ef1760d30f-32|fc_25ca1dc4-c639-9179-bd7f-de5839a7090f_0",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.1 test:github-automation\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-automation.mjs\n\n(node:65166) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - legacy seeded repository constants are recognition-only\nok - P0 and P1 capability reported separately\nok - errors redact secret-like substrings\nok - default config is disabled with empty repositories\nok - config rejects non machine-active-credential assignee source\nok - normalize accepts empty repositories and migrates missing projectId\nok - safe projection hides projectRoot and validation command text\nok - CAS patch rejects stale revision\nok - IMP-02 wire repositories add/remove with CAS and path rejection\nok - credential readiness missing fields\nok - generated-key RS256 JWT verifies and respects lifetime\nok - installation token cache and fixed-host guards\nok - githubGetUserWithBearerToken returns canonical login\nok - gh success path\nok - multi-account without active is blocked\nok - gh unavailable falls back to git credential + canonical /user\nok - non-github git credential host is blocked\nok - credential timeout readiness\nok - safe assignee projection omits secrets\nok - parseGitCredentialFillOutput never treats username as enough\nok - interpretGhAuthStatus detects unsupported host\nok - source isolation: App modules do not import Links or personal auth fallbacks\nok - config file on disk contains no credential env material\nok - webhook signature verifies with timing-safe compare\nok - invalid signature has zero business effects\nok - missing signature is unauthorized\nok - oversize body returns 413 without enqueue\nok - non-allowlisted repository is ignored with zero jobs\nok - unknown event is ignored\nok - allowlisted issues delivery enqueues one job without issue body\nok - duplicate delivery does not create a second job\nok - issue lease serializes concurrent critical sections\nok - scheduler advances received job to claim_readiness checkpoint\nok - effect marker crash-intent path is durable and generation-safe\nok - safe event projection never includes body or secrets\nok - envelope parser strips issue body and truncates title\nok - LOOP-01 envelope extracts actor/comment metadata without body text\nok - LOOP-01 actor classifier prefers performedViaAppId over login\nok - gha-02 modules stay isolated from Links/OAuth credential stores\nok - approved label catalog includes claim and claim-blocked\nok - owner intent strips quotes/code and prefers negation\nok - owner authorization requires owner actor and complete claim\nok - comment markers are idempotent and secret-free\nok - deterministic triage classifies docs vs high-risk\nok - manual skill skip gate for active automation claims\nok - claim runner success requires assignee readback + claimed label + comment\nok - claim runner treats assign 2xx silent-ignore as blocked\nok - credential missing never claims success or worktree phase\nok - gha-03 modules stay isolated from Links/OAuth and publisher\nok - P0 capability is healthy without Contents/PR permissions\nok - machine assignee failure is never readiness healthy\nok - disable and mode=off keep audit delivery without enqueue\nok - LOOP-01 self/bot issue_comment and mutation events stay audit-only\nok - LOOP-01 action matrix: labeled/closed do not claim; human comment reuses active job\nok - LOOP-01 reopened may open a new generation; paused holds actionable events\nok - rollback does not leave false successful claim status\nok - owner adoption refuses incomplete claim and never starts worktree phase\nok - claim recovery path can become complete after blocked assignee fix\nok - docs and AGENTS keep App actor vs machine assignee separated\nok - source modules never claim P1 ships with P0 and keep publisher absent\nok - GHA-09 PR lifecycle: merged vs closed-unmerged for known head/PR\nok - GHA-09 PR lifecycle: unknown/fork/head-collision never mutate jobs\nok - GHA-09 status projection: full-agent residual risk + forbidden fields\nok - GHA-09 config CAS + disallowed credential/risk overrides\nok - GHA-09 job actions are state-gated and idempotent-ish\nok - GHA-09 pull_request webhook reconciles without enqueueing issue jobs\nok - GHA-09 reviewer skill blocks missing Fixes contract\nok - IMP-05 empty default allowlist is not hard-locked to yolk-pi-web\nok - IMP-05 setup verify returns fixed checklist steps without side effects\nok - IMP-05 setup verify ready path still never enqueues work\nok - IMP-05 config GET projects + multi-repo add/remove stay path-free\nok - IMP-05 UI/API surfaces use local credentials path without yolk-pi-web hard lock\nok - IMP-05 sentinel scan over setup projection + config GET\nok - GHCRED-06 local store first-save permissions generation and restart-import\nok - GHCRED-06 partial rotation atomic generation and blank-preserve\nok - GHCRED-06 env overlay matrix blank fallback and invalid local masking\nok - GHCRED-06 local webhook HMAC pass/fail and env secret override\nok - GHCRED-06 installation token cache clears after local rotation and delete\nok - GHCRED-06 fail-closed malformed future symlink oversize non-RSA and concurrent upsert\nok - GHCRED-06 credentials route GET/PUT/DELETE contracts and sentinel isolation\nok - GHCRED-06 setup/status source semantics and non-credential surfaces stay clean\n\npassed=81 failed=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T00:49:50.184Z",
+            "toolCallId": "call-3ad3609f-45d6-49d2-84b5-779427850aaa-33|fc_29b38f16-e01f-94aa-a17a-8bea61a0be05_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npx eslint lib/github-automation-store.ts lib/github-automation-runtime.ts scripts/test-github-automation.mjs 2>&1 | tail -40; node_modules/.bin/tsc --noEmit 2>&1 | tail -40\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T00:50:00.963Z",
+            "toolCallId": "call-3ad3609f-45d6-49d2-84b5-779427850aaa-33|fc_29b38f16-e01f-94aa-a17a-8bea61a0be05_0",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T00:50:19.438Z",
+            "text": "### Implementation Complete — LOOP-01\n\n#### Files Changed\n\n- `lib/github-automation-store.ts` — Additive safe envelope/delivery fields (`senderType`, `commentId`, `commentUpdatedAt`, `commentBodySha256`, `performedViaAppId`, `actorSource`); new ignore reasons; opaque comment body hash helper; never persists comment text.\n- `lib/github-automation-runtime.ts` — Actor source classifier (`self_app` / `bot_actor` / `human_actor` / `unknown_actor`); issues/issue_comment action matrix; generation eligibility (`opened`/`reopened` only); audit-only self/Bot path (zero job / zero wake / zero mutation); closed lifecycle park (`blocked` + `issue_closed`); global paused still authoritative.\n- `scripts/test-github-automation.mjs` — LOOP-01 focused coverage: metadata strip, classifier, 100× self-edited audit-only chain, action matrix, reopen generation, paused hold.\n\n`lib/github-automation-types.ts` / `lib/github-issue-triage-runner.ts` — no code changes needed for LOOP-01; contracts live on the store envelope and ingress path.\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** — `passed=81 failed=0` |\n| `npx eslint` on changed files | **pass** |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n\n#### Acceptance mapped\n\n- App/Bot comment create/edit + assign/label → durable `ignored` delivery, fixed reason (`self_app_event` / `bot_actor_event`), no job/generation/wake.\n- Human `issues.opened` → one job g1; duplicate delivery still no-op.\n- `labeled` / terminal + non-generation events → no claim, no gen++.\n- `closed` → one lifecycle reconcile parks active job; no new generation.\n- `reopened` → may open g2; global `paused` holds actionable opens without enqueue.\n- Historical v1 deliveries without new fields remain readable; missing actor fields fail closed as `unknown_actor`.\n\n#### Notes / Risks\n\n- Conservative Bot handling intentionally drops third-party bot issue/comment business actions (documented product safety).\n- Closed reconcile is skipped while `config.paused` (zero business side effects under kill switch).\n- Exact-comment command protocol, stable marker v2, receipt/status are **out of scope** (IDEMP-02 / CMD-03).\n- Global paused left unchanged; no commit/push/merge.\n\n#### Main session next\n\n1. Mark LOOP-01 done; claim **IDEMP-02** (stable marker / no-op PATCH / comment version keys).\n2. No product decision blockers for LOOP-01 after UI approval.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T00:50:19.439Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2886,
+        "tokens": 1218,
+        "tokenSource": "usage",
+        "tps": 2.7,
+        "firstTokenAt": "2026-07-27T00:42:48.526Z",
+        "lastTokenAt": "2026-07-27T00:50:19.309Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-7b634811cba7e0f59b0d8647",
+        "taskId": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-195830-_-github-_-_-/implementer-7b634811cba7e0f59b0d8647.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T00:42:38.859Z",
+        "finishedAt": "2026-07-27T00:50:19.443Z",
+        "updatedAt": "2026-07-27T00:50:19.443Z",
+        "itemCount": 78,
+        "messageCount": 6,
+        "toolCallCount": 34,
+        "stderrBytes": 0,
+        "bytes": 222112,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa106-179e-7c79-816f-c54d0d3fc2ed",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T00-42-38-878Z_019fa106-179e-7c79-816f-c54d0d3fc2ed.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-6a9b3d6f60ca98cc5616b363",
+      "subtaskId": "IDEMP-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T00:50:52.299Z",
+      "finishedAt": "2026-07-27T00:57:05.659Z",
+      "runner": "sdk",
+      "childSessionId": "019fa10d-9f25-73ff-8dbf-57b1e909f20d",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T00-50-52-325Z_019fa10d-9f25-73ff-8dbf-57b1e909f20d.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f93f1-287d-78af-bc46-33373ab92e0e",
+        "childSessionId": "019fa10d-9f25-73ff-8dbf-57b1e909f20d",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — IDEMP-02\n\n#### Files Changed\n\n- `lib/github-automation-comments.ts` — stable **v2** markers (`kind/repo/issue`, receipt + `commentId`); v1 parse/compat; strict identity match; body normalize/equality; **no-op PATCH** (`writePerformed`); unknown POST/PATCH **re-list reconcile**; `getGithubIssueComment` + version/hash helpers\n- `lib/github-issue-triage-runner.ts` — markers without trace identity; upsert passes `repositoryId`\n- `scripts/test-github-automation.mjs` — IDEMP-02 focused coverage\n- `.ypi/tasks/.../handoff.md` — task-local handoff updated\n\n#### Verification\n\n- `npm run test:github-automation` — **84/84 pass**\n- eslint on changed files — **pass**\n- `tsc --noEmit` — **pass**\n\n#### Notes / Risks\n\n- No CMD-03 (commands/receipts/status bodies/docs)\n- First **semantic** rewrite after deploy may still do one v1→v2 body write; LOOP-01 must keep self `edited` audit-only\n- `upsertGithubAutomationComment` now requires `repositoryId`\n- Owner path still scans recent comments until CMD-03\n- Global paused untouched; no commit/push\n\n#### Main session next\n\nClaim **CMD-03**; use exact-comment helpers; do not unpause without user decision.",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T00:50:52.299Z",
+        "updatedAt": "2026-07-27T00:57:05.659Z",
+        "eventCount": 1526,
+        "lastTextPreview": "### Implementation Complete — IDEMP-02\n\n#### Files Changed\n\n- `lib/github-automation-comments.ts` — stable **v2** markers (`kind/repo/issue`, receipt + `commentId`); v1 parse/compat; strict identity match; body normalize/equality; **no-op PATCH** (`writePerformed`); unknown POST/PATCH **re-list reconcile**; `getGithubIssueComment` + version/hash helpers\n- `lib/github-issue-triage-runner.ts` — markers without trace identity; upsert passes `repositoryId`\n- `scripts/test-github-automation.mjs` — IDEMP-02 focused coverage\n- `.ypi/tasks/.../handoff.md` — task-local handoff updated\n\n#### Verification\n\n- `npm run test:github-automation` — **84/84 pass**\n- eslint on changed files — **pass**\n- `tsc --noEmit` — **pass**\n\n#### Notes / Risks\n\n- No CMD-03 (commands/receipts/status bodies/docs)\n- First **semantic** rewrite after deploy may still do one v1→v2 body write; LOOP-01 must keep self `edited` audit-only\n- `upsertGithubAutomationComment` now requires `repositoryId`\n- Owner path still scans recent comments until CMD-03\n- Global paused untouched; no commit/push\n\n#### Main session next\n\nClaim **CMD-03**; use exact-comment helpers; do not unpause without user decision.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T00:56:59.766Z",
+            "text": "Updating task-local handoff for the parent session.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T00:56:59.768Z",
+            "toolCallId": "call-a8fbc174-df41-4a4b-8f47-4f58235e64e2-45|fc_93390ca7-a0f1-94c1-88f8-61d9eea4a302_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff.md\",\n  \"content\": \"# Handoff：IDEMP-02 完成\\n\\n## Subtask\\n\\n- **ID**: IDEMP-02\\n- **Title**: Make canonical comments and comment versions idempotent\\n- **Status**: implemented (awaiting checker / next claim CMD-03)\\n- **Member**: implementer\\n\\n## Files Changed\\n\\n- `lib/github-automation-comments.ts` — stable v2 markers; v1 parse compatibility; strict kind/repo/issue(/commentId) identity; body normalize + equality; no-op PATCH (`writePerformed`); unknown POST/PATCH re-list reconcile; exact comment GET + version/hash verification helpers; receipt marker shape reserved for CMD-03\\n- `lib/github-issue-triage-runner.ts` — call sites use stable markers (no trace identity) and pass `repositoryId` into upsert\\n- `scripts/test-github-automation.mjs` — IDEMP-02 focused tests (v1/v2 parse, exact version keys, no-op/reconcile/duplicate authority)\\n\\n## Not in this subtask (CMD-03+)\\n\\n- Owner command parser/dispatcher, receipt/status body builders, parked re-triage, per-job pause/continue\\n- Docs (DOC-05) and full suite barrier (CHECK-06)\\n- No global paused change; no live GitHub mutations; no commit/push/merge\\n\\n## Verification\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:github-automation` | **pass** (84/84) |\\n| `npx eslint lib/github-automation-comments.ts lib/github-issue-triage-runner.ts` | **pass** |\\n| `node_modules/.bin/tsc --noEmit` | **pass** |\\n\\n## Acceptance mapped\\n\\n- Same body → `writePerformed=false`, PATCH count 0 (incl. CRLF normalize)\\n- Trace-only change no longer appears in marker identity; different `traceId` builds identical v2 marker\\n- Unknown create outcome re-lists marker/body → `remote_confirmed` without duplicate write\\n- Marker lookup requires kind/repo/issue; other-issue/forged markers rejected; duplicates pick earliest id, never delete\\n- v1 markers still readable as authority; no pure-migration auto-PATCH\\n\\n## Risks / checker focus\\n\\n- First real **semantic** body change after deploy will rewrite v1 → v2 marker text once (expected); LOOP-01 must keep that self `edited` audit-only (already done)\\n- `upsertGithubAutomationComment` now **requires** `repositoryId` (breaking for any external caller; in-repo call sites updated)\\n- Exact-comment helpers are ready for CMD-03 but owner scan path in triage runner is still the pre-CMD-03 “recent comments” path — do not treat as fixed until CMD-03\\n- Global paused remains user-controlled; this subtask did not touch it\\n\\n## Main session next\\n\\n1. Mark IDEMP-02 done / claim **CMD-03** for implementer.\\n2. CMD-03 should consume `getGithubIssueComment` + `verifyExactGithubCommentVersion` + receipt marker builder; do not reintroduce trace-in-marker or body scan adoption.\\n3. Do not unpause global automation for smoke without explicit user decision.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T00:56:59.774Z",
+            "toolCallId": "call-a8fbc174-df41-4a4b-8f47-4f58235e64e2-45|fc_93390ca7-a0f1-94c1-88f8-61d9eea4a302_0",
+            "toolName": "write",
+            "text": "Successfully wrote 2704 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T00:57:05.649Z",
+            "text": "### Implementation Complete — IDEMP-02\n\n#### Files Changed\n\n- `lib/github-automation-comments.ts` — stable **v2** markers (`kind/repo/issue`, receipt + `commentId`); v1 parse/compat; strict identity match; body normalize/equality; **no-op PATCH** (`writePerformed`); unknown POST/PATCH **re-list reconcile**; `getGithubIssueComment` + version/hash helpers\n- `lib/github-issue-triage-runner.ts` — markers without trace identity; upsert passes `repositoryId`\n- `scripts/test-github-automation.mjs` — IDEMP-02 focused coverage\n- `.ypi/tasks/.../handoff.md` — task-local handoff updated\n\n#### Verification\n\n- `npm run test:github-automation` — **84/84 pass**\n- eslint on changed files — **pass**\n- `tsc --noEmit` — **pass**\n\n#### Notes / Risks\n\n- No CMD-03 (commands/receipts/status bodies/docs)\n- First **semantic** rewrite after deploy may still do one v1→v2 body write; LOOP-01 must keep self `edited` audit-only\n- `upsertGithubAutomationComment` now requires `repositoryId`\n- Owner path still scans recent comments until CMD-03\n- Global paused untouched; no commit/push\n\n#### Main session next\n\nClaim **CMD-03**; use exact-comment helpers; do not unpause without user decision.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T00:57:05.656Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1486,
+        "tokens": 329,
+        "tokenSource": "usage",
+        "tps": 1.1,
+        "firstTokenAt": "2026-07-27T00:52:05.942Z",
+        "lastTokenAt": "2026-07-27T00:57:05.637Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-6a9b3d6f60ca98cc5616b363",
+        "taskId": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-195830-_-github-_-_-/implementer-6a9b3d6f60ca98cc5616b363.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T00:50:52.299Z",
+        "finishedAt": "2026-07-27T00:57:05.656Z",
+        "updatedAt": "2026-07-27T00:57:05.656Z",
+        "itemCount": 101,
+        "messageCount": 5,
+        "toolCallCount": 46,
+        "stderrBytes": 0,
+        "bytes": 183657,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa10d-9f25-73ff-8dbf-57b1e909f20d",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T00-50-52-325Z_019fa10d-9f25-73ff-8dbf-57b1e909f20d.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-4a90d80327b87b72a62efd5a",
+      "subtaskId": "CMD-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T00:57:24.920Z",
+      "finishedAt": "2026-07-27T01:08:36.208Z",
+      "runner": "sdk",
+      "childSessionId": "019fa113-9cc9-7a83-befc-f6c2ada4eb4d",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T00-57-24-937Z_019fa113-9cc9-7a83-befc-f6c2ada4eb4d.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f93f1-287d-78af-bc46-33373ab92e0e",
+        "childSessionId": "019fa113-9cc9-7a83-befc-f6c2ada4eb4d",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete (CMD-03)\n\n#### Files Changed\n- `lib/github-owner-intent.ts` — Phase 1 grammar: `@AppBot` / `/ypi` + `状态|重新评估|采纳|暂停|继续`; legacy awaiting-owner adopt; durable `commandKey` (no free-text residual)\n- `lib/github-automation-comments.ts` — receipt/status builders + triage command help (Chinese, secret-free)\n- `lib/github-automation-store.ts` — effect names: `owner_command`, `command_receipt`, `automation_status`\n- `lib/github-issue-triage-runner.ts` — exact comment GET/version gate; receipts; re-evaluate (title/body only); structured adopt; per-job pause/continue; **no** recent-comment scan; never clears global paused\n- `lib/github-automation-runtime.ts` — wake commandable phases on human `issue_comment`; terminal jobs can receive commands **without** generation++\n- `scripts/test-github-automation.mjs` — CMD-03 tests + LOOP-01 terminal-comment expectation update\n- `.ypi/tasks/.../handoff.md` — subtask handoff\n\n#### Verification\n- `npm run test:github-automation` — **88/88 pass**\n- eslint on changed libs — **pass**\n- `tsc --noEmit` — **pass**\n\n#### Notes / Risks\n- Global paused **unchanged**; no commit/push/merge\n- Terminal `not_adopted` now reuses the same job for commands (no g++) — intentional\n- Full self-loop chain / docs still **TEST-04 / DOC-05**\n- Checker: exact-comment TOCTOU, no-injection, pause vs global pause, receipt copy vs HTML prototype\n\n#### Main session next\n1. Mark CMD-03 done; claim **TEST-04** + **DOC-05** (parallel)\n2. Do not unpause automation without explicit user decision",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T00:57:24.920Z",
+        "updatedAt": "2026-07-27T01:08:36.208Z",
+        "eventCount": 1931,
+        "lastTextPreview": "### Implementation Complete (CMD-03)\n\n#### Files Changed\n- `lib/github-owner-intent.ts` — Phase 1 grammar: `@AppBot` / `/ypi` + `状态|重新评估|采纳|暂停|继续`; legacy awaiting-owner adopt; durable `commandKey` (no free-text residual)\n- `lib/github-automation-comments.ts` — receipt/status builders + triage command help (Chinese, secret-free)\n- `lib/github-automation-store.ts` — effect names: `owner_command`, `command_receipt`, `automation_status`\n- `lib/github-issue-triage-runner.ts` — exact comment GET/version gate; receipts; re-evaluate (title/body only); structured adopt; per-job pause/continue; **no** recent-comment scan; never clears global paused\n- `lib/github-automation-runtime.ts` — wake commandable phases on human `issue_comment`; terminal jobs can receive commands **without** generation++\n- `scripts/test-github-automation.mjs` — CMD-03 tests + LOOP-01 terminal-comment expectation update\n- `.ypi/tasks/.../handoff.md` — subtask handoff\n\n#### Verification\n- `npm run test:github-automation` — **88/88 pass**\n- eslint on changed libs — **pass**\n- `tsc --noEmit` — **pass**\n\n#### Notes / Risks\n- Global paused **unchanged**; no commit/push/merge\n- Terminal `not_adopted` now reuses the same job for commands (no g++) — intentional\n- Full self-loop chain / docs still **TEST-04 / DOC-05**\n- Checker: exact-comment TOCTOU, no-injection, pause vs global pause, receipt copy vs HTML prototype\n\n#### Main session next\n1. Mark CMD-03 done; claim **TEST-04** + **DOC-05** (parallel)\n2. Do not unpause automation without explicit user decision",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:08:08.079Z",
+            "toolCallId": "call-2511788c-fd27-49ad-a579-d639721f3993-56|fc_786cd7c0-ba19-9529-98b5-a17f2d5a4d0c_1",
+            "toolName": "bash",
+            "text": "ok - generated-key RS256 JWT verifies and respects lifetime\nok - installation token cache and fixed-host guards\nok - githubGetUserWithBearerToken returns canonical login\nok - gh success path\nok - multi-account without active is blocked\nok - gh unavailable falls back to git credential + canonical /user\nok - non-github git credential host is blocked\nok - credential timeout readiness\nok - safe assignee projection omits secrets\nok - parseGitCredentialFillOutput never treats username as enough\nok - interpretGhAuthStatus detects unsupported host\nok - source isolation: App modules do not import Links or personal auth fallbacks\nok - config file on disk contains no credential env material\nok - webhook signature verifies with timing-safe compare\nok - invalid signature has zero business effects\nok - missing signature is unauthorized\nok - oversize body returns 413 without enqueue\nok - non-allowlisted repository is ignored with zero jobs\nok - unknown event is ignored\nok - allowlisted issues delivery enqueues one job without issue body\nok - duplicate delivery does not create a second job\nok - issue lease serializes concurrent critical sections\nok - scheduler advances received job to claim_readiness checkpoint\nok - effect marker crash-intent path is durable and generation-safe\nok - safe event projection never includes body or secrets\nok - envelope parser strips issue body and truncates title\nok - LOOP-01 envelope extracts actor/comment metadata without body text\nok - LOOP-01 actor classifier prefers performedViaAppId over login\nok - gha-02 modules stay isolated from Links/OAuth credential stores\nok - approved label catalog includes claim and claim-blocked\nok - owner intent strips quotes/code and prefers negation\nok - owner authorization requires owner actor and complete claim\nok - comment markers are idempotent and secret-free\nok - IDEMP-02 parses v1/v2 markers with strict repo/issue identity\nok - IDEMP-02 exact comment version verification and opaque keys\nok - IDEMP-02 upsert no-op PATCH and unknown-outcome reconcile\nok - deterministic triage classifies docs vs high-risk\nok - manual skill skip gate for active automation claims\nok - claim runner success requires assignee readback + claimed label + comment\nok - claim runner treats assign 2xx silent-ignore as blocked\nok - credential missing never claims success or worktree phase\nok - gha-03 modules stay isolated from Links/OAuth and publisher\nok - P0 capability is healthy without Contents/PR permissions\nok - machine assignee failure is never readiness healthy\nok - disable and mode=off keep audit delivery without enqueue\nok - LOOP-01 self/bot issue_comment and mutation events stay audit-only\nok - LOOP-01 action matrix: labeled/closed do not claim; human comment reuses active job\nok - LOOP-01 reopened may open a new generation; paused holds actionable events\nok - rollback does not leave false successful claim status\nok - owner adoption refuses incomplete claim and never starts worktree phase\nok - claim recovery path can become complete after blocked assignee fix\nok - docs and AGENTS keep App actor vs machine assignee separated\nok - source modules never claim P1 ships with P0 and keep publisher absent\nok - GHA-09 PR lifecycle: merged vs closed-unmerged for known head/PR\nok - GHA-09 PR lifecycle: unknown/fork/head-collision never mutate jobs\nok - GHA-09 status projection: full-agent residual risk + forbidden fields\nok - GHA-09 config CAS + disallowed credential/risk overrides\nok - GHA-09 job actions are state-gated and idempotent-ish\nok - GHA-09 pull_request webhook reconciles without enqueueing issue jobs\nok - GHA-09 reviewer skill blocks missing Fixes contract\nok - IMP-05 empty default allowlist is not hard-locked to yolk-pi-web\nok - IMP-05 setup verify returns fixed checklist steps without side effects\nok - IMP-05 setup verify ready path still never enqueues work\nok - IMP-05 config GET projects + multi-repo add/remove stay path-free\nok - IMP-05 UI/API surfaces use local credentials path without yolk-pi-web hard lock\nok - IMP-05 sentinel scan over setup projection + config GET\nok - GHCRED-06 local store first-save permissions generation and restart-import\nok - GHCRED-06 partial rotation atomic generation and blank-preserve\nok - GHCRED-06 env overlay matrix blank fallback and invalid local masking\nok - GHCRED-06 local webhook HMAC pass/fail and env secret override\nok - GHCRED-06 installation token cache clears after local rotation and delete\nok - GHCRED-06 fail-closed malformed future symlink oversize non-RSA and concurrent upsert\nok - GHCRED-06 credentials route GET/PUT/DELETE contracts and sentinel isolation\nok - GHCRED-06 setup/status source semantics and non-credential surfaces stay clean\nok - CMD-03 command parser targets @AppBot / /ypi and legacy adopt\nok - CMD-03 receipt/status builders are Chinese and secret-free\nok - CMD-03 exact owner adopt uses GET comment and writes receipt once\nok - CMD-03 non-owner / global paused / status are fail-closed\n\npassed=88 failed=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T01:08:28.958Z",
+            "toolCallId": "call-5c1963be-a9fe-4966-84ef-fdc0906d04d5-57|fc_5698eb33-6de5-92e0-ba1b-b07102e49b29_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff.md\",\n  \"content\": \"# Handoff：CMD-03 完成\\n\\n## Subtask\\n\\n- **ID**: CMD-03\\n- **Title**: Implement exact Owner commands, receipts, and observable status\\n- **Status**: implemented (awaiting checker / next TEST-04 + DOC-05)\\n- **Member**: implementer\\n\\n## Files Changed\\n\\n- `lib/github-owner-intent.ts` — Phase 1 command grammar (`状态/重新评估/采纳/暂停/继续`), `@AppBot` + `/ypi` targets, legacy awaiting-owner adopt, durable `commandKey`, no free-text residual export\\n- `lib/github-automation-comments.ts` — receipt/status body builders, owner command help section on triage, Chinese reason copy\\n- `lib/github-automation-store.ts` — additive effect names: `command_receipt`, `automation_status`, `owner_command`\\n- `lib/github-issue-triage-runner.ts` — exact comment GET + version gate; owner/non-owner/bot/global-paused receipts; re-evaluate without re-claim; adopt via structured path; per-job pause/continue (never clears global paused); no recent-comment scan\\n- `lib/github-automation-runtime.ts` — wake commandable phases on human `issue_comment`; terminal `not_adopted` / accepted / pr_open reuse same generation for commands\\n- `scripts/test-github-automation.mjs` — CMD-03 parser/receipt/adopt/non-owner/paused/status tests; LOOP-01 terminal comment expectation updated for command reuse\\n\\n## Acceptance mapped\\n\\n- Owner command → one receipt with accepted/rejected/ignored/superseded + phase + next step\\n- Non-owner / Bot / incomplete claim / closed / recommendation≠yes / global paused fail closed\\n- Status is read-only; old adoption cannot be replayed by scanning comments\\n- Free comment text not stored as agent/task/validation/branch/remote/publisher config; adopt hashes matched phrase only\\n- Per-job pause/continue only; Issue text cannot clear `config.paused`\\n\\n## Verification\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:github-automation` | **pass** (88/88) |\\n| `npx eslint` on changed lib files | **pass** |\\n| `node_modules/.bin/tsc --noEmit` | **pass** |\\n\\n## Not in this subtask\\n\\n- TEST-04 full self-loop chain / unattended no-injection expansion (partial coverage only)\\n- DOC-05 architecture/api/library/setup/troubleshooting updates\\n- CHECK-06 barrier / live unpaused smoke\\n- No global paused change; no commit/push/merge\\n\\n## Risks / checker focus\\n\\n- First semantic triage rewrite after deploy still may PATCH once (v1→v2); LOOP-01 keeps self edited audit-only\\n- `not_adopted` terminal jobs now wake on human comments for commands (generation still frozen) — intentional CMD-03; confirm product OK\\n- Receipt write failure after state transition leaves effect `intended`/`remote_confirmed` without forcing re-exec on confirmed keys; reconcile is best-effort upsert\\n- App bot login for mention matching defaults to `@AppBot` / `*[bot]` when login unknown — operators should ensure real bot login is known if custom\\n- Global paused remains user-controlled; not touched\\n\\n## Main session next\\n\\n1. Mark CMD-03 done; claim **TEST-04** and **DOC-05** in parallel (max 2).\\n2. Do not unpause global automation without explicit user decision.\\n3. Checker reviews exact-comment TOCTOU, no-injection, pause boundaries, receipt copy vs HTML prototype.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:08:28.962Z",
+            "toolCallId": "call-5c1963be-a9fe-4966-84ef-fdc0906d04d5-57|fc_5698eb33-6de5-92e0-ba1b-b07102e49b29_0",
+            "toolName": "write",
+            "text": "Successfully wrote 3122 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T01:08:36.194Z",
+            "text": "### Implementation Complete (CMD-03)\n\n#### Files Changed\n- `lib/github-owner-intent.ts` — Phase 1 grammar: `@AppBot` / `/ypi` + `状态|重新评估|采纳|暂停|继续`; legacy awaiting-owner adopt; durable `commandKey` (no free-text residual)\n- `lib/github-automation-comments.ts` — receipt/status builders + triage command help (Chinese, secret-free)\n- `lib/github-automation-store.ts` — effect names: `owner_command`, `command_receipt`, `automation_status`\n- `lib/github-issue-triage-runner.ts` — exact comment GET/version gate; receipts; re-evaluate (title/body only); structured adopt; per-job pause/continue; **no** recent-comment scan; never clears global paused\n- `lib/github-automation-runtime.ts` — wake commandable phases on human `issue_comment`; terminal jobs can receive commands **without** generation++\n- `scripts/test-github-automation.mjs` — CMD-03 tests + LOOP-01 terminal-comment expectation update\n- `.ypi/tasks/.../handoff.md` — subtask handoff\n\n#### Verification\n- `npm run test:github-automation` — **88/88 pass**\n- eslint on changed libs — **pass**\n- `tsc --noEmit` — **pass**\n\n#### Notes / Risks\n- Global paused **unchanged**; no commit/push/merge\n- Terminal `not_adopted` now reuses the same job for commands (no g++) — intentional\n- Full self-loop chain / docs still **TEST-04 / DOC-05**\n- Checker: exact-comment TOCTOU, no-injection, pause vs global pause, receipt copy vs HTML prototype\n\n#### Main session next\n1. Mark CMD-03 done; claim **TEST-04** + **DOC-05** (parallel)\n2. Do not unpause automation without explicit user decision",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T01:08:36.201Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1838,
+        "tokens": 435,
+        "tokenSource": "usage",
+        "tps": 0.66,
+        "firstTokenAt": "2026-07-27T00:57:40.600Z",
+        "lastTokenAt": "2026-07-27T01:08:36.193Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-4a90d80327b87b72a62efd5a",
+        "taskId": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-195830-_-github-_-_-/implementer-4a90d80327b87b72a62efd5a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T00:57:24.920Z",
+        "finishedAt": "2026-07-27T01:08:36.202Z",
+        "updatedAt": "2026-07-27T01:08:36.202Z",
+        "itemCount": 124,
+        "messageCount": 4,
+        "toolCallCount": 58,
+        "stderrBytes": 0,
+        "bytes": 342349,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa113-9cc9-7a83-befc-f6c2ada4eb4d",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T00-57-24-937Z_019fa113-9cc9-7a83-befc-f6c2ada4eb4d.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-31a0e42b65feab699fef6653",
+      "subtaskId": "DOC-05",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T01:08:59.280Z",
+      "finishedAt": "2026-07-27T01:13:27.825Z",
+      "runner": "sdk",
+      "childSessionId": "019fa11e-351e-7708-9fde-7ae5c6fa6bf9",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T01-08-59-294Z_019fa11e-351e-7708-9fde-7ae5c6fa6bf9.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f93f1-287d-78af-bc46-33373ab92e0e",
+        "childSessionId": "019fa11e-351e-7708-9fde-7ae5c6fa6bf9",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete (DOC-05)\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — actor/source matrix, generation rules, stable markers, exact owner commands, closed park, global vs per-job pause, generation-storm recovery\n- `docs/modules/api.md` — webhook envelope/classify path; operator-only `paused`; per-job job controls\n- `docs/modules/library.md` — store/runtime/comments/owner-intent/triage/runner contracts + non-injection rule\n- `docs/integrations/README.md` — design + rollback/stop-bleed aligned with approved protocol\n- `docs/integrations/github-app-automation-setup.md` — Owner `@AppBot`/`/ypi` protocol, acceptance, FAQ, boundaries\n- `docs/operations/troubleshooting.md` — self/Bot ignore reasons, command failures, pause table, generation-storm runbook\n- `.ypi/tasks/.../handoff-doc-05.md` — task handoff artifact\n\n#### Verification\n\n- Stale “any issue_comment enqueues / scan recent comments” guidance on DOC-05 targets — **clean**\n- Contract terms present across all six docs (`self_app_event`, `@AppBot`/`/ypi`, markers, `issue_closed`, global paused, storm recovery)\n- **No** production code changes; **no** commit/push; global paused **unchanged**\n\n#### Notes / Risks\n\n- Product docs default to `@AppBot`; runtime may use real `*[bot]` login or `/ypi` — matches code fallback\n- Align with TEST-04 when it finishes; then CHECK-06\n- Main session: mark DOC-05 done; do not unpause automation without explicit user decision",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T01:08:59.280Z",
+        "updatedAt": "2026-07-27T01:13:27.825Z",
+        "eventCount": 916,
+        "lastTextPreview": "### Implementation Complete (DOC-05)\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — actor/source matrix, generation rules, stable markers, exact owner commands, closed park, global vs per-job pause, generation-storm recovery\n- `docs/modules/api.md` — webhook envelope/classify path; operator-only `paused`; per-job job controls\n- `docs/modules/library.md` — store/runtime/comments/owner-intent/triage/runner contracts + non-injection rule\n- `docs/integrations/README.md` — design + rollback/stop-bleed aligned with approved protocol\n- `docs/integrations/github-app-automation-setup.md` — Owner `@AppBot`/`/ypi` protocol, acceptance, FAQ, boundaries\n- `docs/operations/troubleshooting.md` — self/Bot ignore reasons, command failures, pause table, generation-storm runbook\n- `.ypi/tasks/.../handoff-doc-05.md` — task handoff artifact\n\n#### Verification\n\n- Stale “any issue_comment enqueues / scan recent comments” guidance on DOC-05 targets — **clean**\n- Contract terms present across all six docs (`self_app_event`, `@AppBot`/`/ypi`, markers, `issue_closed`, global paused, storm recovery)\n- **No** production code changes; **no** commit/push; global paused **unchanged**\n\n#### Notes / Risks\n\n- Product docs default to `@AppBot`; runtime may use real `*[bot]` login or `/ypi` — matches code fallback\n- Align with TEST-04 when it finishes; then CHECK-06\n- Main session: mark DOC-05 done; do not unpause automation without explicit user decision",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T01:13:19.399Z",
+            "toolCallId": "call-eb2cc150-ea37-464b-862f-cd42d183a8b8-22|fc_e9752c68-c350-9e69-a781-df927de688fc_1",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff-doc-05.md\",\n  \"content\": \"# Handoff：DOC-05 完成\\n\\n## Subtask\\n\\n- **ID**: DOC-05\\n- **Title**: Document identity/action/command/recovery contracts\\n- **Status**: implemented (awaiting checker / parallel with TEST-04)\\n- **Member**: implementer\\n\\n## Files Changed\\n\\n- `docs/architecture/overview.md` — ingress actor/source matrix, generation rules, stable markers, exact owner commands, closed/park behavior, global vs per-job pause, generation-storm recovery; identity matrix updated\\n- `docs/modules/api.md` — webhook safe envelope + classify/enqueue rules; config `paused` operator-only; jobs per-job pause ≠ global; notes for exact-comment path\\n- `docs/modules/library.md` — store/runtime/comments/owner-intent/triage/runner module map updated for LOOP/IDEMP/CMD contracts; non-injection reuse rule\\n- `docs/integrations/README.md` — design bullets for self-event isolation, command protocol, markers; rollback/stop-bleed; test coverage note\\n- `docs/integrations/github-app-automation-setup.md` — Owner `@AppBot`/`/ypi` protocol, identity isolation, acceptance, FAQ generation storm, product boundary table\\n- `docs/operations/troubleshooting.md` — ignored self/Bot reasons, owner command failures, per-job vs global pause table, generation-storm runbook\\n\\n## Acceptance mapped\\n\\n- Docs consistently describe audit-only self events, action/generation rules, stable markers, exact `@AppBot`/`/ypi` commands, receipt/status, per-job vs global pause, closed Issue park, no comment injection, and recovery without deleting durable history\\n- Stale “any comment / broad adoption scan” guidance removed from the six DOC-05 targets\\n- Global paused remains user/management controlled in all wording\\n\\n## Verification\\n\\n| Check | Result |\\n| --- | --- |\\n| Stale phrase search (`any issue_comment enqueues`, scan recent, …) on DOC-05 files | **clean** |\\n| Coverage search for self_app / @AppBot / generation storm / exact comment / issue_closed | **present** across architecture, api, library, integrations, setup, troubleshooting |\\n| Production code changes | **none** (docs only) |\\n| Global paused | **unchanged** (docs only; no config mutation) |\\n| git commit/push/merge | **not performed** |\\n\\n## Not in this subtask\\n\\n- TEST-04 focused suite expansion\\n- CHECK-06 barrier / live unpaused smoke\\n- Any production TypeScript changes\\n\\n## Risks / checker focus\\n\\n- Setup guide uses `@AppBot` as product-facing default when real bot login may differ at runtime (matches code fallback); operators with custom App slug should use their real `@…[bot]` login or `/ypi`\\n- Architecture overview is dense; if product wants a shorter operator-only section, DOC can later split a dedicated runbook without changing contracts\\n- Parallel TEST-04 may still be running; docs assert contracts already implemented in LOOP/IDEMP/CMD — checker should align wording with final tests\\n\\n## Main session next\\n\\n1. Mark DOC-05 done when checker accepts.\\n2. Ensure TEST-04 completes in parallel; then CHECK-06.\\n3. Do **not** clear global automation paused without explicit user decision.\\n\\\"}\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:13:19.463Z",
+            "toolCallId": "call-eb2cc150-ea37-464b-862f-cd42d183a8b8-21|fc_e9752c68-c350-9e69-a781-df927de688fc_0",
+            "toolName": "bash",
+            "text": "docs/modules/library.md:113:| `lib/ypi-studio-workflows.ts` | Project-local YPI Studio structured workflow reader/initializer for `.ypi/workflows/`, including default workflow state machines, trigger metadata, transitions, progress states, `plan-review.md` as the primary approval-stage review artifact, UI prototype gate instructions for feature/bugfix planning, required `ui.md` for UI-change approval, non-overwriting backfill, explicit same-name default workflow refresh, and re-exports of pure workflow flow helpers. |\ndocs/modules/library.md:114:| `lib/ypi-studio-workflow-flow.ts` | Pure YPI Studio workflow projection helpers for ordering the main path, building display nodes/edges, and separating branch/exception transitions with loop/missing-state safeguards for UI and session-widget reuse. |\ndocs/modules/library.md:115:| `lib/ypi-studio-widget-continue.ts` | Pure helpers for widget decision → Chat Send continuation (Hybrid B). Exports `ypiStudioWidgetActionNeedsChatContinue(kind)` type-guard (true only for `approve_plan` / `request_plan_changes` / `approve_improvement_plan` — `return_to_user_acceptance` and `studio_archive` are intentionally excluded; `studio_archive` is a Send-only Chat action, not a post-PATCH continue) and `buildYpiStudioWidgetChatContinuePrompt(input)` which builds a fixed, machine-auditable guided user message per PRD §3.2. Prompt is pure text — never contains HTML, URLs, file paths, or secret material. No React, no fetch, no side effects. Covered by `npm run test:studio-widget-continue`. |\ndocs/modules/library.md:116:| `lib/ypi-studio-task-preview.ts` | Client-safe helpers shared by `YpiStudioPanel`, `YpiStudioSessionWidget`, `YpiStudioTaskDocumentView`, and the legacy `YpiStudioPlanReviewModal` for task-local plan/artifact open policy: `taskRelativeFilePath`, `improvementRelativePath`, `resolveTaskRelativeHref` (rejects schemes, absolute/protocol-relative paths, `..`, backslashes, and directory targets), `buildStudioTaskFileApiUrl` (`mode=read|preview` with optional `improvementId`), `buildStudioTaskDocumentPageUrl` (app-local `/studio/task-document` query contract encoding `taskKey`/`cwd`/`path`/`improvementId`/`title`), `openStudioTaskDocumentInNewTab` / `openStudioTaskRelativeInNewTab` (non-HTML → document page new tab; HTML → CSP sandbox preview; popup blocked / invalid paths return a failure result and **never** fall back to `onOpenFile`/right-side preview), `openStudioTaskHtmlPrototype` (`window.open` with `noopener,noreferrer` + files API `mode=preview`, explicit task/improvement scope), plus shared empty/TBD detection and sanitized document error copy. Legacy `openTaskRelativeLink` / `openImprovementRelativeLink` still map Markdown/text to the file viewer when callers pass `onOpenFile` and may fall back on blocked HTML popups — prefer the document-page helpers for new Studio material entry points. These helpers only improve client UX; server resolvers in `lib/ypi-studio-tasks.ts` remain the security authority. Preview helpers never write approval grants, PATCH tasks, or run transitions. Covered by `npm run test:studio-task-preview`. |\ndocs/modules/library.md:117:| `lib/ypi-studio-tasks.ts` | Project-local YPI Studio task persistence and projections for `.ypi/tasks/`, including task creation with the standard `plan-review.md` approval artifact, exclusive session ownership helpers (`isYpiStudioSessionContextId`, `replaceTaskSessionContext`, `assertTaskBoundToContext`, `bindYpiStudioTaskToContext`, `removeYpiStudioRuntimePointerIfMatches`), read-only exact-context runtime pointer lookup, workflow transition validation, hard approval gate/grant enforcement for `awaiting_approval -> implementing` (a later explicit chat approval via `recordYpiStudioUserApproval()` with `source=user-input`, or an atomic widget approval via `approveYpiStudioPlanFromWidget()` with `source=user-widget`, may create the grant; transition `reason` is not approval; artifact/plan revisions and `changes_requested` / widget `requestYpiStudioPlanChangesFromWidget` clear the grant and bump `meta.planRevision`). Phase 1 single-lock widget helpers: `approveYpiStudioPlanFromWidget`, `requestYpiStudioPlanChangesFromWidget`, `approveYpiStudioImprovementPlanFromWidget` (binding/status/revision/material CAS, no nested public lock helpers, `override` absent from contract; improvement approval does not touch main plan/progress). Body guards `isYpiStudioWidgetApprovePlanBody` / `RequestPlanChanges` / `ApproveImprovementPlan` reject `override` and non-integer `expectedRevision`, `awaiting_approval` entry validation that requires meaningful non-TBD `plan-review.md`, artifact updates, task-local relative-file resolution for plan approval previews (`resolveYpiStudioTaskRelativeFile`) with URL/absolute/`..`/backslash/symlink-escape rejection, implementation plan/progress normalization, DAG contract fields (`subtasks[].dependsOn` as scheduling source, schemaVersion 2 scheduler metadata, `waiting/queued/failed`, multi active/queued/next ids, `waitingOn`/`blockedBy`) with old-plan compatibility, structured execution groups as UI/readability projection only, server-derived implementation detail projection (`subtasksWithStatus`, status counts, waiting/blocking reasons, runs by subtask, compact subtask timeline, and `waiting_for_studio_children` session runtime hints), next-ready selection, subtask claim/status/history/local-review helpers, event JSONL, subagent run summaries with optional transcript refs and resolved model/thinking metadata, active/archived/all task list/detail readers, completed-task archive moves to `.ypi/tasks/archive/<YYYY-MM>/`, runtime pointer cleanup, and `.ypi/knowledge` Markdown/index persistence plus bounded knowledge-context retrieval. **Session ownership:** active tasks keep at most one session-class owner in `contextIds` (`pi_<sessionId>`, `pi_transcript_<hash>`, `pi_process_<hash>`); unknown non-session contexts are preserved as metadata. Create initializes the owner when a context is provided. `bindYpiStudioTaskToContext` is the only exclusive transfer entry (lock-protected): it replaces all known session-class keys with the next owner, compare-before-unlinks removed pointers that still point at this task, writes the new pointer, clears a cross-session main-task `approvalGrant`, and records a `context_transfer` note event; re-bind to the same sole owner is idempotent (pointer refresh only). Ordinary main/improvement mutations with a context call `assertTaskBoundToContext` and must not append or implicitly reclaim ownership. Legacy multi-owner `contextIds` are not repaired on read; the next explicit bind lazily normalizes them. Archived tasks reject bind; archive cleanup still clears matching runtime pointers. Cardinality is asymmetric: one task → one session owner; one session → many tasks. **Improvement flow:** a main task carries an additive `improvements` record (`schemaVersion: 1`, `parentStatus: \"none\" | \"waiting_for_improvements\" | \"review_ready\"`, and `instances[]`) where each instance owns `id` (`imp_<random>`), `displayId` (`IMP-001`…), `title`, `feedback`, `status`/`phase`/`owner`, optional `approval`/`acceptance`/`disposition`/`approvalMode`, artifact/plan/progress/run metadata, and is stored only under `.ypi/tasks/<task>/improvements/<imp-id>/`. Helpers: `createYpiStudioImprovement()` (only from `review`/`user_acceptance`/`waiting_for_improvements`, atomically sets `parentStatus=waiting_for_improvements` and seeds `brief`/`design`/`plan-review` files), `transitionYpiStudioImprovement()` (valid transitions only; `implementing` requires a recorded approval of the same revision and session context; `accepted` only from `waiting_user_acceptance`; `accepted_not_doing` only from `cancelled`/`failed`), `recordYpiStudioImprovementApproval()` (meaningful `plan-review.md` + HTML prototype when `ui.md` indicates UI changes), `reviseYpiStudioImprovementPlan()` and `updateYpiStudioImprovementArtifact()` (atomically bump the instance `approval.revision` and clear any stale grant inside the parent mutation lock), `updateYpiStudioImprovementPlan()` (instance-local DAG plan), `resolveYpiStudioImprovementDisposition()` (explicit `accepted`/`accepted_not_doing`/`cancelled`/`failed` disposition; rejects archived tasks and already-resolved instances), `reconcileYpiStudioImprovements()` (idempotent: returns the parent to `review` only when **all** instances are `accepted` or `accepted_not_doing`, otherwise stays `waiting_for_improvements` and blocks `completed`/`archive`), `resolveYpiStudioImprovementRelativeFile()` (instance-root-scoped file resolver that validates task ownership and instance existence and rejects URL/absolute/`..`/backslash/symlink escapes relative to the instance directory), and the improvement-instance **execution-scope helpers** added to close the dispatch loop and durable run attribution: `getNextYpiStudioImplementationSubtask(cwd, task, { limit, improvementId? })` (with `improvementId`, resolves ready subtasks only from the instance plan/progress and requires the main task to be `waiting_for_improvements` with the instance in `implementing`/`checking`; without it, the existing main-task semantics are unchanged and `improvementId` is never inferred from a `subtaskId`), `claimYpiStudioImprovementSubtask(task, body)` (a lock-protected, instance-scoped claim that reuses the same DAG ready/dependency/concurrency/history/runId-dedupe rules as the main `claimYpiStudioImplementationSubtask` but reads/writes only `instance.implementationPlan`/`instance.implementationProgress`, never the main task plan/progress; the event `data` carries `improvementId`), and `recordYpiStudioSubagentRun()` improvement branch (when a run carries `improvementId`, it requires the main task to still be `waiting_for_improvements` and the instance to exist, appends the run id to `instance.runIds` with `Set`-dedupe, and updates only the scoped instance progress via the shared `applySubagentRunToImplementationProgress` state machine; runs without `improvementId` keep the byte-level main-task branch, and `reconcileYpiStudioRuntimeLostSubagentRun()` preserves the stored `improvementId` so terminal/cancel/runtime-lost writes retain the same scope). `instance.runIds` is an append-only audit index: completion, cancellation, and runtime-lost never remove an id and only update the same-id run status and instance progress, so the UI member-runs tab can always list historical improvement runs; old runs without `improvementId` and old instances with empty `runIds` are not retroactively backfilled. v1 tasks without an `improvements` field project as having no improvements and are never auto-written back or promoted to top-level tasks; the field upgrades lazily on first improvement mutation. |\ndocs/modules/library.md:118:| `lib/ypi-studio-session-link.ts` | Session-scoped YPI Studio multi-task association resolver and lightweight widget projection builder. `resolveYpiStudioTaskForSession()` returns `YpiStudioSessionTasksLinkResult` with backward-compatible `task` (primary task) plus `tasks[]` (all bound candidates), `primaryTaskKey`, `warnings`, and optional `diagnostics`. Candidates are limited to tasks whose `contextIds` contain exact session context keys (`pi_<sessionId>` / `pi_transcript_<hash>`); the resolver does **not** infer a single owner from array order, `updatedAt`, or runtime pointers — exclusive ownership is enforced on write by `lib/ypi-studio-tasks.ts`. After exclusive transfer, a previous session key is gone from the task, so that session's `tasks[]` no longer includes it even when the transcript still mentions the task. Runtime pointer evidence only marks bound tasks as `current`/primary — unbound runtime references enter diagnostics/warnings but not `tasks[]`. Transcript evidence is diagnostics-only (for `lastEvidenceOrder` sorting on bound tasks; unbound transcript mentions enter `diagnostics.transcriptObservedTaskKeys`). Multiple different tasks bound to the same session remain valid multi-task behavior and no longer produce a fatal `ambiguous` — all candidates are returned and sorted by priority: needs_user/failed/blocked > running/queued > current runtime > updatedAt desc > archived last. Uses `exactRuntimeKeys()` for session context matching, `buildCandidate()` to assemble per-summary projections, and `buildProjection()`/`buildSubagents()`/`buildWidgetImplementationProjection()` for lightweight widget data. **Additive quick-preview projection:** `buildWidgetQuickPreviews()` emits optional `quickPreviews[]` from the complete main/improvement artifact registry (and on-disk `plan-review.md` / `.html/.htm` discovery) — presence is independent of `awaiting_approval` / `waiting_plan_approval`. Descriptors are filename-only (`kind`, `fileName`, `label`, `approvalState`, optional explicit `improvementId`/`displayId`); they never include Markdown/HTML body, full feedback, or transcript. Approval tones come only from current server evidence: main `meta.approvalGrant` / `planRevision`, improvement `instance.approval`, archived → `readonly`. Improvement instance projections also expose optional `canAccept` when status is `waiting_user_acceptance` and the task is not archived (server status remains authoritative). Main-task projection exposes optional `canAcceptMain` via pure helper `canAcceptMainTask()` only when status is `user_acceptance`, the task is not archived, and unresolved improvement count is `0` — never from `review` / `review_ready` alone; server transition gates remain authoritative. Covered by `npm run test:studio-main-accept`. **Phase 1 / IMP-002 decision projection/continuation (including completed CTA):** `buildWidgetUserActions()` emits sparse optional `userActions[]` (max 2; allowlisted kinds only; no endpoints/bodies/paths/feedback). Clean `review` (unresolved improvements == 0, not archived) projects exactly one primary `start_user_acceptance`; `completed && !archived` projects up to two actions: primary `studio_archive` (Chat-only; requires `onComposeSend(\"/studio-archive\")`) plus optional secondary `return_to_user_acceptance` (only when `supportsReturnToUserAcceptance` is not false, determined by `findYpiStudioTransition(workflow, \"completed\", \"user_acceptance\")`; review-only workflows project only archive). unresolved/`user_acceptance`/archived phases do not project completed CTAs. Domain helper `startYpiStudioUserAcceptanceFromWidget()` in `lib/ypi-studio-tasks.ts` performs single-lock `review -> user_acceptance` with binding/status/unresolved/revision CAS and `source=user-widget` audit — no plan grant, no complete/archive. Domain helper `returnYpiStudioToUserAcceptanceFromWidget()` performs single-lock `completed -> user_acceptance`, clears `completedAt`, requires the `completed → user_acceptance` workflow edge, and uses `source=user-widget` audit — no plan grant, no archive, no Chat continuation. `resolveYpiStudioSessionAutocontinueCommand()` continues primary main `implementing` or the first implementing improvement instance DAG (command includes `improvementId` / scoped stateKey). **Server wake deprecated as primary path (Hybrid B):** `bestEffortContinueAfterWidgetRequestPlanChanges()` / `resolveYpiStudioRequestPlanChangesContinuation()` are retained for tests and emergency rollback but no longer called from the route main path — widget request_plan_changes continuation now travels through the Chat `handleSend` path with a guided prompt built by `lib/ypi-studio-widget-continue.ts`. Covered by `npm run test:studio-widget-actions` and continuation cases in `npm run test:studio-dag`. |\ndocs/modules/library.md:119:| `lib/ypi-studio-transcripts.ts` | Bounded sidecar writer/reader for YPI Studio member delegation transcripts under `.ypi/.runtime/studio-subagents/`, including safe path keys, item truncation, total sidecar/API response caps, meta refs, API projections, and small tail previews for the session widget. Item/capture/API projection clipping is display/storage protection surfaced as informational metadata or display notes, not child-run failure. |\ndocs/modules/library.md:120:| `lib/ypi-studio-subagent-runtime.ts` | In-process registry for active YPI Studio child member processes so parent session abort/destroy and abort routes can cancel matching child runs without importing `ypi-studio-extension` from `rpc…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:13:19.464Z",
+            "toolCallId": "call-eb2cc150-ea37-464b-862f-cd42d183a8b8-22|fc_e9752c68-c350-9e69-a781-df927de688fc_1",
+            "toolName": "write",
+            "text": "Successfully wrote 3008 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff-doc-05.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T01:13:27.810Z",
+            "text": "### Implementation Complete (DOC-05)\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — actor/source matrix, generation rules, stable markers, exact owner commands, closed park, global vs per-job pause, generation-storm recovery\n- `docs/modules/api.md` — webhook envelope/classify path; operator-only `paused`; per-job job controls\n- `docs/modules/library.md` — store/runtime/comments/owner-intent/triage/runner contracts + non-injection rule\n- `docs/integrations/README.md` — design + rollback/stop-bleed aligned with approved protocol\n- `docs/integrations/github-app-automation-setup.md` — Owner `@AppBot`/`/ypi` protocol, acceptance, FAQ, boundaries\n- `docs/operations/troubleshooting.md` — self/Bot ignore reasons, command failures, pause table, generation-storm runbook\n- `.ypi/tasks/.../handoff-doc-05.md` — task handoff artifact\n\n#### Verification\n\n- Stale “any issue_comment enqueues / scan recent comments” guidance on DOC-05 targets — **clean**\n- Contract terms present across all six docs (`self_app_event`, `@AppBot`/`/ypi`, markers, `issue_closed`, global paused, storm recovery)\n- **No** production code changes; **no** commit/push; global paused **unchanged**\n\n#### Notes / Risks\n\n- Product docs default to `@AppBot`; runtime may use real `*[bot]` login or `/ypi` — matches code fallback\n- Align with TEST-04 when it finishes; then CHECK-06\n- Main session: mark DOC-05 done; do not unpause automation without explicit user decision",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T01:13:27.820Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1753,
+        "tokens": 382,
+        "tokenSource": "usage",
+        "tps": 1.45,
+        "firstTokenAt": "2026-07-27T01:09:05.021Z",
+        "lastTokenAt": "2026-07-27T01:13:27.781Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-31a0e42b65feab699fef6653",
+        "taskId": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-195830-_-github-_-_-/implementer-31a0e42b65feab699fef6653.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T01:08:59.280Z",
+        "finishedAt": "2026-07-27T01:13:27.820Z",
+        "updatedAt": "2026-07-27T01:13:27.820Z",
+        "itemCount": 53,
+        "messageCount": 3,
+        "toolCallCount": 23,
+        "stderrBytes": 0,
+        "bytes": 224110,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa11e-351e-7708-9fde-7ae5c6fa6bf9",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T01-08-59-294Z_019fa11e-351e-7708-9fde-7ae5c6fa6bf9.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-fc0026da9acc9178ba5b9509",
+      "subtaskId": "TEST-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T01:08:59.261Z",
+      "finishedAt": "2026-07-27T01:19:07.051Z",
+      "runner": "sdk",
+      "childSessionId": "019fa11e-3519-7877-b593-c4042d5e1729",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T01-08-59-289Z_019fa11e-3519-7877-b593-c4042d5e1729.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f93f1-287d-78af-bc46-33373ab92e0e",
+        "childSessionId": "019fa11e-3519-7877-b593-c4042d5e1729",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete (TEST-04 only)\n\n#### Files Changed\n- `scripts/test-github-automation.mjs` — TEST-04 regressions: 100 App self-edits (g1–g80), exact-comment TOCTOU, pause/continue + free-text reject, deleted/closed/schema v1, command effect crash recovery\n- `scripts/test-github-unattended.mjs` — no free-text injection into prompt/task/runner/validation\n- `scripts/test-github-unattended-runner.mjs` — structured pause/retry no-injection; empty-default allowlist fixture for start-gates\n- `.ypi/tasks/.../handoff.md` — updated handoff artifact\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** 93/93 |\n| `npm run test:github-unattended` | **pass** 18/18 |\n| `npm run test:github-unattended-runner` | **pass** 14/14 |\n| `npm run test:github-publish-policy` | **pass** 23/23 |\n\nNo `lib/` production changes. Global paused untouched. No commit/push/live GitHub mutations.\n\n#### Notes / Risks\n- Self-loop proves **ingress** audit-only (zero job/generation/wake/remote mutation); does not re-inject App PATCH as live network loop.\n- Continue may leave job `reasonCode=retry_wake` while effect records continue — tests allow both.\n- Delivery replay → `duplicate` via exclusive-create.\n- Status receipt next-step may mention「采纳」as guidance; recognized command must remain「状态」.\n\n#### Main session\n1. Mark TEST-04 done; finish DOC-05 if still open, then CHECK-06.\n2. Do not unpause global automation without explicit user decision.",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T01:08:59.261Z",
+        "updatedAt": "2026-07-27T01:19:07.051Z",
+        "eventCount": 2461,
+        "lastTextPreview": "### Implementation Complete (TEST-04 only)\n\n#### Files Changed\n- `scripts/test-github-automation.mjs` — TEST-04 regressions: 100 App self-edits (g1–g80), exact-comment TOCTOU, pause/continue + free-text reject, deleted/closed/schema v1, command effect crash recovery\n- `scripts/test-github-unattended.mjs` — no free-text injection into prompt/task/runner/validation\n- `scripts/test-github-unattended-runner.mjs` — structured pause/retry no-injection; empty-default allowlist fixture for start-gates\n- `.ypi/tasks/.../handoff.md` — updated handoff artifact\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** 93/93 |\n| `npm run test:github-unattended` | **pass** 18/18 |\n| `npm run test:github-unattended-runner` | **pass** 14/14 |\n| `npm run test:github-publish-policy` | **pass** 23/23 |\n\nNo `lib/` production changes. Global paused untouched. No commit/push/live GitHub mutations.\n\n#### Notes / Risks\n- Self-loop proves **ingress** audit-only (zero job/generation/wake/remote mutation); does not re-inject App PATCH as live network loop.\n- Continue may leave job `reasonCode=retry_wake` while effect records continue — tests allow both.\n- Delivery replay → `duplicate` via exclusive-create.\n- Status receipt next-step may mention「采纳」as guidance; recognized command must remain「状态」.\n\n#### Main session\n1. Mark TEST-04 done; finish DOC-05 if still open, then CHECK-06.\n2. Do not unpause global automation without explicit user decision.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:18:44.560Z",
+            "toolCallId": "call-7c96e250-937f-47f4-96b3-74b4a986a18f-64|fc_7eb6f791-57f8-9985-88e5-69fd0b9cb362_0",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.1 test:github-unattended-runner\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended-runner.mjs\n\n(node:76575) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - full-agent profile is not sandboxed and keeps residual risk codes\nok - scrubGithubAutomationOwnedSecretsFromEnv removes App/machine env keys\nok - validation commands come from config only; Issue cannot set them\nok - branch name is deterministic and not derived from Issue title\nok - resolve project root requires Project Registry membership\nok - ensureGithubAutomationWorktree creates and reuses one path per generation\nok - ensure unattended Studio task records owner+policy without interactive grant\nok - UI fail-closed policyGrant cannot authorize implementing\nok - start gates require unattended mode, complete claim, allowlist root\nok - queue without unattended parks at accepted_waiting_automation (P0 path)\nok - pause request and retry wake keep injectsCommentText=false\nok - TEST-04 structured pause/retry never accept free-text comment injection\nok - runner state refuses secret markers\nok - source modules document residual risk and do not claim host isolation\n\npassed=14 failed=0\n---\nok - TEST-04 g1-g80 self-loop: 100 App edits stay audit-only with zero mutations\nok - TEST-04 exact comment TOCTOU: superseded, author mismatch, historical adopt ignored\nok - TEST-04 pause/continue commands never clear global paused or inject free text\nok - TEST-04 deleted comment + closed lifecycle + schema v1 missing fields fail closed\nok - TEST-04 command effect crash-intent recovers without double side effect\npassed=93 failed=0\nok - TEST-04 owner comment free text never enters prompt/task/runner/validation\npassed=18 failed=0\npassed=23 failed=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T01:18:59.742Z",
+            "toolCallId": "call-bd6d014e-ef34-4ad7-a1c8-0c7b8fc546ab-65|fc_ea0ab782-0e82-9a5b-8c8d-f9d2970fbf96_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff.md\",\n  \"content\": \"# Handoff：TEST-04 完成\\n\\n## Subtask\\n\\n- **ID**: TEST-04\\n- **Title**: Add loop and command regression coverage\\n- **Status**: implemented (awaiting checker / DOC-05 parallel or CHECK-06)\\n- **Member**: implementer\\n\\n## Files Changed\\n\\n- `scripts/test-github-automation.mjs` — TEST-04 suite:\\n  - g1–g80 self-loop (1 human open + App assign/4 labels/comment create + **100** App comment edits; login rename; delivery replay)\\n  - exact-comment TOCTOU (status vs historical 采纳, superseded edit, author mismatch)\\n  - pause/continue + free-text unsupported + global paused fail-closed\\n  - deleted comment + closed lifecycle + schema v1 missing fields\\n  - command effect crash-intent → remote_confirmed without double side effect\\n- `scripts/test-github-unattended.mjs` — TEST-04 no free-text injection into prompt/task/runner/validation\\n- `scripts/test-github-unattended-runner.mjs` — TEST-04 structured pause/retry never accept free-text; fixture allowlist fix for empty-default repos in start-gates test\\n- `scripts/test-github-publish-policy.mjs` — unchanged (regression green)\\n\\n## Acceptance mapped\\n\\n| Criterion | Coverage |\\n| --- | --- |\\n| 100 App self comment edits, zero job/generation/wake/mutation | `TEST-04 g1-g80 self-loop…` |\\n| Action matrix / deleted / closed / paused | LOOP-01 + TEST-04 deleted/closed + pause/continue global paused |\\n| Exact comment replay / superseded / historical adopt ignored | `TEST-04 exact comment TOCTOU…` + CMD-03 adopt replay |\\n| Marker no-op / unknown-outcome | IDEMP-02 existing tests (still green) |\\n| Crash/reconcile command effect | `TEST-04 command effect crash-intent…` |\\n| No comment text injection | unattended + unattended-runner TEST-04 cases |\\n\\n## Verification\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:github-automation` | **pass** (93/93) |\\n| `npm run test:github-unattended` | **pass** (18/18) |\\n| `npm run test:github-unattended-runner` | **pass** (14/14) |\\n| `npm run test:github-publish-policy` | **pass** (23/23) |\\n\\nNo production `lib/` changes. Global automation paused not modified. No commit / push / merge. No live GitHub mutations.\\n\\n## Notes / Risks\\n\\n- Self-loop chain feeds **ingress** only (webhook → audit ignore); it does not re-emit App PATCH as a live network loop. LOOP-01 + mock mutation counter prove zero handler/wake/remote write.\\n- Continue path stamps job `reasonCode=retry_wake` after structured wake; command effect keeps `continue_requested` — tests accept both.\\n- Delivery id replay returns `duplicate` (exclusive-create), not a second `ignored` row.\\n- Status receipt next-step copy may mention「采纳」as guidance; recognized command must still be「状态」only.\\n- Empty-default allowlist required fixture repo in unattended-runner start-gates test (pre-existing fragility, fixed in TEST-04 scope).\\n\\n## Main session next\\n\\n1. Mark TEST-04 done; keep **DOC-05** parallel if not finished.\\n2. **CHECK-06** (checker): focused suites already green; still need lint/tsc + privacy scans + HTML copy review.\\n3. Do **not** unpause global automation without explicit user decision.\\n4. No production code changes in this subtask — checker should focus on regression strength and any DOC-05 staleness.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:18:59.746Z",
+            "toolCallId": "call-bd6d014e-ef34-4ad7-a1c8-0c7b8fc546ab-65|fc_ea0ab782-0e82-9a5b-8c8d-f9d2970fbf96_0",
+            "toolName": "write",
+            "text": "Successfully wrote 3157 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T01:19:07.045Z",
+            "text": "### Implementation Complete (TEST-04 only)\n\n#### Files Changed\n- `scripts/test-github-automation.mjs` — TEST-04 regressions: 100 App self-edits (g1–g80), exact-comment TOCTOU, pause/continue + free-text reject, deleted/closed/schema v1, command effect crash recovery\n- `scripts/test-github-unattended.mjs` — no free-text injection into prompt/task/runner/validation\n- `scripts/test-github-unattended-runner.mjs` — structured pause/retry no-injection; empty-default allowlist fixture for start-gates\n- `.ypi/tasks/.../handoff.md` — updated handoff artifact\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** 93/93 |\n| `npm run test:github-unattended` | **pass** 18/18 |\n| `npm run test:github-unattended-runner` | **pass** 14/14 |\n| `npm run test:github-publish-policy` | **pass** 23/23 |\n\nNo `lib/` production changes. Global paused untouched. No commit/push/live GitHub mutations.\n\n#### Notes / Risks\n- Self-loop proves **ingress** audit-only (zero job/generation/wake/remote mutation); does not re-inject App PATCH as live network loop.\n- Continue may leave job `reasonCode=retry_wake` while effect records continue — tests allow both.\n- Delivery replay → `duplicate` via exclusive-create.\n- Status receipt next-step may mention「采纳」as guidance; recognized command must remain「状态」.\n\n#### Main session\n1. Mark TEST-04 done; finish DOC-05 if still open, then CHECK-06.\n2. Do not unpause global automation without explicit user decision.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T01:19:07.046Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1960,
+        "tokens": 410,
+        "tokenSource": "usage",
+        "tps": 0.68,
+        "firstTokenAt": "2026-07-27T01:09:05.730Z",
+        "lastTokenAt": "2026-07-27T01:19:07.023Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-fc0026da9acc9178ba5b9509",
+        "taskId": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-195830-_-github-_-_-/implementer-fc0026da9acc9178ba5b9509.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T01:08:59.261Z",
+        "finishedAt": "2026-07-27T01:19:07.047Z",
+        "updatedAt": "2026-07-27T01:19:07.047Z",
+        "itemCount": 140,
+        "messageCount": 4,
+        "toolCallCount": 66,
+        "stderrBytes": 0,
+        "bytes": 323723,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa11e-3519-7877-b593-c4042d5e1729",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T01-08-59-289Z_019fa11e-3519-7877-b593-c4042d5e1729.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-0ddb9a3dae7f0694ff805e4b",
+      "subtaskId": "CHECK-06",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T01:19:35.783Z",
+      "finishedAt": "2026-07-27T01:21:55.229Z",
+      "runner": "sdk",
+      "childSessionId": "019fa127-eb76-71ab-a95c-ac831155f9e2",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T01-19-35-798Z_019fa127-eb76-71ab-a95c-ac831155f9e2.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f93f1-287d-78af-bc46-33373ab92e0e",
+        "childSessionId": "019fa127-eb76-71ab-a95c-ac831155f9e2",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- None (validation-only; no in-scope code defects requiring checker patches)\n\n#### Remaining Findings\n- **Non-blocking:** Live unpaused GitHub mutation smoke not run — global `paused` intentionally left `true`\n- **Non-blocking:** Self-loop coverage is ingress + mock counters, not a live PATCH→webhook network loop\n- **Non-blocking:** Receipt/help copy is slightly richer than HTML but matches the approved contract\n- **Blocking:** None\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** 93/93 |\n| `npm run test:github-unattended` | **pass** 18/18 |\n| `npm run test:github-unattended-runner` | **pass** 14/14 |\n| `npm run test:github-publish-policy` | **pass** 23/23 |\n| `npm run lint` | **pass** (0 errors; 11 pre-existing unrelated warnings) |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n| Global paused re-read | **true** before and after tests |\n| Privacy / no-injection / docs scans | **pass** |\n\n#### Verdict\n**Pass** — LOOP-01…DOC-05 meet PRD/Design/approved UI: self/Bot audit-only (zero job/wake/mutation), generation gate, stable marker no-op PATCH, exact-comment commands, receipt/status, no free-text injection, schema fail-closed, docs consistent. Historical g1–g80 not rewritten. No commit/push/unpause.\n\n---\n\n### Handoff (CHECK-06)\n\n**Artifacts produced**\n- `.ypi/tasks/.../review.md`\n- `.ypi/tasks/.../handoff-check-06.md`\n\n**Production files changed by checker:** none\n\n**Reviewed prior change set**\n- `lib/github-automation-{runtime,store,comments}.ts`, `lib/github-owner-intent.ts`, `lib/github-issue-triage-runner.ts`\n- focused test scripts + six DOC-05 docs\n\n**Remaining risks**\n1. Production stop-bleed depends on deploying this build\n2. After any user-approved unpause, watch one test Issue ≥2 min for zero self-generation storm\n3. Real bot login may differ from product default `@AppBot` (`/ypi` is stable)\n\n**Decisions for main session**\n1. Mark plan **7/7 done** / closeout\n2. Whether/when to clear global paused for controlled live smoke (not by checker)\n3. Commit/PR timing (checker did not commit)",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T01:19:35.783Z",
+        "updatedAt": "2026-07-27T01:21:55.229Z",
+        "eventCount": 1080,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None (validation-only; no in-scope code defects requiring checker patches)\n\n#### Remaining Findings\n- **Non-blocking:** Live unpaused GitHub mutation smoke not run — global `paused` intentionally left `true`\n- **Non-blocking:** Self-loop coverage is ingress + mock counters, not a live PATCH→webhook network loop\n- **Non-blocking:** Receipt/help copy is slightly richer than HTML but matches the approved contract\n- **Blocking:** None\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** 93/93 |\n| `npm run test:github-unattended` | **pass** 18/18 |\n| `npm run test:github-unattended-runner` | **pass** 14/14 |\n| `npm run test:github-publish-policy` | **pass** 23/23 |\n| `npm run lint` | **pass** (0 errors; 11 pre-existing unrelated warnings) |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n| Global paused re-read | **true** before and after tests |\n| Privacy / no-injection / docs scans | **pass** |\n\n#### Verdict\n**Pass** — LOOP-01…DOC-05 meet PRD/Design/approved UI: self/Bot audit-only (zero job/wake/mutation), generation gate, stable marker no-op PATCH, exact-comment commands, receipt/status, no free-text injection, schema fail-closed, docs consistent. Historical g1–g80 not rewritten. No commit/push/unpause.\n\n---\n\n### Handoff (CHECK-06)\n\n**Artifacts produced**\n- `.ypi/tasks/.../review.md`\n- `.ypi/tasks/.../handoff-check-06.md`\n\n**Production files changed by checker:** none\n\n**Reviewed prior change set**\n- `lib/github-automation-{runtime,store,comments}.ts`, `lib/github-owner-intent.ts`, `lib/github-issue-triage-runner.ts`\n- focused test scripts + six DOC-05 docs\n\n**Remaining risks**\n1. Production stop-bleed depends on deploying this build\n2. After any user-approved unpause, watch one test Issue ≥2 min for zero self-generation storm\n3. Real bot login may differ from product default `@AppBot` (`/ypi` is stable)\n\n**Decisions for main session**\n1. Mark plan **7/7 done** / closeout\n2. Whether/when to clear global paused for controlled live smoke (not by checker)\n3. Commit/PR timing (checker did not commit)",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T01:21:24.535Z",
+            "toolCallId": "call-3c103e8e-31d5-469c-a180-20aeab4b26ee-18|fc_78bc6304-92d6-9c92-b541-a5ee3041c2da_1",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff-check-06.md\",\n  \"content\": \"# Handoff：CHECK-06 完成\\n\\n## Subtask\\n\\n- **ID**: CHECK-06\\n- **Title**: Integrated paused-safe validation and checker review\\n- **Status**: done — **Pass**\\n- **Member**: checker\\n\\n## Files / artifacts produced by checker\\n\\n- `.ypi/tasks/.../review.md` — full CHECK-06 review\\n- `.ypi/tasks/.../handoff-check-06.md` — this handoff\\n\\nNo production code changes in CHECK-06. No commit / push / merge. Global automation **paused left true**.\\n\\n## Reviewed change set (prior subtasks)\\n\\n| Area | Paths |\\n| --- | --- |\\n| LOOP/IDEMP/CMD | `lib/github-automation-runtime.ts`, `store.ts`, `comments.ts`, `owner-intent.ts`, `issue-triage-runner.ts` |\\n| TEST-04 | `scripts/test-github-automation.mjs`, `test-github-unattended.mjs`, `test-github-unattended-runner.mjs` |\\n| DOC-05 | `docs/architecture/overview.md`, `docs/modules/api.md`, `docs/modules/library.md`, `docs/integrations/README.md`, `docs/integrations/github-app-automation-setup.md`, `docs/operations/troubleshooting.md` |\\n\\n## Verification\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:github-automation` | **pass** 93/93 |\\n| `npm run test:github-unattended` | **pass** 18/18 |\\n| `npm run test:github-unattended-runner` | **pass** 14/14 |\\n| `npm run test:github-publish-policy` | **pass** 23/23 |\\n| `npm run lint` | **pass** (0 errors; 11 pre-existing warnings, unrelated) |\\n| `node_modules/.bin/tsc --noEmit` | **pass** (empty output) |\\n| Global paused re-read | **true** before and after suites |\\n| Privacy / injection / stale-doc scans | **pass** (opaque hashes only; no config write from command path; docs contract-aligned) |\\n\\n## Findings fixed\\n\\nNone (validation-only; no in-scope code defects requiring checker patch).\\n\\n## Remaining findings\\n\\n### Non-blocking\\n\\n- Live unpaused GitHub mutation smoke **not run** (blocked by intentional global paused; needs user decision).\\n- Self-loop regression is ingress+mock based, not a live PATCH re-ingress network loop.\\n- Minor production receipt/help wording is slightly richer than HTML prototype but matches approved interaction contract.\\n\\n### Blocking\\n\\nNone.\\n\\n## Remaining risks\\n\\n1. Operator must deploy this build before relying on stop-bleed in production traffic.\\n2. After user clears global paused, watch a single test Issue ≥2 minutes for zero self-generation storm; re-enable paused if needed.\\n3. Custom App bot login may differ from product default `@AppBot`; `/ypi` remains stable target.\\n\\n## Decisions needed from main session\\n\\n1. Mark CHECK-06 / plan **7/7 done**; close implementation workflow as appropriate.\\n2. Decide whether/when to clear global paused for a controlled live smoke (checker must not do this).\\n3. Decide commit/PR timing (checker did not commit).\\n4. Optional: record production bot login in operator notes if not `AppBot`.\\n\\n## Verdict\\n\\n**Pass** — implementation satisfies PRD/Design/approved UI for self-loop stop-bleed, exact owner command receipt/status, no-injection, and paused-safe validation. Ready for main-session closeout pending operator deploy / optional live smoke.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:21:24.536Z",
+            "toolCallId": "call-3c103e8e-31d5-469c-a180-20aeab4b26ee-17|fc_78bc6304-92d6-9c92-b541-a5ee3041c2da_0",
+            "toolName": "write",
+            "text": "Successfully wrote 3627 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:21:24.536Z",
+            "toolCallId": "call-3c103e8e-31d5-469c-a180-20aeab4b26ee-18|fc_78bc6304-92d6-9c92-b541-a5ee3041c2da_1",
+            "toolName": "write",
+            "text": "Successfully wrote 3003 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff-check-06.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T01:21:55.219Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None (validation-only; no in-scope code defects requiring checker patches)\n\n#### Remaining Findings\n- **Non-blocking:** Live unpaused GitHub mutation smoke not run — global `paused` intentionally left `true`\n- **Non-blocking:** Self-loop coverage is ingress + mock counters, not a live PATCH→webhook network loop\n- **Non-blocking:** Receipt/help copy is slightly richer than HTML but matches the approved contract\n- **Blocking:** None\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** 93/93 |\n| `npm run test:github-unattended` | **pass** 18/18 |\n| `npm run test:github-unattended-runner` | **pass** 14/14 |\n| `npm run test:github-publish-policy` | **pass** 23/23 |\n| `npm run lint` | **pass** (0 errors; 11 pre-existing unrelated warnings) |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n| Global paused re-read | **true** before and after tests |\n| Privacy / no-injection / docs scans | **pass** |\n\n#### Verdict\n**Pass** — LOOP-01…DOC-05 meet PRD/Design/approved UI: self/Bot audit-only (zero job/wake/mutation), generation gate, stable marker no-op PATCH, exact-comment commands, receipt/status, no free-text injection, schema fail-closed, docs consistent. Historical g1–g80 not rewritten. No commit/push/unpause.\n\n---\n\n### Handoff (CHECK-06)\n\n**Artifacts produced**\n- `.ypi/tasks/.../review.md`\n- `.ypi/tasks/.../handoff-check-06.md`\n\n**Production files changed by checker:** none\n\n**Reviewed prior change set**\n- `lib/github-automation-{runtime,store,comments}.ts`, `lib/github-owner-intent.ts`, `lib/github-issue-triage-runner.ts`\n- focused test scripts + six DOC-05 docs\n\n**Remaining risks**\n1. Production stop-bleed depends on deploying this build\n2. After any user-approved unpause, watch one test Issue ≥2 min for zero self-generation storm\n3. Real bot login may differ from product default `@AppBot` (`/ypi` is stable)\n\n**Decisions for main session**\n1. Mark plan **7/7 done** / closeout\n2. Whether/when to clear global paused for controlled live smoke (not by checker)\n3. Commit/PR timing (checker did not commit)",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T01:21:55.227Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2520,
+        "tokens": 597,
+        "tokenSource": "usage",
+        "tps": 4.73,
+        "firstTokenAt": "2026-07-27T01:19:48.801Z",
+        "lastTokenAt": "2026-07-27T01:21:55.136Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-0ddb9a3dae7f0694ff805e4b",
+        "taskId": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-195830-_-github-_-_-/checker-0ddb9a3dae7f0694ff805e4b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T01:19:35.783Z",
+        "finishedAt": "2026-07-27T01:21:55.227Z",
+        "updatedAt": "2026-07-27T01:21:55.227Z",
+        "itemCount": 46,
+        "messageCount": 4,
+        "toolCallCount": 19,
+        "stderrBytes": 0,
+        "bytes": 131868,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa127-eb76-71ab-a95c-ac831155f9e2",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T01-19-35-798Z_019fa127-eb76-71ab-a95c-ac831155f9e2.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-0b0d1d5d2db49ee95ecba407",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T01:22:09.729Z",
+      "finishedAt": "2026-07-27T01:24:19.514Z",
+      "runner": "sdk",
+      "childSessionId": "019fa12a-44d3-726e-a8e2-481796e57394",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T01-22-09-747Z_019fa12a-44d3-726e-a8e2-481796e57394.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f93f1-287d-78af-bc46-33373ab92e0e",
+        "childSessionId": "019fa12a-44d3-726e-a8e2-481796e57394",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "Perform final task-level checker review. Inspect all changed production code, tests, docs, checks.md and approved HTML. Verify the self-loop is stopped at ingestion (zero jobs/wakes/mutations for App self events), comment writes are stable…",
+      "summary": "### Check Complete #### Findings Fixed - None（检查-only；未改生产代码、未 unpause、未 commit/push/merge） #### Remaining Findings - **Blocking**: None - **Non-blocking**: 1. Live unpaused GitHub smoke **未执行**（`paused=true` 有意保留） 2. 自循环回归是 ingress+mock，不是真实 PATCH→webhook 网络环 3. 生产文案略丰富于 HTML 原型，但契约一致 4. 部署后需观察真实 self delivery / Settings jobs 是否仍增长 #### Verification | Command | Result | | --- | --- | | `npm run test:github-automation` | pass 93/93 | | `npm run test:github-unattended` | pass 18/18 | | `npm run test:github-unattended-runner` | pass 14/14 | | `npm run test:github-publish-policy` | pass 23/23 | | `npm run lint` | pass（0 errors；11 既有 warnings） | | `node_modules/.bin/tsc --noEmit` | pass | | Global paused re-read | **true** | #### Verdict **Pass** — 入口自事件零 job/wake/mutation、canonical 幂等、exact owner `@AppBot`/`/ypi` receipt/status、无 free-text 注入、评论不能清 global paused；UI 原型与用户审批齐全。 --- ### Handoff（主会话） **Artifacts updated** - `review.md` — 最终 task-level review - `checks.md` — 验收勾选 + 证据 - `hand…",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T01:22:09.729Z",
+        "updatedAt": "2026-07-27T01:24:19.514Z",
+        "eventCount": 1080,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None（检查-only；未改生产代码、未 unpause、未 commit/push/merge）\n\n#### Remaining Findings\n- **Blocking**: None\n- **Non-blocking**:\n  1. Live unpaused GitHub smoke **未执行**（`paused=true` 有意保留）\n  2. 自循环回归是 ingress+mock，不是真实 PATCH→webhook 网络环\n  3. 生产文案略丰富于 HTML 原型，但契约一致\n  4. 部署后需观察真实 self delivery / Settings jobs 是否仍增长\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | pass 93/93 |\n| `npm run test:github-unattended` | pass 18/18 |\n| `npm run test:github-unattended-runner` | pass 14/14 |\n| `npm run test:github-publish-policy` | pass 23/23 |\n| `npm run lint` | pass（0 errors；11 既有 warnings） |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| Global paused re-read | **true** |\n\n#### Verdict\n**Pass** — 入口自事件零 job/wake/mutation、canonical 幂等、exact owner `@AppBot`/`/ypi` receipt/status、无 free-text 注入、评论不能清 global paused；UI 原型与用户审批齐全。\n\n---\n\n### Handoff（主会话）\n\n**Artifacts updated**\n- `review.md` — 最终 task-level review\n- `checks.md` — 验收勾选 + 证据\n- `handoff-check-06.md` — 本 handoff\n\n**Production change set reviewed**（先前实现员）\n- `lib/github-automation-runtime.ts|store.ts|comments.ts|owner-intent.ts|issue-triage-runner.ts`\n- `scripts/test-github-automation.mjs` + unattended suites\n- 6 份 DOC-05 文档\n\n**Decisions needed**\n1. 关闭 CHECK-06 / 计划 7/7\n2. 是否/何时由用户解除 global paused 做 live smoke\n3. commit/PR 时机（检查员未提交）\n4. 可选：记录真实 bot login（若非 `AppBot`；`/ypi` 仍可用）",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:24:11.064Z",
+            "toolCallId": "call-bf94f37c-cb49-411a-9b93-96f1ca75df74-18|fc_b2fbbfc1-fdd0-90ee-ba00-433496ae1eda_0",
+            "toolName": "write",
+            "text": "Successfully wrote 5349 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:24:11.077Z",
+            "toolCallId": "call-bf94f37c-cb49-411a-9b93-96f1ca75df74-19|fc_b2fbbfc1-fdd0-90ee-ba00-433496ae1eda_1",
+            "toolName": "write",
+            "text": "Successfully wrote 5382 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/checks.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T01:24:11.092Z",
+            "toolCallId": "call-bf94f37c-cb49-411a-9b93-96f1ca75df74-20|fc_b2fbbfc1-fdd0-90ee-ba00-433496ae1eda_2",
+            "toolName": "write",
+            "text": "Successfully wrote 2440 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环/handoff-check-06.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T01:24:19.504Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None（检查-only；未改生产代码、未 unpause、未 commit/push/merge）\n\n#### Remaining Findings\n- **Blocking**: None\n- **Non-blocking**:\n  1. Live unpaused GitHub smoke **未执行**（`paused=true` 有意保留）\n  2. 自循环回归是 ingress+mock，不是真实 PATCH→webhook 网络环\n  3. 生产文案略丰富于 HTML 原型，但契约一致\n  4. 部署后需观察真实 self delivery / Settings jobs 是否仍增长\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | pass 93/93 |\n| `npm run test:github-unattended` | pass 18/18 |\n| `npm run test:github-unattended-runner` | pass 14/14 |\n| `npm run test:github-publish-policy` | pass 23/23 |\n| `npm run lint` | pass（0 errors；11 既有 warnings） |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| Global paused re-read | **true** |\n\n#### Verdict\n**Pass** — 入口自事件零 job/wake/mutation、canonical 幂等、exact owner `@AppBot`/`/ypi` receipt/status、无 free-text 注入、评论不能清 global paused；UI 原型与用户审批齐全。\n\n---\n\n### Handoff（主会话）\n\n**Artifacts updated**\n- `review.md` — 最终 task-level review\n- `checks.md` — 验收勾选 + 证据\n- `handoff-check-06.md` — 本 handoff\n\n**Production change set reviewed**（先前实现员）\n- `lib/github-automation-runtime.ts|store.ts|comments.ts|owner-intent.ts|issue-triage-runner.ts`\n- `scripts/test-github-automation.mjs` + unattended suites\n- 6 份 DOC-05 文档\n\n**Decisions needed**\n1. 关闭 CHECK-06 / 计划 7/7\n2. 是否/何时由用户解除 global paused 做 live smoke\n3. commit/PR 时机（检查员未提交）\n4. 可选：记录真实 bot login（若非 `AppBot`；`/ypi` 仍可用）",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T01:24:19.505Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1837,
+        "tokens": 553,
+        "tokenSource": "usage",
+        "tps": 4.72,
+        "firstTokenAt": "2026-07-27T01:22:22.349Z",
+        "lastTokenAt": "2026-07-27T01:24:19.480Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-0b0d1d5d2db49ee95ecba407",
+        "taskId": "20260724-195830-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-195830-_-github-_-_-/checker-0b0d1d5d2db49ee95ecba407.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T01:22:09.729Z",
+        "finishedAt": "2026-07-27T01:24:19.512Z",
+        "updatedAt": "2026-07-27T01:24:19.512Z",
+        "itemCount": 50,
+        "messageCount": 4,
+        "toolCallCount": 21,
+        "stderrBytes": 0,
+        "bytes": 134946,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019fa12a-44d3-726e-a8e2-481796e57394",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T01-22-09-747Z_019fa12a-44d3-726e-a8e2-481796e57394.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-27T00:41:38.375Z",
+      "contextId": "pi_019f93f1-287d-78af-bc46-33373ab92e0e",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-27T00:41:57.763Z",
+      "contextId": "pi_019f93f1-287d-78af-bc46-33373ab92e0e",
+      "inputHash": "6bd27e68f72abeb984a906cb",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-27T01:30:07.547Z",
+    "archiveReason": "Accepted and archived from session widget",
+    "knowledgeEntryId": "20260727-093007-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
+    "knowledgePath": ".ypi/knowledge/20260727-093007-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-27T00:41:30.345Z",
+    "sourceArtifact": "implement.md",
+    "summary": "Stop App self-authored webhook feedback at ingestion, make comments/generation durable and idempotent, then add exact owner command receipts/status without allowing Issue text to alter global pause or execution policy.",
+    "strategy": "Approved UI gate first; ingress filtering, remote idempotency, exact owner commands, tests/docs in parallel, then paused-safe checker validation.",
+    "maxConcurrency": 2,
+    "scheduler": {
+      "mode": "dag",
+      "failFast": true,
+      "defaultFailurePolicy": "block_dependents"
+    },
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "ui-gate",
+          "title": "Approved UI gate",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "UI-00"
+          ]
+        },
+        {
+          "id": "safety-core",
+          "title": "Ingress/idempotency/commands",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "LOOP-01",
+            "IDEMP-02",
+            "CMD-03"
+          ]
+        },
+        {
+          "id": "coverage-docs",
+          "title": "Tests and docs",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "TEST-04",
+            "DOC-05"
+          ]
+        },
+        {
+          "id": "closeout",
+          "title": "Validation",
+          "relation": "barrier",
+          "dependencies": [],
+          "subtaskIds": [
+            "CHECK-06"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "UI-00",
+        "title": "Approve GitHub Issue command/status prototype",
+        "phase": "design-gate",
+        "order": 0,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "ui.md",
+          "github-issue-command-loop.html",
+          "plan-review.md"
+        ],
+        "instructions": [
+          "Approval complete: use @AppBot or /ypi; commands status, re-evaluate, adopt, pause, continue; per-job pause cannot clear global pause; closed Issue pauses/blocks and requires explicit owner continue."
+        ],
+        "acceptance": [
+          "HTML exists and approval recorded."
+        ],
+        "validation": [
+          "Review prototype and approval record."
+        ],
+        "risks": [
+          "Do not intercept machine-assignee mentions."
+        ],
+        "parallelizable": false,
+        "member": "ui-designer",
+        "priority": 0,
+        "localReview": {
+          "required": true,
+          "reviewer": "architect"
+        }
+      },
+      {
+        "id": "LOOP-01",
+        "title": "Stop self-event job creation at ingestion",
+        "phase": "ingestion",
+        "order": 1,
+        "dependsOn": [
+          "UI-00"
+        ],
+        "dependencies": [
+          "UI-00"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/github-automation-store.ts",
+          "lib/github-automation-runtime.ts",
+          "lib/github-automation-types.ts",
+          "lib/github-issue-triage-runner.ts"
+        ],
+        "instructions": [
+          "Add sender/app/comment metadata without persisting text; classify App/Bot self events as audit-only; implement action matrix and explicit generation eligibility; preserve global pause."
+        ],
+        "acceptance": [
+          "100 self edits create zero jobs/wakes/mutations; duplicate human open is idempotent; closed/unrelated actions do not claim."
+        ],
+        "validation": [
+          "Focused github automation tests and eslint."
+        ],
+        "risks": [
+          "Conservative Bot filtering and closed reconciliation."
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 1,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "IDEMP-02",
+        "title": "Make canonical comments idempotent",
+        "phase": "idempotency",
+        "order": 2,
+        "dependsOn": [
+          "LOOP-01"
+        ],
+        "dependencies": [
+          "LOOP-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/github-automation-comments.ts",
+          "lib/github-automation-store.ts",
+          "lib/github-issue-triage-runner.ts"
+        ],
+        "instructions": [
+          "Add stable v2 markers, deterministic bodies, no-op PATCH, exact comment version/hash verification, and remote unknown-outcome reconciliation with v1 compatibility."
+        ],
+        "acceptance": [
+          "Same body and trace-only changes cause zero PATCH; unknown outcomes reconcile without duplicates."
+        ],
+        "validation": [
+          "Marker/no-op/reconcile focused tests."
+        ],
+        "risks": [
+          "Avoid migration-only edits and list/create races."
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 2,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "CMD-03",
+        "title": "Implement exact owner commands and receipts",
+        "phase": "command",
+        "order": 3,
+        "dependsOn": [
+          "IDEMP-02"
+        ],
+        "dependencies": [
+          "IDEMP-02"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/github-owner-intent.ts",
+          "lib/github-issue-triage-runner.ts",
+          "lib/github-automation-runner.ts",
+          "lib/github-automation-comments.ts",
+          "lib/github-automation-store.ts",
+          "lib/github-automation-labels.ts"
+        ],
+        "instructions": [
+          "Parse approved anchored commands against exact owner comment id/version; emit durable receipts/status; keep free text out of agent/task/config; expose per-job controls only and never clear global pause."
+        ],
+        "acceptance": [
+          "Every owner command gets one receipt; rejected/paused/closed/non-owner cases are explicit; old comments cannot replay."
+        ],
+        "validation": [
+          "Command matrix and unattended no-injection tests."
+        ],
+        "risks": [
+          "Ambiguous language and receipt/state crash reconciliation."
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 3,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "DOC-05",
+        "title": "Document identity/action/command/recovery contracts",
+        "phase": "docs",
+        "order": 4,
+        "dependsOn": [
+          "CMD-03"
+        ],
+        "dependencies": [
+          "CMD-03"
+        ],
+        "relation": "parallel",
+        "files": [
+          "docs/architecture/overview.md",
+          "docs/modules/api.md",
+          "docs/modules/library.md",
+          "docs/integrations/README.md",
+          "docs/integrations/github-app-automation-setup.md",
+          "docs/operations/troubleshooting.md"
+        ],
+        "instructions": [
+          "Document audit-only self events, action/generation rules, stable markers, exact owner commands, receipts/status, per-job/global pause boundary, closed behavior, and no injection."
+        ],
+        "acceptance": [
+          "Docs consistently describe the approved protocol and recovery without deleting durable history."
+        ],
+        "validation": [
+          "Search stale broad enqueue/adoption guidance and review against prototype/tests."
+        ],
+        "risks": [
+          "Stale examples or misleading resume wording."
+        ],
+        "parallelGroup": "coverage-docs",
+        "parallelizable": true,
+        "member": "implementer",
+        "priority": 4,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "TEST-04",
+        "title": "Add loop and command regression coverage",
+        "phase": "tests",
+        "order": 4,
+        "dependsOn": [
+          "CMD-03"
+        ],
+        "dependencies": [
+          "CMD-03"
+        ],
+        "relation": "parallel",
+        "files": [
+          "scripts/test-github-automation.mjs",
+          "scripts/test-github-unattended.mjs",
+          "scripts/test-github-unattended-runner.mjs",
+          "scripts/test-github-publish-policy.mjs"
+        ],
+        "instructions": [
+          "Model 100 App self comment edits, action matrix, exact comment replay, crash/reconcile, marker no-op, paused/closed flows, and no comment injection."
+        ],
+        "acceptance": [
+          "Focused suites pass offline and former g1-g80 loop is a deterministic regression."
+        ],
+        "validation": [
+          "Run four GitHub focused scripts."
+        ],
+        "risks": [
+          "Mocks must feed self events through ingestion."
+        ],
+        "parallelGroup": "coverage-docs",
+        "parallelizable": true,
+        "member": "implementer",
+        "priority": 4,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "CHECK-06",
+        "title": "Integrated paused-safe validation and checker review",
+        "phase": "validation",
+        "order": 5,
+        "dependsOn": [
+          "TEST-04",
+          "DOC-05"
+        ],
+        "dependencies": [
+          "TEST-04",
+          "DOC-05"
+        ],
+        "relation": "barrier",
+        "instructions": [
+          "Run focused suites, lint, tsc, privacy scans, inspect audit for zero new jobs while paused; do not unpause or perform live mutation smoke."
+        ],
+        "acceptance": [
+          "Checks pass or unrelated failures isolated; global pause and historical records unchanged."
+        ],
+        "validation": [
+          "Four focused scripts, npm run lint, tsc --noEmit, checks.md manual/privacy checklist."
+        ],
+        "risks": [
+          "Real unpaused E2E remains blocked and must be reported."
+        ],
+        "parallelizable": false,
+        "member": "checker",
+        "priority": 5,
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-27T01:30:07.547Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 7,
+      "skipped": 0
+    },
+    "subtasks": {
+      "UI-00": {
+        "id": "UI-00",
+        "status": "done",
+        "updatedAt": "2026-07-27T00:42:19.822Z",
+        "startedAt": "2026-07-27T00:42:14.413Z",
+        "finishedAt": "2026-07-27T00:42:19.822Z",
+        "attempts": 1,
+        "runIds": [],
+        "claimedAt": "2026-07-27T00:42:14.413Z",
+        "claimedByContextId": "pi_019f93f1-287d-78af-bc46-33373ab92e0e",
+        "validation": [
+          "HTML prototype exists",
+          "User approval recorded in ui.md and plan-review.md"
+        ],
+        "localReview": {
+          "runIds": [],
+          "updatedAt": "2026-07-27T00:42:19.822Z"
+        }
+      },
+      "LOOP-01": {
+        "id": "LOOP-01",
+        "status": "done",
+        "updatedAt": "2026-07-27T00:50:19.448Z",
+        "startedAt": "2026-07-27T00:42:31.885Z",
+        "finishedAt": "2026-07-27T00:50:19.448Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-7b634811cba7e0f59b0d8647"
+        ],
+        "lastRunId": "implementer-7b634811cba7e0f59b0d8647",
+        "claimedAt": "2026-07-27T00:42:31.885Z",
+        "claimedByContextId": "pi_019f93f1-287d-78af-bc46-33373ab92e0e",
+        "summary": "### Implementation Complete — LOOP-01\n\n#### Files Changed\n\n- `lib/github-automation-store.ts` — Additive safe envelope/delivery fields (`senderType`, `commentId`, `commentUpdatedAt`, `commentBodySha256`, `performedViaAppId`, `actorSource`); new ignore reasons; opaque comment body hash helper; never persists comment text.\n- `lib/github-automation-runtime.ts` — Actor source classifier (`self_app` / `bot_actor` / `human_actor` / `unknown_actor`); issues/issue_comment action matrix; generation eligibility (`opened`/`reopened` only); audit-only self/Bot path (zero job / zero wake / zero mutation); closed lifecycle park (`blocked` + `issue_closed`); global paused still authoritative.\n- `scripts/test-github-automation.mjs` — LOOP-01 focused coverage: metadata strip, classifier, 100× self-edited audit-only chain, action matrix, reopen generation, paused hold.\n\n`lib/github-automation-types.ts` / `lib/github-issue-triage-runner.ts` — no code changes needed for LOOP-01; contracts live on the store envelope and ingress path.\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** — `passed=81 failed=0` |\n| `npx eslint` on changed files | **pass** |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n\n#### Acceptance mapped\n\n- App/Bot comment create/edit + assign/label → durable `ignored` delivery, fixed reason (`self_app_event` / `bot_actor_event`), no job/generation/wake.\n- Human `issues.opened` → one job g1; duplicate delivery still no-op.\n- `labeled` / terminal + non-generation events → no claim, no gen++.\n- `closed` → one lifecycle reconcile parks active job; no new generation.\n- `reopened` → may open g2; global `paused` holds actionable opens without enqueue.\n- Historical v1 deliveries without new fields remain readable; missing actor fields fail closed as `unknown_actor`.\n\n#### Notes / Risks\n\n- Conservative Bot handling intentionally drops third-party bot issue/comment business actions (documented product safety).\n- Closed reconcile is skipped while `config.paused` (zero business side effects under kill switch).\n- Exact-comment command protocol, stable marker v2, receipt/status are **out of scope** (IDEMP-02 / CMD-03).\n- Global paused left unchanged; no commit/push/merge.\n\n#### Main session next\n\n1. Mark LOOP-01 done; claim **IDEMP-02** (stable marker / no-op PATCH / comment version keys).\n2. No product decision blockers for LOOP-01 after UI approval."
+      },
+      "IDEMP-02": {
+        "id": "IDEMP-02",
+        "status": "done",
+        "updatedAt": "2026-07-27T00:57:05.659Z",
+        "startedAt": "2026-07-27T00:50:46.115Z",
+        "finishedAt": "2026-07-27T00:57:05.659Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-6a9b3d6f60ca98cc5616b363"
+        ],
+        "lastRunId": "implementer-6a9b3d6f60ca98cc5616b363",
+        "claimedAt": "2026-07-27T00:50:46.115Z",
+        "claimedByContextId": "pi_019f93f1-287d-78af-bc46-33373ab92e0e",
+        "summary": "### Implementation Complete — IDEMP-02\n\n#### Files Changed\n\n- `lib/github-automation-comments.ts` — stable **v2** markers (`kind/repo/issue`, receipt + `commentId`); v1 parse/compat; strict identity match; body normalize/equality; **no-op PATCH** (`writePerformed`); unknown POST/PATCH **re-list reconcile**; `getGithubIssueComment` + version/hash helpers\n- `lib/github-issue-triage-runner.ts` — markers without trace identity; upsert passes `repositoryId`\n- `scripts/test-github-automation.mjs` — IDEMP-02 focused coverage\n- `.ypi/tasks/.../handoff.md` — task-local handoff updated\n\n#### Verification\n\n- `npm run test:github-automation` — **84/84 pass**\n- eslint on changed files — **pass**\n- `tsc --noEmit` — **pass**\n\n#### Notes / Risks\n\n- No CMD-03 (commands/receipts/status bodies/docs)\n- First **semantic** rewrite after deploy may still do one v1→v2 body write; LOOP-01 must keep self `edited` audit-only\n- `upsertGithubAutomationComment` now requires `repositoryId`\n- Owner path still scans recent comments until CMD-03\n- Global paused untouched; no commit/push\n\n#### Main session next\n\nClaim **CMD-03**; use exact-comment helpers; do not unpause without user decision."
+      },
+      "CMD-03": {
+        "id": "CMD-03",
+        "status": "done",
+        "updatedAt": "2026-07-27T01:08:36.209Z",
+        "startedAt": "2026-07-27T00:57:17.758Z",
+        "finishedAt": "2026-07-27T01:08:36.208Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-4a90d80327b87b72a62efd5a"
+        ],
+        "lastRunId": "implementer-4a90d80327b87b72a62efd5a",
+        "claimedAt": "2026-07-27T00:57:17.758Z",
+        "claimedByContextId": "pi_019f93f1-287d-78af-bc46-33373ab92e0e",
+        "summary": "### Implementation Complete (CMD-03)\n\n#### Files Changed\n- `lib/github-owner-intent.ts` — Phase 1 grammar: `@AppBot` / `/ypi` + `状态|重新评估|采纳|暂停|继续`; legacy awaiting-owner adopt; durable `commandKey` (no free-text residual)\n- `lib/github-automation-comments.ts` — receipt/status builders + triage command help (Chinese, secret-free)\n- `lib/github-automation-store.ts` — effect names: `owner_command`, `command_receipt`, `automation_status`\n- `lib/github-issue-triage-runner.ts` — exact comment GET/version gate; receipts; re-evaluate (title/body only); structured adopt; per-job pause/continue; **no** recent-comment scan; never clears global paused\n- `lib/github-automation-runtime.ts` — wake commandable phases on human `issue_comment`; terminal jobs can receive commands **without** generation++\n- `scripts/test-github-automation.mjs` — CMD-03 tests + LOOP-01 terminal-comment expectation update\n- `.ypi/tasks/.../handoff.md` — subtask handoff\n\n#### Verification\n- `npm run test:github-automation` — **88/88 pass**\n- eslint on changed libs — **pass**\n- `tsc --noEmit` — **pass**\n\n#### Notes / Risks\n- Global paused **unchanged**; no commit/push/merge\n- Terminal `not_adopted` now reuses the same job for commands (no g++) — intentional\n- Full self-loop chain / docs still **TEST-04 / DOC-05**\n- Checker: exact-comment TOCTOU, no-injection, pause vs global pause, receipt copy vs HTML prototype\n\n#### Main session next\n1. Mark CMD-03 done; claim **TEST-04** + **DOC-05** (parallel)\n2. Do not unpause automation without explicit user decision"
+      },
+      "DOC-05": {
+        "id": "DOC-05",
+        "status": "done",
+        "updatedAt": "2026-07-27T01:13:27.826Z",
+        "startedAt": "2026-07-27T01:08:47.846Z",
+        "finishedAt": "2026-07-27T01:13:27.825Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-31a0e42b65feab699fef6653"
+        ],
+        "lastRunId": "implementer-31a0e42b65feab699fef6653",
+        "claimedAt": "2026-07-27T01:08:47.846Z",
+        "claimedByContextId": "pi_019f93f1-287d-78af-bc46-33373ab92e0e",
+        "summary": "### Implementation Complete (DOC-05)\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — actor/source matrix, generation rules, stable markers, exact owner commands, closed park, global vs per-job pause, generation-storm recovery\n- `docs/modules/api.md` — webhook envelope/classify path; operator-only `paused`; per-job job controls\n- `docs/modules/library.md` — store/runtime/comments/owner-intent/triage/runner contracts + non-injection rule\n- `docs/integrations/README.md` — design + rollback/stop-bleed aligned with approved protocol\n- `docs/integrations/github-app-automation-setup.md` — Owner `@AppBot`/`/ypi` protocol, acceptance, FAQ, boundaries\n- `docs/operations/troubleshooting.md` — self/Bot ignore reasons, command failures, pause table, generation-storm runbook\n- `.ypi/tasks/.../handoff-doc-05.md` — task handoff artifact\n\n#### Verification\n\n- Stale “any issue_comment enqueues / scan recent comments” guidance on DOC-05 targets — **clean**\n- Contract terms present across all six docs (`self_app_event`, `@AppBot`/`/ypi`, markers, `issue_closed`, global paused, storm recovery)\n- **No** production code changes; **no** commit/push; global paused **unchanged**\n\n#### Notes / Risks\n\n- Product docs default to `@AppBot`; runtime may use real `*[bot]` login or `/ypi` — matches code fallback\n- Align with TEST-04 when it finishes; then CHECK-06\n- Main session: mark DOC-05 done; do not unpause automation without explicit user decision"
+      },
+      "TEST-04": {
+        "id": "TEST-04",
+        "status": "done",
+        "updatedAt": "2026-07-27T01:19:07.052Z",
+        "startedAt": "2026-07-27T01:08:47.846Z",
+        "finishedAt": "2026-07-27T01:19:07.051Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-fc0026da9acc9178ba5b9509"
+        ],
+        "lastRunId": "implementer-fc0026da9acc9178ba5b9509",
+        "claimedAt": "2026-07-27T01:08:47.846Z",
+        "claimedByContextId": "pi_019f93f1-287d-78af-bc46-33373ab92e0e",
+        "summary": "### Implementation Complete (TEST-04 only)\n\n#### Files Changed\n- `scripts/test-github-automation.mjs` — TEST-04 regressions: 100 App self-edits (g1–g80), exact-comment TOCTOU, pause/continue + free-text reject, deleted/closed/schema v1, command effect crash recovery\n- `scripts/test-github-unattended.mjs` — no free-text injection into prompt/task/runner/validation\n- `scripts/test-github-unattended-runner.mjs` — structured pause/retry no-injection; empty-default allowlist fixture for start-gates\n- `.ypi/tasks/.../handoff.md` — updated handoff artifact\n\n#### Verification\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** 93/93 |\n| `npm run test:github-unattended` | **pass** 18/18 |\n| `npm run test:github-unattended-runner` | **pass** 14/14 |\n| `npm run test:github-publish-policy` | **pass** 23/23 |\n\nNo `lib/` production changes. Global paused untouched. No commit/push/live GitHub mutations.\n\n#### Notes / Risks\n- Self-loop proves **ingress** audit-only (zero job/generation/wake/remote mutation); does not re-inject App PATCH as live network loop.\n- Continue may leave job `reasonCode=retry_wake` while effect records continue — tests allow both.\n- Delivery replay → `duplicate` via exclusive-create.\n- Status receipt next-step may mention「采纳」as guidance; recognized command must remain「状态」.\n\n#### Main session\n1. Mark TEST-04 done; finish DOC-05 if still open, then CHECK-06.\n2. Do not unpause global automation without explicit user decision."
+      },
+      "CHECK-06": {
+        "id": "CHECK-06",
+        "status": "done",
+        "updatedAt": "2026-07-27T01:21:55.230Z",
+        "startedAt": "2026-07-27T01:19:26.590Z",
+        "finishedAt": "2026-07-27T01:21:55.229Z",
+        "attempts": 1,
+        "runIds": [
+          "checker-0ddb9a3dae7f0694ff805e4b"
+        ],
+        "lastRunId": "checker-0ddb9a3dae7f0694ff805e4b",
+        "claimedAt": "2026-07-27T01:19:26.590Z",
+        "claimedByContextId": "pi_019f93f1-287d-78af-bc46-33373ab92e0e",
+        "summary": "### Check Complete\n\n#### Findings Fixed\n- None (validation-only; no in-scope code defects requiring checker patches)\n\n#### Remaining Findings\n- **Non-blocking:** Live unpaused GitHub mutation smoke not run — global `paused` intentionally left `true`\n- **Non-blocking:** Self-loop coverage is ingress + mock counters, not a live PATCH→webhook network loop\n- **Non-blocking:** Receipt/help copy is slightly richer than HTML but matches the approved contract\n- **Blocking:** None\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **pass** 93/93 |\n| `npm run test:github-unattended` | **pass** 18/18 |\n| `npm run test:github-unattended-runner` | **pass** 14/14 |\n| `npm run test:github-publish-policy` | **pass** 23/23 |\n| `npm run lint` | **pass** (0 errors; 11 pre-existing unrelated warnings) |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n| Global paused re-read | **true** before and after tests |\n| Privacy / no-injection / docs scans | **pass** |\n\n#### Verdict\n**Pass** — LOOP-01…DOC-05 meet PRD/Design/approved UI: self/Bot audit-only (zero job/wake/mutation), generation gate, stable marker no-op PATCH, exact-comment commands, receipt/status, no free-text injection, schema fail-closed, docs consistent. Historical g1–g80 not rewritten. No commit/push/unpause.\n\n---\n\n### Handoff (CHECK-06)\n\n**Artifacts produced**\n- `.ypi/tasks/.../review.md`\n- `.ypi/tasks/.../handoff-check-06.md`\n\n**Production files changed by checker:** none\n\n**Reviewed prior change set**\n- `lib/github-automation-{runtime,store,comments}.ts`, `lib/github-owner-intent.ts`, `lib/github-issue-triage-runner.ts`\n- focused test scripts + six DOC-05 docs\n\n**Remaining risks**\n1. Production stop-bleed depends on deploying this build\n2. After any user-approved unpause, watch one test Issue ≥2 min for zero self-generation storm\n3. Real bot login may differ from product default `@AppBot` (`/ypi` is stable)\n\n**Decisions for main session**\n1. Mark plan **7/7 done** / closeout\n2. Whether/when to clear global paused for controlled live smoke (not by checker)\n3. Commit/PR timing (checker did not commit)"
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-27T00:42:14.413Z",
+        "subtaskId": "UI-00",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T00:42:19.822Z",
+        "subtaskId": "UI-00",
+        "from": "running",
+        "to": "done"
+      },
+      {
+        "at": "2026-07-27T00:42:31.885Z",
+        "subtaskId": "LOOP-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T00:50:46.115Z",
+        "subtaskId": "IDEMP-02",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T00:57:17.758Z",
+        "subtaskId": "CMD-03",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T01:08:47.846Z",
+        "subtaskId": "TEST-04",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T01:08:47.846Z",
+        "subtaskId": "DOC-05",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T01:19:26.590Z",
+        "subtaskId": "CHECK-06",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

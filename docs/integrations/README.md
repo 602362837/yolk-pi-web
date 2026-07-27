@@ -383,13 +383,16 @@ Repository Issue automation is a **separate domain** from Links OAuth connection
 
 ### Design
 
-- **App Bot identity**: GitHub App installation performs webhook verification, labels, comments, and assignment API calls. Later P1 also owns push/PR publishing. Never falls back to Links tokens, personal PAT, or `gh auth` for those mutations.
-- **Machine assignee identity**: the host’s active `gh` login (else fixed `github.com` git credential + canonical `GET /user`) is added as the Issue **Assignee** for human-visible ownership. Credential material is resolver-only and never stored in automation config/jobs/task/session.
+- **App Bot identity**: GitHub App installation performs webhook verification, labels, comments, and assignment API calls. Later P1 also owns push/PR publishing. Never falls back to Links tokens, personal PAT, or `gh auth` for those mutations. App/Bot-authored webhook events are **audit-only** (zero job/wake/mutation) so self-edited triage/receipt/status comments cannot re-enter claim/triage.
+- **Machine assignee identity**: the host’s active `gh` login (else fixed `github.com` git credential + canonical `GET /user`) is added as the Issue **Assignee** for human-visible ownership. Credential material is resolver-only and never stored in automation config/jobs/task/session. `@machine-assignee` is **not** an automation command target (avoids hijacking ordinary human @-mentions).
 - **Local App credentials**: server-only store under `github-automation/credentials.v1.json` + generation PEM (`0700`/`0600`, atomic pointer, lock). Runtime resolves each field **env → local → missing**. Safe APIs project booleans/sources only (no values/paths/fingerprints). Successful local save/delete clears installation token cache.
+- **Ingress matrix**: verified safe envelope classifies `self_app` (performed-via App ID), `bot_actor`, `human_actor`, `unknown`. Action matrix allows human `issues.opened` (first generation), `reopened` (lifecycle/new generation), restricted `edited` re-triage, `closed` fail-closed park (`issue_closed`, keep WorkTree), and human exact `issue_comment` commands; `assigned`/`labeled` and self/Bot comments are ignored for business effects. Generation is not a delivery counter.
+- **Canonical comments**: stable v2 markers (`kind`+`repo`+`issue`; receipts also bind `commentId`); semantic body equality ⇒ zero PATCH; unknown outcomes re-list by marker before retry.
+- **Owner command protocol**: human Owner comments targeting `@AppBot` or leading `/ypi` with Phase 1 enums `状态` / `重新评估` / `采纳` / `暂停` / `继续` (legacy bare adoption while awaiting owner). Worker GETs the delivery’s exact comment id/version only; durable command key + receipt/status comments; free text never becomes agent/validation/branch/remote/publisher input and cannot clear global `paused`. Per-job pause/continue ≠ global kill switch.
 - **Successful claim**: `ypi:claimed` **and** Issue read-back assignees contain the machine login (plus local lease + marker comment). Assign HTTP 2xx without read-back is **not** success.
 - **Claim blocked**: missing/invalid/unassignable credentials or read-back failure → `blocked_claim_assignee`; do not keep a false `ypi:claimed`; optional `ypi:claim-blocked` + safe App comment; retry after operator fix.
 - **P0 stop condition**: owner affirmative adoption records `accepted_waiting_automation` only when unattended is off.
-- **P1 unattended (default-off)**: with `mode=unattended` and `unattended.enabled=true`, complete claim + owner actor + affirmative intent may start durable WorkTree + Studio + **full agent** (`executionProfile=full-agent`, `riskProfile=docs-and-small-bugfix`), then server App publisher opens one `Fixes #N` PR (never auto-merge). Full agent is **not sandboxed**: arbitrary commands, network, and same-OS-user filesystem reads remain residual risk; only product-owned App/machine secrets are guaranteed not to be deliberately injected into agent context. Prefer a dedicated low-privilege OS account/container. Pause/retry resume the same job; `unattended.enabled=false` rolls back to P0 adoption parking.
+- **P1 unattended (default-off)**: with `mode=unattended` and `unattended.enabled=true`, complete claim + owner actor + affirmative intent may start durable WorkTree + Studio + **full agent** (`executionProfile=full-agent`, `riskProfile=docs-and-small-bugfix`), then server App publisher opens one `Fixes #N` PR (never auto-merge). Full agent is **not sandboxed**: arbitrary commands, network, and same-OS-user filesystem reads remain residual risk; only product-owned App/machine secrets (and non-injection of Issue/comment free text as agent commands) are guaranteed not to be deliberately injected into agent context. Prefer a dedicated low-privilege OS account/container. Pause/retry resume the same job; `unattended.enabled=false` rolls back to P0 adoption parking.
 
 ### Configuration
 
@@ -404,11 +407,11 @@ Non-secret policy lives under `~/.pi/agent/github-automation/config.json` (defau
 ### Permissions / events (P0)
 
 - Permissions: Metadata read, Issues read/write. Contents/PR permissions are **not** required for P0 readiness.
-- Events: `issues`, `issue_comment` (installation lifecycle recorded for later binding).
+- Events: `issues`, `issue_comment` (installation lifecycle recorded for later binding). **Not every action enqueues work** — self/Bot and label/assign mutations are audit-only; only human lifecycle/command paths bind jobs under the generation gate (see architecture overview).
 
 ### Key modules
 
-`lib/github-automation-*` (including `github-automation-setup-verify.ts`), `lib/github-app-*` (including `github-app-credential-store.ts`, `github-app-credentials.ts`), `lib/github-machine-assignee.ts`, `lib/github-webhook-verify.ts`, `lib/github-issue-triage-runner.ts`, `lib/github-owner-intent.ts`, `lib/github-full-agent-profile.ts`, `lib/github-automation-runner.ts`, `lib/github-git-publisher.ts`, `lib/github-risk-policy.ts`, `lib/github-diff-policy.ts`, `lib/github-pr-contract.ts`, routes under `app/api/github-automation/` (`webhook`, `credentials`, `status`, `config`, `verify`, `jobs`), UI `components/GithubAutomationConfig.tsx`.
+`lib/github-automation-*` (including `github-automation-setup-verify.ts`, runtime action matrix, store envelope/effects, comments markers/receipts), `lib/github-app-*` (including `github-app-credential-store.ts`, `github-app-credentials.ts`), `lib/github-machine-assignee.ts`, `lib/github-webhook-verify.ts`, `lib/github-issue-triage-runner.ts`, `lib/github-owner-intent.ts`, `lib/github-full-agent-profile.ts`, `lib/github-automation-runner.ts`, `lib/github-git-publisher.ts`, `lib/github-risk-policy.ts`, `lib/github-diff-policy.ts`, `lib/github-pr-contract.ts`, routes under `app/api/github-automation/` (`webhook`, `credentials`, `status`, `config`, `verify`, `jobs`), UI `components/GithubAutomationConfig.tsx`.
 
 ### Tests
 
@@ -418,14 +421,15 @@ npm run test:github-unattended
 npm run test:github-publish-policy
 ```
 
-Uses temporary `PI_CODING_AGENT_DIR`, generated App keys, mocked GitHub HTTP, and mocked credential executables — never real operator credentials or live GitHub network. `test:github-unattended` covers owner/claim gates, residual-risk non-injection sentinels, high-risk/final-diff blocks, restart/pause, 429/permission/uninstall, and one mocked docs → PR path. Sentinel scans prove **non-injection**, not host sandboxing.
+Uses temporary `PI_CODING_AGENT_DIR`, generated App keys, mocked GitHub HTTP, and mocked credential executables — never real operator credentials or live GitHub network. `test:github-automation` covers self-loop/action matrix/generation, stable markers/no-op PATCH, exact-comment commands/receipts. `test:github-unattended` covers owner/claim gates, residual-risk non-injection sentinels, high-risk/final-diff blocks, restart/pause, 429/permission/uninstall, and one mocked docs → PR path. Sentinel scans prove **non-injection**, not host sandboxing.
 
-### Rollback
+### Rollback / stop-bleed
 
-1. Set `enabled=false` and/or `mode=off` in automation config (stops new jobs; keeps verified delivery audit).
+1. Set `paused=true` (operator kill switch) and/or `enabled=false` / `mode=off` in automation config (stops new jobs; keeps verified delivery audit). **Issue comments cannot clear `paused`.**
 2. Set `unattended.enabled=false` to keep triage but park owner adoption at `accepted_waiting_automation` (no new WorkTree/PR).
-3. Do not delete Issue labels/comments/assignees, jobs, worktrees, branches, PRs, or events automatically.
-4. Never fall back to App-bot-as-assignee or personal-PAT Bot when machine credentials fail.
+3. Keep self/Bot audit-only filter + generation gate even if command dispatch is disabled; stop receipt/status updates without deleting history.
+4. Do not delete Issue labels/comments/assignees, jobs, worktrees, branches, PRs, or multi-generation audit (e.g. historical storms) automatically.
+5. Never fall back to App-bot-as-assignee or personal-PAT Bot when machine credentials fail.
 
 ## Skills and Commands
 

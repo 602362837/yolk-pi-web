@@ -492,9 +492,40 @@ Focused tests: `npm run test:github-automation` (P0), `npm run test:github-unatt
 
 | Identity | Allowed | Forbidden |
 | --- | --- | --- |
-| GitHub App installation | webhook, labels, comments, add-assignee API, later P1 push/PR | pretending to be owner approval; becoming the human Assignee |
-| Machine active `gh` / fixed `github.com` git credential user | Assignee display only; login discovery + assignability check | Bot comments, labels, push/PR fallback; storing token in config/task/session |
-| Repository owner actor | Affirmative natural-language adoption comments | Supplying paths/commands/policy/tokens |
+| GitHub App installation | webhook, labels, comments, add-assignee API, later P1 push/PR | pretending to be owner approval; becoming the human Assignee; authorizing owner commands |
+| Machine active `gh` / fixed `github.com` git credential user | Assignee display only; login discovery + assignability check | Bot comments, labels, push/PR fallback; automation command target; storing token in config/task/session |
+| Repository owner actor (human) | Exact-comment Phase 1 commands (`@AppBot` / `/ypi`) and legacy bare adoption while awaiting owner | Supplying paths/commands/policy/tokens; clearing global paused; free-text injection into agent/prompt/validation |
+| Third-party Bot / App actors | Durable delivery audit only | Owner authorization, command dispatch, claim/triage, scheduler wake |
+
+### Ingress: actor source, action matrix, generation
+
+After HMAC verification the runtime builds a **safe envelope** (sender id/type, optional comment id/updatedAt, opaque comment body SHA-256, `performed_via_github_app.id`). Comment **text is never persisted** in deliveries/jobs/effects.
+
+**Actor source** (authorization is never based on mutable `${slug}[bot]` login alone):
+
+1. `performedViaAppId === effective App ID` → `self_app` (definite self)
+2. `senderType` in `{Bot, App}` → `bot_actor` (conservative non-actionable)
+3. Positive human sender id → `human_actor`
+4. Else → `unknown_actor` (fail closed)
+
+**Self / Bot / unknown** Issue and `issue_comment` deliveries are **audit-only**: exclusive delivery + fixed ignore reason (`self_app_event` / `bot_actor_event` / …), **zero** job create/bind, **zero** active-delivery rebind, **zero** scheduler wake, **zero** GitHub mutation. This is the permanent stop-bleed against App self-edited comment loops (e.g. historical g1–g80 storms).
+
+**Human action matrix (summary):**
+
+| Event | Action | Handling |
+| --- | --- | --- |
+| `issues` | `opened` | At most one initial claim/triage generation |
+| `issues` | `reopened` | Lifecycle reconcile; may open a new generation |
+| `issues` | `edited` | Restricted re-triage on existing Issue state only; no unconditional new generation / re-claim |
+| `issues` | `closed` | Fail-closed lifecycle on existing active job (`blocked` / pause with reason `issue_closed`); keep WorkTree/durable state; **no** claim/triage/comment rewrite/generation bump |
+| `issues` | `assigned` / `labeled` / other | Audit-only |
+| `issue_comment` | `created` / `edited` | Exact-comment owner command path only (human) |
+| `issue_comment` | `deleted` | Superseded/audit reconcile only; never authorizes |
+| `pull_request` | supported | Existing PR lifecycle path (no Issue job enqueue) |
+
+**Generation** is the Issue automation lifecycle counter, not a delivery counter. It may increase only for `opened` / `reopened` (or explicit operator restart / structured retry policy). Label/assign/Bot mutation/status query/deleted comment/closed/duplicate delivery must **not** bump generation. Terminal jobs no longer auto-increment generation on arbitrary webhook deliveries. Human commands on parked/terminal-but-commandable phases (e.g. `not_adopted`, awaiting owner) reuse the **same** generation.
+
+Global `config.paused` remains highest priority after classification: delivery disposition `paused`, no command parse/execute; **Issue comments cannot clear global paused**.
 
 ### Successful claim definition
 
@@ -507,19 +538,52 @@ Focused tests: `npm run test:github-automation` (P0), `npm run test:github-unatt
 
 Incomplete identity/assign/read-back → `blocked_claim_assignee`. Bot-managed `ypi:claimed` is withheld or removed; optional `ypi:claim-blocked` may be set; App publishes a safe incomplete-claim comment. Fix credentials/collaborator/Issues permissions and retry the same durable job.
 
+### Canonical comments and remote idempotency
+
+Automation comments use stable markers (v2 preferred, v1 readable):
+
+```html
+<!-- ypi-github-automation:v2 kind=triage repo=<repositoryId> issue=<n> -->
+<!-- ypi-github-automation:v2 kind=command_receipt repo=<id> issue=<n> comment=<commentId> -->
+<!-- ypi-github-automation:v2 kind=automation_status repo=<id> issue=<n> -->
+```
+
+- Marker **identity** is `kind + repositoryId + issueNumber` (+ `commentId` for receipts). Trace/time/phase never enter identity (local audit only).
+- Body builders are deterministic; normalized body equality ⇒ **zero PATCH** (`writePerformed:false`).
+- Lookup must match kind/repo/issue (and receipt comment id); foreign markers are never reused. Historical duplicates pick one authority; comments are never auto-deleted.
+- Unknown POST/PATCH outcomes re-list by marker/body before any blind retry.
+
+### Owner exact-comment command protocol
+
+Phase 1 commands (enum only — parser never exports free-text residual to agent/task/validation):
+
+| Command | Target | Effect |
+| --- | --- | --- |
+| `状态` | `@AppBot` or leading `/ypi` | Read-only phase / blocked / next step |
+| `重新评估` | same | Re-triage from **current Issue title/body** only (no comment free-text injection; no re-claim) |
+| `采纳` / `可以做` / `开始实现` | same; bare affirmative also allowed while awaiting owner | Structured owner adoption (recommendation=yes, open Issue, complete claim, policy gates) |
+| `暂停` / `继续` | same | Per-job pause/resume only; **never** clears `config.paused` |
+
+Processing binds the delivery’s **exact comment id**, author id/type, and version (updatedAt / body hash). Worker GETs that comment only; it does **not** scan “any recent affirmative comment.” Version mismatch ⇒ `superseded`. Durable `commandKey` / effect markers ensure one side effect per comment version. Public **command_receipt** and single **automation_status** comments update only on semantic change; they never echo raw body/hash/paths/tokens. Non-owner and Bot default to audit silence (no rejection spam).
+
+**Non-injection boundary:** Issue/comment text cannot set validation argv, branch/base/remote, risk policy, publisher, App/machine credentials, or global paused, and is never appended to agent prompt/task instructions.
+
 ### P0 flow
 
 ```text
 POST /api/github-automation/webhook
   → capped raw body + X-Hub-Signature-256 (timingSafeEqual)
   → allowlist by immutable repository.id
-  → exclusive delivery + durable job enqueue → 202
+  → safe envelope (actor/source + optional comment version metadata; no body text)
+  → classify actor + action matrix
+     ├─ self/bot/unknown or non-actionable: exclusive delivery + ignore reason; zero job/wake
+     ├─ issues.closed: lifecycle park active job (issue_closed); zero claim/triage
+     └─ human actionable: exclusive delivery + job bind/wake under generation gate → 202
   → scheduler + per-issue lease
-  → resolve machine login (gh active, else github.com git credential + GET /user)
-  → App assign + Issue read-back + ensure ypi:claimed
-  → triage labels + Chinese conclusion comment
-  → owner actor + affirmative intent
-  → accepted_waiting_automation   # P0 stop: no WorkTree / no PR
+  → claim path (human opened only): machine login → App assign + read-back + ypi:claimed
+  → triage labels + stable-marker Chinese conclusion (+ owner command help)
+  → human issue_comment: exact comment GET → owner command → receipt/status
+  → adopt (when gates pass): accepted_waiting_automation   # P0 stop: no WorkTree / no PR
 ```
 
 ### Permissions and events (P0)
@@ -531,7 +595,7 @@ POST /api/github-automation/webhook
 | Pull requests | not required |
 | Contents | not required |
 
-Events: `issues`, `issue_comment`, plus installation lifecycle for later binding. Operator provides a **public HTTPS** ingress to the webhook route (self-hosted reverse proxy/tunnel); the product does not ship a cloud relay.
+Events: `issues`, `issue_comment`, plus installation lifecycle for later binding. Not every action is business-actionable — see the action matrix above. Operator provides a **public HTTPS** ingress to the webhook route (self-hosted reverse proxy/tunnel); the product does not ship a cloud relay.
 
 ### Secrets and storage
 
@@ -561,10 +625,13 @@ Write rules: process queue + mkdir lock; generation key file is written and fsyn
 
 Durable non-secret state remains under the same root (`config.json`, deliveries, jobs, issue state, safe events, mkdir leases). Raw webhook bodies, signatures, Issue/comment text, App JWT/installation tokens, and machine personal tokens must not be persisted in audit/job records. **Public HTTPS** should expose only `POST /api/github-automation/webhook`; management UI and credentials/config APIs must stay on loopback/VPN/controlled access — writing App credentials amplifies unauthenticated management-surface risk.
 
-### Disable / rollback
+### Disable / rollback / generation-storm recovery
 
 - `enabled=false` or `mode=off` stops new jobs; webhook still verifies and records safe paused/ignored deliveries.
-- Does **not** delete Issue comments/labels/assignees, jobs, audit events, or force a false successful claim.
+- Global `paused=true` is the operator **stop-bleed**: new deliveries audit as paused; command parse/runner does not execute; **only the management config surface** (Settings / `PATCH /config`) may clear it — never Issue comments.
+- Does **not** delete Issue comments/labels/assignees, jobs, audit events, WorkTrees, or force a false successful claim. Historical multi-generation storms (e.g. g1–g80) are retained for audit; do not bulk-rewrite or delete them to “fix” a loop.
+- Permanent safety layers that must remain even if command UX is disabled: self/Bot audit-only filter, action matrix, generation eligibility gate, stable marker + body no-op PATCH.
+- If command protocol misbehaves: disable comment command dispatch / stop updating receipt/status; keep Settings job retry/pause/resume and durable audit. Do not remove self-event filtering.
 - Machine credential failure blocks new claims (`blocked_claim_assignee`); it does not fall back to App-bot assignee or personal PAT Bot identity.
 
 Focused tests (offline, temp `PI_CODING_AGENT_DIR`, mocked GitHub/credentials; no real operator secrets or live GitHub network):
