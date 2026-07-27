@@ -74,6 +74,90 @@ interface JobActionAvailability {
   reasonCode: string | null;
 }
 
+type JobSchedulerState =
+  | "queued"
+  | "leased"
+  | "backoff"
+  | "paused"
+  | "idle"
+  | "terminal"
+  | "unknown";
+
+type JobAgentExecutionState =
+  | "not_started"
+  | "bootstrapping"
+  | "implementing"
+  | "checking"
+  | "publishing"
+  | "ended"
+  | "failed"
+  | "unknown";
+
+type JobSessionAvailability =
+  | "none"
+  | "creating"
+  | "active"
+  | "ended"
+  | "failed"
+  | "unknown_legacy";
+
+type JobBlockedLayer =
+  | "start_gate"
+  | "worktree"
+  | "studio_task"
+  | "policy_pre"
+  | "policy_plan"
+  | "session_bootstrap"
+  | "agent"
+  | "validation"
+  | "policy_final"
+  | "publisher"
+  | "lifecycle"
+  | "scheduler"
+  | "unknown";
+
+type JobRetryability =
+  | "automatic"
+  | "operator_after_change"
+  | "operator"
+  | "none";
+
+type JobSafeProgressKind =
+  | "checkpoint_advanced"
+  | "session_created"
+  | "child_run_terminal"
+  | "validation_terminal"
+  | "policy_terminal"
+  | "publisher_terminal"
+  | "command_consumed"
+  | "reconciled";
+
+interface JobProgressCounts {
+  schedulerRuns: number;
+  agentRuns: number;
+  noProgressRuns: number;
+  meaningfulProgress: number;
+}
+
+interface JobSafeProgressSummary {
+  at: string | null;
+  kind: JobSafeProgressKind | null;
+}
+
+interface JobEvaluatedProvenance {
+  codeRevision: string;
+  policyVersion: string;
+}
+
+interface RuntimeProvenance {
+  packageVersion: string;
+  buildId: string;
+  codeRevision: string;
+  processEpoch: string;
+  processStartedAt: string;
+  policyVersion: string;
+}
+
 interface JobSafeProjection {
   jobId: string;
   repositoryId: number;
@@ -82,6 +166,10 @@ interface JobSafeProjection {
   issueTitlePreview: string | null;
   phase: string;
   status: string;
+  /**
+   * Legacy field: scheduler lease run count only.
+   * UI labels as "调度尝试", never "第 N 次执行" / Agent runs.
+   */
   attempt: number;
   generation: number;
   traceId: string;
@@ -95,6 +183,17 @@ interface JobSafeProjection {
   headBranch: string | null;
   hasPullRequest: boolean;
   actions: JobActionAvailability[];
+  // Additive GHA-CLOSE-04/06 observability — server projection only; never invent truth.
+  schedulerState?: JobSchedulerState;
+  agentExecutionState?: JobAgentExecutionState;
+  sessionAvailability?: JobSessionAvailability;
+  blockedAtLayer?: JobBlockedLayer | null;
+  retryability?: JobRetryability;
+  lastMeaningfulProgress?: JobSafeProgressSummary;
+  counts?: JobProgressCounts;
+  workspaceLabel?: string | null;
+  sessionIdShort?: string | null;
+  evaluatedProvenance?: JobEvaluatedProvenance | null;
 }
 
 interface RepositorySafeProjection {
@@ -212,6 +311,8 @@ interface StatusProjection {
   };
   jobs: JobSafeProjection[];
   config: ConfigSafeProjection;
+  /** Running process package/build/policy provenance (additive; may be absent on older servers). */
+  runtimeProvenance?: RuntimeProvenance;
 }
 
 type SetupItemState = "ready" | "pending" | "needs_fix" | "unknown";
@@ -943,6 +1044,574 @@ function claimStatusLabel(claim: JobSafeProjection["claimStatus"]): string {
   return "claim 未知";
 }
 
+type UiTone = "ok" | "warn" | "bad" | "info" | "muted";
+
+type JobFilterKind =
+  | "all"
+  | "policy"
+  | "retry"
+  | "active"
+  | "release"
+  | "terminal";
+
+const JOB_RAIL_STEPS = [
+  "调度",
+  "策略",
+  "Session",
+  "实现",
+  "检查",
+  "发布",
+] as const;
+
+function shortTraceId(traceId: string): string {
+  if (traceId.length <= 12) return traceId;
+  return `${traceId.slice(0, 8)}…`;
+}
+
+function formatClockTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleTimeString("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function jobSchedulerState(job: JobSafeProjection): JobSchedulerState {
+  return job.schedulerState ?? "unknown";
+}
+
+function jobAgentExecutionState(job: JobSafeProjection): JobAgentExecutionState {
+  return job.agentExecutionState ?? "unknown";
+}
+
+function jobSessionAvailability(job: JobSafeProjection): JobSessionAvailability {
+  return job.sessionAvailability ?? "unknown_legacy";
+}
+
+function jobProgressCounts(job: JobSafeProjection): JobProgressCounts {
+  const schedulerRuns =
+    typeof job.counts?.schedulerRuns === "number"
+      ? job.counts.schedulerRuns
+      : Number.isFinite(job.attempt)
+        ? Math.max(0, Math.floor(job.attempt))
+        : 0;
+  return {
+    schedulerRuns,
+    agentRuns:
+      typeof job.counts?.agentRuns === "number" ? Math.max(0, job.counts.agentRuns) : 0,
+    noProgressRuns:
+      typeof job.counts?.noProgressRuns === "number"
+        ? Math.max(0, job.counts.noProgressRuns)
+        : 0,
+    meaningfulProgress:
+      typeof job.counts?.meaningfulProgress === "number"
+        ? Math.max(0, job.counts.meaningfulProgress)
+        : 0,
+  };
+}
+
+function isPolicyBlockedLayer(layer: JobBlockedLayer | null | undefined): boolean {
+  return layer === "policy_pre" || layer === "policy_plan" || layer === "policy_final";
+}
+
+function blockedLayerLabel(layer: JobBlockedLayer | null | undefined): string {
+  switch (layer) {
+    case "start_gate":
+      return "启动门禁";
+    case "worktree":
+      return "WorkTree";
+    case "studio_task":
+      return "Studio 任务";
+    case "policy_pre":
+      return "前置策略门禁";
+    case "policy_plan":
+      return "规划策略门禁";
+    case "session_bootstrap":
+      return "Session 启动";
+    case "agent":
+      return "Agent 执行";
+    case "validation":
+      return "验证";
+    case "policy_final":
+      return "最终策略门禁";
+    case "publisher":
+      return "发布";
+    case "lifecycle":
+      return "生命周期";
+    case "scheduler":
+      return "调度";
+    case "unknown":
+      return "未知层";
+    default:
+      return "—";
+  }
+}
+
+function sessionAvailabilityLabel(availability: JobSessionAvailability): {
+  primary: string;
+  secondary: string;
+  tone: UiTone;
+} {
+  switch (availability) {
+    case "none":
+      return {
+        primary: "尚未启动 Agent",
+        secondary: "Session 不存在",
+        tone: "warn",
+      };
+    case "creating":
+      return {
+        primary: "正在创建 Session",
+        secondary: "Session 启动中",
+        tone: "info",
+      };
+    case "active":
+      return {
+        primary: "Session 可用",
+        secondary: "Agent 可在获准工作区运行",
+        tone: "ok",
+      };
+    case "ended":
+      return {
+        primary: "Session 已结束",
+        secondary: "审计可查",
+        tone: "ok",
+      };
+    case "failed":
+      return {
+        primary: "Session 失败",
+        secondary: "启动或绑定失败",
+        tone: "bad",
+      };
+    case "unknown_legacy":
+    default:
+      return {
+        primary: "Session 状态未知",
+        secondary: "旧记录缺少可证字段",
+        tone: "muted",
+      };
+  }
+}
+
+function agentExecutionLabel(job: JobSafeProjection): {
+  label: string;
+  tone: UiTone;
+  help: string;
+} {
+  const agent = jobAgentExecutionState(job);
+  const session = jobSessionAvailability(job);
+  const sessionInfo = sessionAvailabilityLabel(session);
+  const layer = job.blockedAtLayer ?? null;
+  const counts = jobProgressCounts(job);
+
+  // Never invent Agent active from phase/status/attempt. Unknown stays conservative.
+  if (agent === "unknown") {
+    return {
+      label: "状态未知",
+      tone: "muted",
+      help: "尚无可证实 Agent 活动 · 不根据 phase/status 推断",
+    };
+  }
+
+  if (agent === "not_started") {
+    if (isPolicyBlockedLayer(layer) || job.status === "blocked" || job.phase === "blocked") {
+      return {
+        label: "策略阻塞",
+        tone: "warn",
+        help: `${sessionInfo.primary} · ${sessionInfo.secondary}`,
+      };
+    }
+    if (jobSchedulerState(job) === "backoff" || job.status === "retry_due") {
+      return {
+        label: "等待重试",
+        tone: "bad",
+        help: `${sessionInfo.primary} · ${sessionInfo.secondary}`,
+      };
+    }
+    return {
+      label: "尚未启动 Agent",
+      tone: "warn",
+      help: sessionInfo.secondary,
+    };
+  }
+
+  if (agent === "bootstrapping") {
+    return {
+      label: "启动 Session",
+      tone: "info",
+      help: sessionInfo.primary,
+    };
+  }
+  if (agent === "implementing") {
+    return {
+      label: "实现中",
+      tone: "info",
+      help: `${sessionInfo.primary}${job.lastMeaningfulProgress?.at ? ` · 最近进展 ${formatSafeTime(job.lastMeaningfulProgress.at)}` : ""}`,
+    };
+  }
+  if (agent === "checking") {
+    return {
+      label: "检查中",
+      tone: "info",
+      help: sessionInfo.primary,
+    };
+  }
+  if (agent === "publishing") {
+    return {
+      label: "发布中",
+      tone: "info",
+      help: sessionInfo.primary,
+    };
+  }
+  if (agent === "ended") {
+    const prBit =
+      job.prNumber != null
+        ? `PR #${job.prNumber} 已发布`
+        : job.hasPullRequest
+          ? "PR 已发布"
+          : "终态";
+    return {
+      label: "已完成",
+      tone: "ok",
+      help: prBit,
+    };
+  }
+  if (agent === "failed") {
+    return {
+      label: "失败",
+      tone: "bad",
+      help:
+        layer != null
+          ? `阻塞层：${blockedLayerLabel(layer)}`
+          : sessionInfo.primary,
+    };
+  }
+
+  // Exhaustive fallback — still never claim Agent active without evidence.
+  return {
+    label: "尚未启动 Agent",
+    tone: "warn",
+    help:
+      counts.agentRuns > 0
+        ? `Agent 启动 ${counts.agentRuns} · 当前无活动证据`
+        : sessionInfo.secondary,
+  };
+}
+
+function schedulerStateLabel(job: JobSafeProjection): {
+  label: string;
+  tone: UiTone;
+} {
+  const state = jobSchedulerState(job);
+  switch (state) {
+    case "queued":
+      return { label: "已领取 / 排队", tone: "info" };
+    case "leased":
+      return { label: "Lease 活跃", tone: "ok" };
+    case "backoff":
+      return {
+        label: job.nextRetryAt
+          ? `Backoff 至 ${formatClockTime(job.nextRetryAt)}`
+          : "Backoff 等待",
+        tone: "warn",
+      };
+    case "paused":
+      return { label: "已暂停", tone: "warn" };
+    case "idle":
+      return { label: "空闲", tone: "muted" };
+    case "terminal":
+      return { label: "终态 · 不再调度", tone: "ok" };
+    case "unknown":
+    default:
+      return { label: "调度状态未知", tone: "muted" };
+  }
+}
+
+function progressKindLabel(kind: JobSafeProgressKind | null | undefined): string {
+  switch (kind) {
+    case "checkpoint_advanced":
+      return "checkpoint 前进";
+    case "session_created":
+      return "Session 已创建";
+    case "child_run_terminal":
+      return "子运行结束";
+    case "validation_terminal":
+      return "验证结束";
+    case "policy_terminal":
+      return "策略判定结束";
+    case "publisher_terminal":
+      return "发布结束";
+    case "command_consumed":
+      return "命令已消费";
+    case "reconciled":
+      return "已 reconcile";
+    default:
+      return "尚无";
+  }
+}
+
+function retryabilityLabel(value: JobRetryability | null | undefined): string {
+  switch (value) {
+    case "automatic":
+      return "可自动重试";
+    case "operator_after_change":
+      return "条件变化后可重试";
+    case "operator":
+      return "需 operator 重试";
+    case "none":
+      return "不可重试";
+    default:
+      return "—";
+  }
+}
+
+function jobFilterKind(job: JobSafeProjection): JobFilterKind {
+  const agent = jobAgentExecutionState(job);
+  const scheduler = jobSchedulerState(job);
+  const layer = job.blockedAtLayer ?? null;
+
+  if (scheduler === "terminal" || agent === "ended") return "terminal";
+  if (agent === "checking" || agent === "publishing") return "release";
+  if (
+    agent === "implementing" ||
+    agent === "bootstrapping" ||
+    jobSessionAvailability(job) === "active"
+  ) {
+    return "active";
+  }
+  if (scheduler === "backoff" || job.status === "retry_due") return "retry";
+  if (
+    isPolicyBlockedLayer(layer) ||
+    job.status === "blocked" ||
+    job.phase === "blocked" ||
+    job.phase === "blocked_claim_assignee"
+  ) {
+    return "policy";
+  }
+  return "all";
+}
+
+function jobMatchesFilter(job: JobSafeProjection, filter: JobFilterKind): boolean {
+  if (filter === "all") return true;
+  return jobFilterKind(job) === filter;
+}
+
+type RailStepState = "pending" | "done" | "active" | "blocked";
+
+/**
+ * Map server observability to the 6-step rail.
+ * Conservative: never mark Session/实现 active without session evidence.
+ */
+function jobRailStates(job: JobSafeProjection): RailStepState[] {
+  const agent = jobAgentExecutionState(job);
+  const session = jobSessionAvailability(job);
+  const scheduler = jobSchedulerState(job);
+  const layer = job.blockedAtLayer ?? null;
+  const states: RailStepState[] = [
+    "pending",
+    "pending",
+    "pending",
+    "pending",
+    "pending",
+    "pending",
+  ];
+
+  // 0 调度
+  if (scheduler === "terminal" || agent === "ended") {
+    states[0] = "done";
+  } else if (scheduler === "backoff" || scheduler === "paused") {
+    states[0] = "active";
+  } else if (scheduler === "leased" || scheduler === "queued" || scheduler === "idle") {
+    states[0] = "done";
+  } else {
+    states[0] = "active";
+  }
+
+  const policyBlocked = isPolicyBlockedLayer(layer);
+  const pastPolicy =
+    session === "active" ||
+    session === "creating" ||
+    session === "ended" ||
+    session === "failed" ||
+    agent === "bootstrapping" ||
+    agent === "implementing" ||
+    agent === "checking" ||
+    agent === "publishing" ||
+    agent === "ended" ||
+    agent === "failed";
+
+  // 1 策略
+  if (policyBlocked && !pastPolicy) {
+    states[1] = "blocked";
+  } else if (pastPolicy) {
+    states[1] = "done";
+  } else if (agent === "not_started" || agent === "unknown") {
+    states[1] = policyBlocked ? "blocked" : "active";
+  }
+
+  // 2 Session
+  if (layer === "session_bootstrap" || session === "failed") {
+    states[2] = "blocked";
+  } else if (session === "creating" || agent === "bootstrapping") {
+    states[2] = "active";
+  } else if (
+    session === "active" ||
+    session === "ended" ||
+    agent === "implementing" ||
+    agent === "checking" ||
+    agent === "publishing" ||
+    agent === "ended"
+  ) {
+    states[2] = "done";
+  }
+
+  // 3 实现 / 4 检查 / 5 发布 — only with real agent evidence
+  if (agent === "implementing") {
+    states[3] = "active";
+  } else if (
+    agent === "checking" ||
+    agent === "publishing" ||
+    agent === "ended"
+  ) {
+    states[3] = "done";
+  } else if (agent === "failed" && layer === "agent") {
+    states[3] = "blocked";
+  }
+
+  if (agent === "checking") {
+    states[4] = layer === "validation" ? "blocked" : "active";
+  } else if (agent === "publishing" || agent === "ended") {
+    states[4] = "done";
+  } else if (agent === "failed" && layer === "validation") {
+    states[4] = "blocked";
+  }
+
+  if (agent === "publishing") {
+    states[5] = layer === "publisher" || layer === "policy_final" ? "blocked" : "active";
+  } else if (agent === "ended") {
+    states[5] = "done";
+  } else if (
+    agent === "failed" &&
+    (layer === "publisher" || layer === "policy_final")
+  ) {
+    states[5] = "blocked";
+  }
+
+  return states;
+}
+
+function nextStepCopy(job: JobSafeProjection): { title: string; detail: string } {
+  const agent = jobAgentExecutionState(job);
+  const scheduler = jobSchedulerState(job);
+  const layer = job.blockedAtLayer ?? null;
+  const retryability = job.retryability ?? null;
+
+  if (scheduler === "terminal" || agent === "ended") {
+    return {
+      title: "下一步：无需操作",
+      detail: "终态保留安全审计摘要；不会显示绝对路径、Issue 正文或评论。",
+    };
+  }
+  if (scheduler === "paused" || job.status === "paused") {
+    return {
+      title: "下一步：可恢复到安全 checkpoint",
+      detail: "恢复不会跳过策略；从上次安全 checkpoint 继续。",
+    };
+  }
+  if (isPolicyBlockedLayer(layer)) {
+    return {
+      title: "下一步：按策略要求补齐规划条件，再重试",
+      detail:
+        "本页不能跳过策略；“重试”只重新唤醒同一 durable job，并从安全 checkpoint reconciliation。",
+    };
+  }
+  if (scheduler === "backoff" || job.status === "retry_due") {
+    return {
+      title: "下一步：可等待自动重试，或修复条件后手动重试",
+      detail:
+        retryability === "operator_after_change"
+          ? "条件未变化时手动重试不会绕过同一确定性 gate。"
+          : "手动重试仍执行同一 policy gate，不改变或绕过策略。",
+    };
+  }
+  if (agent === "bootstrapping" || jobSessionAvailability(job) === "creating") {
+    return {
+      title: "下一步：等待 parent Session 启动完成",
+      detail: "Session 启动失败会进入可见 blocker，不会假装 Agent active。",
+    };
+  }
+  if (agent === "implementing") {
+    return {
+      title: "下一步：等待实现到达检查 checkpoint",
+      detail: "暂停不会强杀执行中的 Git 命令，将在下一个安全 checkpoint 生效。",
+    };
+  }
+  if (agent === "checking") {
+    return {
+      title: "下一步：等待检查完成",
+      detail: "检查通过后才会进入发布；不会提前宣称 PR 已创建。",
+    };
+  }
+  if (agent === "publishing") {
+    return {
+      title: "下一步：等待发布完成",
+      detail: "暂停将在下一个安全 checkpoint 生效；已产生的外部副作用不会自动回滚。",
+    };
+  }
+  if (agent === "failed") {
+    return {
+      title: "下一步：查看阻塞层后决定是否重试",
+      detail: "确定性策略/绑定失败不会自动自旋；需条件变化或 operator 明确重试。",
+    };
+  }
+  return {
+    title: "下一步：等待调度推进或查看详情",
+    detail: "调度中不代表 Agent 已启动；以 Session 与 Agent 运行状态为准。",
+  };
+}
+
+function summarizeJobCounts(jobs: readonly JobSafeProjection[]): {
+  scheduling: number;
+  policyBlocked: number;
+  waitingRetry: number;
+  agentActive: number;
+  terminal: number;
+} {
+  let scheduling = 0;
+  let policyBlocked = 0;
+  let waitingRetry = 0;
+  let agentActive = 0;
+  let terminal = 0;
+  for (const job of jobs) {
+    const kind = jobFilterKind(job);
+    if (kind === "terminal") terminal += 1;
+    else if (kind === "policy") policyBlocked += 1;
+    else if (kind === "retry") waitingRetry += 1;
+    else if (kind === "active" || kind === "release") agentActive += 1;
+    else {
+      const scheduler = jobSchedulerState(job);
+      if (
+        scheduler === "queued" ||
+        scheduler === "leased" ||
+        scheduler === "idle" ||
+        scheduler === "paused"
+      ) {
+        scheduling += 1;
+      } else if (job.status === "queued" || job.status === "running") {
+        // Legacy fallback for raw queue counts only — still not Agent active.
+        scheduling += 1;
+      }
+    }
+  }
+  return { scheduling, policyBlocked, waitingRetry, agentActive, terminal };
+}
+
 async function copyEnvName(name: string): Promise<boolean> {
   try {
     if (navigator.clipboard?.writeText) {
@@ -998,6 +1667,8 @@ export function GithubAutomationConfig() {
   const [actionNotice, setActionNotice] = useState<InlineNotice | null>(null);
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [jobFilter, setJobFilter] = useState<JobFilterKind>("all");
+  const [expandedJobIds, setExpandedJobIds] = useState<Record<string, boolean>>({});
   const [formMode, setFormMode] = useState<FormMode>({ kind: "closed" });
   const [draft, setDraft] = useState<RepositoryDraft>(emptyDraft);
   const [formError, setFormError] = useState<string | null>(null);
@@ -3318,19 +3989,19 @@ export function GithubAutomationConfig() {
         </section>
       ) : null}
 
-      {/* ── Jobs ── */}
-      <section className="github-automation-card" aria-label="队列与最近 jobs">
+      {/* ── Jobs (GHA-CLOSE-06 dual-layer observability) ── */}
+      <section className="github-automation-card" aria-label="Jobs 运行实况">
         <div className="github-automation-card-head">
           <div>
-            <h4 className="github-automation-card-title">队列与最近 jobs</h4>
+            <h4 className="github-automation-card-title">Jobs 运行实况</h4>
             <p className="github-automation-card-sub">
-              仅显示安全摘要，默认最近 10 条；刷新不启动 scheduler 或 enqueue job。
+              “调度状态”和“Agent 运行状态”独立显示；调度尝试次数不等于 Agent 执行次数。刷新只读取安全摘要，不会唤醒 scheduler 或创建 job。
             </p>
           </div>
           <button
             type="button"
             className="github-automation-button"
-            disabled={refreshing || loadState === "loading" || stale}
+            disabled={refreshing || loadState === "loading"}
             aria-busy={refreshing}
             onClick={() => void fetchStatus({ reason: "manual" })}
           >
@@ -3339,28 +4010,97 @@ export function GithubAutomationConfig() {
         </div>
         <div className="github-automation-card-body">
           {loadState === "loading" && !status ? (
-            <>
+            <div className="github-automation-jobs-loading" role="status" aria-live="polite">
+              <p className="github-automation-loading-copy">
+                正在读取 scheduler 与 Agent 安全 projection…
+              </p>
               <div className="github-automation-skeleton github-automation-skeleton--card" />
               <div className="github-automation-skeleton github-automation-skeleton--card" />
-            </>
+            </div>
           ) : status ? (
             <>
-              <div className="github-automation-count-row" aria-label="队列计数">
-                {(
-                  [
-                    ["排队", status.runtime.counts.queued],
-                    ["运行中", status.runtime.counts.running],
-                    ["重试", status.runtime.counts.retry],
-                    ["阻塞", status.runtime.counts.blocked],
-                    ["PR open", status.runtime.counts.prOpen],
-                  ] as const
-                ).map(([label, count]) => (
-                  <span className="github-automation-count" key={label}>
-                    <b>{count}</b>
-                    {label}
-                  </span>
-                ))}
+              <div className="github-automation-truth-note">
+                <span className="github-automation-truth-mark" aria-hidden="true">
+                  i
+                </span>
+                <div>
+                  <strong>状态口径：</strong>
+                  “调度中”只代表 durable job 被 scheduler 处理；只有出现“Session 可用”时，才表示 Agent
+                  已开始在获准工作区运行。
+                </div>
               </div>
+
+              {stale ? (
+                <div className="github-automation-stale-note" role="alert">
+                  <strong>无法刷新状态。</strong> 以下为{" "}
+                  {formatClockTime(status.generatedAt)} 的最后安全快照，已标记“可能过期”；重试 /
+                  暂停 / 恢复暂不可用。
+                </div>
+              ) : null}
+
+              {(() => {
+                const truthCounts = summarizeJobCounts(status.jobs);
+                return (
+                  <div className="github-automation-count-row" aria-label="按真实性拆分的队列计数">
+                    <span className="github-automation-count">
+                      <b>{truthCounts.scheduling}</b>调度中
+                    </span>
+                    <span className="github-automation-count github-automation-count--blocked">
+                      <b>{truthCounts.policyBlocked}</b>策略阻塞
+                    </span>
+                    <span className="github-automation-count github-automation-count--retry">
+                      <b>{truthCounts.waitingRetry}</b>等待重试
+                    </span>
+                    <span className="github-automation-count github-automation-count--agent">
+                      <b>{truthCounts.agentActive}</b>Agent active
+                    </span>
+                    <span className="github-automation-count">
+                      <b>{truthCounts.terminal}</b>终态
+                    </span>
+                  </div>
+                );
+              })()}
+
+              {status.runtimeProvenance ? (
+                <p className="github-automation-runtime-provenance" role="status">
+                  运行版本 {status.runtimeProvenance.packageVersion} · build{" "}
+                  {status.runtimeProvenance.buildId || "—"} · policy{" "}
+                  {status.runtimeProvenance.policyVersion} · 进程启动{" "}
+                  {formatSafeTime(status.runtimeProvenance.processStartedAt)}
+                </p>
+              ) : null}
+
+              {status.jobs.length > 0 ? (
+                <nav className="github-automation-job-filters" aria-label="筛选 jobs">
+                  {(
+                    [
+                      ["all", "全部"],
+                      ["policy", "策略阻塞"],
+                      ["retry", "等待重试"],
+                      ["active", "Agent active"],
+                      ["release", "检查 / 发布"],
+                      ["terminal", "终态"],
+                    ] as const
+                  ).map(([key, label]) => {
+                    const count =
+                      key === "all"
+                        ? status.jobs.length
+                        : status.jobs.filter((j) => jobMatchesFilter(j, key)).length;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className="github-automation-filter-button"
+                        aria-pressed={jobFilter === key}
+                        onClick={() => setJobFilter(key)}
+                      >
+                        {label}
+                        {key === "all" ? ` ${count}` : count > 0 ? ` ${count}` : ""}
+                      </button>
+                    );
+                  })}
+                </nav>
+              ) : null}
 
               {status.jobs.length === 0 ? (
                 <div className="github-automation-empty">
@@ -3372,98 +4112,100 @@ export function GithubAutomationConfig() {
                   启用后只处理新的已验证 delivery；不会自动回扫历史 Issue。
                 </div>
               ) : (
-                <div className="github-automation-jobs">
-                  {status.jobs.map((job) => {
-                    const retry = jobActionAvailability(job, "retry");
-                    const pause = jobActionAvailability(job, "pause");
-                    const resume = jobActionAvailability(job, "resume");
-                    const busy = busyJobId === job.jobId;
-                    const issueHref = `https://github.com/${job.repositoryFullName}/issues/${job.issueNumber}`;
-                    const prHref =
-                      job.prNumber != null
-                        ? `https://github.com/${job.repositoryFullName}/pull/${job.prNumber}`
-                        : null;
-                    const title =
-                      job.issueTitlePreview?.trim() ||
-                      `${job.repositoryFullName}#${job.issueNumber}`;
+                <div
+                  className={`github-automation-jobs${stale ? " github-automation-jobs--stale" : ""}`}
+                >
+                  {status.jobs.filter((job) => jobMatchesFilter(job, jobFilter)).length === 0 ? (
+                    <div className="github-automation-empty">
+                      <strong>当前筛选下没有 job</strong>
+                      <br />
+                      切换筛选或刷新安全 projection；不会 enqueue。
+                    </div>
+                  ) : null}
+                  {status.jobs
+                    .filter((job) => jobMatchesFilter(job, jobFilter))
+                    .map((job) => {
+                      const retry = jobActionAvailability(job, "retry");
+                      const pause = jobActionAvailability(job, "pause");
+                      const resume = jobActionAvailability(job, "resume");
+                      const busy = busyJobId === job.jobId;
+                      const issueHref = `https://github.com/${job.repositoryFullName}/issues/${job.issueNumber}`;
+                      const prHref =
+                        job.prNumber != null
+                          ? `https://github.com/${job.repositoryFullName}/pull/${job.prNumber}`
+                          : null;
+                      const title =
+                        job.issueTitlePreview?.trim() ||
+                        `${job.repositoryFullName}#${job.issueNumber}`;
+                      const agentUi = agentExecutionLabel(job);
+                      const schedulerUi = schedulerStateLabel(job);
+                      const sessionUi = sessionAvailabilityLabel(jobSessionAvailability(job));
+                      const counts = jobProgressCounts(job);
+                      const layer = job.blockedAtLayer ?? null;
+                      const expanded = Boolean(expandedJobIds[job.jobId]);
+                      const detailId = `github-automation-job-detail-${job.jobId}`;
+                      const rail = jobRailStates(job);
+                      const next = nextStepCopy(job);
+                      const filterKind = jobFilterKind(job);
+                      const cardMod =
+                        filterKind === "policy"
+                          ? " github-automation-job-card--policy"
+                          : filterKind === "retry"
+                            ? " github-automation-job-card--retry"
+                            : "";
+                      const progress = job.lastMeaningfulProgress;
+                      const progressText =
+                        progress?.at || progress?.kind
+                          ? `${progressKindLabel(progress?.kind)}${
+                              progress?.at ? ` · ${formatSafeTime(progress.at)}` : ""
+                            }`
+                          : "尚无";
+                      const sessionFact =
+                        jobSessionAvailability(job) === "none"
+                          ? "不存在 · 尚未启动 Agent"
+                          : jobSessionAvailability(job) === "active"
+                            ? `可用${job.sessionIdShort ? ` · ${job.sessionIdShort}` : ""}`
+                            : jobSessionAvailability(job) === "ended"
+                              ? `审计可用${job.sessionIdShort ? ` · ${job.sessionIdShort}` : ""}`
+                              : sessionUi.primary;
+                      const nextRetryText =
+                        job.nextRetryAt != null
+                          ? `${formatSafeTime(job.nextRetryAt)} · ${retryabilityLabel(job.retryability)}`
+                          : schedulerUi.label.includes("终态")
+                            ? "— · 终态"
+                            : isPolicyBlockedLayer(layer)
+                              ? "无自动重试 · 等待 operator"
+                              : retryabilityLabel(job.retryability);
 
-                    let statusPill: { tone: "ok" | "warn" | "bad" | "info"; label: string } = {
-                      tone: "info",
-                      label: "状态可刷新",
-                    };
-                    if (job.status === "completed" || job.phase === "completed") {
-                      statusPill = { tone: "ok", label: "已完成" };
-                    } else if (job.phase === "pr_open" || job.hasPullRequest) {
-                      statusPill = {
-                        tone: "info",
-                        label: job.prNumber != null ? `PR #${job.prNumber}` : "PR open",
-                      };
-                    } else if (
-                      job.status === "blocked" ||
-                      job.phase === "blocked" ||
-                      job.phase === "blocked_claim_assignee" ||
-                      job.claimStatus === "blocked_claim_assignee"
-                    ) {
-                      statusPill = { tone: "warn", label: "需人工接手" };
-                    } else if (job.status === "paused" || job.phase === "paused") {
-                      statusPill = { tone: "warn", label: "已暂停" };
-                    }
+                      const pills: Array<{ tone: UiTone; label: string }> = [];
+                      if (layer) {
+                        pills.push({
+                          tone: "warn",
+                          label: `阻塞层：${blockedLayerLabel(layer)}`,
+                        });
+                      }
+                      if (counts.noProgressRuns > 0 && jobAgentExecutionState(job) !== "ended") {
+                        pills.push({
+                          tone: "bad",
+                          label: `无有效进展 ×${counts.noProgressRuns}`,
+                        });
+                      }
+                      if (counts.agentRuns > 0) {
+                        pills.push({
+                          tone: "info",
+                          label: `Agent 启动 ${counts.agentRuns}`,
+                        });
+                      }
+                      pills.push({
+                        tone: "muted",
+                        label: `调度尝试 ${counts.schedulerRuns}`,
+                      });
+                      if (job.prNumber != null) {
+                        pills.push({ tone: "ok", label: `PR #${job.prNumber}` });
+                      }
 
-                    const metaParts = [
-                      claimStatusLabel(job.claimStatus),
-                      job.reasonCode ? job.reasonCode : null,
-                      `trace ${job.traceId}`,
-                      job.nextRetryAt ? `下次重试 ${formatSafeTime(job.nextRetryAt)}` : null,
-                    ].filter(Boolean);
-
-                    return (
-                      <article className="github-automation-job" key={job.jobId}>
-                        <div className="github-automation-job-main">
-                          <div className="github-automation-job-title">
-                            <a
-                              href={issueHref}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`打开 Issue #${job.issueNumber}`}
-                            >
-                              #{job.issueNumber}
-                            </a>
-                            <span className="github-automation-truncate" title={title}>
-                              {title}
-                            </span>
-                          </div>
-                          <div
-                            className="github-automation-job-meta"
-                            title={metaParts.join(" · ")}
-                          >
-                            safe · {metaParts.join(" · ")} · 无正文、评论或本地路径
-                          </div>
-                        </div>
-                        <div className="github-automation-job-phase">
-                          {job.phase}
-                          <small>
-                            {job.status}
-                            {job.attempt > 1 ? ` · 第 ${job.attempt} 次` : ""}
-                            {prHref ? (
-                              <>
-                                {" · "}
-                                <a href={prHref} target="_blank" rel="noopener noreferrer">
-                                  PR #{job.prNumber}
-                                </a>
-                                {" · Fixes #"}
-                                {job.issueNumber}
-                              </>
-                            ) : null}
-                          </small>
-                        </div>
-                        <div>
-                          <span
-                            className={`github-automation-pill github-automation-pill--${statusPill.tone}`}
-                          >
-                            {statusPill.label}
-                          </span>
-                        </div>
-                        <div className="github-automation-job-actions">
+                      const actionButtons = (
+                        <>
                           {resume.available ? (
                             <button
                               type="button"
@@ -3500,22 +4242,290 @@ export function GithubAutomationConfig() {
                               {busy && busyAction === "retry" ? "处理中…" : "重试"}
                             </button>
                           ) : null}
-                          {!retry.available && !pause.available && !resume.available ? (
+                          {prHref && !retry.available && !pause.available && !resume.available ? (
+                            <a
+                              className="github-automation-button"
+                              href={prHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              查看 PR #{job.prNumber}
+                            </a>
+                          ) : null}
+                          {!retry.available &&
+                          !pause.available &&
+                          !resume.available &&
+                          !prHref ? (
                             <span className="github-automation-job-no-action">
                               {retry.reasonCode
                                 ? `不可用：${retry.reasonCode}`
                                 : "无可用操作"}
                             </span>
                           ) : null}
-                        </div>
-                      </article>
-                    );
-                  })}
+                        </>
+                      );
+
+                      return (
+                        <article
+                          className={`github-automation-job-card${cardMod}`}
+                          key={job.jobId}
+                          aria-labelledby={`github-automation-job-title-${job.jobId}`}
+                        >
+                          {stale ? (
+                            <span className="github-automation-job-stale-badge">可能过期</span>
+                          ) : null}
+                          <div className="github-automation-job-summary">
+                            <div className="github-automation-job-identity">
+                              <div
+                                className="github-automation-job-title"
+                                id={`github-automation-job-title-${job.jobId}`}
+                              >
+                                <a
+                                  href={issueHref}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`打开 Issue #${job.issueNumber}`}
+                                >
+                                  #{job.issueNumber}
+                                </a>
+                                <span
+                                  className="github-automation-truncate"
+                                  title={title}
+                                >
+                                  {title}
+                                </span>
+                              </div>
+                              <div className="github-automation-job-meta">
+                                {job.repositoryFullName} · trace {shortTraceId(job.traceId)} ·
+                                更新于 {formatClockTime(job.updatedAt)} ·{" "}
+                                {claimStatusLabel(job.claimStatus)}
+                              </div>
+                            </div>
+
+                            <div className="github-automation-status-block">
+                              <span className="github-automation-status-label">
+                                Agent 运行状态
+                              </span>
+                              <div className="github-automation-status-value">
+                                <span
+                                  className={`github-automation-dot github-automation-dot--${agentUi.tone}`}
+                                  aria-hidden="true"
+                                />
+                                <span>{agentUi.label}</span>
+                              </div>
+                              <div className="github-automation-status-help">
+                                <strong>
+                                  {jobSessionAvailability(job) === "none"
+                                    ? "尚未启动 Agent"
+                                    : sessionUi.primary}
+                                </strong>
+                                {" · "}
+                                {agentUi.help}
+                              </div>
+                            </div>
+
+                            <div className="github-automation-status-block">
+                              <span className="github-automation-status-label">调度状态</span>
+                              <div className="github-automation-status-value">
+                                <span
+                                  className={`github-automation-dot github-automation-dot--${schedulerUi.tone}`}
+                                  aria-hidden="true"
+                                />
+                                <span>{schedulerUi.label}</span>
+                              </div>
+                              <div className="github-automation-job-pills">
+                                {pills.map((pill) => (
+                                  <span
+                                    key={`${job.jobId}-${pill.label}`}
+                                    className={`github-automation-pill github-automation-pill--${pill.tone === "muted" ? "info" : pill.tone}`}
+                                  >
+                                    {pill.label}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              className="github-automation-button github-automation-details-toggle"
+                              aria-expanded={expanded}
+                              aria-controls={detailId}
+                              onClick={() =>
+                                setExpandedJobIds((prev) => ({
+                                  ...prev,
+                                  [job.jobId]: !prev[job.jobId],
+                                }))
+                              }
+                            >
+                              {expanded ? "收起详情" : "查看详情"}
+                            </button>
+                          </div>
+
+                          {expanded ? (
+                            <div className="github-automation-job-detail" id={detailId}>
+                              <div
+                                className="github-automation-job-rail"
+                                aria-label="Job 阶段轨道"
+                              >
+                                {JOB_RAIL_STEPS.map((stepLabel, index) => {
+                                  const stepState = rail[index] ?? "pending";
+                                  const symbol =
+                                    stepState === "done"
+                                      ? "✓"
+                                      : stepState === "blocked"
+                                        ? "!"
+                                        : "•";
+                                  return (
+                                    <div
+                                      key={stepLabel}
+                                      className={`github-automation-rail-step github-automation-rail-step--${stepState}`}
+                                    >
+                                      <span
+                                        className="github-automation-rail-dot"
+                                        aria-hidden="true"
+                                      >
+                                        {symbol}
+                                      </span>
+                                      <span>{stepLabel}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <dl className="github-automation-job-facts">
+                                <div className="github-automation-job-fact">
+                                  <dt>CHECKPOINT</dt>
+                                  <dd>
+                                    {job.checkpoint ? (
+                                      <code>{job.checkpoint}</code>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </dd>
+                                </div>
+                                <div className="github-automation-job-fact">
+                                  <dt>BLOCKED AT LAYER</dt>
+                                  <dd
+                                    className={
+                                      layer
+                                        ? "github-automation-job-fact--emphasis"
+                                        : undefined
+                                    }
+                                  >
+                                    {blockedLayerLabel(layer)}
+                                  </dd>
+                                </div>
+                                <div className="github-automation-job-fact">
+                                  <dt>REASON</dt>
+                                  <dd>{job.reasonCode ?? "—"}</dd>
+                                </div>
+                                <div className="github-automation-job-fact">
+                                  <dt>SESSION AVAILABILITY</dt>
+                                  <dd
+                                    className={
+                                      jobSessionAvailability(job) === "none" ||
+                                      jobSessionAvailability(job) === "failed"
+                                        ? "github-automation-job-fact--emphasis"
+                                        : jobSessionAvailability(job) === "active" ||
+                                            jobSessionAvailability(job) === "ended"
+                                          ? "github-automation-job-fact--good"
+                                          : undefined
+                                    }
+                                  >
+                                    {sessionFact}
+                                  </dd>
+                                </div>
+                                <div className="github-automation-job-fact">
+                                  <dt>LAST MEANINGFUL PROGRESS</dt>
+                                  <dd>{progressText}</dd>
+                                </div>
+                                <div className="github-automation-job-fact">
+                                  <dt>NEXT RETRY</dt>
+                                  <dd>{nextRetryText}</dd>
+                                </div>
+                                <div className="github-automation-job-fact">
+                                  <dt>RETRY PROGRESS</dt>
+                                  <dd>
+                                    有效进展 {counts.meaningfulProgress} · 无进展重试{" "}
+                                    {counts.noProgressRuns} · Agent 启动 {counts.agentRuns}
+                                  </dd>
+                                </div>
+                                <div className="github-automation-job-fact">
+                                  <dt>WORKSPACE LABEL</dt>
+                                  <dd>
+                                    {job.workspaceLabel?.trim() ||
+                                      (jobSessionAvailability(job) === "none"
+                                        ? "未分配（无 Session）"
+                                        : "—")}
+                                  </dd>
+                                </div>
+                                {job.evaluatedProvenance ? (
+                                  <div className="github-automation-job-fact">
+                                    <dt>EVALUATED PROVENANCE</dt>
+                                    <dd>
+                                      code {job.evaluatedProvenance.codeRevision} · policy{" "}
+                                      {job.evaluatedProvenance.policyVersion}
+                                    </dd>
+                                  </div>
+                                ) : null}
+                                {status.runtimeProvenance ? (
+                                  <div className="github-automation-job-fact">
+                                    <dt>RUNTIME PROVENANCE</dt>
+                                    <dd>
+                                      {status.runtimeProvenance.packageVersion} /{" "}
+                                      {status.runtimeProvenance.buildId || "—"} /{" "}
+                                      {status.runtimeProvenance.policyVersion}
+                                    </dd>
+                                  </div>
+                                ) : null}
+                              </dl>
+
+                              <div className="github-automation-job-next">
+                                <div className="github-automation-job-next-copy">
+                                  <strong>{next.title}</strong>
+                                  <span>{next.detail}</span>
+                                </div>
+                                <div className="github-automation-job-actions">{actionButtons}</div>
+                              </div>
+
+                              <div className="github-automation-job-diagnostic">
+                                诊断原始态（次级）：status={job.status} · phase={job.phase} ·
+                                attempt={job.attempt}（=调度尝试，不是 Agent 执行次数）· gen=
+                                {job.generation}
+                                {prHref ? (
+                                  <>
+                                    {" · "}
+                                    <a
+                                      href={prHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      PR #{job.prNumber}
+                                    </a>
+                                    {" · Fixes #"}
+                                    {job.issueNumber}
+                                  </>
+                                ) : null}
+                                。不可将其直接翻译为“Agent 正在运行 / 第 N 次执行”。
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="github-automation-job-summary-actions">
+                              {actionButtons}
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
                 </div>
               )}
             </>
           ) : (
-            <div className="github-automation-empty">无法加载 job 列表</div>
+            <div className="github-automation-empty" role="alert">
+              <strong>无法加载 job 列表</strong>
+              <br />
+              这不是空队列。请重试刷新安全 projection。
+            </div>
           )}
         </div>
       </section>

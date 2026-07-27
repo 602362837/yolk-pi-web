@@ -43,6 +43,8 @@ import {
 } from "./github-automation-store";
 import {
   GITHUB_FULL_AGENT_PROFILE,
+  GITHUB_UNATTENDED_POLICY_ID,
+  GITHUB_UNATTENDED_POLICY_VERSION,
   toGithubFullAgentProfileSafeProjection,
   type GithubFullAgentResidualRiskCode,
 } from "./github-full-agent-profile";
@@ -50,20 +52,43 @@ import { getMachineGithubAssigneeSafeProjection } from "./github-machine-assigne
 import type {
   GithubAppCapabilitySnapshot,
   GithubAppCredentialSafeProjection,
+  GithubAutomationAgentExecutionState,
+  GithubAutomationBlockedLayer,
   GithubAutomationConfigV1,
+  GithubAutomationEvaluatedProvenance,
+  GithubAutomationJobProgressCounts,
   GithubAutomationMode,
+  GithubAutomationRetryability,
+  GithubAutomationRuntimeProvenance,
+  GithubAutomationSafeProgressSummary,
+  GithubAutomationSchedulerState,
+  GithubAutomationSessionAvailability,
   GithubMachineAssigneeSafeProjection,
 } from "./github-automation-types";
 import {
+  classifyGithubAutomationRetryability,
+  createLegacyGithubAutomationJobObservability,
   emptyPermissionSnapshot,
   deriveGithubAppCapability,
+  githubRiskPolicyStageToBlockedLayer,
 } from "./github-automation-types";
 import {
   requestGithubUnattendedJobPause,
   wakeGithubUnattendedJobForRetry,
   readGithubAutomationRunnerState,
+  reconcileGithubAutomationLegacyJob,
+  isGithubAutomationDeterministicBlockUnchanged,
+  type GithubAutomationRunnerStateV1,
 } from "./github-automation-runner";
 import { wakeGithubAutomationScheduler } from "./github-automation-scheduler";
+import { getGithubAutomationRuntimeProvenance } from "./github-automation-provenance";
+
+export {
+  getGithubAutomationCodeRevision,
+  getGithubAutomationRuntimeProvenance,
+  getGithubAutomationEvaluatedProvenance,
+  _testResetGithubAutomationRuntimeProvenanceCache,
+} from "./github-automation-provenance";
 
 // ─── Forbidden field names (tests assert absence) ────────────────────────────
 
@@ -228,6 +253,10 @@ export interface GithubAutomationJobSafeProjection {
   issueTitlePreview: string | null;
   phase: GithubAutomationJobPhase;
   status: GithubAutomationJobStatus;
+  /**
+   * Legacy field: scheduler lease run count only.
+   * UI must label as "调度尝试", never "第 N 次执行" / Agent runs.
+   */
   attempt: number;
   generation: number;
   traceId: string;
@@ -241,6 +270,20 @@ export interface GithubAutomationJobSafeProjection {
   headBranch: string | null;
   hasPullRequest: boolean;
   actions: GithubAutomationJobActionAvailability[];
+  // ── Additive GHA-CLOSE-01/04 observability (safe; defaults for legacy jobs) ──
+  schedulerState: GithubAutomationSchedulerState;
+  agentExecutionState: GithubAutomationAgentExecutionState;
+  sessionAvailability: GithubAutomationSessionAvailability;
+  blockedAtLayer: GithubAutomationBlockedLayer | null;
+  retryability: GithubAutomationRetryability;
+  lastMeaningfulProgress: GithubAutomationSafeProgressSummary;
+  counts: GithubAutomationJobProgressCounts;
+  /** Safe workspace label only — never absolute path. */
+  workspaceLabel: string | null;
+  /** Opaque short session id when available (never sessionFile/path). */
+  sessionIdShort: string | null;
+  /** Provenance captured when the current block/decision was evaluated. */
+  evaluatedProvenance: GithubAutomationEvaluatedProvenance | null;
 }
 
 export interface GithubAutomationStatusProjection {
@@ -252,6 +295,11 @@ export interface GithubAutomationStatusProjection {
   policy: GithubAutomationPolicyProjection;
   jobs: GithubAutomationJobSafeProjection[];
   config: GithubAutomationConfigSafeProjection;
+  /**
+   * Running process package/build/policy provenance (GHA-CLOSE-04).
+   * Compare with job.evaluatedProvenance to detect stale runtime after code deploy.
+   */
+  runtimeProvenance: GithubAutomationRuntimeProvenance;
 }
 
 // ─── Action policy ───────────────────────────────────────────────────────────
@@ -281,6 +329,12 @@ export function evaluateGithubAutomationJobActions(
     automationEnabled?: boolean;
     mode?: GithubAutomationMode;
     globalPaused?: boolean;
+    /** Live process code revision for deterministic-block retry gate (GHA-CLOSE-05). */
+    runtimeCodeRevision?: string | null;
+    /** Live process policy version for deterministic-block retry gate. */
+    runtimePolicyVersion?: string | null;
+    /** Force retry unavailable (tests / explicit operator messaging). */
+    blockUnchangedRetry?: boolean;
   },
 ): GithubAutomationJobActionAvailability[] {
   const enabled = options?.automationEnabled !== false;
@@ -309,6 +363,22 @@ export function evaluateGithubAutomationJobActions(
       job.phase !== "blocked_claim_assignee"
     ) {
       return "status_not_retryable";
+    }
+    // GHA-CLOSE-05: deterministic policy/manual block with unchanged fingerprint +
+    // evaluated provenance must not allow blind operator retry spin.
+    if (
+      isGithubAutomationDeterministicBlockUnchanged(job, {
+        codeRevision: options?.runtimeCodeRevision ?? "",
+        policyVersion: options?.runtimePolicyVersion ?? "",
+      }) &&
+      options?.runtimeCodeRevision &&
+      options?.runtimePolicyVersion
+    ) {
+      return "retry_conditions_unchanged";
+    }
+    // When runtime provenance omitted, still block if caller passed explicit flag.
+    if (options?.blockUnchangedRetry === true) {
+      return "retry_conditions_unchanged";
     }
     return null;
   })();
@@ -382,6 +452,364 @@ function effectRemoteId(
   return null;
 }
 
+/** Opaque short id for UI — never the session file path. */
+export function toGithubAutomationSessionIdShort(
+  sessionId: string | null | undefined,
+): string | null {
+  if (typeof sessionId !== "string") return null;
+  const trimmed = sessionId.trim();
+  if (!trimmed) return null;
+  // Reject anything that looks like a path.
+  if (
+    trimmed.includes("/") ||
+    trimmed.includes("\\") ||
+    trimmed.includes("..") ||
+    trimmed.startsWith("~")
+  ) {
+    return null;
+  }
+  if (trimmed.length <= 12) return trimmed;
+  return `${trimmed.slice(0, 8)}…${trimmed.slice(-4)}`;
+}
+
+/**
+ * Safe workspace label for Settings (never absolute path / sessionFile).
+ * Example: "yolk-pi-web · WT issue-22 g1"
+ */
+export function buildGithubAutomationWorkspaceLabel(input: {
+  repositoryFullName: string;
+  issueNumber: number;
+  generation: number;
+  projectDisplayName?: string | null;
+  branchName?: string | null;
+  hasWorktreeBinding?: boolean;
+}): string | null {
+  const hasBinding =
+    input.hasWorktreeBinding === true ||
+    (typeof input.branchName === "string" && input.branchName.trim().length > 0);
+  if (!hasBinding && !input.projectDisplayName) {
+    // Without WorkTree evidence, do not invent a label.
+    return null;
+  }
+  const shortRepo = input.repositoryFullName.includes("/")
+    ? input.repositoryFullName.split("/").pop() ?? input.repositoryFullName
+    : input.repositoryFullName;
+  const project =
+    typeof input.projectDisplayName === "string" && input.projectDisplayName.trim()
+      ? input.projectDisplayName.trim().slice(0, 64)
+      : shortRepo.slice(0, 64);
+  // Prefer issue+generation over branch (branch may contain repo id numeric segment).
+  const issue =
+    Number.isFinite(input.issueNumber) && input.issueNumber > 0
+      ? Math.floor(input.issueNumber)
+      : 0;
+  const gen =
+    Number.isFinite(input.generation) && input.generation > 0
+      ? Math.floor(input.generation)
+      : 1;
+  if (issue > 0) {
+    return `${project} · WT issue-${issue} g${gen}`;
+  }
+  if (typeof input.branchName === "string" && input.branchName.trim()) {
+    // Only keep trailing alnum/hyphen fragments — never full path.
+    const frag = input.branchName
+      .trim()
+      .split("/")
+      .filter(Boolean)
+      .pop()
+      ?.replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .slice(0, 40);
+    if (frag) return `${project} · WT ${frag}`;
+  }
+  return `${project} · WT`;
+}
+
+export interface DeriveGithubAutomationJobObservabilityOptions {
+  /** Optional runner sidecar (GHA-CLOSE-03/04). Never projected raw. */
+  runner?: GithubAutomationRunnerStateV1 | null;
+  /** Safe project display name from config (no absolute path). */
+  projectDisplayName?: string | null;
+  /** Inject runtime provenance for evaluated comparison (defaults to live). */
+  runtimeProvenance?: GithubAutomationRuntimeProvenance;
+}
+
+/**
+ * Derive conservative dual-layer observability from durable job + optional runner.
+ * Missing additive fields ⇒ unknown_legacy / not_started — never fake Agent active.
+ */
+export function deriveGithubAutomationJobObservabilityFromRecord(
+  job: GithubAutomationJobRecord,
+  options: DeriveGithubAutomationJobObservabilityOptions = {},
+): {
+  schedulerState: GithubAutomationSchedulerState;
+  agentExecutionState: GithubAutomationAgentExecutionState;
+  sessionAvailability: GithubAutomationSessionAvailability;
+  blockedAtLayer: GithubAutomationBlockedLayer | null;
+  retryability: GithubAutomationRetryability;
+  lastMeaningfulProgress: GithubAutomationSafeProgressSummary;
+  counts: GithubAutomationJobProgressCounts;
+  workspaceLabel: string | null;
+  sessionIdShort: string | null;
+  evaluatedProvenance: GithubAutomationEvaluatedProvenance | null;
+} {
+  const legacy = createLegacyGithubAutomationJobObservability(job.attempt);
+  const runner = options.runner ?? null;
+  const hasProgressFields =
+    job.progressRevision != null ||
+    job.agentRunCount != null ||
+    job.noProgressRunCount != null ||
+    job.meaningfulProgressCount != null ||
+    job.blockedAtLayer != null ||
+    job.evaluatedCodeRevision != null ||
+    job.evaluatedPolicyVersion != null;
+  const hasRunnerSidecar = runner != null;
+
+  let schedulerState: GithubAutomationSchedulerState = legacy.schedulerState;
+  if (job.status === "paused" || job.phase === "paused") {
+    schedulerState = "paused";
+  } else if (job.status === "completed" || job.status === "cancelled" || job.status === "ignored") {
+    schedulerState = "terminal";
+  } else if (job.status === "retry_due" || job.phase === "retry_due") {
+    schedulerState = "backoff";
+  } else if (job.status === "running") {
+    schedulerState = "leased";
+  } else if (job.status === "queued") {
+    schedulerState = "queued";
+  } else if (job.status === "blocked") {
+    schedulerState = "idle";
+  }
+
+  // Session truth: prefer runner sessionId; never invent active from phase alone.
+  const runnerSessionId =
+    typeof runner?.sessionId === "string" && runner.sessionId.trim()
+      ? runner.sessionId.trim()
+      : null;
+  const sessionIdShort = toGithubAutomationSessionIdShort(runnerSessionId);
+
+  let sessionAvailability: GithubAutomationSessionAvailability =
+    hasProgressFields || hasRunnerSidecar ? "none" : "unknown_legacy";
+  let agentExecutionState: GithubAutomationAgentExecutionState =
+    hasProgressFields || hasRunnerSidecar ? "not_started" : "unknown";
+
+  let agentRuns =
+    typeof job.agentRunCount === "number" && Number.isFinite(job.agentRunCount)
+      ? Math.max(0, Math.floor(job.agentRunCount))
+      : 0;
+  // Sidecar session without stamped agentRunCount still proves at least one bootstrap.
+  if (agentRuns === 0 && runnerSessionId) {
+    agentRuns = 1;
+  }
+
+  if (runnerSessionId) {
+    if (job.phase === "completed" || job.status === "completed") {
+      sessionAvailability = "ended";
+      agentExecutionState = "ended";
+    } else if (
+      job.status === "blocked" &&
+      (job.reasonCode === "session_bootstrap_failed" ||
+        job.blockedAtLayer === "session_bootstrap")
+    ) {
+      sessionAvailability = "failed";
+      agentExecutionState = "failed";
+    } else {
+      sessionAvailability = "active";
+      if (job.phase === "checking") agentExecutionState = "checking";
+      else if (
+        job.phase === "publishing" ||
+        job.phase === "final_policy" ||
+        job.phase === "pr_open"
+      ) {
+        agentExecutionState = "publishing";
+      } else if (job.status === "blocked" || job.phase === "blocked") {
+        // Session exists but job blocked later (policy_final etc.) — not "implementing".
+        agentExecutionState = "failed";
+      } else {
+        agentExecutionState = "implementing";
+      }
+    }
+  } else if (agentRuns > 0) {
+    // Count says Agent started but sidecar lost session id.
+    sessionAvailability = "unknown_legacy";
+    if (job.phase === "checking") agentExecutionState = "checking";
+    else if (job.phase === "publishing" || job.phase === "final_policy") {
+      agentExecutionState = "publishing";
+    } else if (job.phase === "completed" || job.status === "completed") {
+      agentExecutionState = "ended";
+      sessionAvailability = "ended";
+    } else if (job.status === "blocked" || job.phase === "blocked") {
+      agentExecutionState = "failed";
+    } else {
+      agentExecutionState = "implementing";
+    }
+  } else if (
+    job.phase === "implementing" ||
+    job.checkpoint === "implementing" ||
+    runner?.checkpoint === "implementing"
+  ) {
+    // Entered implementing without session id yet: bootstrapping, not active.
+    agentExecutionState =
+      hasProgressFields || hasRunnerSidecar ? "bootstrapping" : "unknown";
+    sessionAvailability =
+      hasProgressFields || hasRunnerSidecar ? "creating" : "unknown_legacy";
+    if (
+      job.reasonCode === "session_bootstrap_failed" ||
+      job.reasonCode === "session_bootstrap_transient" ||
+      job.blockedAtLayer === "session_bootstrap"
+    ) {
+      sessionAvailability =
+        job.reasonCode === "session_bootstrap_failed" ? "failed" : "creating";
+      agentExecutionState =
+        job.reasonCode === "session_bootstrap_failed" ? "failed" : "bootstrapping";
+    }
+  } else if (
+    job.phase === "checking" ||
+    job.phase === "publishing" ||
+    job.phase === "final_policy"
+  ) {
+    // Late phases without session evidence: do not claim active Session.
+    agentExecutionState =
+      hasProgressFields || hasRunnerSidecar ? "bootstrapping" : "unknown";
+    sessionAvailability =
+      hasProgressFields || hasRunnerSidecar ? "creating" : "unknown_legacy";
+  } else if (
+    job.phase === "planning" ||
+    job.phase === "policy_check" ||
+    job.phase === "accepted_waiting_automation" ||
+    job.phase === "implementation_queued" ||
+    job.checkpoint === "studio_task_ready" ||
+    job.checkpoint === "policy_plan" ||
+    job.checkpoint === "worktree_ready" ||
+    runner?.checkpoint === "studio_task_ready" ||
+    runner?.checkpoint === "planning" ||
+    runner?.checkpoint === "policy_check"
+  ) {
+    // Policy/Studio gate before Session is a legitimate none.
+    agentExecutionState =
+      hasProgressFields || hasRunnerSidecar ? "not_started" : "unknown";
+    sessionAvailability =
+      hasProgressFields || hasRunnerSidecar ? "none" : "unknown_legacy";
+  }
+
+  let blockedAtLayer: GithubAutomationBlockedLayer | null = null;
+  if (typeof job.blockedAtLayer === "string" && job.blockedAtLayer) {
+    blockedAtLayer = job.blockedAtLayer as GithubAutomationBlockedLayer;
+  } else if (job.status === "blocked" || job.phase === "blocked") {
+    if (
+      job.reasonCode === "session_bootstrap_failed" ||
+      job.reasonCode === "session_bootstrap_transient" ||
+      job.reasonCode === "blocked_session_binding"
+    ) {
+      blockedAtLayer = "session_bootstrap";
+    } else if (job.reasonCode?.startsWith("blocked_")) {
+      if (job.phase === "final_policy" || job.checkpoint === "final_policy") {
+        blockedAtLayer = githubRiskPolicyStageToBlockedLayer("final");
+      } else if (
+        job.phase === "planning" ||
+        job.phase === "policy_check" ||
+        job.checkpoint === "studio_task_ready" ||
+        job.checkpoint === "policy_plan" ||
+        job.checkpoint === "blocked"
+      ) {
+        blockedAtLayer = githubRiskPolicyStageToBlockedLayer("plan");
+      } else if (
+        job.phase === "implementation_queued" ||
+        job.checkpoint === "implementation_queued"
+      ) {
+        blockedAtLayer = githubRiskPolicyStageToBlockedLayer("pre");
+      } else {
+        blockedAtLayer = "unknown";
+      }
+    } else if (job.reasonCode === "runner_no_progress") {
+      blockedAtLayer = "scheduler";
+    } else {
+      blockedAtLayer = "unknown";
+    }
+  }
+
+  const retryability: GithubAutomationRetryability =
+    typeof job.retryability === "string" && job.retryability
+      ? (job.retryability as GithubAutomationRetryability)
+      : classifyGithubAutomationRetryability(job.reasonCode);
+
+  const lastMeaningfulProgress: GithubAutomationSafeProgressSummary = {
+    at:
+      typeof job.lastMeaningfulProgressAt === "string"
+        ? job.lastMeaningfulProgressAt
+        : null,
+    kind:
+      typeof job.lastMeaningfulProgressKind === "string"
+        ? (job.lastMeaningfulProgressKind as GithubAutomationSafeProgressSummary["kind"])
+        : null,
+  };
+
+  const counts: GithubAutomationJobProgressCounts = {
+    schedulerRuns:
+      typeof job.attempt === "number" && Number.isFinite(job.attempt)
+        ? Math.max(0, Math.floor(job.attempt))
+        : 0,
+    agentRuns,
+    noProgressRuns:
+      typeof job.noProgressRunCount === "number" &&
+      Number.isFinite(job.noProgressRunCount)
+        ? Math.max(0, Math.floor(job.noProgressRunCount))
+        : 0,
+    meaningfulProgress:
+      typeof job.meaningfulProgressCount === "number" &&
+      Number.isFinite(job.meaningfulProgressCount)
+        ? Math.max(0, Math.floor(job.meaningfulProgressCount))
+        : 0,
+  };
+
+  const workspaceLabel = buildGithubAutomationWorkspaceLabel({
+    repositoryFullName: job.repositoryFullName,
+    issueNumber: job.issueNumber,
+    generation: job.generation,
+    projectDisplayName: options.projectDisplayName ?? null,
+    branchName: runner?.branchName ?? effectRemoteId(job, "branch"),
+    hasWorktreeBinding: Boolean(
+      runner?.branchName ||
+        runner?.projectId ||
+        runner?.spaceId ||
+        runner?.worktreePath ||
+        runner?.checkpoint === "worktree_ready" ||
+        runner?.checkpoint === "studio_task_ready" ||
+        runner?.checkpoint === "implementing" ||
+        runner?.checkpoint === "awaiting_publish" ||
+        runner?.checkpoint === "publishing" ||
+        runner?.checkpoint === "pr_open",
+    ),
+  });
+
+  let evaluatedProvenance: GithubAutomationEvaluatedProvenance | null = null;
+  if (
+    typeof job.evaluatedCodeRevision === "string" &&
+    job.evaluatedCodeRevision.trim() &&
+    typeof job.evaluatedPolicyVersion === "string" &&
+    job.evaluatedPolicyVersion.trim()
+  ) {
+    evaluatedProvenance = {
+      codeRevision: job.evaluatedCodeRevision.trim().slice(0, 120),
+      policyVersion: job.evaluatedPolicyVersion.trim().slice(0, 64),
+    };
+  } else if (job.status === "blocked" || job.phase === "blocked") {
+    // Legacy blocks: mark unknown rather than inventing current runtime.
+    evaluatedProvenance = null;
+  }
+
+  return {
+    schedulerState,
+    agentExecutionState,
+    sessionAvailability,
+    blockedAtLayer,
+    retryability,
+    lastMeaningfulProgress,
+    counts,
+    workspaceLabel,
+    sessionIdShort,
+    evaluatedProvenance,
+  };
+}
+
 export function toGithubAutomationJobSafeProjection(
   job: GithubAutomationJobRecord,
   options?: {
@@ -389,6 +817,10 @@ export function toGithubAutomationJobSafeProjection(
     automationEnabled?: boolean;
     mode?: GithubAutomationMode;
     globalPaused?: boolean;
+    runner?: GithubAutomationRunnerStateV1 | null;
+    projectDisplayName?: string | null;
+    /** When false, skip disk read of runner sidecar (tests may inject runner). */
+    resolveRunner?: boolean;
   },
 ): GithubAutomationJobSafeProjection {
   const prRemote = effectRemoteId(job, "pull_request");
@@ -396,6 +828,16 @@ export function toGithubAutomationJobSafeProjection(
     prRemote && /^\d+$/.test(prRemote) ? Number.parseInt(prRemote, 10) : null;
   const headBranch = effectRemoteId(job, "branch");
   const claimStatus = options?.claimStatus ?? "unknown";
+  const runner =
+    options?.runner !== undefined
+      ? options.runner
+      : options?.resolveRunner === false
+        ? null
+        : readGithubAutomationRunnerState(job.jobId);
+  const observability = deriveGithubAutomationJobObservabilityFromRecord(job, {
+    runner,
+    projectDisplayName: options?.projectDisplayName ?? null,
+  });
 
   return {
     jobId: job.jobId,
@@ -421,7 +863,19 @@ export function toGithubAutomationJobSafeProjection(
       automationEnabled: options?.automationEnabled,
       mode: options?.mode,
       globalPaused: options?.globalPaused,
+      runtimeCodeRevision: getGithubAutomationRuntimeProvenance().codeRevision,
+      runtimePolicyVersion: getGithubAutomationRuntimeProvenance().policyVersion,
     }),
+    schedulerState: observability.schedulerState,
+    agentExecutionState: observability.agentExecutionState,
+    sessionAvailability: observability.sessionAvailability,
+    blockedAtLayer: observability.blockedAtLayer,
+    retryability: observability.retryability,
+    lastMeaningfulProgress: observability.lastMeaningfulProgress,
+    counts: observability.counts,
+    workspaceLabel: observability.workspaceLabel,
+    sessionIdShort: observability.sessionIdShort,
+    evaluatedProvenance: observability.evaluatedProvenance,
   };
 }
 
@@ -541,6 +995,14 @@ export async function buildGithubAutomationStatusProjection(
   const limit = Math.max(1, Math.min(options.jobLimit ?? 10, 50));
   const limitedJobs = jobs.slice(0, limit);
 
+  const projectDisplayByRepoId = new Map<number, string>();
+  for (const repo of config.repositories) {
+    const shortName = repo.fullName.includes("/")
+      ? repo.fullName.split("/").pop() ?? repo.fullName
+      : repo.fullName;
+    projectDisplayByRepoId.set(repo.repositoryId, shortName);
+  }
+
   const jobProjections: GithubAutomationJobSafeProjection[] = [];
   for (const job of limitedJobs) {
     const claimStatus = await resolveClaimStatus(job);
@@ -550,9 +1012,13 @@ export async function buildGithubAutomationStatusProjection(
         automationEnabled: config.enabled,
         mode: config.mode,
         globalPaused: config.paused,
+        projectDisplayName:
+          projectDisplayByRepoId.get(job.repositoryId) ?? null,
       }),
     );
   }
+
+  const runtimeProvenance = getGithubAutomationRuntimeProvenance();
 
   const capabilityBlockers: string[] = [];
   if (!app.configured) capabilityBlockers.push("app_not_configured");
@@ -623,8 +1089,8 @@ export async function buildGithubAutomationStatusProjection(
     },
     repositories,
     policy: {
-      policyId: "docs-and-small-bugfix",
-      policyVersion: "1",
+      policyId: GITHUB_UNATTENDED_POLICY_ID,
+      policyVersion: GITHUB_UNATTENDED_POLICY_VERSION,
       riskProfile: "docs-and-small-bugfix",
       executionProfile: "full-agent",
       unattendedEnabled: config.unattended.enabled,
@@ -649,6 +1115,7 @@ export async function buildGithubAutomationStatusProjection(
     },
     jobs: jobProjections,
     config: configProjection,
+    runtimeProvenance,
   };
 }
 
@@ -1095,10 +1562,28 @@ export async function applyGithubAutomationJobAction(options: {
     };
   }
 
-  const actions = evaluateGithubAutomationJobActions(job, {
+  // GHA-CLOSE-05: normalize legacy command/space/checkpoint before action gates.
+  // Reconcile is idempotent and never creates generation / skips policy.
+  let working = job;
+  try {
+    const reconciled = await reconcileGithubAutomationLegacyJob({
+      jobId: job.jobId,
+      config,
+    });
+    if (reconciled.job) {
+      working = reconciled.job;
+    }
+  } catch {
+    // Best-effort; action gate still uses on-disk job.
+  }
+
+  const runtime = getGithubAutomationRuntimeProvenance();
+  const actions = evaluateGithubAutomationJobActions(working, {
     automationEnabled: config.enabled,
     mode: config.mode,
     globalPaused: config.paused,
+    runtimeCodeRevision: runtime.codeRevision,
+    runtimePolicyVersion: runtime.policyVersion,
   });
   const gate = actions.find((a) => a.action === options.action);
   if (!gate?.available) {
@@ -1108,8 +1593,8 @@ export async function applyGithubAutomationJobAction(options: {
       message: gate?.reasonCode
         ? `Action not allowed: ${gate.reasonCode}`
         : "Action not allowed",
-      job: toGithubAutomationJobSafeProjection(job, {
-        claimStatus: await resolveClaimStatus(job),
+      job: toGithubAutomationJobSafeProjection(working, {
+        claimStatus: await resolveClaimStatus(working),
         automationEnabled: config.enabled,
         mode: config.mode,
         globalPaused: config.paused,
@@ -1118,19 +1603,22 @@ export async function applyGithubAutomationJobAction(options: {
     };
   }
 
-  let next = job;
+  let next = working;
   if (options.action === "pause") {
     // Prefer runner pause flag when unattended state exists; always mark durable job paused.
-    await requestGithubUnattendedJobPause(job.jobId);
+    await requestGithubUnattendedJobPause(working.jobId);
     next = await writeGithubAutomationJob({
-      ...job,
-      status: job.status === "running" ? "running" : "paused",
+      ...working,
+      status: working.status === "running" ? "running" : "paused",
       // Running jobs keep running until checkpoint; queued/retry park immediately.
-      phase: job.status === "running" ? job.phase : "paused",
-      reasonCode: job.status === "running" ? "pause_requested" : "paused",
+      phase: working.status === "running" ? working.phase : "paused",
+      reasonCode: working.status === "running" ? "pause_requested" : "paused",
+      // Preserve generation + attempt audit.
+      attempt: working.attempt,
+      generation: working.generation,
       updatedAt: new Date().toISOString(),
     });
-    if (job.status !== "running") {
+    if (working.status !== "running") {
       next = await writeGithubAutomationJob({
         ...next,
         status: "paused",
@@ -1139,8 +1627,9 @@ export async function applyGithubAutomationJobAction(options: {
     }
   } else if (options.action === "resume" || options.action === "retry") {
     next = await wakeGithubUnattendedJobForRetry({
-      job,
+      job: working,
       clearPause: true,
+      config,
     });
     // wakeGithubUnattendedJobForRetry no-ops runner state when absent; ensure durable queued.
     if (next.status !== "queued") {
@@ -1149,6 +1638,8 @@ export async function applyGithubAutomationJobAction(options: {
         status: "queued",
         reasonCode: options.action === "resume" ? "resume_wake" : "retry_wake",
         nextRetryAt: null,
+        attempt: next.attempt,
+        generation: next.generation,
         updatedAt: new Date().toISOString(),
       });
     }
@@ -1168,7 +1659,7 @@ export async function applyGithubAutomationJobAction(options: {
         ? "Pause recorded; in-flight Git commands are not force-killed"
         : options.action === "resume"
           ? "Resume accepted; job re-queued at next safe checkpoint"
-          : "Retry accepted; durable job will reconcile before re-running effects",
+          : "Retry accepted; legacy state reconciled and job re-queued at last safe checkpoint (same generation)",
     job: toGithubAutomationJobSafeProjection(next, {
       claimStatus,
       automationEnabled: config.enabled,

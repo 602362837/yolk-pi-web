@@ -486,7 +486,78 @@ When operator enables `mode=unattended` **and** `unattended.enabled=true` (still
 - Global unattended concurrency is 1; pause/stop/retry resume the same durable job/generation (no automatic merge/release/main push).
 - Rollback: `unattended.enabled=false` returns owner adoption to `accepted_waiting_automation`; `enabled=false`/`mode=off` stops new jobs without deleting Issue/comment/label/assignee/worktree/task/branch/PR/audit records.
 
-Focused tests: `npm run test:github-automation` (P0), `npm run test:github-unattended` (P1 adversarial/recovery/E2E with mocks), `npm run test:github-publish-policy` (diff/PR/publisher).
+#### Durable state machine (no-spin)
+
+Unattended work is a **progress-credentialed durable runner**, not “scheduler `running` means Agent is coding”:
+
+```text
+verified owner command (consume once)
+  → start gates → WorkTree(projectId + spaceId) → Studio task ready
+  → scope/policy plan gate (no Session is valid and visible)
+  → implementing → parent Session bootstrap + WorkTree index
+  → full-agent child run (scrubbed env copy; never delete shared process.env)
+  → validation → final actual-diff policy → server App publisher → PR / terminal
+```
+
+Each scheduler lease must end in an explicit disposition:
+
+| Disposition | Meaning | Scheduler effect |
+| --- | --- | --- |
+| `progressed` | checkpoint / `progressRevision` advanced | may continue / wake again |
+| `waiting` | waiting on Agent / external / timer | do **not** immediately re-lease as runnable queued |
+| `retry_due` | recoverable infra/runtime failure | exponential backoff + jitter + cap (`nextRetryAt`) |
+| `blocked` | deterministic/manual gate (`blockFingerprint`) | no auto retry; operator retry only after code/policy/input change |
+| `terminal` | completed / cancelled / ignored | stop scheduling |
+
+Missing disposition or unchanged `progressRevision` is `runner_no_progress` → bounded backoff, then stable block. **Never** park no-progress work as immediately runnable `queued` (the #22 spin class).
+
+#### Counts and truthfulness
+
+- Legacy `attempt` is retained and defined as **scheduler lease-run count** (UI: 「调度尝试 N」).
+- Additive counters: `agentRunCount` / `meaningfulProgressCount` / `noProgressRunCount` / `progressRevision` / `lastMeaningfulProgressAt`.
+- Meaningful progress = checkpoint advance, Session create, child/validation/policy/publisher terminal — **not** lease heartbeat or scheduler ticks.
+- Safe status projection exposes dual layers: `schedulerState`, `agentExecutionState`, `sessionAvailability`, `blockedAtLayer`, retryability, counts, safe `workspaceLabel`, and `runtimeProvenance` / optional `evaluatedProvenance`. Absolute paths, sessionFile, Issue/comment bodies, prompts, transcripts, and tool payloads stay off the wire.
+
+#### Owner command consumption
+
+`deliveryId` remains audit identity. Pending command work items are separate: exact comment id/version is executed **once**, then marked consumed. After `remote_confirmed` adoption, active unattended jobs must **fall through** to runner continuation — idempotent command replay must not return early and cut off `studio_task_ready` → implementing.
+
+#### Policy stages
+
+| Stage | Facts | Empty files |
+| --- | --- | --- |
+| `pre` | config, complete claim, owner auth, high-confidence scope hints | deferred (not “allowed docs”) |
+| `plan` | runner-owned structured plan evidence; `issueTitlePreview` is advisory only (never copied as `planText`) | deferred |
+| `final` | actual Git diff + structured validation/small-bugfix evidence | `blocked_empty_diff` |
+
+Title hints cannot override a safe actual final diff. High-confidence UI/secret/release paths stay fail-closed; “模型” alone is not a secret/auth hit. There is **no** skip-policy action.
+
+#### WorkTree Session binding and env isolation
+
+- WorkTree ensure/reuse resolves and persists **`projectId + spaceId`**. Parent Session bootstrap requires both; failure is visible `retry_due` / `blocked_session_binding`, never silent “Agent active”.
+- Parent/child JSONL headers and WorkTree `.ypi/sessions/index.v1.json` share the same project/space identity. WorkTree Sessions must not appear under main space.
+- Policy/Studio gates **before** implementing legitimately have `sessionAvailability=none` — UI must say 「尚未启动 Agent / Session 不存在」.
+- Full-agent child env uses a **scrubbed env copy** (`buildGithubUnattendedScrubbedEnv` / `scrubGithubAutomationOwnedSecretsFromEnv`). Shared Next/server `process.env` must not be deleted/temporarily mutated (publisher/webhook credentials stay intact). This is product non-injection, not an OS sandbox.
+
+#### Lease heartbeat and fencing
+
+Long full-agent runs use lease owner heartbeat + fencing token. Stale removal requires expired heartbeat / dead owner (not directory age alone). Process-local `inFlight` is skipped by stale-running reconcile. Writes after lease loss with a stale fencing token are rejected.
+
+#### Runtime / policy provenance and full restart
+
+`GET /api/github-automation/status` projects safe `runtimeProvenance` (`packageVersion`, Next `buildId`, opaque `codeRevision`, `processEpoch`, `processStartedAt`, `policyVersion`). Blocks may store `evaluatedProvenance`. After code/package/policy fix, operators must **fully restart** `ypi` (hot reload / package version string alone is insufficient) and compare runtime vs evaluated stamps before trusting recovery.
+
+#### #22-class recovery (same generation)
+
+1. Per-job pause (or global `paused` if needed) — stop attempt growth.
+2. Deploy fix + full restart; confirm provenance.
+3. Idempotent `reconcileGithubAutomationLegacyJob`: consume already `remote_confirmed` commands, repair missing `spaceId`, normalize safe checkpoint (often `studio_task_ready`), preserve generation/legacy attempt; never rewrite history or create g2.
+4. Operator **single** retry/resume on the same job/WorkTree/branch/task.
+5. Allowed outcomes only: stable policy/manual block (no Session) **or** implementing with WorkTree Session + auditable child run. Forbidden: 2s queued/running jitter, attempt skyrocket, “实现中” without Session, skip gate, delete audit.
+
+Operator runbook detail: `docs/operations/troubleshooting.md` (Unattended planning spin / no Session).
+
+Focused tests: `npm run test:github-automation` (P0 + disposition/lease), `npm run test:github-unattended` (P1 adversarial/recovery/E2E with mocks), `npm run test:github-unattended-runner` (runner checkpoints / Session binding), `npm run test:github-publish-policy` (diff/PR/publisher).
 
 ### Identity matrix
 

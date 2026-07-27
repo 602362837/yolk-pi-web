@@ -935,7 +935,8 @@ await test("E2E high-risk path blocks at final policy and never opens PR", async
     },
     riskProfile: "docs-and-small-bugfix",
     issueTitlePreview: job0.issueTitlePreview,
-    planText: job0.issueTitlePreview,
+    // Title must not be copied into planText (GHA-CLOSE-01).
+    planText: null,
   });
   assert.equal(finalEval.policy.decision, "block");
   assert.equal(diffPolicy.isGithubFinalDiffAllowed(finalEval), false);
@@ -1106,6 +1107,27 @@ await test("permission_missing and installation_missing block without fallback i
     // best-effort
   }
 
+  // Seed a durable Studio task so the runner stays on the publish path instead of
+  // re-entering studio_task_ready → implementing. Include spaceId (GHA-CLOSE-03).
+  const ensuredTask = session.ensureGithubUnattendedStudioTask({
+    worktreePath: wt.worktreePath,
+    repository: {
+      ...cfg.repositories[0],
+      installationId: 4242,
+    },
+    issueNumber: 831,
+    issueTitlePreview: "docs: uninstall",
+    jobId: job0.jobId,
+    generation: 1,
+    owner: {
+      ownerActorId: 99,
+      ownerCommentId: 1,
+      ownerCommentHash: session.hashGithubOwnerCommentForAuthorization("可以做"),
+      matchedPhrase: "可以做",
+    },
+    uiGate: "pass",
+  });
+
   runner.writeGithubAutomationRunnerState({
     schemaVersion: 1,
     jobId: job0.jobId,
@@ -1117,14 +1139,17 @@ await test("permission_missing and installation_missing block without fallback i
     branchName: wt.branchName,
     baseRef: "main",
     projectId: wt.projectId,
-    taskId: null,
+    spaceId: wt.spaceId,
+    taskId: ensuredTask.task.id,
     sessionId: null,
     contextId: null,
     sessionFile: null,
-    scopeFingerprint: null,
+    scopeFingerprint: ensuredTask.binding.scopeFingerprint,
     ownerActorId: 99,
     ownerCommentId: 1,
-    ownerCommentHash: "h",
+    ownerCommentHash: ensuredTask.binding.scopeFingerprint
+      ? session.hashGithubOwnerCommentForAuthorization("可以做")
+      : "h",
     lastMember: null,
     lastRunId: null,
     pauseRequested: false,

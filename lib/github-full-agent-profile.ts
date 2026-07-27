@@ -42,8 +42,13 @@ export const GITHUB_FULL_AGENT_RISK_PROFILE: GithubAutomationRiskProfile =
 /** Policy id used when recording internal policyGrant evidence. */
 export const GITHUB_UNATTENDED_POLICY_ID = "docs-and-small-bugfix";
 
-/** Policy version bound into policyGrant (bump when gate semantics change). */
-export const GITHUB_UNATTENDED_POLICY_VERSION = "1";
+/**
+ * Policy version bound into policyGrant / risk evaluation provenance.
+ * Bump when gate semantics change (stage sources, empty-diff defer, title/plan split).
+ * GHA-CLOSE-01: pre/plan empty files are explicit deferred; title is never planText;
+ * final ignores free-text title hints over actual diffs.
+ */
+export const GITHUB_UNATTENDED_POLICY_VERSION = "1.1";
 
 /**
  * Explicit residual-risk codes. Settings / docs / tests must surface these —

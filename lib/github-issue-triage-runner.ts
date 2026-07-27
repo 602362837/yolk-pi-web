@@ -72,6 +72,7 @@ import {
 import {
   appendGithubAutomationSafeEvent,
   readGithubAutomationDelivery,
+  readGithubAutomationJob,
   upsertEffectMarker,
   upsertGithubAutomationIssueState,
   writeGithubAutomationJob,
@@ -85,6 +86,7 @@ import type {
   GithubMachineAssigneeReadinessCode,
   GithubMachineAssigneeResolvedIdentity,
 } from "./github-automation-types";
+import { isGithubAutomationUnattendedContinuationPhase } from "./github-automation-types";
 import { githubAppInstallationRequest } from "./github-app-client";
 import {
   addGithubIssueAssigneeWithReadback,
@@ -1073,6 +1075,29 @@ function findOwnerCommandEffect(
   );
 }
 
+/** Mark pendingCommand consumed after exact comment/version side effects complete. */
+function consumePendingCommand(
+  job: GithubAutomationJobRecord,
+  commandKey: string,
+): GithubAutomationJobRecord["pendingCommand"] {
+  const now = new Date().toISOString();
+  if (job.pendingCommand && job.pendingCommand.commandKey === commandKey) {
+    return {
+      ...job.pendingCommand,
+      state: "consumed",
+      updatedAt: now,
+    };
+  }
+  if (job.pendingCommand) {
+    return {
+      ...job.pendingCommand,
+      state: "consumed",
+      updatedAt: now,
+    };
+  }
+  return job.pendingCommand ?? null;
+}
+
 async function writeCommandReceipt(options: {
   ctx: ClaimContext;
   job: GithubAutomationJobRecord;
@@ -1924,6 +1949,54 @@ async function runOwnerIntentIfPresent(
   // Durable idempotency: same comment version + command executes once.
   const prior = findOwnerCommandEffect(job.effects, commandKey);
   if (prior && prior.status === "remote_confirmed") {
+    // Mark pendingCommand consumed (audit deliveryId stays; work item is one-shot).
+    const consumedPending =
+      job.pendingCommand &&
+      job.pendingCommand.commandKey === commandKey &&
+      job.pendingCommand.state === "pending"
+        ? {
+            ...job.pendingCommand,
+            state: "consumed" as const,
+            updatedAt: new Date().toISOString(),
+          }
+        : job.pendingCommand && job.pendingCommand.commandKey === commandKey
+          ? job.pendingCommand
+          : job.pendingCommand?.state === "pending" &&
+              job.pendingCommand.deliveryId === job.deliveryId
+            ? {
+                ...job.pendingCommand,
+                state: "consumed" as const,
+                updatedAt: new Date().toISOString(),
+              }
+            : job.pendingCommand ??
+              ({
+                deliveryId: job.deliveryId ?? "",
+                commentId: exact.id,
+                versionHash: bodySha256,
+                commandKey,
+                state: "consumed" as const,
+                updatedAt: new Date().toISOString(),
+              } satisfies NonNullable<GithubAutomationJobRecord["pendingCommand"]>);
+
+    // GHA-CLOSE-02 / #22: remote_confirmed adoption (or any already-handled command)
+    // must NOT cut off unattended runner continuation on active phases. Side effects
+    // stay one-shot; fall through so continueGithubUnattendedJob can run.
+    if (isGithubAutomationUnattendedContinuationPhase(job.phase)) {
+      job = await persistJob({
+        ...job,
+        pendingCommand: consumedPending,
+        // Preserve checkpoint/reason so runner resumes (e.g. studio_task_ready).
+        reasonCode:
+          job.reasonCode === "retry_wake" || job.reasonCode == null
+            ? job.reasonCode
+            : job.reasonCode === prior.reasonCode
+              ? job.reasonCode
+              : job.reasonCode,
+      });
+      // Returning null lets githubIssueTriageJobHandler continue to the runner.
+      return null;
+    }
+
     // Re-issue receipt upsert (no-op if body same) without re-running side effects.
     await writeCommandReceipt({
       ctx,
@@ -1939,6 +2012,7 @@ async function runOwnerIntentIfPresent(
     return {
       job: await persistJob({
         ...job,
+        pendingCommand: consumedPending,
         leaseOwner: null,
         leaseExpiresAt: null,
         reasonCode: prior.reasonCode ?? job.reasonCode,
@@ -1948,8 +2022,18 @@ async function runOwnerIntentIfPresent(
     };
   }
 
+  const pendingCommand: NonNullable<GithubAutomationJobRecord["pendingCommand"]> = {
+    deliveryId: job.deliveryId ?? "",
+    commentId: exact.id,
+    versionHash: bodySha256,
+    commandKey,
+    state: "pending",
+    updatedAt: new Date().toISOString(),
+  };
+
   job = await persistJob({
     ...job,
+    pendingCommand,
     effects: upsertEffectMarker(job.effects, {
       name: "owner_command",
       status: "intended",
@@ -1984,6 +2068,7 @@ async function runOwnerIntentIfPresent(
     });
     job = await persistJob({
       ...job,
+      pendingCommand: consumePendingCommand(job, commandKey),
       effects: upsertEffectMarker(job.effects, {
         name: "owner_command",
         status: "remote_confirmed",
@@ -2015,7 +2100,16 @@ async function runOwnerIntentIfPresent(
         injectsCommentText: false,
       },
     });
-    return { job, wakeAgain: false };
+    // Active unattended phases: status is side-effect-free; fall through to runner
+    // so the same delivery does not spin forever without continuation.
+    if (isGithubAutomationUnattendedContinuationPhase(job.phase)) {
+      return null;
+    }
+    return {
+      job,
+      wakeAgain: false,
+      disposition: { kind: "waiting", wakeOn: "external" },
+    };
   }
 
   if (command === "re_evaluate") {
@@ -2094,6 +2188,7 @@ async function runOwnerIntentIfPresent(
     });
     job = await persistJob({
       ...job,
+      pendingCommand: consumePendingCommand(job, commandKey),
       effects: upsertEffectMarker(job.effects, {
         name: "owner_command",
         status: "remote_confirmed",
@@ -2136,6 +2231,7 @@ async function runOwnerIntentIfPresent(
     // Mark command effect confirmed on the returned job when still same generation.
     const nextJob = await persistJob({
       ...result.job,
+      pendingCommand: consumePendingCommand(result.job, commandKey),
       effects: upsertEffectMarker(result.job.effects, {
         name: "owner_command",
         status: result.job.reasonCode === "incomplete_claim_on_owner_intent"
@@ -2193,6 +2289,7 @@ async function runOwnerIntentIfPresent(
       reasonCode: "pause_requested",
       leaseOwner: null,
       leaseExpiresAt: null,
+      pendingCommand: consumePendingCommand(job, commandKey),
       effects: upsertEffectMarker(job.effects, {
         name: "owner_command",
         status: "remote_confirmed",
@@ -2341,6 +2438,7 @@ async function runOwnerIntentIfPresent(
     });
     job = await persistJob({
       ...job,
+      pendingCommand: consumePendingCommand(job, commandKey),
       effects: upsertEffectMarker(job.effects, {
         name: "owner_command",
         status: "remote_confirmed",
@@ -2498,7 +2596,7 @@ export const githubIssueTriageJobHandler: GithubAutomationJobHandler = async (
     return { job: blocked, wakeAgain: false };
   }
 
-  const ctx: ClaimContext = {
+  let ctx: ClaimContext = {
     config: context.config,
     job,
     installationId,
@@ -2508,6 +2606,8 @@ export const githubIssueTriageJobHandler: GithubAutomationJobHandler = async (
 
   // CMD-03: exact owner commands on any active job when delivery is issue_comment.
   // Covers awaiting_owner adoption + status/re-evaluate/pause/continue on later phases.
+  // GHA-CLOSE-02: remote_confirmed replay on unattended continuation phases returns null
+  // so the runner can proceed (delivery audit stays; command work item is one-shot).
   if (
     job.deliveryId &&
     (job.phase === "awaiting_owner" ||
@@ -2528,6 +2628,12 @@ export const githubIssueTriageJobHandler: GithubAutomationJobHandler = async (
   ) {
     const ownerResult = await runOwnerIntentIfPresent(ctx);
     if (ownerResult) return ownerResult;
+    // Fallthrough: re-read job so pendingCommand/consumed markers are visible to runner.
+    const refreshed = await readGithubAutomationJob(job.jobId);
+    if (refreshed) {
+      job = refreshed;
+      ctx = { ...ctx, job: refreshed };
+    }
   }
 
   // P1 durable runner continuation (WorkTree / full agent checkpoints)

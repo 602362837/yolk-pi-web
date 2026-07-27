@@ -274,7 +274,15 @@ export interface EvaluateGithubDiffPolicyInput {
   baseRef: string;
   limits: GithubRiskPolicyLimits;
   riskProfile?: GithubAutomationRiskProfile | string | null;
+  /**
+   * Runner-owned structured plan evidence only.
+   * Callers MUST NOT copy issueTitlePreview into this field (GHA-CLOSE-01).
+   */
   planText?: string | null;
+  /**
+   * Untrusted Issue title preview. Advisory evidence for pre/plan high-confidence
+   * hints only; final stage ignores free-text hints over actual diffs.
+   */
   issueTitlePreview?: string | null;
   explicitSmallBugfix?: boolean;
   /** Optional pre-built snapshot (tests). */
@@ -285,6 +293,10 @@ export interface EvaluateGithubDiffPolicyInput {
 
 /**
  * Collect (unless snapshot provided) and evaluate risk policy for a stage.
+ *
+ * Evidence rules (GHA-CLOSE-01):
+ * - pre/plan: title is separate from planText; empty files → deferred outcome
+ * - final: snapshot.files (actual diff) dominate; free-text title is not planText
  */
 export async function evaluateGithubDiffPolicy(
   input: EvaluateGithubDiffPolicyInput,
@@ -298,13 +310,14 @@ export async function evaluateGithubDiffPolicy(
       timeoutMs: input.timeoutMs,
     }));
 
+  // Never coalesce title into planText — keep channels distinct for evidenceSource.
   const policy = evaluateGithubRiskPolicy({
     stage: input.stage,
     riskProfile: input.riskProfile,
     limits: input.limits,
     files: snapshot.files,
-    planText: input.planText,
-    issueTitlePreview: input.issueTitlePreview,
+    planText: input.planText ?? null,
+    issueTitlePreview: input.issueTitlePreview ?? null,
     explicitSmallBugfix: input.explicitSmallBugfix,
   });
 
@@ -313,6 +326,7 @@ export async function evaluateGithubDiffPolicy(
 
 /**
  * True when final policy allows publish. No allow → no push.
+ * Deferred pre/plan outcomes never satisfy this helper.
  */
 export function isGithubFinalDiffAllowed(
   evaluation: GithubDiffPolicyEvaluation,
@@ -320,7 +334,10 @@ export function isGithubFinalDiffAllowed(
   return (
     evaluation.stage === "final" &&
     evaluation.policy.decision === "allow" &&
-    evaluation.policy.reasonCode !== "blocked_empty_diff"
+    evaluation.policy.outcome === "allow" &&
+    evaluation.policy.deferred !== true &&
+    evaluation.policy.reasonCode !== "blocked_empty_diff" &&
+    evaluation.policy.reasonCode !== "deferred_no_declared_files"
   );
 }
 

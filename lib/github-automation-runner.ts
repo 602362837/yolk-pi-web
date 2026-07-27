@@ -63,14 +63,15 @@ import type {
 } from "./github-automation-types";
 import {
   GITHUB_FULL_AGENT_PROFILE,
-  scrubGithubAutomationOwnedSecretsFromEnv,
   containsGithubAutomationSecretInjectionMarker,
 } from "./github-full-agent-profile";
 import {
   ensureGithubAutomationWorktree,
   resolveGithubAutomationProjectRoot,
+  resolveGithubAutomationWorktreeSpaceId,
   assertWorktreeNotControlledByIssue,
 } from "./github-automation-worktree";
+import { getGithubAutomationEvaluatedProvenance } from "./github-automation-provenance";
 import {
   ensureGithubUnattendedStudioTask,
   transitionGithubUnattendedTaskToImplementing,
@@ -125,6 +126,11 @@ export interface GithubAutomationRunnerStateV1 {
   branchName: string | null;
   baseRef: string | null;
   projectId: string | null;
+  /**
+   * Additive WorkTree space binding (wt_…). Required with projectId for parent
+   * Session bootstrap. Legacy sidecars may omit it; runner re-resolves on read.
+   */
+  spaceId?: string | null;
   taskId: string | null;
   sessionId: string | null;
   contextId: string | null;
@@ -193,6 +199,7 @@ function emptyRunnerState(job: GithubAutomationJobRecord): GithubAutomationRunne
     branchName: null,
     baseRef: null,
     projectId: null,
+    spaceId: null,
     taskId: null,
     sessionId: null,
     contextId: null,
@@ -293,7 +300,32 @@ export async function evaluateGithubUnattendedStartGates(input: {
 async function persistJob(
   job: GithubAutomationJobRecord,
 ): Promise<GithubAutomationJobRecord> {
-  const next = { ...job, updatedAt: new Date().toISOString() };
+  let next: GithubAutomationJobRecord = {
+    ...job,
+    updatedAt: new Date().toISOString(),
+  };
+  // Stamp evaluated build/policy provenance on newly entered blocks (GHA-CLOSE-04).
+  // Additive only; never overwrite an existing stamp (legacy / re-persist).
+  if (
+    (next.status === "blocked" || next.phase === "blocked") &&
+    (!next.evaluatedCodeRevision || !next.evaluatedPolicyVersion)
+  ) {
+    try {
+      const { getGithubAutomationEvaluatedProvenance } = await import(
+        "./github-automation-provenance"
+      );
+      const evaluated = getGithubAutomationEvaluatedProvenance();
+      next = {
+        ...next,
+        evaluatedCodeRevision:
+          next.evaluatedCodeRevision ?? evaluated.codeRevision,
+        evaluatedPolicyVersion:
+          next.evaluatedPolicyVersion ?? evaluated.policyVersion,
+      };
+    } catch {
+      // Provenance is best-effort; blocking must still persist.
+    }
+  }
   await writeGithubAutomationJob(next);
   return next;
 }
@@ -518,8 +550,8 @@ export async function runGithubUnattendedImplementation(
   inflight.add(job.jobId);
 
   try {
-    // Scrub automation-owned secrets from process env for the duration of agent work.
-    scrubGithubAutomationOwnedSecretsFromEnv(process.env);
+    // Do NOT mutate shared process.env here. Agent/bash isolation uses scrubbed
+    // env copies (GHA-CLOSE-03). Server publisher credentials stay intact.
 
     let state = readGithubAutomationRunnerState(job.jobId) ?? emptyRunnerState(job);
 
@@ -594,6 +626,7 @@ export async function runGithubUnattendedImplementation(
         branchName: wt.branchName,
         baseRef: wt.baseRef,
         projectId: wt.projectId,
+        spaceId: wt.spaceId,
         reasonCode: null,
       });
 
@@ -641,6 +674,29 @@ export async function runGithubUnattendedImplementation(
 
       if (input.singleStep) {
         return { job, wakeAgain: true };
+      }
+    }
+
+    // Legacy sidecars / reuse: repair missing spaceId while WorkTree already exists.
+    if (state.worktreePath && state.projectId && !state.spaceId) {
+      try {
+        const repoRoot =
+          (await resolveGithubAutomationProjectRoot(repository)).rootPath;
+        const space = await resolveGithubAutomationWorktreeSpaceId({
+          projectId: state.projectId,
+          repoRoot,
+          worktreePath: state.worktreePath,
+          branchName: state.branchName,
+          baseRef: state.baseRef,
+        });
+        if (space.spaceId) {
+          state = writeGithubAutomationRunnerState({
+            ...state,
+            spaceId: space.spaceId,
+          });
+        }
+      } catch {
+        // Visible later at Session bootstrap if still unbound.
       }
     }
 
@@ -760,9 +816,10 @@ export async function runGithubUnattendedImplementation(
             maxChangedLines: input.config.unattended.maxChangedLines,
           },
           riskProfile: input.config.unattended.riskProfile,
+          // Title is untrusted advisory only — never copy into planText (GHA-CLOSE-01).
           issueTitlePreview: job.issueTitlePreview,
-          planText: job.issueTitlePreview,
-          // Empty/WIP tree is ok at plan; title hints can still block UI/release/secret.
+          planText: null,
+          // Empty/WIP tree is ok at plan; high-confidence title hints can still block UI/release/secret.
           snapshot: {
             baseRef: state.baseRef || repository.baseRef || "main",
             files: [],
@@ -770,7 +827,8 @@ export async function runGithubUnattendedImplementation(
             numstatRawPreview: "",
           },
         });
-        if (planGate.policy.decision === "block") {
+        // deferred empty plan (outcome=defer) continues; only hard blocks stop.
+        if (planGate.policy.decision === "block" || planGate.policy.outcome === "block") {
           job = await persistJob({
             ...job,
             phase: "blocked",
@@ -912,17 +970,78 @@ export async function runGithubUnattendedImplementation(
         });
       }
 
-      // Bootstrap session once for parent context (full tools).
+      // Parent Session bootstrap is required before claiming Agent active.
+      // projectId+spaceId must be paired; failure is a visible blocker (GHA-CLOSE-03).
       if (!state.sessionId) {
+        // Legacy sidecars may only have projectId; re-resolve WorkTree space.
+        if (state.projectId && !state.spaceId && state.worktreePath) {
+          try {
+            const repoRoot =
+              (await resolveGithubAutomationProjectRoot(repository)).rootPath;
+            const space = await resolveGithubAutomationWorktreeSpaceId({
+              projectId: state.projectId,
+              repoRoot,
+              worktreePath: state.worktreePath,
+              branchName: state.branchName,
+              baseRef: state.baseRef,
+            });
+            if (space.spaceId) {
+              state = writeGithubAutomationRunnerState({
+                ...state,
+                spaceId: space.spaceId,
+              });
+            }
+          } catch {
+            // handled below as binding failure
+          }
+        }
+
+        if (!state.projectId || !state.spaceId) {
+          const reasonCode = "blocked_session_binding";
+          state = writeGithubAutomationRunnerState({
+            ...state,
+            reasonCode,
+          });
+          job = await persistJob({
+            ...job,
+            phase: "blocked",
+            status: "blocked",
+            checkpoint: "blocked",
+            reasonCode,
+            leaseOwner: null,
+            leaseExpiresAt: null,
+          });
+          await appendGithubAutomationSafeEvent({
+            at: new Date().toISOString(),
+            kind: "unattended_session_bootstrap_failed",
+            repositoryId: job.repositoryId,
+            issueNumber: job.issueNumber,
+            jobId: job.jobId,
+            deliveryId: job.deliveryId,
+            phase: job.phase,
+            reasonCode,
+            traceId: job.traceId,
+            meta: {
+              message: "projectId and spaceId are required before Session bootstrap",
+              hasProjectId: Boolean(state.projectId),
+              hasSpaceId: Boolean(state.spaceId),
+            },
+          });
+          return { job, wakeAgain: false };
+        }
+
         try {
           const boot = await bootstrapGithubAutomationAgentSession({
             worktreePath: state.worktreePath!,
             projectId: state.projectId,
+            spaceId: state.spaceId,
           });
           // Dispose immediately — child runs use SDK sessions; we only need binding ids.
           try {
-            // AgentSessionWrapper.destroy/dispose may not always exist; best-effort.
-            const disposable = boot.session as { dispose?: () => void; destroy?: () => void };
+            const disposable = boot.session as {
+              dispose?: () => void;
+              destroy?: () => void;
+            };
             disposable.dispose?.();
             disposable.destroy?.();
           } catch {
@@ -936,9 +1055,52 @@ export async function runGithubUnattendedImplementation(
               (boot as { sessionFile?: string | null }).sessionFile ??
               boot.session.sessionFile ??
               null,
+            reasonCode: null,
+          });
+          // Stamp agentRunCount only after successful parent Session bootstrap.
+          const priorRuns =
+            typeof job.agentRunCount === "number" && Number.isFinite(job.agentRunCount)
+              ? Math.max(0, Math.floor(job.agentRunCount))
+              : 0;
+          job = await persistJob({
+            ...job,
+            agentRunCount: priorRuns + 1,
+            lastMeaningfulProgressAt: new Date().toISOString(),
+            lastMeaningfulProgressKind: "session_created",
+            meaningfulProgressCount:
+              (typeof job.meaningfulProgressCount === "number"
+                ? job.meaningfulProgressCount
+                : 0) + 1,
+            progressRevision:
+              (typeof job.progressRevision === "number" ? job.progressRevision : 0) +
+              1,
           });
         } catch (err) {
-          // Session bootstrap failure is non-fatal for pure child SDK path; record safe reason.
+          // Bootstrap failure is fatal for this tick: do not continue as Agent active.
+          const message = safeGithubAutomationErrorMessage(err).slice(0, 160);
+          const transient =
+            /ENOENT|EACCES|EPERM|EBUSY|EMFILE|ENFILE|EAGAIN|timeout|temporar|busy|locked/i.test(
+              message,
+            );
+          const reasonCode = transient
+            ? "session_bootstrap_transient"
+            : "session_bootstrap_failed";
+          state = writeGithubAutomationRunnerState({
+            ...state,
+            reasonCode,
+          });
+          job = await persistJob({
+            ...job,
+            // Transient → retryable queued; binding/hard errors → stable blocked.
+            phase: transient ? "implementing" : "blocked",
+            status: transient ? "queued" : "blocked",
+            checkpoint: transient ? "implementing" : "blocked",
+            reasonCode,
+            blockedAtLayer: "session_bootstrap",
+            retryability: transient ? "automatic" : "operator",
+            leaseOwner: null,
+            leaseExpiresAt: null,
+          });
           await appendGithubAutomationSafeEvent({
             at: new Date().toISOString(),
             kind: "unattended_session_bootstrap_failed",
@@ -947,12 +1109,11 @@ export async function runGithubUnattendedImplementation(
             jobId: job.jobId,
             deliveryId: job.deliveryId,
             phase: job.phase,
-            reasonCode: "session_bootstrap_failed",
+            reasonCode,
             traceId: job.traceId,
-            meta: {
-              message: safeGithubAutomationErrorMessage(err).slice(0, 120),
-            },
+            meta: { message },
           });
+          return { job, wakeAgain: transient };
         }
       }
 
@@ -1562,6 +1723,451 @@ export async function runGithubUnattendedImplementation(
   }
 }
 
+// ─── Legacy / #22 reconcile (GHA-CLOSE-05) ───────────────────────────────────
+
+/** Allowlisted repair codes for operator-visible reconcile summaries. */
+export type GithubAutomationLegacyRepairCode =
+  | "pending_command_consumed"
+  | "space_id_repaired"
+  | "checkpoint_normalized"
+  | "blocked_layer_cleared_for_resume"
+  | "lease_fields_cleared";
+
+export type GithubAutomationLegacyReconcileCode =
+  | "reconciled"
+  | "unchanged"
+  | "not_found"
+  | "terminal";
+
+export interface GithubAutomationLegacyReconcileResult {
+  code: GithubAutomationLegacyReconcileCode;
+  changed: boolean;
+  job: GithubAutomationJobRecord | null;
+  runner: GithubAutomationRunnerStateV1 | null;
+  /** Allowlisted repair codes only — never free text / paths. */
+  repairs: GithubAutomationLegacyRepairCode[];
+  /** Safe checkpoint after reconcile (null when job missing). */
+  safeCheckpoint: string | null;
+  generation: number | null;
+  /** Legacy `attempt` retained as scheduler-run audit; never rewritten. */
+  preservedAttempt: number | null;
+}
+
+const SAFE_RESUME_CHECKPOINTS = new Set<GithubAutomationRunnerCheckpoint>([
+  "implementation_queued",
+  "worktree_ready",
+  "studio_task_ready",
+  "planning",
+  "policy_check",
+  "implementing",
+  "checking",
+  "awaiting_publish",
+  "publishing",
+]);
+
+/**
+ * Compute the last safe durable checkpoint for a legacy/#22-shaped job.
+ * Never invents implementing when no Session exists; never advances generation.
+ */
+export function resolveGithubAutomationSafeRecoveryCheckpoint(input: {
+  job: GithubAutomationJobRecord;
+  state: GithubAutomationRunnerStateV1 | null;
+}): GithubAutomationRunnerCheckpoint {
+  const state = input.state;
+  const phase = input.job.phase;
+  const raw =
+    state?.checkpoint ??
+    (typeof input.job.checkpoint === "string"
+      ? (input.job.checkpoint as GithubAutomationRunnerCheckpoint)
+      : null);
+
+  if (
+    raw === "awaiting_publish" ||
+    raw === "publishing" ||
+    phase === "final_policy" ||
+    phase === "publishing"
+  ) {
+    return "awaiting_publish";
+  }
+  if (raw === "checking" || phase === "checking" || state?.lastMember === "checker") {
+    return "checking";
+  }
+  if (
+    state?.sessionId ||
+    raw === "implementing" ||
+    phase === "implementing" ||
+    state?.lastMember === "implementer"
+  ) {
+    // Only claim implementing when a Session already exists or we were mid-implement.
+    if (state?.sessionId || raw === "implementing" || phase === "implementing") {
+      return "implementing";
+    }
+  }
+  if (
+    state?.taskId ||
+    raw === "studio_task_ready" ||
+    raw === "planning" ||
+    phase === "planning"
+  ) {
+    return "studio_task_ready";
+  }
+  if (state?.worktreePath || raw === "worktree_ready") {
+    return "worktree_ready";
+  }
+  if (raw && SAFE_RESUME_CHECKPOINTS.has(raw) && raw !== "blocked") {
+    return raw;
+  }
+  return "implementation_queued";
+}
+
+/**
+ * Repair missing WorkTree `spaceId` on a runner sidecar (additive write only).
+ * Does not create WorkTrees, generations, or Sessions.
+ */
+export async function repairGithubAutomationRunnerSpaceBinding(input: {
+  state: GithubAutomationRunnerStateV1;
+  config: GithubAutomationConfigV1;
+}): Promise<{ state: GithubAutomationRunnerStateV1; repaired: boolean }> {
+  const state = input.state;
+  if (state.spaceId || !state.projectId || !state.worktreePath) {
+    return { state, repaired: false };
+  }
+  const repository = findRepositoryConfigById(
+    input.config,
+    state.repositoryId,
+  );
+  if (!repository) {
+    return { state, repaired: false };
+  }
+  try {
+    const repoRoot = (await resolveGithubAutomationProjectRoot(repository)).rootPath;
+    const space = await resolveGithubAutomationWorktreeSpaceId({
+      projectId: state.projectId,
+      repoRoot,
+      worktreePath: state.worktreePath,
+      branchName: state.branchName,
+      baseRef: state.baseRef,
+    });
+    if (!space.spaceId) {
+      return { state, repaired: false };
+    }
+    const next = writeGithubAutomationRunnerState({
+      ...state,
+      spaceId: space.spaceId,
+    });
+    return { state: next, repaired: true };
+  } catch {
+    return { state, repaired: false };
+  }
+}
+
+/**
+ * Consume a pending owner command when the durable effect is already
+ * `remote_confirmed` (the #22 adoption replay trap). Audit `deliveryId` stays.
+ * Idempotent: repeated calls do not re-emit side effects or change generation.
+ */
+export function consumeGithubAutomationLegacyPendingCommand(
+  job: GithubAutomationJobRecord,
+): { job: GithubAutomationJobRecord; repaired: boolean } {
+  const now = new Date().toISOString();
+  const remoteConfirmedCommand = job.effects.find(
+    (e) => e.name === "owner_command" && e.status === "remote_confirmed",
+  );
+
+  // Prefer exact pending work item; fall back to any pending when delivery matches.
+  if (job.pendingCommand?.state === "consumed") {
+    return { job, repaired: false };
+  }
+
+  if (job.pendingCommand?.state === "pending") {
+    const nextPending = {
+      ...job.pendingCommand,
+      state: "consumed" as const,
+      updatedAt: now,
+    };
+    return {
+      job: { ...job, pendingCommand: nextPending },
+      repaired: true,
+    };
+  }
+
+  // Legacy spin: deliveryId still points at adoption, effect remote_confirmed,
+  // but pendingCommand was never written (pre-GHA-CLOSE-02 schema).
+  if (remoteConfirmedCommand) {
+    const commandKey =
+      typeof remoteConfirmedCommand.remoteId === "string" &&
+      remoteConfirmedCommand.remoteId.trim()
+        ? remoteConfirmedCommand.remoteId.trim()
+        : `legacy:${job.jobId}:owner_command`;
+    return {
+      job: {
+        ...job,
+        pendingCommand: {
+          deliveryId: job.deliveryId ?? "",
+          commentId: 0,
+          versionHash: "legacy_reconcile",
+          commandKey,
+          state: "consumed",
+          updatedAt: now,
+        },
+      },
+      repaired: true,
+    };
+  }
+
+  return { job, repaired: false };
+}
+
+/**
+ * Idempotent legacy/#22 reconcile:
+ * - consume already remote_confirmed owner commands (no re-side-effect)
+ * - repair missing WorkTree spaceId when projectId+path exist
+ * - normalize checkpoint to last safe resume point (no Session invent)
+ * - preserve generation, attempt, worktree, branch, task, events
+ * - never skip policy, never create g2, never delete history
+ *
+ * Does **not** auto-wake the scheduler. Operator must pause (stop-bleed),
+ * deploy/restart, reconcile, then single retry/resume.
+ */
+export async function reconcileGithubAutomationLegacyJob(input: {
+  jobId: string;
+  config?: GithubAutomationConfigV1;
+}): Promise<GithubAutomationLegacyReconcileResult> {
+  const { readGithubAutomationConfig } = await import("./github-automation-config");
+  const { readGithubAutomationJob } = await import("./github-automation-store");
+  const config = input.config ?? (await readGithubAutomationConfig());
+  const existing = await readGithubAutomationJob(input.jobId);
+  if (!existing) {
+    return {
+      code: "not_found",
+      changed: false,
+      job: null,
+      runner: null,
+      repairs: [],
+      safeCheckpoint: null,
+      generation: null,
+      preservedAttempt: null,
+    };
+  }
+
+  if (
+    existing.status === "completed" ||
+    existing.status === "cancelled" ||
+    existing.status === "ignored" ||
+    existing.phase === "completed" ||
+    existing.phase === "cancelled"
+  ) {
+    return {
+      code: "terminal",
+      changed: false,
+      job: existing,
+      runner: readGithubAutomationRunnerState(existing.jobId),
+      repairs: [],
+      safeCheckpoint: existing.checkpoint,
+      generation: existing.generation,
+      preservedAttempt: existing.attempt,
+    };
+  }
+
+  const repairs: GithubAutomationLegacyRepairCode[] = [];
+  let job = existing;
+  let state = readGithubAutomationRunnerState(job.jobId);
+  const preservedAttempt = job.attempt;
+  const generation = job.generation;
+
+  // 1) One-shot command consume for already-confirmed adoption.
+  const commandResult = consumeGithubAutomationLegacyPendingCommand(job);
+  if (commandResult.repaired) {
+    job = commandResult.job;
+    repairs.push("pending_command_consumed");
+  }
+
+  // 2) spaceId repair on runner sidecar (reuse g1 WorkTree).
+  if (state) {
+    const spaceResult = await repairGithubAutomationRunnerSpaceBinding({
+      state,
+      config,
+    });
+    if (spaceResult.repaired) {
+      state = spaceResult.state;
+      repairs.push("space_id_repaired");
+    }
+  }
+
+  // 3) Safe checkpoint normalization — never invent Session / implementing without evidence.
+  const safeCheckpoint = resolveGithubAutomationSafeRecoveryCheckpoint({
+    job,
+    state,
+  });
+  const jobCheckpoint = job.checkpoint;
+  const runnerCheckpoint = state?.checkpoint ?? null;
+  const clearStalePlanBlock =
+    (job.phase === "planning" || job.checkpoint === "studio_task_ready") &&
+    safeCheckpoint === "studio_task_ready" &&
+    job.blockedAtLayer === "policy_plan" &&
+    !state?.sessionId;
+  const needsCheckpointNorm =
+    jobCheckpoint !== safeCheckpoint ||
+    (state != null && runnerCheckpoint !== safeCheckpoint) ||
+    clearStalePlanBlock;
+
+  if (needsCheckpointNorm) {
+    if (state) {
+      state = writeGithubAutomationRunnerState({
+        ...state,
+        checkpoint: safeCheckpoint,
+        // Do not clear pauseRequested here — operator owns pause/resume.
+        reasonCode:
+          state.reasonCode === "retry_wake" ? state.reasonCode : "legacy_reconciled",
+      });
+    }
+    let nextPhase = job.phase;
+    if (safeCheckpoint === "studio_task_ready" || safeCheckpoint === "planning") {
+      nextPhase = "planning";
+    } else if (safeCheckpoint === "checking") {
+      nextPhase = "checking";
+    } else if (
+      safeCheckpoint === "awaiting_publish" ||
+      safeCheckpoint === "publishing"
+    ) {
+      nextPhase = "final_policy";
+    } else if (safeCheckpoint === "implementing") {
+      nextPhase = "implementing";
+    } else if (
+      job.phase === "blocked" &&
+      (safeCheckpoint === "worktree_ready" ||
+        safeCheckpoint === "implementation_queued")
+    ) {
+      nextPhase = "implementation_queued";
+    }
+    job = {
+      ...job,
+      checkpoint: safeCheckpoint,
+      phase: nextPhase,
+      blockedAtLayer: clearStalePlanBlock ? null : job.blockedAtLayer,
+      blockFingerprint: clearStalePlanBlock ? null : job.blockFingerprint,
+      // Preserve attempt / generation / deliveryId / effects history.
+      attempt: preservedAttempt,
+      generation,
+    };
+    repairs.push("checkpoint_normalized");
+    if (clearStalePlanBlock) {
+      repairs.push("blocked_layer_cleared_for_resume");
+    }
+  }
+
+  // 4) Clear stale lease ownership when not actively fenced (offline reconcile).
+  if (job.leaseOwner || job.leaseExpiresAt) {
+    job = {
+      ...job,
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      leaseFencingToken: null,
+      leaseHeartbeatAt: null,
+    };
+    repairs.push("lease_fields_cleared");
+  }
+
+  if (repairs.length === 0) {
+    return {
+      code: "unchanged",
+      changed: false,
+      job,
+      runner: state,
+      repairs: [],
+      safeCheckpoint,
+      generation,
+      preservedAttempt,
+    };
+  }
+
+  job = await persistJob({
+    ...job,
+    // Reason is safe enum-like; do not wipe operator pause/retry reasons.
+    reasonCode:
+      job.reasonCode === "retry_wake" ||
+      job.reasonCode === "paused" ||
+      job.reasonCode === "pause_requested" ||
+      job.reasonCode === "resume_wake"
+        ? job.reasonCode
+        : job.reasonCode ?? "legacy_reconciled",
+    attempt: preservedAttempt,
+    generation,
+  });
+
+  await appendGithubAutomationSafeEvent({
+    at: new Date().toISOString(),
+    kind: "legacy_job_reconciled",
+    repositoryId: job.repositoryId,
+    issueNumber: job.issueNumber,
+    jobId: job.jobId,
+    deliveryId: job.deliveryId,
+    phase: job.phase,
+    reasonCode: "legacy_reconciled",
+    traceId: job.traceId,
+    meta: {
+      repairCount: repairs.length,
+      // Bounded join of allowlisted codes only.
+      repairs: repairs.join(",").slice(0, 160),
+      safeCheckpoint,
+      generation,
+      preservedAttempt,
+      injectsCommentText: false,
+      createsGeneration: false,
+    },
+  });
+
+  return {
+    code: "reconciled",
+    changed: true,
+    job,
+    runner: state,
+    repairs,
+    safeCheckpoint,
+    generation,
+    preservedAttempt,
+  };
+}
+
+/**
+ * True when a deterministic policy/manual block must not be re-run blindly:
+ * fingerprint present and evaluated provenance still matches the live process.
+ * Missing fingerprint/provenance (legacy) ⇒ allow one operator re-evaluation.
+ */
+export function isGithubAutomationDeterministicBlockUnchanged(
+  job: GithubAutomationJobRecord,
+  runtime?: { codeRevision: string; policyVersion: string },
+): boolean {
+  const retryability =
+    typeof job.retryability === "string" && job.retryability
+      ? job.retryability
+      : null;
+  const isDeterministic =
+    retryability === "operator_after_change" ||
+    (job.reasonCode != null &&
+      (job.reasonCode.startsWith("blocked_") ||
+        job.reasonCode === "blocked_manual_ui_approval"));
+  if (!isDeterministic) return false;
+  if (job.status !== "blocked" && job.phase !== "blocked") return false;
+  if (!job.blockFingerprint) return false;
+  if (!job.evaluatedCodeRevision || !job.evaluatedPolicyVersion) return false;
+  let codeRevision = runtime?.codeRevision ?? null;
+  let policyVersion = runtime?.policyVersion ?? null;
+  if (!codeRevision || !policyVersion) {
+    try {
+      const live = getGithubAutomationEvaluatedProvenance();
+      codeRevision = codeRevision ?? live.codeRevision;
+      policyVersion = policyVersion ?? live.policyVersion;
+    } catch {
+      return false;
+    }
+  }
+  return (
+    job.evaluatedCodeRevision === codeRevision &&
+    job.evaluatedPolicyVersion === policyVersion
+  );
+}
+
 // ─── Pause / resume / retry wake ─────────────────────────────────────────────
 
 /**
@@ -1670,10 +2276,26 @@ function resolveGithubUnattendedRetryResume(input: {
 export async function wakeGithubUnattendedJobForRetry(input: {
   job: GithubAutomationJobRecord;
   clearPause?: boolean;
+  /** Optional config for legacy reconcile (spaceId repair). */
+  config?: GithubAutomationConfigV1;
 }): Promise<GithubAutomationJobRecord> {
-  let state = readGithubAutomationRunnerState(input.job.jobId);
+  // GHA-CLOSE-05: idempotent legacy normalize before wake (command consume, space, checkpoint).
+  // Does not create generation / skip policy / delete history.
+  let job = input.job;
+  try {
+    const reconciled = await reconcileGithubAutomationLegacyJob({
+      jobId: input.job.jobId,
+      config: input.config,
+    });
+    if (reconciled.job) {
+      job = reconciled.job;
+    }
+  } catch {
+    // Reconcile is best-effort; wake still uses durable resume rules.
+  }
+  let state = readGithubAutomationRunnerState(job.jobId);
   const resume = resolveGithubUnattendedRetryResume({
-    job: input.job,
+    job,
     state,
   });
   if (state) {
@@ -1684,8 +2306,8 @@ export async function wakeGithubUnattendedJobForRetry(input: {
       reasonCode: "retry_wake",
     });
   }
-  const job = await persistJob({
-    ...input.job,
+  job = await persistJob({
+    ...job,
     status: "queued",
     phase: resume.phase,
     checkpoint: resume.checkpoint,
@@ -1693,6 +2315,9 @@ export async function wakeGithubUnattendedJobForRetry(input: {
     nextRetryAt: null,
     leaseOwner: null,
     leaseExpiresAt: null,
+    // Preserve legacy scheduler-run audit counter; do not reset attempt.
+    attempt: job.attempt,
+    generation: job.generation,
   });
   await appendGithubAutomationSafeEvent({
     at: new Date().toISOString(),

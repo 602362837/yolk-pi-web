@@ -32,8 +32,9 @@ export interface AgentSessionBootstrapOptions {
   projectId?: string;
   spaceId?: string;
   /**
-   * Optional pre-start hook used by GitHub unattended automation to scrub
-   * automation-owned secret env vars. Does not provide host sandboxing.
+   * Optional pre-start hook. GitHub unattended no longer uses this to delete
+   * shared process.env keys (GHA-CLOSE-03); prefer per-run toolEnv on child runs.
+   * Does not provide host sandboxing.
    */
   beforeStart?: () => void | Promise<void>;
 }

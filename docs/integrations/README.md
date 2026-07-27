@@ -394,6 +394,18 @@ Repository Issue automation is a **separate domain** from Links OAuth connection
 - **P0 stop condition**: owner affirmative adoption records `accepted_waiting_automation` only when unattended is off.
 - **P1 unattended (default-off)**: with `mode=unattended` and `unattended.enabled=true`, complete claim + owner actor + affirmative intent may start durable WorkTree + Studio + **full agent** (`executionProfile=full-agent`, `riskProfile=docs-and-small-bugfix`), then server App publisher opens one `Fixes #N` PR (never auto-merge). Full agent is **not sandboxed**: arbitrary commands, network, and same-OS-user filesystem reads remain residual risk; only product-owned App/machine secrets (and non-injection of Issue/comment free text as agent commands) are guaranteed not to be deliberately injected into agent context. Prefer a dedicated low-privilege OS account/container. Pause/retry resume the same job; `unattended.enabled=false` rolls back to P0 adoption parking.
 
+### P1 observability, disposition, and recovery (GHA-CLOSE)
+
+- **Scheduler ≠ Agent.** Settings Jobs is dual-layer: `agentExecutionState` + `schedulerState` + `sessionAvailability` + `blockedAtLayer` from server safe projection. No Session ⇒ 「尚未启动 Agent」; legacy `attempt` is **调度尝试** (lease runs), not Agent runs.
+- **Disposition contract.** Each lease ends as `progressed` / `waiting` / `retry_due` / `blocked` / `terminal`. No-progress must not park as immediately runnable `queued` (prevents #22-class spin).
+- **Command once.** Audit `deliveryId` ≠ pending command work item. After `remote_confirmed` adoption, active jobs continue the unattended runner instead of replaying the same comment side effect.
+- **Session binding.** WorkTree ensure/reuse persists `projectId+spaceId`; parent Session bootstrap requires both and writes the WorkTree space index (not main). Bootstrap failure is a visible blocker.
+- **Env.** Child full-agent runs receive a scrubbed **env copy**; shared Next `process.env` is never deleted for isolation. Server App publisher keeps effective credentials in the parent process.
+- **Lease.** Heartbeat + fencing token; stale reconcile skips process-local `inFlight`; lost lease rejects old-owner writes.
+- **Provenance.** Status projects `runtimeProvenance` (package/build/code/process/policy). After a fix, **fully restart** `ypi` before reconcile/retry; compare runtime vs evaluated stamps.
+- **#22 recovery.** Pause → deploy/restart → idempotent legacy reconcile (consume old command, repair `spaceId`, same generation/WorkTree) → single operator retry. No skip-policy, no g2, no history delete. See `docs/operations/troubleshooting.md` and `docs/architecture/overview.md` P1 section.
+- **UI.** `components/GithubAutomationConfig.tsx` Jobs section only consumes projection/`actions[]` (retry/pause/resume). Stale snapshots stay readable but disable mutation.
+
 ### Configuration
 
 | Path | Purpose |
@@ -411,25 +423,27 @@ Non-secret policy lives under `~/.pi/agent/github-automation/config.json` (defau
 
 ### Key modules
 
-`lib/github-automation-*` (including `github-automation-setup-verify.ts`, runtime action matrix, store envelope/effects, comments markers/receipts), `lib/github-app-*` (including `github-app-credential-store.ts`, `github-app-credentials.ts`), `lib/github-machine-assignee.ts`, `lib/github-webhook-verify.ts`, `lib/github-issue-triage-runner.ts`, `lib/github-owner-intent.ts`, `lib/github-full-agent-profile.ts`, `lib/github-automation-runner.ts`, `lib/github-git-publisher.ts`, `lib/github-risk-policy.ts`, `lib/github-diff-policy.ts`, `lib/github-pr-contract.ts`, routes under `app/api/github-automation/` (`webhook`, `credentials`, `status`, `config`, `verify`, `jobs`), UI `components/GithubAutomationConfig.tsx`.
+`lib/github-automation-*` (including `github-automation-setup-verify.ts`, runtime action matrix, store envelope/effects, comments markers/receipts, `github-automation-projection.ts`, `github-automation-provenance.ts`, scheduler disposition/lease, runner reconcile), `lib/github-app-*` (including `github-app-credential-store.ts`, `github-app-credentials.ts`), `lib/github-machine-assignee.ts`, `lib/github-webhook-verify.ts`, `lib/github-issue-triage-runner.ts`, `lib/github-owner-intent.ts`, `lib/github-full-agent-profile.ts`, `lib/github-automation-runner.ts`, `lib/github-automation-session.ts`, `lib/github-automation-worktree.ts`, `lib/github-git-publisher.ts`, `lib/github-risk-policy.ts`, `lib/github-diff-policy.ts`, `lib/github-pr-contract.ts`, routes under `app/api/github-automation/` (`webhook`, `credentials`, `status`, `config`, `verify`, `jobs`), UI `components/GithubAutomationConfig.tsx`.
 
 ### Tests
 
 ```bash
 npm run test:github-automation
 npm run test:github-unattended
+npm run test:github-unattended-runner
 npm run test:github-publish-policy
 ```
 
-Uses temporary `PI_CODING_AGENT_DIR`, generated App keys, mocked GitHub HTTP, and mocked credential executables — never real operator credentials or live GitHub network. `test:github-automation` covers self-loop/action matrix/generation, stable markers/no-op PATCH, exact-comment commands/receipts. `test:github-unattended` covers owner/claim gates, residual-risk non-injection sentinels, high-risk/final-diff blocks, restart/pause, 429/permission/uninstall, and one mocked docs → PR path. Sentinel scans prove **non-injection**, not host sandboxing.
+Uses temporary `PI_CODING_AGENT_DIR`, generated App keys, mocked GitHub HTTP, and mocked credential executables — never real operator credentials or live GitHub network. `test:github-automation` covers self-loop/action matrix/generation, stable markers/no-op PATCH, exact-comment commands/receipts, disposition/no-spin/lease fencing, and safe projection forbidden-key/sentinel cases. `test:github-unattended` covers owner/claim gates, residual-risk non-injection sentinels, high-risk/final-diff blocks, restart/pause, 429/permission/uninstall, legacy/#22 reconcile, and one mocked docs → PR path. `test:github-unattended-runner` covers runner checkpoints, Session `projectId+spaceId` binding, and env-copy isolation. Sentinel scans prove **non-injection**, not host sandboxing.
 
 ### Rollback / stop-bleed
 
 1. Set `paused=true` (operator kill switch) and/or `enabled=false` / `mode=off` in automation config (stops new jobs; keeps verified delivery audit). **Issue comments cannot clear `paused`.**
 2. Set `unattended.enabled=false` to keep triage but park owner adoption at `accepted_waiting_automation` (no new WorkTree/PR).
 3. Keep self/Bot audit-only filter + generation gate even if command dispatch is disabled; stop receipt/status updates without deleting history.
-4. Do not delete Issue labels/comments/assignees, jobs, worktrees, branches, PRs, or multi-generation audit (e.g. historical storms) automatically.
-5. Never fall back to App-bot-as-assignee or personal-PAT Bot when machine credentials fail.
+4. Layered product rollback without history rewrite: hide additive Jobs UI detail while keeping dual-layer truth copy; disable automatic `retry_due` into operator-visible block (never re-enable queued spin); stop unattended Agent while retaining reconcile/command-consume/fencing; never restore shared `process.env` deletion as “isolation”.
+5. Do not delete Issue labels/comments/assignees, jobs, worktrees, branches, PRs, or multi-generation audit (e.g. historical storms) automatically.
+6. Never fall back to App-bot-as-assignee or personal-PAT Bot when machine credentials fail.
 
 ## Skills and Commands
 

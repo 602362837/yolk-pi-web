@@ -78,11 +78,18 @@ export interface StudioSdkChildRunOptions {
   onUpdate?: ToolUpdateCallback;
   persistence?: StudioSdkChildRunCallbacks;
   /**
-   * Optional preflight hook (e.g. scrub automation-owned secret env vars before
-   * the child AgentSession is created). GitHub unattended full-agent runs use
-   * this for defense-in-depth; it is not a host sandbox guarantee.
+   * Optional preflight hook. Prefer {@link toolEnv} for env isolation — do not
+   * use this to delete keys from shared process.env (GHA-CLOSE-03).
+   * Not a host sandbox guarantee.
    */
   beforeStart?: () => void | Promise<void>;
+  /**
+   * Optional per-run env for child bash tool spawns. When set, bash commands
+   * inherit this copy instead of live process.env. Used by GitHub unattended
+   * to pass a scrubbed env without mutating the shared Next process.
+   * Residual same-user filesystem risk remains (not an OS sandbox).
+   */
+  toolEnv?: NodeJS.ProcessEnv;
   /**
    * When true, child still uses the standard full tool set minus recursive
    * Studio/browser tools. Restricted-tools-only mode is intentionally not a
@@ -267,7 +274,7 @@ function modelFromPolicyArg(
 }
 
 export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOptions): Promise<StudioSdkChildRunResult> {
-  const { root, prompt, policy, meta, writer, signal, onUpdate, persistence, beforeStart } = options;
+  const { root, prompt, policy, meta, writer, signal, onUpdate, persistence, beforeStart, toolEnv } = options;
   // fullAgent is accepted for call-site clarity; standard exclude list already keeps file/bash/network.
   void options.fullAgent;
   const warnings: string[] = [];
@@ -668,12 +675,29 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
       if (diagnostic.type === "warning" || diagnostic.type === "error") addWarning(diagnostic.message);
     }
     const model = modelFromPolicyArg(policy, services.modelRuntime, warnings);
+    // When toolEnv is provided, override the builtin bash tool so child shell
+    // spawns use the scrubbed env copy instead of shared process.env.
+    // customTools override builtins by name in AgentSession tool registry.
+    let customTools: unknown[] | undefined;
+    if (toolEnv) {
+      const { createBashToolDefinition } = await import("@earendil-works/pi-coding-agent");
+      const scrubbed = { ...toolEnv };
+      customTools = [
+        createBashToolDefinition(root, {
+          spawnHook: (ctx) => ({
+            ...ctx,
+            env: scrubbed,
+          }),
+        }),
+      ];
+    }
     const result = await pi.createAgentSessionFromServices({
       services,
       sessionManager,
       model: model as never,
       thinkingLevel: policy.thinkingArg as never,
       excludeTools: EXCLUDED_CHILD_TOOLS,
+      ...(customTools ? { customTools: customTools as never } : {}),
     });
     session = result.session as typeof session;
     if (result.modelFallbackMessage) addWarning(result.modelFallbackMessage);

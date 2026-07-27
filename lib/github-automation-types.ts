@@ -358,3 +358,320 @@ export function createBlockedAssigneeProjection(
     reasonCode: readiness === "ready" ? null : readiness,
   };
 }
+
+// ─── GHA-CLOSE-01 observability / disposition contracts (additive) ───────────
+//
+// These types freeze the product semantics for later scheduler / projection /
+// UI work (GHA-CLOSE-02…06). Values are additive on wire; missing fields on
+// legacy records MUST project as unknown_legacy / null, never as Agent active.
+
+/**
+ * Product layer where a job is currently blocked or last evaluated.
+ * Used by safe projection and block fingerprints — not free text.
+ */
+export type GithubAutomationBlockedLayer =
+  | "start_gate"
+  | "worktree"
+  | "studio_task"
+  | "policy_pre"
+  | "policy_plan"
+  | "session_bootstrap"
+  | "agent"
+  | "validation"
+  | "policy_final"
+  | "publisher"
+  | "lifecycle"
+  | "scheduler"
+  | "unknown";
+
+/**
+ * Durable handler disposition for one scheduler lease (GHA-CLOSE-02).
+ * Scheduler must not infer queued from "still running".
+ */
+export type GithubAutomationJobDispositionKind =
+  | "progressed"
+  | "waiting"
+  | "retry_due"
+  | "blocked"
+  | "terminal";
+
+export type GithubAutomationJobDisposition =
+  | {
+      kind: "progressed";
+      progressRevision: number;
+      checkpoint: string;
+    }
+  | {
+      kind: "waiting";
+      wakeOn: "agent" | "external" | "timer";
+    }
+  | {
+      kind: "retry_due";
+      reasonCode: string;
+      nextRetryAt: string;
+      retryClass: "infra" | "runtime" | "network" | "session" | "unknown";
+    }
+  | {
+      kind: "blocked";
+      reasonCode: string;
+      layer: GithubAutomationBlockedLayer;
+      fingerprint: string;
+      retryability: GithubAutomationRetryability;
+    }
+  | {
+      kind: "terminal";
+      status: "completed" | "cancelled" | "ignored";
+    };
+
+/**
+ * How (if at all) a blocked/retry state may be retried.
+ * Deterministic policy/manual blocks are never automatic.
+ */
+export type GithubAutomationRetryability =
+  | "automatic"
+  | "operator_after_change"
+  | "operator"
+  | "none";
+
+/** Scheduler view of a job (not Agent execution). */
+export type GithubAutomationSchedulerState =
+  | "queued"
+  | "leased"
+  | "backoff"
+  | "paused"
+  | "idle"
+  | "terminal"
+  | "unknown";
+
+/**
+ * Whether an Agent session has real execution evidence.
+ * No Session ⇒ not_started; never derive from phase/status/attempt alone.
+ */
+export type GithubAutomationAgentExecutionState =
+  | "not_started"
+  | "bootstrapping"
+  | "implementing"
+  | "checking"
+  | "publishing"
+  | "ended"
+  | "failed"
+  | "unknown";
+
+/**
+ * Session availability for Jobs UI.
+ * Policy/Studio gates before implementing may legitimately be `none`.
+ */
+export type GithubAutomationSessionAvailability =
+  | "none"
+  | "creating"
+  | "active"
+  | "ended"
+  | "failed"
+  | "unknown_legacy";
+
+/**
+ * Allowlisted meaningful-progress kinds. Free text / tool payloads are forbidden.
+ * Scheduler heartbeats and lease renewals are NOT meaningful progress.
+ */
+export type GithubAutomationSafeProgressKind =
+  | "checkpoint_advanced"
+  | "session_created"
+  | "child_run_terminal"
+  | "validation_terminal"
+  | "policy_terminal"
+  | "publisher_terminal"
+  | "command_consumed"
+  | "reconciled";
+
+export interface GithubAutomationSafeProgressSummary {
+  at: string | null;
+  kind: GithubAutomationSafeProgressKind | null;
+}
+
+export interface GithubAutomationJobProgressCounts {
+  /** Compatible with legacy `attempt` (scheduler lease runs). */
+  schedulerRuns: number;
+  /** Successful parent Session bootstrap / child start only. */
+  agentRuns: number;
+  /** Lease runs with no progressRevision change. */
+  noProgressRuns: number;
+  /** Count of allowlisted meaningful progress events. */
+  meaningfulProgress: number;
+}
+
+/**
+ * Safe runtime provenance for status / block evaluation comparison.
+ * Never includes absolute paths, secrets, or package tarball contents.
+ */
+export interface GithubAutomationRuntimeProvenance {
+  packageVersion: string;
+  buildId: string;
+  codeRevision: string;
+  processEpoch: string;
+  processStartedAt: string;
+  policyVersion: string;
+}
+
+/** Provenance recorded when a block/decision was evaluated. */
+export interface GithubAutomationEvaluatedProvenance {
+  codeRevision: string;
+  policyVersion: string;
+}
+
+/**
+ * Additive safe job observability fields (GHA-CLOSE-04 will project these).
+ * Declared here so policy/runner/store share one vocabulary.
+ */
+export interface GithubAutomationJobObservabilityContract {
+  schedulerState: GithubAutomationSchedulerState;
+  agentExecutionState: GithubAutomationAgentExecutionState;
+  sessionAvailability: GithubAutomationSessionAvailability;
+  blockedAtLayer: GithubAutomationBlockedLayer | null;
+  retryability: GithubAutomationRetryability;
+  lastMeaningfulProgress: GithubAutomationSafeProgressSummary;
+  counts: GithubAutomationJobProgressCounts;
+  workspaceLabel: string | null;
+  runtimeProvenance?: GithubAutomationRuntimeProvenance;
+  evaluatedProvenance?: GithubAutomationEvaluatedProvenance | null;
+}
+
+/**
+ * Legacy defaults when additive fields are absent on disk.
+ * Must never invent Agent active / session present.
+ */
+export function createLegacyGithubAutomationJobObservability(
+  attempt: number = 0,
+): GithubAutomationJobObservabilityContract {
+  return {
+    schedulerState: "unknown",
+    agentExecutionState: "unknown",
+    sessionAvailability: "unknown_legacy",
+    blockedAtLayer: null,
+    retryability: "operator",
+    lastMeaningfulProgress: { at: null, kind: null },
+    counts: {
+      schedulerRuns: Number.isFinite(attempt) ? Math.max(0, Math.floor(attempt)) : 0,
+      agentRuns: 0,
+      noProgressRuns: 0,
+      meaningfulProgress: 0,
+    },
+    workspaceLabel: null,
+    evaluatedProvenance: null,
+  };
+}
+
+/**
+ * Map a risk-policy stage block onto blockedAtLayer vocabulary.
+ */
+export function githubRiskPolicyStageToBlockedLayer(
+  stage: "pre" | "plan" | "final" | string | null | undefined,
+): GithubAutomationBlockedLayer {
+  if (stage === "pre") return "policy_pre";
+  if (stage === "plan") return "policy_plan";
+  if (stage === "final") return "policy_final";
+  return "unknown";
+}
+
+/**
+ * Deterministic vs recoverable classification for reason codes known at contract freeze.
+ * Scheduler (GHA-CLOSE-02) uses this to avoid re-running the same policy gate.
+ */
+/**
+ * Build a deterministic block fingerprint for re-evaluation gates (GHA-CLOSE-02).
+ * Inputs must be allowlisted scalars — never free text / paths / secrets.
+ */
+export function buildGithubAutomationBlockFingerprint(input: {
+  layer: GithubAutomationBlockedLayer | string;
+  reasonCode: string;
+  checkpoint: string | null | undefined;
+  policyVersion?: string | null;
+  codeRevision?: string | null;
+  scopeFingerprint?: string | null;
+  inputHash?: string | null;
+}): string {
+  const material = [
+    String(input.layer ?? "unknown"),
+    String(input.reasonCode ?? ""),
+    String(input.checkpoint ?? ""),
+    String(input.policyVersion ?? ""),
+    String(input.codeRevision ?? ""),
+    String(input.scopeFingerprint ?? ""),
+    String(input.inputHash ?? ""),
+  ].join("|");
+  // Lightweight stable hash without importing crypto in every consumer:
+  // FNV-1a 32-bit — fingerprint is for equality, not secrecy.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < material.length; i += 1) {
+    h ^= material.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return `bf_${(h >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+/**
+ * Phases where a remote_confirmed owner command must NOT cut off unattended
+ * runner continuation (the #22 spin root cause).
+ */
+export const GITHUB_AUTOMATION_UNATTENDED_CONTINUATION_PHASES: ReadonlySet<string> =
+  new Set([
+    "implementation_queued",
+    "planning",
+    "policy_check",
+    "implementing",
+    "checking",
+    "final_policy",
+    "publishing",
+  ]);
+
+export function isGithubAutomationUnattendedContinuationPhase(
+  phase: string | null | undefined,
+): boolean {
+  return Boolean(phase && GITHUB_AUTOMATION_UNATTENDED_CONTINUATION_PHASES.has(phase));
+}
+
+export function classifyGithubAutomationRetryability(
+  reasonCode: string | null | undefined,
+): GithubAutomationRetryability {
+  if (!reasonCode) return "operator";
+  if (
+    reasonCode.startsWith("blocked_") ||
+    reasonCode === "blocked_manual_ui_approval" ||
+    reasonCode === "deferred_no_declared_files"
+  ) {
+    // Deterministic policy/manual outcomes: operator may re-evaluate only after change.
+    if (
+      reasonCode === "blocked_uncertain" ||
+      reasonCode === "blocked_empty_diff" ||
+      reasonCode === "blocked_ui_interaction" ||
+      reasonCode === "blocked_manual_ui_approval" ||
+      reasonCode === "blocked_workflow_ci" ||
+      reasonCode === "blocked_release_publish" ||
+      reasonCode === "blocked_secret_auth" ||
+      reasonCode === "blocked_dependency_lockfile" ||
+      reasonCode === "blocked_infra" ||
+      reasonCode === "blocked_cross_repo" ||
+      reasonCode === "blocked_large_refactor" ||
+      reasonCode === "blocked_binary_or_symlink" ||
+      reasonCode === "blocked_submodule" ||
+      reasonCode === "blocked_generated_artifact" ||
+      reasonCode === "blocked_over_limit" ||
+      reasonCode === "blocked_risk_profile"
+    ) {
+      return "operator_after_change";
+    }
+  }
+  if (
+    reasonCode.includes("timeout") ||
+    reasonCode.includes("network") ||
+    reasonCode.includes("transient") ||
+    reasonCode.includes("lease") ||
+    reasonCode === "retry_wake" ||
+    reasonCode === "session_bootstrap_transient"
+  ) {
+    return "automatic";
+  }
+  if (reasonCode === "pr_merged" || reasonCode === "already_merged") {
+    return "none";
+  }
+  return "operator";
+}

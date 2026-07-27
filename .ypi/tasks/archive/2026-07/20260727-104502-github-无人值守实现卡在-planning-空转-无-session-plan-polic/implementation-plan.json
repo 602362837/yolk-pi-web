@@ -1,0 +1,402 @@
+{
+  "schemaVersion": 2,
+  "updatedAt": "2026-07-27T02:54:02.000Z",
+  "sourceArtifact": "implement.md",
+  "summary": "修复 GitHub P1 无人值守从策略语义、命令消费、调度/租约、Session/WorkTree 绑定到安全可观测 UI 的完整闭环，并以 #22 现场快照做回归。",
+  "strategy": "先冻结状态/策略契约，再并行修复调度链与 Session 链；随后补安全投影、恢复工具和已批准 UI，最后进行跨层回归与文档检查。",
+  "maxConcurrency": 2,
+  "scheduler": {
+    "maxConcurrency": 2,
+    "failFast": true,
+    "defaultFailurePolicy": "block_dependents"
+  },
+  "execution": {
+    "mode": "mixed",
+    "maxParallel": 2,
+    "groups": [
+      {
+        "id": "contract",
+        "title": "契约冻结",
+        "relation": "serial",
+        "subtaskIds": ["GHA-CLOSE-01"]
+      },
+      {
+        "id": "core",
+        "title": "核心链路并行修复",
+        "relation": "parallel",
+        "dependencies": ["GHA-CLOSE-01"],
+        "subtaskIds": ["GHA-CLOSE-02", "GHA-CLOSE-03"]
+      },
+      {
+        "id": "projection",
+        "title": "投影与恢复",
+        "relation": "serial",
+        "dependencies": ["GHA-CLOSE-02", "GHA-CLOSE-03"],
+        "subtaskIds": ["GHA-CLOSE-04", "GHA-CLOSE-05", "GHA-CLOSE-06"]
+      },
+      {
+        "id": "verification",
+        "title": "回归与交付",
+        "relation": "serial",
+        "dependencies": ["GHA-CLOSE-06"],
+        "subtaskIds": ["GHA-CLOSE-07", "GHA-CLOSE-08"]
+      }
+    ]
+  },
+  "subtasks": [
+    {
+      "id": "GHA-CLOSE-01",
+      "title": "冻结 policy / runner / observability 语义契约",
+      "phase": "design",
+      "description": "把 pre/plan/final、block/retry/defer、scheduler attempt 与 Agent execution 的含义落成纯类型和迁移兼容契约。",
+      "order": 1,
+      "dependsOn": [],
+      "relation": "serial",
+      "files": [
+        "lib/github-risk-policy.ts",
+        "lib/github-diff-policy.ts",
+        "lib/github-automation-store.ts",
+        "lib/github-automation-runner.ts",
+        "lib/github-automation-projection.ts",
+        "lib/github-automation-types.ts"
+      ],
+      "instructions": [
+        "将 issueTitlePreview 与可信 plan evidence 分离；不得再把 title 复制成 planText。",
+        "pre/plan 无文件使用显式 deferred 语义，不伪装为 allowed_docs；final 只信实际 diff 与结构化 small-bugfix 证据。",
+        "定义 blockedAtLayer、retryability、sessionAvailability、meaningful progress、代码/策略版本字段和旧记录缺省值。",
+        "保留 docs-and-small-bugfix、UI 手工原型审批、full-agent 非沙箱边界。"
+      ],
+      "acceptance": [
+        "标题含“模型”不会命中 secret/auth；OAuth/凭据等高风险提示仍按明确上下文 fail closed。",
+        "空 plan 不阻塞 session 前推进，空 final 仍阻止发布。",
+        "确定性 block 与可恢复 retry_due 有不重叠的服务端语义。"
+      ],
+      "validation": [
+        "npm run test:github-publish-policy",
+        "新增 policy stage/table-driven 单元回归"
+      ],
+      "risks": [
+        "放松标题提示可能把真实 UI 任务推迟到 final 才拦截；需高置信 UI hint + 最终路径门禁双层保护。"
+      ],
+      "parallelizable": false,
+      "member": "implementer",
+      "priority": 100,
+      "failurePolicy": "block_dependents",
+      "retry": { "maxAttempts": 1 },
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "GHA-CLOSE-02",
+      "title": "修复 owner command 消费、调度无进展自旋与租约 fencing",
+      "phase": "core-runner",
+      "description": "让 comment delivery 只消费一次，runner continuation 不再被 idempotent replay 截断，并让 scheduler 对无进展、backoff、长 Agent lease 有可证明行为。",
+      "order": 2,
+      "dependsOn": ["GHA-CLOSE-01"],
+      "relation": "parallel",
+      "parallelGroup": "core",
+      "files": [
+        "lib/github-issue-triage-runner.ts",
+        "lib/github-automation-scheduler.ts",
+        "lib/github-automation-store.ts",
+        "lib/github-automation-runner.ts",
+        "lib/github-automation-comments.ts",
+        "scripts/test-github-automation.mjs",
+        "scripts/test-github-unattended.mjs"
+      ],
+      "instructions": [
+        "把 delivery audit identity 与 pending command work item 分离；remote_confirmed command replay 对 active job 必须继续 runner，而不是返回 running job。",
+        "handler 返回显式 progressed/waiting/retry_due/blocked/terminal disposition 与 progress revision。",
+        "无 checkpoint/progress 变化时禁止立即 queued；采用有上限指数退避，重复确定性 gate 结果稳定 blocked。",
+        "attempt 保留兼容但定义为 scheduler lease runs；新增 agentRunCount/noProgressRunCount。",
+        "租约增加 heartbeat、live-owner 检查和 fencing token；stale reconcile 跳过本进程 inFlight，lease 丢失时停止当前执行。",
+        "singleStep 仅在真实前进后 wake；pause/global pause/concurrency 保持现有边界。"
+      ],
+      "acceptance": [
+        "#22 的已处理 adoption comment 不再截断 studio_task_ready continuation。",
+        "同 checkpoint 无进展不会每 2 秒 job_started；attempt 不再无界增长。",
+        "超过 5 分钟的合法 full-agent run 不会被第二进程接管。",
+        "blocked/retry_due 均稳定记录 next action 与 backoff。"
+      ],
+      "validation": [
+        "npm run test:github-automation",
+        "npm run test:github-unattended",
+        "新增 fake-clock 双进程 lease/no-progress 回归"
+      ],
+      "risks": [
+        "command 消费迁移若错误可能漏掉新的 pause/continue；必须用 pending command id/version 与 effect 双重核对。",
+        "fencing 变更涉及多写者 CAS，需保证旧 schema 可读。"
+      ],
+      "parallelizable": true,
+      "member": "implementer",
+      "priority": 95,
+      "failurePolicy": "block_dependents",
+      "retry": { "maxAttempts": 1 },
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "GHA-CLOSE-03",
+      "title": "闭合 WorkTree space、parent Session 与 child runner 隔离",
+      "phase": "session-binding",
+      "description": "保证进入 implementing 后一定能创建可归属的 parent Session，child session 继承 worktree space，并且不通过全局 process.env 删除来隔离凭据。",
+      "order": 3,
+      "dependsOn": ["GHA-CLOSE-01"],
+      "relation": "parallel",
+      "parallelGroup": "core",
+      "files": [
+        "lib/github-automation-worktree.ts",
+        "lib/github-automation-runner.ts",
+        "lib/github-automation-session.ts",
+        "lib/agent-session-bootstrap.ts",
+        "lib/ypi-studio-child-session-runner.ts",
+        "lib/project-registry.ts",
+        "lib/project-space-session-lifecycle.ts",
+        "scripts/test-github-unattended.mjs",
+        "scripts/test-ypi-studio-sdk-runner.mjs"
+      ],
+      "instructions": [
+        "worktree ensure/reuse 必须解析并持久化 projectId+spaceId；runner sidecar additive 保存 spaceId。",
+        "bootstrap 同时传 projectId/spaceId，失败不得静默继续成“像在实现”；进入稳定 retry_due 或 blocked_session_bootstrap。",
+        "child header 继承 parent project/space 并写入 worktree 本地 session index；main space 不吸收 worktree session。",
+        "禁止在共享 Next 进程删除 process.env；GitHub unattended SDK host 使用隔离子进程/等价 per-run env 边界，传入 scrubbed env 副本并在服务进程保留 publisher credentials。",
+        "保留 full-agent host residual risk、不注入 App/machine secrets、agent 无 server publisher capability。"
+      ],
+      "acceptance": [
+        "registered worktree 下 parent Session 可在对应 space 列表出现，main space 不出现。",
+        "runner sidecar、task binding、JSONL header、session index 对同一 project/space/session 一致。",
+        "session bootstrap 错误可见且不继续宣称 Agent active。",
+        "agent run 后 server publisher 仍能解析原 effective App credentials。"
+      ],
+      "validation": [
+        "npm run test:project-space-session-index",
+        "npm run test:studio-sdk-runner",
+        "新增 projectId-without-spaceId、env preserve、worktree ownership 回归"
+      ],
+      "risks": [
+        "引入隔离 SDK host 会影响取消、usage 与 child session 审计；必须复用现有 child JSONL/sidecar wire，不新增 secret IPC。"
+      ],
+      "parallelizable": true,
+      "member": "implementer",
+      "priority": 95,
+      "failurePolicy": "block_dependents",
+      "retry": { "maxAttempts": 1 },
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "GHA-CLOSE-04",
+      "title": "增加安全运行实况 projection 与代码版本闭环",
+      "phase": "api-observability",
+      "description": "服务端统一派生 scheduler、Agent、阻塞层、进展和 build/policy provenance，前端不猜状态。",
+      "order": 4,
+      "dependsOn": ["GHA-CLOSE-02", "GHA-CLOSE-03"],
+      "relation": "barrier",
+      "files": [
+        "lib/github-automation-projection.ts",
+        "lib/github-automation-runner.ts",
+        "lib/github-automation-scheduler.ts",
+        "app/api/github-automation/status/route.ts",
+        "app/api/github-automation/jobs/[jobId]/route.ts",
+        "docs/modules/api.md",
+        "docs/modules/library.md"
+      ],
+      "instructions": [
+        "添加 browser-safe schedulerState/agentExecutionState/sessionAvailability/blockedAtLayer/lastMeaningfulProgress/agentRunCount/noProgressRunCount/workspaceLabel。",
+        "投影 packageVersion、Next buildId/codeRevision、process epoch/start time、policyVersion；block 记录 evaluated provenance。",
+        "只返回 allowlisted 摘要和 opaque id，不返回 worktree/session file/绝对路径/Issue 正文/tool payload。",
+        "旧 job/runner 以 unknown/legacy 明示降级，不假装 active。"
+      ],
+      "acceptance": [
+        "operator 能从一个 job projection 定位 scheduler、policy、Studio、Session、Agent、validation、publisher 中的阻塞层。",
+        "运行中构建与阻塞时构建可比较，源码/安装包/未重启差异可见。",
+        "现有客户端忽略 additive 字段时继续工作。"
+      ],
+      "validation": [
+        "npm run test:github-automation",
+        "projection forbidden-key/sentinel 测试",
+        "GET /api/github-automation/status no-store smoke"
+      ],
+      "risks": [
+        "进展摘要容易泄露内容；只允许固定枚举+计数+时间，不透传字符串。"
+      ],
+      "parallelizable": false,
+      "member": "implementer",
+      "priority": 90,
+      "failurePolicy": "block_dependents",
+      "retry": { "maxAttempts": 1 },
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "GHA-CLOSE-05",
+      "title": "实现既有卡死 job 的兼容恢复与 operator runbook",
+      "phase": "migration-recovery",
+      "description": "不改写历史审计、不跳过 gate，安全归一化 #22 类 legacy job 并要求修复部署后显式重试。",
+      "order": 5,
+      "dependsOn": ["GHA-CLOSE-04"],
+      "relation": "serial",
+      "files": [
+        "lib/github-automation-runner.ts",
+        "lib/github-automation-projection.ts",
+        "app/api/github-automation/jobs/[jobId]/route.ts",
+        "docs/operations/troubleshooting.md",
+        "docs/integrations/github-app-automation-setup.md"
+      ],
+      "instructions": [
+        "提供幂等 reconcile：消费已 remote_confirmed 的旧 command、解析 spaceId、保留 legacy attempt、计算安全恢复 checkpoint。",
+        "确定性 block 只在 code/policy/input fingerprint 变化或 operator 明确 retry 后重评一次；不提供 skip policy。",
+        "#22 先 pause 止血，部署并完整重启，再 reconcile + 单次 retry；复用原 g1 worktree/branch/task。",
+        "不自动删除 job/events/worktree/task/session，也不新建 generation。"
+      ],
+      "acceptance": [
+        "同一恢复动作可重复调用且不重复 command、generation、worktree 或 PR。",
+        "未部署新 build 时 UI 明确不允许盲目 retry 自旋。",
+        "恢复后若仍是 UI/高风险范围，稳定 blocked_manual_ui_approval 而非启动发布。"
+      ],
+      "validation": [
+        "#22 sanitized fixture recovery script",
+        "重复 reconcile/retry idempotency 测试"
+      ],
+      "risks": [
+        "自动恢复错误 checkpoint 可能重复 agent/publish；publisher 与 runId/PR 幂等门禁必须复核。"
+      ],
+      "parallelizable": false,
+      "member": "implementer",
+      "priority": 85,
+      "failurePolicy": "block_dependents",
+      "retry": { "maxAttempts": 1 },
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "GHA-CLOSE-06",
+      "title": "按批准原型改造 Jobs 真实性 UI",
+      "phase": "frontend",
+      "description": "实现双层状态、详情诊断、stale/窄屏/a11y，并保持 retry/pause/resume 既有业务动作。",
+      "order": 6,
+      "dependsOn": ["GHA-CLOSE-04", "GHA-CLOSE-05"],
+      "relation": "serial",
+      "files": [
+        "components/GithubAutomationConfig.tsx",
+        "app/globals.css",
+        "docs/modules/frontend.md",
+        ".ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/github-unattended-job-observability-prototype.html"
+      ],
+      "instructions": [
+        "必须先取得用户对 HTML 原型的明确批准。",
+        "首屏分别显示 Agent 状态与 scheduler 状态；无 session 固定显示尚未启动 Agent。",
+        "将 attempt 文案改为调度尝试，显示 Agent 启动/有效进展/无进展重试。",
+        "展开显示阶段轨道、checkpoint、block layer、reason、next retry、safe session/workspace label、build provenance。",
+        "stale 快照禁用 mutation；只消费服务端 projection/actions，不推断、不新增跳过 gate。"
+      ],
+      "acceptance": [
+        "#22 不再显示像正在实现，首屏可见策略/调度阻塞和 Session 不存在。",
+        "implementing/checking/publishing/terminal 状态可区分，375px 无页面横向滚动。",
+        "键盘、焦点、状态非颜色单通道、reduced-motion 通过。"
+      ],
+      "validation": [
+        "人工按批准 HTML 逐态比对",
+        "浏览器明暗主题与 390px 窄屏 smoke",
+        "npm run lint",
+        "node_modules/.bin/tsc --noEmit"
+      ],
+      "risks": [
+        "若前端保留旧 phase fallback，可能再次制造假 active；unknown 必须保守显示。"
+      ],
+      "parallelizable": false,
+      "member": "implementer",
+      "priority": 80,
+      "failurePolicy": "block_dependents",
+      "retry": { "maxAttempts": 1 },
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "GHA-CLOSE-07",
+      "title": "补齐 #22 跨层回归、故障注入与发布前验证",
+      "phase": "verification",
+      "description": "用真实字段形状但无敏感内容的 fixture 验证 policy→runner→scheduler→session→projection→UI 闭环。",
+      "order": 7,
+      "dependsOn": ["GHA-CLOSE-06"],
+      "relation": "barrier",
+      "files": [
+        "scripts/test-github-automation.mjs",
+        "scripts/test-github-unattended.mjs",
+        "scripts/test-github-unattended-runner.mjs",
+        "scripts/test-github-publish-policy.mjs",
+        "scripts/test-project-space-session-index.mjs"
+      ],
+      "instructions": [
+        "覆盖 title 含模型、空 plan defer、final empty block、UI final block。",
+        "覆盖 remote_confirmed command replay 后 runner 继续、相同 checkpoint 无进展退避、attempt 不暴涨。",
+        "覆盖长 lease heartbeat/fencing、pause/global pause/singleStep/concurrency。",
+        "覆盖 projectId+spaceId、parent/child JSONL/index 归属、session bootstrap failure。",
+        "覆盖 no session 时 safe projection/UI 不显示 Agent active；禁止 secret/path/content 泄漏。",
+        "修复或明确当前 test:github-unattended 的 permission_missing 场景失败，不得忽略。"
+      ],
+      "acceptance": [
+        "三个 GitHub 套件、session/index focused tests、lint、tsc 全绿。",
+        "故障注入可证明不会自动 push/main/merge，不注入 App/machine secrets。",
+        "sanitized #22 fixture 在有限 tick 内达到 stable block 或 implementing，绝不无限 queued/running。"
+      ],
+      "validation": [
+        "npm run test:github-automation",
+        "npm run test:github-unattended",
+        "npm run test:github-unattended-runner",
+        "npm run test:github-publish-policy",
+        "npm run test:project-space-session-index",
+        "npm run test:studio-sdk-runner",
+        "npm run lint",
+        "node_modules/.bin/tsc --noEmit"
+      ],
+      "risks": [
+        "时间/多进程测试易抖动；使用 fake clock、临时 PI_CODING_AGENT_DIR 和确定性 lease fixture。"
+      ],
+      "parallelizable": false,
+      "member": "checker",
+      "priority": 75,
+      "failurePolicy": "block_dependents",
+      "retry": { "maxAttempts": 1 },
+      "localReview": { "required": true, "reviewer": "checker" }
+    },
+    {
+      "id": "GHA-CLOSE-08",
+      "title": "更新架构/模块/运维文档并执行最终门禁",
+      "phase": "handoff",
+      "description": "记录新状态语义、恢复流程、版本/重启要求和 rollback，完成独立 checker 审核。",
+      "order": 8,
+      "dependsOn": ["GHA-CLOSE-07"],
+      "relation": "serial",
+      "files": [
+        "docs/architecture/overview.md",
+        "docs/integrations/README.md",
+        "docs/integrations/github-app-automation-setup.md",
+        "docs/modules/api.md",
+        "docs/modules/frontend.md",
+        "docs/modules/library.md",
+        "docs/operations/troubleshooting.md",
+        "AGENTS.md"
+      ],
+      "instructions": [
+        "文档明确 running/attempt/session/blocked/retry_due 口径、build provenance 与完整重启要求。",
+        "记录 #22 恢复 runbook、no-history-rewrite、same-generation/worktree reuse。",
+        "保留 full-agent residual risk、低权限 OS/container 建议、server publisher、无 auto-merge。",
+        "checker 独立核对需求矩阵、UI 批准记录、diff、测试和安全 projection。"
+      ],
+      "acceptance": [
+        "用户可仅从文档判断卡在哪一层及下一步。",
+        "rollback 可分别关闭 UI 增强、自动 retry、unattended，而不删历史。",
+        "无未审批产品决定被实现。"
+      ],
+      "validation": [
+        "文档链接检查",
+        "git diff --check",
+        "checker 逐项签收 checks.md"
+      ],
+      "risks": [
+        "AGENTS.md 只更新导航，不塞入细节。"
+      ],
+      "parallelizable": false,
+      "member": "checker",
+      "priority": 70,
+      "failurePolicy": "block_dependents",
+      "retry": { "maxAttempts": 1 },
+      "localReview": { "required": true, "reviewer": "checker" }
+    }
+  ]
+}

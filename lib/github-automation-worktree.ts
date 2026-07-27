@@ -26,6 +26,7 @@ import {
 import type { GithubAutomationRepositoryConfig } from "./github-automation-types";
 import {
   canonicalizeProjectPath,
+  getProject,
   listProjects,
   syncRegisteredProjectWorktreeSpace,
 } from "./project-registry";
@@ -59,7 +60,66 @@ export interface GithubAutomationWorktreeEnsureResult {
   baseRef: string;
   repoRoot: string;
   projectId: string | null;
+  /**
+   * Project Registry worktree space id (wt_…).
+   * Required for parent Session bootstrap; null only when project is unregistered
+   * or space resolution failed (caller must surface a visible blocker).
+   */
+  spaceId: string | null;
   spaceSynced: boolean;
+}
+
+/**
+ * Resolve WorkTree spaceId for a registered project.
+ * Prefer sync (create/reuse), then pathKey read-back. Never invents space ids.
+ */
+export async function resolveGithubAutomationWorktreeSpaceId(input: {
+  projectId: string | null;
+  repoRoot: string;
+  worktreePath: string;
+  branchName?: string | null;
+  baseRef?: string | null;
+}): Promise<{ spaceId: string | null; spaceSynced: boolean }> {
+  if (!input.projectId) {
+    return { spaceId: null, spaceSynced: false };
+  }
+
+  let spaceSynced = false;
+  try {
+    const synced = await syncRegisteredProjectWorktreeSpace(
+      input.repoRoot,
+      input.worktreePath,
+      input.branchName ?? undefined,
+      input.baseRef ?? undefined,
+    );
+    if (synced?.space?.id) {
+      return { spaceId: synced.space.id, spaceSynced: true };
+    }
+    spaceSynced = Boolean(synced);
+  } catch {
+    spaceSynced = false;
+  }
+
+  // Read-back: spaceSynced=false does not mean no space exists.
+  try {
+    const project = await getProject(input.projectId);
+    const pathInfo = await canonicalizeProjectPath(input.worktreePath);
+    const match = Object.values(project.spaces).find(
+      (space) =>
+        space.kind === "worktree" &&
+        !space.archived &&
+        (space.pathKey === pathInfo.pathKey ||
+          space.path === pathInfo.displayPath ||
+          space.realPath === pathInfo.realPath),
+    );
+    if (match?.id) {
+      return { spaceId: match.id, spaceSynced };
+    }
+  } catch {
+    // fall through
+  }
+
+  return { spaceId: null, spaceSynced };
 }
 
 /**
@@ -226,6 +286,13 @@ export async function ensureGithubAutomationWorktree(input: {
     existsSync(input.existingWorktreePath) &&
     input.existingBranchName === plan.branchName
   ) {
+    const space = await resolveGithubAutomationWorktreeSpaceId({
+      projectId: resolved.projectId,
+      repoRoot: plan.repoRoot,
+      worktreePath: input.existingWorktreePath,
+      branchName: plan.branchName,
+      baseRef: plan.baseRef,
+    });
     return {
       created: false,
       reused: true,
@@ -234,7 +301,8 @@ export async function ensureGithubAutomationWorktree(input: {
       baseRef: plan.baseRef,
       repoRoot: plan.repoRoot,
       projectId: resolved.projectId,
-      spaceSynced: false,
+      spaceId: space.spaceId,
+      spaceSynced: space.spaceSynced,
     };
   }
 
@@ -244,6 +312,13 @@ export async function ensureGithubAutomationWorktree(input: {
   const byBranch = existing.find((w) => w.branch === plan.branchName);
   if (byPath || byBranch) {
     const record = byPath ?? byBranch!;
+    const space = await resolveGithubAutomationWorktreeSpaceId({
+      projectId: resolved.projectId,
+      repoRoot: plan.repoRoot,
+      worktreePath: record.path,
+      branchName: plan.branchName,
+      baseRef: plan.baseRef,
+    });
     return {
       created: false,
       reused: true,
@@ -252,7 +327,8 @@ export async function ensureGithubAutomationWorktree(input: {
       baseRef: plan.baseRef,
       repoRoot: plan.repoRoot,
       projectId: resolved.projectId,
-      spaceSynced: false,
+      spaceId: space.spaceId,
+      spaceSynced: space.spaceSynced,
     };
   }
 
@@ -290,21 +366,14 @@ export async function ensureGithubAutomationWorktree(input: {
     throw err;
   }
 
-  let spaceSynced = false;
-  if (resolved.projectId) {
-    try {
-      await syncRegisteredProjectWorktreeSpace(
-        plan.repoRoot,
-        created.targetPath,
-        plan.branchName,
-        plan.baseRef,
-      );
-      spaceSynced = true;
-    } catch {
-      // Registry sync is best-effort; WorkTree itself is the durable artifact.
-      spaceSynced = false;
-    }
-  }
+  // Always resolve spaceId (sync + read-back). spaceSynced=false is not "no space".
+  const space = await resolveGithubAutomationWorktreeSpaceId({
+    projectId: resolved.projectId,
+    repoRoot: plan.repoRoot,
+    worktreePath: created.targetPath,
+    branchName: plan.branchName,
+    baseRef: plan.baseRef,
+  });
 
   return {
     created: true,
@@ -314,7 +383,8 @@ export async function ensureGithubAutomationWorktree(input: {
     baseRef: plan.baseRef,
     repoRoot: plan.repoRoot,
     projectId: resolved.projectId,
-    spaceSynced,
+    spaceId: space.spaceId,
+    spaceSynced: space.spaceSynced,
   };
 }
 

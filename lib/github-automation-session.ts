@@ -24,6 +24,23 @@ import {
   containsGithubAutomationSecretInjectionMarker,
   scrubGithubAutomationOwnedSecretsFromEnv,
 } from "./github-full-agent-profile";
+
+/**
+ * Build a scrubbed env *copy* for GitHub unattended agent/bash.
+ * Never mutates the shared Next/server process.env (GHA-CLOSE-03).
+ * Not an OS sandbox — residual same-user file/network risk remains.
+ */
+export function buildGithubUnattendedScrubbedEnv(
+  source: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
+): NodeJS.ProcessEnv {
+  const scrubbed = scrubGithubAutomationOwnedSecretsFromEnv(source);
+  // Cast: ProcessEnv requires NODE_ENV in some TS lib variants; scrubbed copy is a plain map.
+  const env = {} as NodeJS.ProcessEnv;
+  for (const [key, value] of Object.entries(scrubbed)) {
+    if (typeof value === "string") env[key] = value;
+  }
+  return env;
+}
 import type { GithubAutomationRepositoryConfig } from "./github-automation-types";
 import { createYpiStudioChildGuardExtension } from "./ypi-studio-child-guard";
 import {
@@ -491,15 +508,24 @@ export function transitionGithubUnattendedTaskToImplementing(input: {
 export async function bootstrapGithubAutomationAgentSession(
   input: BootstrapGithubAutomationAgentSessionInput,
 ): Promise<GithubAutomationAgentSessionBootstrapResult> {
-  // Scrub process env before session start so child tools inherit cleaner env.
-  // Note: this does not prove host isolation; full agent can still read files.
-  const scrubbed = scrubGithubAutomationOwnedSecretsFromEnv(process.env);
-  for (const key of Object.keys(process.env)) {
-    if (!(key in scrubbed)) {
-      delete process.env[key];
-    }
+  // projectId/spaceId must be paired for WorkTree Session ownership.
+  // Fail closed here so runner cannot claim Agent active without binding.
+  const projectId =
+    typeof input.projectId === "string" && input.projectId.trim()
+      ? input.projectId.trim()
+      : null;
+  const spaceId =
+    typeof input.spaceId === "string" && input.spaceId.trim()
+      ? input.spaceId.trim()
+      : null;
+  if (!projectId || !spaceId) {
+    throw new Error(
+      "GitHub unattended Session bootstrap requires projectId and spaceId together",
+    );
   }
 
+  // Never delete shared process.env. Parent session is binding-only and is
+  // disposed immediately after ids are captured; tools are not exercised here.
   const { createConfiguredEmptyAgentSession } = await import("./agent-session-bootstrap");
   const result = await createConfiguredEmptyAgentSession({
     cwd: input.worktreePath,
@@ -507,14 +533,8 @@ export async function bootstrapGithubAutomationAgentSession(
     modelId: input.modelId,
     // Full agent: do not pass empty toolNames (that would disable all tools).
     // Omitting toolNames keeps the standard tool set (file/bash/network).
-    projectId: input.projectId ?? undefined,
-    spaceId: input.spaceId ?? undefined,
-    beforeStart: () => {
-      const cleaned = scrubGithubAutomationOwnedSecretsFromEnv(process.env);
-      for (const key of Object.keys(process.env)) {
-        if (!(key in cleaned)) delete process.env[key];
-      }
-    },
+    projectId,
+    spaceId,
   });
 
   return {
@@ -602,13 +622,9 @@ export async function runGithubFullAgentMember(
     throw new Error("Refusing full-agent run: prompt contains secret injection markers");
   }
 
-  // Scrub env before child creation (defense-in-depth; not a sandbox).
-  const scrubbed = scrubGithubAutomationOwnedSecretsFromEnv(process.env);
-  for (const key of Object.keys(process.env)) {
-    if (!(key in scrubbed)) {
-      delete process.env[key];
-    }
-  }
+  // Per-run scrubbed env *copy* — never mutate shared Next process.env.
+  // Bash tool spawnHook receives this copy; App/machine credentials remain on server.
+  const scrubbedEnv = buildGithubUnattendedScrubbedEnv(process.env);
 
   const { readPiWebConfigForApi } = await import("./pi-web-config");
   const { resolveYpiStudioMemberPolicy } = await import("./ypi-studio-policy");
@@ -645,12 +661,8 @@ export async function runGithubFullAgentMember(
     writer,
     signal: input.signal,
     fullAgent: true,
-    beforeStart: () => {
-      const cleaned = scrubGithubAutomationOwnedSecretsFromEnv(process.env);
-      for (const key of Object.keys(process.env)) {
-        if (!(key in cleaned)) delete process.env[key];
-      }
-    },
+    // Isolated scrubbed env for child bash/tool spawns (not a host sandbox).
+    toolEnv: scrubbedEnv,
   });
 }
 

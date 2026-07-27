@@ -210,20 +210,129 @@ await test("empty final diff is blocked", () => {
   assert.equal(result.reasonCode, "blocked_empty_diff");
 });
 
-await test("empty plan/pre stages allow and defer to final (no session-blocking false positive)", () => {
+await test("empty plan/pre stages defer to final (no session-blocking false positive)", () => {
   for (const stage of ["pre", "plan"]) {
     const result = risk.evaluateGithubRiskPolicy({
       stage,
       limits,
       files: [],
       riskProfile: "docs-and-small-bugfix",
+      // Title alone must not be copied into planText (GHA-CLOSE-01).
       issueTitlePreview: "chat打开底部模型性能问题",
-      planText: "chat打开底部模型性能问题",
+      planText: null,
     });
     assert.equal(result.decision, "allow", stage);
-    assert.equal(result.classification, "docs", stage);
-    assert.equal(result.reasonCode, "allowed_docs", stage);
+    assert.equal(result.outcome, "defer", stage);
+    assert.equal(result.deferred, true, stage);
+    assert.equal(result.classification, "empty", stage);
+    assert.equal(result.reasonCode, "deferred_no_declared_files", stage);
+    assert.notEqual(result.reasonCode, "allowed_docs", stage);
   }
+});
+
+await test("title with 模型 is not secret; explicit credential title still blocks", () => {
+  const modelTitle = risk.evaluateGithubRiskPolicy({
+    stage: "plan",
+    limits,
+    files: [],
+    issueTitlePreview: "chat打开底部模型性能问题",
+    planText: null,
+  });
+  assert.equal(modelTitle.outcome, "defer");
+  assert.notEqual(modelTitle.classification, "secret_auth");
+
+  const secretTitle = risk.evaluateGithubRiskPolicy({
+    stage: "pre",
+    limits,
+    files: [],
+    issueTitlePreview: "修改凭据密钥存储",
+    planText: null,
+  });
+  assert.equal(secretTitle.decision, "block");
+  assert.equal(secretTitle.classification, "secret_auth");
+  assert.equal(secretTitle.evidenceSource, "issue_title");
+});
+
+await test("plan-stage UI title is manual approval block; final actual docs ignores title OAuth hint", () => {
+  const uiTitle = risk.evaluateGithubRiskPolicy({
+    stage: "pre",
+    limits,
+    files: [],
+    issueTitlePreview: "修改 Settings 页面交互",
+    planText: null,
+  });
+  assert.equal(uiTitle.decision, "block");
+  assert.equal(uiTitle.classification, "ui_interaction");
+  assert.equal(uiTitle.reasonCode, "blocked_manual_ui_approval");
+  assert.equal(uiTitle.evidenceSource, "issue_title");
+
+  const finalDocs = risk.evaluateGithubRiskPolicy({
+    stage: "final",
+    limits,
+    files: [{ path: "docs/integrations/README.md", additions: 4, deletions: 0 }],
+    // Free-text title must not override safe actual docs diff at final.
+    issueTitlePreview: "rotate OAuth token docs only",
+    planText: null,
+  });
+  assert.equal(finalDocs.decision, "allow");
+  assert.equal(finalDocs.outcome, "allow");
+  assert.equal(finalDocs.classification, "docs");
+  assert.equal(finalDocs.evidenceSource, "actual_diff");
+});
+
+await test("planText and issueTitlePreview remain separate evidence sources", () => {
+  const fromPlan = risk.evaluateGithubRiskPolicy({
+    stage: "plan",
+    limits,
+    files: [],
+    planText: "需要改 Settings 页面交互",
+    issueTitlePreview: "harmless docs title",
+  });
+  assert.equal(fromPlan.evidenceSource, "plan_text");
+  assert.equal(fromPlan.reasonCode, "blocked_manual_ui_approval");
+
+  const deferred = risk.evaluateGithubRiskPolicy({
+    stage: "plan",
+    limits,
+    files: [],
+    planText: null,
+    issueTitlePreview: "chat打开底部模型性能问题",
+  });
+  assert.equal(deferred.outcome, "defer");
+  assert.equal(deferred.deferredReason, "awaiting_actual_diff");
+
+  const proj = risk.toGithubRiskPolicySafeProjection(deferred);
+  assert.equal(proj.deferred, true);
+  assert.equal(proj.outcome, "defer");
+  assert.equal(proj.policyVersion, risk.GITHUB_RISK_POLICY_VERSION);
+  assert.ok(typeof proj.policyVersion === "string" && proj.policyVersion.length > 0);
+});
+
+await test("retryability contract: deterministic policy blocks vs automatic infra", () => {
+  const types = jiti(join(root, "lib/github-automation-types.ts"));
+  assert.equal(
+    types.classifyGithubAutomationRetryability("blocked_manual_ui_approval"),
+    "operator_after_change",
+  );
+  assert.equal(
+    types.classifyGithubAutomationRetryability("blocked_empty_diff"),
+    "operator_after_change",
+  );
+  assert.equal(
+    types.classifyGithubAutomationRetryability("session_bootstrap_transient"),
+    "automatic",
+  );
+  assert.equal(
+    types.classifyGithubAutomationRetryability("pr_merged"),
+    "none",
+  );
+  assert.equal(types.githubRiskPolicyStageToBlockedLayer("plan"), "policy_plan");
+  assert.equal(types.githubRiskPolicyStageToBlockedLayer("final"), "policy_final");
+  const legacy = types.createLegacyGithubAutomationJobObservability(279);
+  assert.equal(legacy.sessionAvailability, "unknown_legacy");
+  assert.equal(legacy.agentExecutionState, "unknown");
+  assert.equal(legacy.counts.schedulerRuns, 279);
+  assert.equal(legacy.counts.agentRuns, 0);
 });
 
 await test("wrong riskProfile is blocked", () => {

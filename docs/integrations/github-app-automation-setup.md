@@ -1,18 +1,18 @@
 # 自建 GitHub App：议题自动处理配置指南
 
-本文面向 **蛋黄派客户与自托管运维**。  
+本文面向 **蛋黄派客户与自托管运维**。
 每位部署方需要 **自己创建并安装 GitHub App**；产品不会替你托管云端共享 App。
 
 完成后可以做到：
 
-1. 仓库有新议题时，自动认领并写中文分析结论  
-2. 议题上出现你的本机 GitHub 用户作为 Assignee，并打上处理标签  
-3. 你（仓库所有者）明确说「采纳」后，可选择自动改文档/小 bugfix，并向 `main` 开 PR  
+1. 仓库有新议题时，自动认领并写中文分析结论
+2. 议题上出现你的本机 GitHub 用户作为 Assignee，并打上处理标签
+3. 你（仓库所有者）明确说「采纳」后，可选择自动改文档/小 bugfix，并向 `main` 开 PR
 4. PR 会关联议题，**不会自动合并**
 
 在蛋黄派里配置入口：**设置 → GitHub 自动化**。
 
-**默认凭据路径是设置页「本机 GitHub App 凭据」**：填写 App ID、Webhook secret，粘贴或选择私钥 PEM，保存到本机 agent data dir 后，正常启动 / 重启 `ypi` 即可复用。  
+**默认凭据路径是设置页「本机 GitHub App 凭据」**：填写 App ID、Webhook secret，粘贴或选择私钥 PEM，保存到本机 agent data dir 后，正常启动 / 重启 `ypi` 即可复用。
 环境变量 `YPI_GITHUB_APP_*` 仅作为 CI / 容器 / 专业部署的**高级覆盖**（见文末），不是普通本机用户的必选步骤。
 
 ---
@@ -53,8 +53,8 @@ https://你的域名/api/github-automation/webhook
 ### 公网暴露边界（必读）
 
 - **应公网可达**：`POST /api/github-automation/webhook`
-- **不应无认证公网暴露**：Settings UI、`/api/github-automation/credentials`、`/config`、`/status`、`/verify`、`/jobs/*` 等管理面  
-  本机凭据 API 允许写入 App 身份材料；请仅在本机 loopback、VPN 或受控访问后使用。  
+- **不应无认证公网暴露**：Settings UI、`/api/github-automation/credentials`、`/config`、`/status`、`/verify`、`/jobs/*` 等管理面
+  本机凭据 API 允许写入 App 身份材料；请仅在本机 loopback、VPN 或受控访问后使用。
   反代时建议只把 webhook 路径放到公网入口，管理面走本机或额外访问控制。
 
 ---
@@ -108,11 +108,11 @@ https://你的域名/api/github-automation/webhook
 
 ### 2.5 创建后立刻保存这三样
 
-1. **App ID**（一串数字）  
-2. **Private key**（点 Generate a private key 下载的 `.pem` 文件）  
+1. **App ID**（一串数字）
+2. **Private key**（点 Generate a private key 下载的 `.pem` 文件）
 3. **Webhook secret**（你自己填的那串）
 
-下载的 PEM 只作**临时**保管，下一步会在设置页粘贴或选择文件交给服务端安全落盘。  
+下载的 PEM 只作**临时**保管，下一步会在设置页粘贴或选择文件交给服务端安全落盘。
 不要把 PEM / secret 提交进 git、聊天、截图或 PR。
 
 可选：若你只想先把下载文件挪出浏览器默认下载目录（仍是本地文件，不是产品主路径）：
@@ -128,10 +128,10 @@ chmod 600 ~/.pi/agent/secrets/ypi-github-app.pem
 
 ## 3. 把 App 安装到仓库
 
-1. 打开刚创建的 App 页面  
-2. 选择 **Install App**  
-3. 选择账号/组织  
-4. 建议选 **Only select repositories**，只勾选要自动化的仓库  
+1. 打开刚创建的 App 页面
+2. 选择 **Install App**
+3. 选择账号/组织
+4. 建议选 **Only select repositories**，只勾选要自动化的仓库
 5. 安装后记下 **Installation ID**（安装详情页里的数字）
 
 之后在蛋黄派「允许仓库」里，每个仓库都要填对应的 Installation ID。
@@ -152,9 +152,9 @@ chmod 600 ~/.pi/agent/secrets/ypi-github-app.pem
 
 点击 **保存到本机**：
 
-1. 浏览器通过 `PUT /api/github-automation/credentials` 提交本次输入（multipart）  
-2. 服务端校验后写入 agent data dir（见下节），并清理 installation token 内存缓存  
-3. 成功后页面清空 password / PEM / File 临时输入；状态只显示「已配置 · 本机」等安全投影  
+1. 浏览器通过 `PUT /api/github-automation/credentials` 提交本次输入（multipart）
+2. 服务端校验后写入 agent data dir（见下节），并清理 installation token 内存缓存
+3. 成功后页面清空 password / PEM / File 临时输入；状态只显示「已配置 · 本机」等安全投影
 4. **不需要**配置 shell 环境变量，也**不需要**每次 `export`
 
 首次保存必须三项齐全；之后轮换可只填变更项，**留空表示保留已保存本机值**（不会从环境变量反写到本机）。
@@ -183,9 +183,9 @@ github-automation/                         # 0700
 
 写入规则摘要：
 
-- 先写新 generation 私钥文件，再原子切换 `credentials.v1.json` 指针  
-- 同目录临时文件 + fsync + rename；进程队列 + mkdir 锁  
-- 读取时校验 basename 范围、普通文件、RSA 私钥与指纹；损坏 / 未知 schema **fail closed**  
+- 先写新 generation 私钥文件，再原子切换 `credentials.v1.json` 指针
+- 同目录临时文件 + fsync + rename；进程队列 + mkdir 锁
+- 读取时校验 basename 范围、普通文件、RSA 私钥与指纹；损坏 / 未知 schema **fail closed**
 - 与 Links、`auth.json`、模型 CredentialStore、Session/Task **隔离**；不写 `pi-web.json`
 
 保存或删除成功后：后续 webhook / JWT / GitHub API 立即使用新有效值；**重启 `ypi` 且无任何 `YPI_GITHUB_APP_*` 时仍应保持 configured**。
@@ -194,9 +194,9 @@ github-automation/                         # 0700
 
 危险操作 **移除本机凭据** 会要求确认，且：
 
-- **只删除**本机 fallback（`credentials.v1.json` 与当前 generation 私钥）  
-- **不删除** GitHub App、installation、允许仓库、jobs、审计  
-- **不修改**进程环境变量  
+- **只删除**本机 fallback（`credentials.v1.json` 与当前 generation 私钥）
+- **不删除** GitHub App、installation、允许仓库、jobs、审计
+- **不修改**进程环境变量
 - 若某字段仍由 env 覆盖且三项仍完整，effective 状态可能继续显示「已配置 · env」
 
 ---
@@ -225,9 +225,9 @@ gh auth switch
 
 该用户需要对目标仓库有可被指派的权限（通常是可写协作者）。
 
-> **身份隔离**：App Bot 负责 webhook 验签、标签、评论、指派 API 与后续 PR 发布；  
-> 本机 `gh` / git 凭据用户 **只作为 Assignee 展示身份**，不会变成 Bot 或 publisher 回退，也 **不是** Owner 指令目标（不要用 `@机器Assignee` 触发自动化，以免劫持真人沟通）。  
-> Links 里的 GitHub OAuth 连接与本功能无关。  
+> **身份隔离**：App Bot 负责 webhook 验签、标签、评论、指派 API 与后续 PR 发布；
+> 本机 `gh` / git 凭据用户 **只作为 Assignee 展示身份**，不会变成 Bot 或 publisher 回退，也 **不是** Owner 指令目标（不要用 `@机器Assignee` 触发自动化，以免劫持真人沟通）。
+> Links 里的 GitHub OAuth 连接与本功能无关。
 > App/Bot 自己产生的 label/assign/评论创建与编辑 webhook **只记审计、不建 job、不唤醒调度**，避免 Bot 编辑 triage 评论形成自循环。
 
 ---
@@ -236,17 +236,17 @@ gh auth switch
 
 GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 
-- 云服务器 + Nginx / Caddy 反代  
-- Cloudflare Tunnel 等 HTTPS 隧道  
-- 公司统一网关  
+- 云服务器 + Nginx / Caddy 反代
+- Cloudflare Tunnel 等 HTTPS 隧道
+- 公司统一网关
 
 检查清单：
 
-1. 公网地址可访问：`https://你的域名/api/github-automation/webhook`  
-2. GitHub App 的 Webhook URL 与上面一致  
-3. Webhook secret 与 **设置页本机凭据**（或高级 env 覆盖）一致  
-4. 管理面（设置页 / credentials / config API）**未**无认证挂到同一公网入口  
-5. 在 GitHub App 的 **Recent Deliveries** 里能看到成功投递（通常是 200/202）  
+1. 公网地址可访问：`https://你的域名/api/github-automation/webhook`
+2. GitHub App 的 Webhook URL 与上面一致
+3. Webhook secret 与 **设置页本机凭据**（或高级 env 覆盖）一致
+4. 管理面（设置页 / credentials / config API）**未**无认证挂到同一公网入口
+5. 在 GitHub App 的 **Recent Deliveries** 里能看到成功投递（通常是 200/202）
 
 ---
 
@@ -258,29 +258,29 @@ GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 
 凭据卡下方的 checklist 会按顺序检查，例如：
 
-1. App ID 是否已配置（默认引导：上方本机凭据卡）  
-2. 私钥是否可用  
-3. Webhook secret 是否已配置  
-4. App 是否安装并绑定  
-5. 权限是否足够  
-6. 本机 Assignee 是否可用  
-7. 是否已关联允许仓库  
-8. 是否绑定本地项目  
-9. Webhook 是否健康  
+1. App ID 是否已配置（默认引导：上方本机凭据卡）
+2. 私钥是否可用
+3. Webhook secret 是否已配置
+4. App 是否安装并绑定
+5. 权限是否足够
+6. 本机 Assignee 是否可用
+7. 是否已关联允许仓库
+8. 是否绑定本地项目
+9. Webhook 是否健康
 
-「验证配置」是只读探测：不写盘、不入队、不唤醒调度器、不做 GitHub 写操作，也不接收 secret body。  
+「验证配置」是只读探测：不写盘、不入队、不唤醒调度器、不做 GitHub 写操作，也不接收 secret body。
 某一项未通过时会给出「下一步做什么」，而不是只丢错误码或路径。
 
 ### 7.2 关联允许仓库
 
 新安装默认 **没有** 预置任何仓库，需要你自己添加：
 
-1. 点击 **关联仓库 / 添加**  
-2. 填写 `owner/repo`（例如 `acme/website`）  
-3. 填写 Installation ID  
-4. 选择本地项目（来自项目列表，用于后续自动改代码时的工作目录）  
-5. 默认分支一般填 `main`  
-6. 保存  
+1. 点击 **关联仓库 / 添加**
+2. 填写 `owner/repo`（例如 `acme/website`）
+3. 填写 Installation ID
+4. 选择本地项目（来自项目列表，用于后续自动改代码时的工作目录）
+5. 默认分支一般填 `main`
+6. 保存
 
 可以添加多个仓库，也可以删除不再使用的仓库。
 
@@ -294,12 +294,12 @@ GitHub 需要主动通知你的蛋黄派。任选一种方式即可：
 
 建议：
 
-1. 先用 **仅 Triage** 跑通  
-2. 确认认领和评论正常  
-3. 再考虑打开无人值守  
+1. 先用 **仅 Triage** 跑通
+2. 确认认领和评论正常
+3. 再考虑打开无人值守
 
-无人值守默认使用完整 agent 能力，可以执行命令和访问网络，因此只应在你明确接受风险后开启。  
-只有 **仓库所有者** 通过受支持指令明确采纳时才会开始自动实现。  
+无人值守默认使用完整 agent 能力，可以执行命令和访问网络，因此只应在你明确接受风险后开启。
+只有 **仓库所有者** 通过受支持指令明确采纳时才会开始自动实现。
 产品保证不会把 App 私钥 / JWT / installation token、Webhook secret、本机个人凭据**主动注入** agent 上下文，也 **不会** 把 Issue/评论自由文本注入 agent 提示词、validation、分支/remote 或 publisher；这不等于 OS 级沙箱。生产建议使用独立低权限系统用户或容器。
 
 ### 7.4 Owner 指令（Issue 评论协议）
@@ -315,10 +315,10 @@ Triage 结论评论会附带开发者指令说明。请用 **仓库 Owner** 账�
 
 规则摘要：
 
-- 命令绑定**本条**评论 id/版本；编辑同一条评论会更新回执，不会扫描历史「采纳」评论误触发。  
-- 每条受支持命令会有可更新的 **command receipt**；长流程用**单条** status 评论，仅语义变化时更新。  
-- 非 Owner、Bot、全局 paused、认领不完整、Issue 已关闭等 fail closed；非定向闲聊默认不刷拒绝评论。  
-- Issue 关闭时 active job 进入 blocked/paused（`issue_closed`），**保留** WorkTree；reopen 后需 Owner **显式继续**。  
+- 命令绑定**本条**评论 id/版本；编辑同一条评论会更新回执，不会扫描历史「采纳」评论误触发。
+- 每条受支持命令会有可更新的 **command receipt**；长流程用**单条** status 评论，仅语义变化时更新。
+- 非 Owner、Bot、全局 paused、认领不完整、Issue 已关闭等 fail closed；非定向闲聊默认不刷拒绝评论。
+- Issue 关闭时 active job 进入 blocked/paused（`issue_closed`），**保留** WorkTree；reopen 后需 Owner **显式继续**。
 - **全局 paused** 只能在设置 / config 管理面操作；评论永远不能改 validation、allowlist、凭据或 publisher。
 
 ---
@@ -327,44 +327,44 @@ Triage 结论评论会附带开发者指令说明。请用 **仓库 Owner** 账�
 
 ### 8.1 最小验收：只开 Triage
 
-1. 设置页本机凭据已保存（**可不设置**任何 `YPI_GITHUB_APP_*`）  
-2. 完全停止并重新启动蛋黄派后，status / 验证仍显示 App 凭据已配置  
-3. App 已安装到测试仓库  
-4. 设置页已关联该仓库  
-5. 「验证配置」无关键阻塞项  
-6. 模式设为 **仅 Triage** 并启用  
-7. 在测试仓库新建一个 Issue  
+1. 设置页本机凭据已保存（**可不设置**任何 `YPI_GITHUB_APP_*`）
+2. 完全停止并重新启动蛋黄派后，status / 验证仍显示 App 凭据已配置
+3. App 已安装到测试仓库
+4. 设置页已关联该仓库
+5. 「验证配置」无关键阻塞项
+6. 模式设为 **仅 Triage** 并启用
+7. 在测试仓库新建一个 Issue
 
 预期结果：
 
-- 议题被认领到你的 GitHub 用户  
-- 出现处理相关标签  
-- Bot 发布**一条**中文结论评论（含 Owner 指令说明）；之后至少观察 1–2 分钟：**不应**因 Bot 自己编辑评论而不断产生新 generation / 重复 PATCH  
+- 议题被认领到你的 GitHub 用户
+- 出现处理相关标签
+- Bot 发布**一条**中文结论评论（含 Owner 指令说明）；之后至少观察 1–2 分钟：**不应**因 Bot 自己编辑评论而不断产生新 generation / 重复 PATCH
 
 ### 8.2 所有者指令与采纳
 
 用仓库所有者账号在议题下发送定向指令，例如：
 
-- `@AppBot 状态` 或 `/ypi 状态` → 应出现 receipt，且为只读  
-- `@AppBot 采纳`（或等待采纳阶段的「可以做」「开始实现」）→ 一次状态推进 + receipt  
+- `@AppBot 状态` 或 `/ypi 状态` → 应出现 receipt，且为只读
+- `@AppBot 采纳`（或等待采纳阶段的「可以做」「开始实现」）→ 一次状态推进 + receipt
 
-非所有者、Bot、疑问句、否定句、引用/代码块中的伪命令不会触发自动实现。  
+非所有者、Bot、疑问句、否定句、引用/代码块中的伪命令不会触发自动实现。
 若全局 paused 开启，delivery 只记审计/paused，命令不执行。
 
 ### 8.3 可选：自动开 PR
 
 在权限已包含 Pull requests / Contents，且无人值守校验通过后：
 
-1. 所有者采纳  
-2. 系统在隔离工作区处理文档或小 bugfix  
-3. 向默认分支开 PR，并关联议题  
-4. **不会自动合并**，仍由你审核  
+1. 所有者采纳
+2. 系统在隔离工作区处理文档或小 bugfix
+3. 向默认分支开 PR，并关联议题
+4. **不会自动合并**，仍由你审核
 
 ---
 
 ## 9. 高级：环境变量覆盖（CI / 容器 / 专业部署）
 
-普通本机安装 **不需要** 配置环境变量。  
+普通本机安装 **不需要** 配置环境变量。
 若你使用 secret manager、systemd、容器编排等，可对进程注入以下变量；**非空 env 按字段覆盖本机值**：
 
 ```bash
@@ -383,12 +383,27 @@ export YPI_GITHUB_APP_SLUG="your-app-slug"
 | 不写回 | 设置页保存 **永不** 把 env 值复制进本机文件；删除本机凭据也 **不修改** env |
 | 无 reveal | UI / status / verify 只显示来源枚举，不显示 env 值或路径 |
 
-适用场景：CI、不可写 agent dir 的容器、由运维统一注入的密钥。  
+适用场景：CI、不可写 agent dir 的容器、由运维统一注入的密钥。
 本机用户请优先使用第 4 节设置页路径。
 
 ---
 
 ## 10. 常见问题
+
+### 无人值守 job 卡在 planning、attempt 暴涨、没有 Session
+
+这是 durable scheduler / 命令幂等 / 策略门禁问题，不是 Sidebar 漏列 Session。Settings Jobs 应显示双层状态（Agent vs 调度）；无 Session 时主文案是「尚未启动 Agent / Session 不存在」，`attempt` 只表示「调度尝试」。
+
+1. **止血**：对该 job pause；若不稳定再开全局 `paused`，停止 attempt 增长。
+2. **部署 + 完整重启** `ypi`（热更新不够），用 status 的 `runtimeProvenance`（package/build/code/process/policy）确认新 build/policy 已加载。
+3. **单次 retry**：服务端会先做幂等 legacy reconcile（消费已确认的 Owner command、解析 WorkTree `spaceId`、归一到安全 checkpoint、保留 generation/legacy attempt），**复用原 generation / WorkTree / branch / Studio task**。
+4. **预期**：稳定策略/人工阻断（无 Session），或进入 implementing 并在 **WorkTree space** 出现 parent Session。
+5. **禁止**：跳过策略、手工改 job/task、删除审计、新建 g2、在未重启旧进程上反复 retry、把「调度尝试 N」当成 Agent 在跑。
+6. 若 retry 显示条件未变（`retry_conditions_unchanged`），先改 code/policy/input 并重启，再重试。
+
+完整 runbook：`docs/operations/troubleshooting.md` →「Unattended planning spin / no Session」；架构语义：`docs/architecture/overview.md` P1 章节。
+
+
 
 | 现象 | 怎么处理 |
 | --- | --- |
@@ -403,6 +418,7 @@ export YPI_GITHUB_APP_SLUG="your-app-slug"
 | 允许仓库是空的 | 正常，需要你手动关联，不会默认塞任何仓库 |
 | 无人值守按钮不可用 | 先完成 checklist；若要自动 PR，还需 Contents / Pull requests 权限 |
 | 想立刻停掉 | 在设置里打开全局 **paused**，或 `enabled=false` / 改回「仅 Triage」；**不要**指望 Issue 评论解除/设置全局暂停；不必删除本机凭据与历史 delivery/job |
+| Jobs 显示 planning/第 N 次但无 Session（#22 类） | 先 per-job pause（必要时全局 paused）止血；完整部署并**重启** `ypi`；确认 status `runtimeProvenance`；再对同一 job 单次 retry（系统会幂等 reconcile：消费旧 adoption command、补 spaceId、保留 generation/attempt/WorkTree）；不要手改 JSON、不要建 g2、不要删历史、不要跳过策略；无 Session 时应显示“尚未启动 Agent”；条件未变时的 retry 可能是 `retry_conditions_unchanged` |
 | Bot 评论反复编辑 / generation 暴涨 | 确认已部署含 self/Bot 入口过滤的版本；打开全局 paused 止血；检查 deliveries 忽略原因为 `self_app_event`/`bot_actor_event`；**不要**批量删除 g1–gN 审计来“修复” |
 | 发了「采纳」无 receipt | 需 `@AppBot` 或 `/ypi` 定向（等待采纳阶段的裸肯定语除外）；确认是 Owner 人类账号、非 Bot；确认非全局 paused |
 | `@机器Assignee` 无反应 | 预期：默认不把机器 Assignee 当自动化目标 |
@@ -412,19 +428,19 @@ export YPI_GITHUB_APP_SLUG="your-app-slug"
 
 ## 11. 推荐落地清单
 
-- [ ] 创建自己的 GitHub App  
-- [ ] 先授予 Metadata + Issues；需要自动 PR 时再加 Pull requests + Contents  
-- [ ] 勾选 Issues、Issue comment 事件  
-- [ ] 保存 App ID、私钥 PEM、Webhook secret（勿入库）  
-- [ ] 在「设置 → GitHub 自动化」本机凭据卡保存三项  
-- [ ] 安装 App 到目标仓库，记录 Installation ID  
-- [ ] 配置公网 HTTPS **仅** Webhook 路由；管理面受控  
-- [ ] 本机 `gh` 登录完成  
-- [ ] 关联允许仓库并「验证配置」  
-- [ ] 重启 `ypi`（无 `YPI_GITHUB_APP_*`）确认仍 configured  
-- [ ] 先用「仅 Triage」跑通一个测试议题  
-- [ ] 确认无误后，再决定是否开启无人值守  
-- [ ] （可选）CI/容器再配置高级 env 覆盖  
+- [ ] 创建自己的 GitHub App
+- [ ] 先授予 Metadata + Issues；需要自动 PR 时再加 Pull requests + Contents
+- [ ] 勾选 Issues、Issue comment 事件
+- [ ] 保存 App ID、私钥 PEM、Webhook secret（勿入库）
+- [ ] 在「设置 → GitHub 自动化」本机凭据卡保存三项
+- [ ] 安装 App 到目标仓库，记录 Installation ID
+- [ ] 配置公网 HTTPS **仅** Webhook 路由；管理面受控
+- [ ] 本机 `gh` 登录完成
+- [ ] 关联允许仓库并「验证配置」
+- [ ] 重启 `ypi`（无 `YPI_GITHUB_APP_*`）确认仍 configured
+- [ ] 先用「仅 Triage」跑通一个测试议题
+- [ ] 确认无误后，再决定是否开启无人值守
+- [ ] （可选）CI/容器再配置高级 env 覆盖
 
 ---
 

@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GitHub 自动化 Jobs · 状态真实性与可观测性原型</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #ffffff;
+      --bg-panel: #f5f5f5;
+      --bg-hover: #eeeeee;
+      --bg-selected: #e8e8e8;
+      --bg-subtle: rgba(0, 0, 0, .03);
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --success: #15803d;
+      --warning: #b45309;
+      --danger: #b91c1c;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono", monospace;
+      --shadow: 0 18px 55px rgba(15, 23, 42, .12);
+    }
+    html.dark {
+      color-scheme: dark;
+      --bg: #1a1a1a;
+      --bg-panel: #242424;
+      --bg-hover: #2e2e2e;
+      --bg-selected: #383838;
+      --bg-subtle: rgba(255, 255, 255, .04);
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-muted: #9ca3af;
+      --text-dim: #6b7280;
+      --accent: #60a5fa;
+      --accent-hover: #93c5fd;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --danger: #fb7185;
+      --shadow: 0 22px 60px rgba(0, 0, 0, .55);
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; }
+    body {
+      background: var(--bg-panel);
+      color: var(--text);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+    }
+    button, select { font: inherit; }
+    button { color: inherit; }
+    a { color: var(--accent); }
+    code { font-family: var(--font-mono); }
+    .prototype {
+      width: min(1120px, calc(100% - 32px));
+      margin: 24px auto;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--bg);
+      box-shadow: var(--shadow);
+    }
+    .prototype.force-narrow { width: min(390px, calc(100% - 16px)); }
+    .demo-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg-panel) 82%, var(--bg));
+    }
+    .demo-label { color: var(--text-muted); font-size: 11px; font-weight: 700; }
+    .demo-actions, .toolbar-actions, .job-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+    .icon-button, .button, .filter-button {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .icon-button { min-width: 34px; padding: 7px; }
+    .button:hover:not(:disabled), .icon-button:hover:not(:disabled), .filter-button:hover:not(:disabled) {
+      border-color: var(--accent); color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 7%, var(--bg));
+    }
+    .button.primary { border-color: transparent; color: white; background: var(--accent); }
+    .button.primary:hover:not(:disabled) { color: white; background: var(--accent-hover); }
+    .button.danger { color: var(--danger); }
+    .button:disabled, .icon-button:disabled { opacity: .55; cursor: not-allowed; }
+    button:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible {
+      outline: 2px solid var(--accent); outline-offset: 2px;
+    }
+    .page { padding: 18px; }
+    .page-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px;
+    }
+    .eyebrow { color: var(--text-dim); font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    h1 { margin: 3px 0 0; font-size: 19px; line-height: 1.25; }
+    .lead { max-width: 700px; margin: 6px 0 0; color: var(--text-muted); font-size: 12px; }
+    .card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--bg); }
+    .card-head {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+      padding: 13px 14px; border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--bg-panel) 72%, var(--bg));
+    }
+    .card-title { margin: 0; font-size: 14px; font-weight: 750; }
+    .card-sub { margin: 4px 0 0; color: var(--text-muted); font-size: 11px; }
+    .card-body { padding: 13px 14px; }
+    .truth-note {
+      display: flex; align-items: flex-start; gap: 9px; margin-bottom: 12px; padding: 10px 11px;
+      border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border)); border-radius: 9px;
+      background: color-mix(in srgb, var(--accent) 8%, var(--bg)); color: var(--text-muted); font-size: 11px;
+    }
+    .truth-note strong { color: var(--text); }
+    .truth-note .mark { color: var(--accent); font-weight: 900; }
+    .stale-note {
+      display: none; margin-bottom: 10px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+      border-radius: 9px; color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, var(--bg)); font-size: 12px;
+    }
+    .stale .stale-note { display: block; }
+    .count-row { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 11px; }
+    .count {
+      display: flex; align-items: baseline; gap: 5px; padding: 5px 8px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--bg-subtle); color: var(--text-muted); font-size: 10px;
+    }
+    .count b { color: var(--text); font-size: 15px; }
+    .count.agent b { color: var(--success); }
+    .count.blocked b { color: var(--warning); }
+    .count.retry b { color: var(--danger); }
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .filter-button { min-height: 29px; padding: 5px 8px; color: var(--text-muted); font-size: 11px; }
+    .filter-button[aria-pressed="true"] {
+      border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 9%, var(--bg));
+    }
+    .list-state-select {
+      min-height: 34px; padding: 6px 30px 6px 9px; border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); background: var(--bg); font-size: 11px; font-weight: 700;
+    }
+    .jobs { display: flex; flex-direction: column; gap: 9px; }
+    .job-card {
+      position: relative; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); overflow: hidden;
+    }
+    .job-card.policy { border-color: color-mix(in srgb, var(--warning) 42%, var(--border)); }
+    .job-card.retry { border-color: color-mix(in srgb, var(--danger) 28%, var(--border)); }
+    .job-summary {
+      display: grid; grid-template-columns: minmax(210px, 1.25fr) minmax(160px, .85fr) minmax(185px, .95fr) auto;
+      gap: 12px; align-items: center; padding: 11px;
+    }
+    .job-identity { min-width: 0; }
+    .job-title { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12px; font-weight: 750; }
+    .job-title a { flex: none; text-decoration: none; }
+    .truncate { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .job-meta { margin-top: 4px; color: var(--text-dim); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .status-block { min-width: 0; }
+    .status-label { display: block; margin-bottom: 4px; color: var(--text-dim); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .status-value { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 12px; font-weight: 800; }
+    .status-help { margin-top: 3px; color: var(--text-muted); font-size: 10px; overflow-wrap: anywhere; }
+    .dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--text-dim); }
+    .dot.ok { background: var(--success); }
+    .dot.warn { background: var(--warning); }
+    .dot.bad { background: var(--danger); }
+    .dot.info { background: var(--accent); }
+    .pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 3px 7px;
+      border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); background: var(--bg);
+      font-size: 10px; font-weight: 800; line-height: 1.3; white-space: nowrap;
+    }
+    .pill.ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 38%, var(--border)); background: color-mix(in srgb, var(--success) 10%, var(--bg)); }
+    .pill.warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 38%, var(--border)); background: color-mix(in srgb, var(--warning) 10%, var(--bg)); }
+    .pill.bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 38%, var(--border)); background: color-mix(in srgb, var(--danger) 9%, var(--bg)); }
+    .pill.info { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 34%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--bg)); }
+    .details-toggle { min-height: 30px; padding: 5px 8px; }
+    .job-detail { padding: 0 11px 11px; border-top: 1px solid var(--border); background: var(--bg-subtle); }
+    .job-detail[hidden] { display: none; }
+    .rail { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 13px 0 12px; }
+    .rail-step { position: relative; min-width: 0; text-align: center; color: var(--text-dim); font-size: 9px; font-weight: 750; }
+    .rail-step::before {
+      content: ""; position: absolute; top: 7px; left: 0; right: 0; height: 2px; background: var(--border); z-index: 0;
+    }
+    .rail-step:first-child::before { left: 50%; }
+    .rail-step:last-child::before { right: 50%; }
+    .rail-dot {
+      position: relative; z-index: 1; display: grid; place-items: center; width: 15px; height: 15px; margin: 0 auto 5px;
+      border: 1px solid var(--border); border-radius: 50%; background: var(--bg); color: transparent;
+    }
+    .rail-step.done { color: var(--text-muted); }
+    .rail-step.done::before { background: color-mix(in srgb, var(--success) 55%, var(--border)); }
+    .rail-step.done .rail-dot { border-color: var(--success); background: color-mix(in srgb, var(--success) 12%, var(--bg)); color: var(--success); }
+    .rail-step.active { color: var(--accent); }
+    .rail-step.active .rail-dot { border: 4px solid color-mix(in srgb, var(--accent) 42%, var(--bg)); background: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+    .rail-step.blocked { color: var(--warning); }
+    .rail-step.blocked .rail-dot { border-color: var(--warning); background: color-mix(in srgb, var(--warning) 15%, var(--bg)); color: var(--warning); }
+    .facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+    .fact { min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+    .fact dt { margin: 0 0 3px; color: var(--text-dim); font-size: 9px; font-weight: 800; }
+    .fact dd { margin: 0; color: var(--text); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+    .fact dd.emphasis { color: var(--warning); font-weight: 800; }
+    .fact dd.good { color: var(--success); font-weight: 750; }
+    .next-row {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center;
+      margin-top: 8px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+    }
+    .next-copy strong { display: block; font-size: 11px; }
+    .next-copy span { display: block; margin-top: 2px; color: var(--text-muted); font-size: 10px; }
+    .diagnostic { margin-top: 7px; color: var(--text-dim); font: 9px/1.45 var(--font-mono); overflow-wrap: anywhere; }
+    .stale .job-card { opacity: .73; }
+    .stale .job-card::after {
+      content: "可能过期"; position: absolute; top: 8px; right: 8px; padding: 2px 6px; border-radius: 999px;
+      color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--bg)); font-size: 9px; font-weight: 800;
+    }
+    .state-panel { display: none; min-height: 190px; place-items: center; padding: 28px; text-align: center; color: var(--text-muted); }
+    .state-panel.active { display: grid; }
+    .state-icon { width: 38px; height: 38px; display: grid; place-items: center; margin: 0 auto 8px; border: 1px solid var(--border); border-radius: 11px; background: var(--bg-subtle); }
+    .state-panel strong { color: var(--text); }
+    .skeleton { width: min(680px, 100%); }
+    .skeleton-line { height: 72px; margin: 9px 0; border-radius: 9px; background: linear-gradient(90deg, var(--bg-subtle), color-mix(in srgb, var(--text) 8%, var(--bg)), var(--bg-subtle)); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    .toast {
+      position: fixed; right: 18px; bottom: 18px; z-index: 20; max-width: min(360px, calc(100vw - 36px));
+      padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--success) 38%, var(--border)); border-radius: 9px;
+      color: var(--success); background: var(--bg); box-shadow: var(--shadow); font-size: 12px;
+    }
+    .toast[hidden] { display: none; }
+    .dialog-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .42); }
+    .dialog-backdrop[hidden] { display: none; }
+    .dialog { width: min(440px, 100%); padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); box-shadow: var(--shadow); }
+    .dialog h2 { margin: 0; font-size: 16px; }
+    .dialog p { margin: 8px 0 16px; color: var(--text-muted); font-size: 12px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    .prototype.force-narrow .demo-bar,
+    .prototype.force-narrow .page-head,
+    .prototype.force-narrow .card-head { align-items: stretch; flex-direction: column; }
+    .prototype.force-narrow .toolbar-actions { width: 100%; }
+    .prototype.force-narrow .list-state-select,
+    .prototype.force-narrow .toolbar-actions .button { flex: 1; }
+    .prototype.force-narrow .job-summary { grid-template-columns: 1fr; gap: 9px; }
+    .prototype.force-narrow .details-toggle { width: 100%; }
+    .prototype.force-narrow .facts { grid-template-columns: 1fr 1fr; }
+    .prototype.force-narrow .rail { overflow-x: auto; grid-template-columns: repeat(6, minmax(64px, 1fr)); }
+    .prototype.force-narrow .next-row { grid-template-columns: 1fr; }
+    .prototype.force-narrow .job-actions .button { flex: 1; }
+
+    @media (max-width: 640px) {
+      .prototype { width: 100%; min-height: 100dvh; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .page { padding: 12px; }
+      .demo-bar, .page-head, .card-head { align-items: stretch; flex-direction: column; }
+      .toolbar-actions { width: 100%; }
+      .list-state-select, .toolbar-actions .button { flex: 1; }
+      .job-summary { grid-template-columns: 1fr; gap: 9px; }
+      .details-toggle { width: 100%; }
+      .facts { grid-template-columns: 1fr 1fr; }
+      .rail { overflow-x: auto; grid-template-columns: repeat(6, minmax(64px, 1fr)); }
+      .next-row { grid-template-columns: 1fr; }
+      .job-actions .button { flex: 1; }
+    }
+    @media (max-width: 390px) { .facts { grid-template-columns: 1fr; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="prototype" id="prototype">
+    <div class="demo-bar">
+      <span class="demo-label">HTML 原型 · 数据为安全 projection 示例，不代表真实 job</span>
+      <div class="demo-actions">
+        <button class="icon-button" id="narrowToggle" type="button" aria-pressed="false" title="切换 390px 窄屏预览">▥</button>
+        <button class="icon-button" id="themeToggle" type="button" aria-pressed="false" title="切换明暗主题">◐</button>
+      </div>
+    </div>
+
+    <div class="page">
+      <header class="page-head">
+        <div>
+          <div class="eyebrow">Settings / GitHub Automation</div>
+          <h1>Jobs 运行实况</h1>
+          <p class="lead">先回答“Agent 是否真的启动”，再展示 scheduler、策略门禁、checkpoint 与重试。刷新只读取安全摘要，不会唤醒 scheduler 或创建 job。</p>
+        </div>
+        <span class="pill ok"><span class="dot ok"></span>Scheduler 心跳正常 · 10:44:50</span>
+      </header>
+
+      <section class="card" aria-labelledby="jobs-heading">
+        <div class="card-head">
+          <div>
+            <h2 class="card-title" id="jobs-heading">队列与最近 jobs</h2>
+            <p class="card-sub">“调度状态”和“Agent 运行状态”独立显示；调度尝试次数不等于 Agent 执行次数。</p>
+          </div>
+          <div class="toolbar-actions">
+            <label>
+              <span class="status-label">列表状态演示</span>
+              <select class="list-state-select" id="listState" aria-label="切换列表状态演示">
+                <option value="normal">正常</option>
+                <option value="loading">加载中</option>
+                <option value="empty">空状态</option>
+                <option value="stale">刷新失败 / 旧快照</option>
+              </select>
+            </label>
+            <button class="button" id="refreshButton" type="button">↻ 刷新状态</button>
+          </div>
+        </div>
+        <div class="card-body" id="normalContent">
+          <div class="truth-note"><span class="mark" aria-hidden="true">i</span><div><strong>状态口径：</strong>“调度中”只代表 durable job 被 scheduler 处理；只有出现“Session 可用”时，才表示 Agent 已开始在获准工作区运行。</div></div>
+          <div class="stale-note" role="alert"><strong>无法刷新状态。</strong> 以下为 10:42:11 的最后安全快照，已标记“可能过期”；重试 / 暂停 / 恢复暂不可用。</div>
+          <div class="count-row" aria-label="队列计数">
+            <span class="count"><b>2</b>调度中</span>
+            <span class="count blocked"><b>1</b>策略阻塞</span>
+            <span class="count retry"><b>1</b>等待重试</span>
+            <span class="count agent"><b>2</b>Agent active</span>
+            <span class="count"><b>1</b>终态</span>
+          </div>
+          <nav class="filters" aria-label="筛选状态样例">
+            <button class="filter-button" type="button" data-filter="all" aria-pressed="true">全部 5</button>
+            <button class="filter-button" type="button" data-filter="policy" aria-pressed="false">策略阻塞</button>
+            <button class="filter-button" type="button" data-filter="retry" aria-pressed="false">等待重试</button>
+            <button class="filter-button" type="button" data-filter="active" aria-pressed="false">Agent active</button>
+            <button class="filter-button" type="button" data-filter="release" aria-pressed="false">检查 / 发布</button>
+            <button class="filter-button" type="button" data-filter="terminal" aria-pressed="false">终态</button>
+          </nav>
+
+          <div class="jobs" id="jobsList">
+            <article class="job-card policy" data-kind="policy" aria-labelledby="job22-title">
+              <div class="job-summary">
+                <div class="job-identity">
+                  <div class="job-title" id="job22-title"><a href="#issue-22" aria-label="打开 Issue 22">#22</a><span class="truncate" title="无人值守实现卡在 planning policy gate">无人值守实现卡在 planning policy gate</span></div>
+                  <div class="job-meta">yolk-pi-web/pi-agent-web · trace gh_a82c… · 更新于 10:44:43</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">Agent 运行状态</span>
+                  <div class="status-value"><span class="dot warn"></span>策略阻塞</div>
+                  <div class="status-help"><strong>尚未启动 Agent</strong> · Session 不存在</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">调度状态</span>
+                  <div class="status-value"><span class="dot ok"></span>已领取 · 心跳正常</div>
+                  <div class="pills"><span class="pill warn">阻塞层：planning policy</span><span class="pill">调度尝试 4</span></div>
+                </div>
+                <button class="button details-toggle" type="button" aria-expanded="true" aria-controls="job22-detail">收起详情</button>
+              </div>
+              <div class="job-detail" id="job22-detail">
+                <div class="rail" aria-label="Job 进度：策略门禁阻塞">
+                  <div class="rail-step done"><span class="rail-dot">✓</span>调度</div><div class="rail-step blocked"><span class="rail-dot">!</span>策略</div><div class="rail-step"><span class="rail-dot">•</span>Session</div><div class="rail-step"><span class="rail-dot">•</span>实现</div><div class="rail-step"><span class="rail-dot">•</span>检查</div><div class="rail-step"><span class="rail-dot">•</span>发布</div>
+                </div>
+                <dl class="facts">
+                  <div class="fact"><dt>CHECKPOINT</dt><dd><code>planning_policy_gate</code></dd></div>
+                  <div class="fact"><dt>BLOCKED AT LAYER</dt><dd class="emphasis">规划策略门禁</dd></div>
+                  <div class="fact"><dt>REASON</dt><dd>规划条件未满足（服务端安全摘要）</dd></div>
+                  <div class="fact"><dt>SESSION AVAILABILITY</dt><dd class="emphasis">不存在 · 尚未启动 Agent</dd></div>
+                  <div class="fact"><dt>LAST MEANINGFUL PROGRESS</dt><dd>尚无 · Session 未创建</dd></div>
+                  <div class="fact"><dt>NEXT RETRY</dt><dd>无自动重试 · 等待 operator</dd></div>
+                  <div class="fact"><dt>RETRY PROGRESS</dt><dd>有效进展 0 · 无进展重试 3</dd></div>
+                  <div class="fact"><dt>WORKSPACE</dt><dd>未分配（无 Session）</dd></div>
+                </dl>
+                <div class="next-row">
+                  <div class="next-copy"><strong>下一步：按策略要求补齐规划条件，再重试</strong><span>本页不能跳过策略；“重试”只重新唤醒同一 durable job，并从安全 checkpoint reconciliation。</span></div>
+                  <div class="job-actions"><button class="button danger job-action" type="button" data-action="retry" data-target="#22 · gh_a82c…">重试</button></div>
+                </div>
+                <div class="diagnostic">诊断原始态（次级）：status=running · phase=planning · attempt=4；不可将其直接翻译为“Agent 正在运行 / 第 4 次执行”。</div>
+              </div>
+            </article>
+
+            <article class="job-card retry" data-kind="retry" aria-labelledby="job23-title">
+              <div class="job-summary">
+                <div class="job-identity">
+                  <div class="job-title" id="job23-title"><a href="#issue-23">#23</a><span class="truncate">Policy gate 重试等待</span></div>
+                  <div class="job-meta">yolk-pi-web/pi-agent-web · trace gh_b14d… · 更新于 10:44:38</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">Agent 运行状态</span>
+                  <div class="status-value"><span class="dot bad"></span>等待重试</div>
+                  <div class="status-help"><strong>尚未启动 Agent</strong> · Session 不存在</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">调度状态</span>
+                  <div class="status-value"><span class="dot warn"></span>Backoff 至 10:52</div>
+                  <div class="pills"><span class="pill bad">无有效进展 ×3</span><span class="pill">调度尝试 4</span></div>
+                </div>
+                <button class="button details-toggle" type="button" aria-expanded="false" aria-controls="job23-detail">查看详情</button>
+              </div>
+              <div class="job-detail" id="job23-detail" hidden>
+                <div class="rail" aria-label="Job 进度：策略后退避等待"><div class="rail-step done"><span class="rail-dot">✓</span>调度</div><div class="rail-step blocked"><span class="rail-dot">!</span>策略</div><div class="rail-step"><span class="rail-dot">•</span>Session</div><div class="rail-step"><span class="rail-dot">•</span>实现</div><div class="rail-step"><span class="rail-dot">•</span>检查</div><div class="rail-step"><span class="rail-dot">•</span>发布</div></div>
+                <dl class="facts"><div class="fact"><dt>CHECKPOINT</dt><dd><code>planning_policy_gate</code></dd></div><div class="fact"><dt>BLOCKED AT LAYER</dt><dd class="emphasis">规划策略门禁</dd></div><div class="fact"><dt>REASON</dt><dd>同一 checkpoint 未产生有效进展</dd></div><div class="fact"><dt>SESSION AVAILABILITY</dt><dd class="emphasis">不存在 · 尚未启动 Agent</dd></div><div class="fact"><dt>LAST MEANINGFUL PROGRESS</dt><dd>尚无</dd></div><div class="fact"><dt>NEXT RETRY</dt><dd>10:52:00 · 约 7 分钟后</dd></div><div class="fact"><dt>RETRY PROGRESS</dt><dd>有效进展 0 · 无进展重试 3</dd></div><div class="fact"><dt>WORKSPACE</dt><dd>未分配（无 Session）</dd></div></dl>
+                <div class="next-row"><div class="next-copy"><strong>下一步：可等待自动重试，或修复条件后手动重试</strong><span>手动重试仍执行同一 policy gate，不改变或绕过策略。</span></div><div class="job-actions"><button class="button danger job-action" type="button" data-action="retry" data-target="#23 · gh_b14d…">重试</button></div></div>
+              </div>
+            </article>
+
+            <article class="job-card" data-kind="active" aria-labelledby="job24-title">
+              <div class="job-summary">
+                <div class="job-identity">
+                  <div class="job-title" id="job24-title"><a href="#issue-24">#24</a><span class="truncate" title="修复自动化 job 可观测性并补充覆盖较长标题的安全投影">修复自动化 job 可观测性并补充覆盖较长标题的安全投影</span></div>
+                  <div class="job-meta">yolk-pi-web/pi-agent-web · trace gh_c39e… · 更新于 10:44:46</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">Agent 运行状态</span>
+                  <div class="status-value"><span class="dot info"></span>实现中</div>
+                  <div class="status-help"><strong>Session 可用</strong> · 最近进展 34 秒前</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">调度状态</span>
+                  <div class="status-value"><span class="dot ok"></span>Lease 活跃 · 心跳正常</div>
+                  <div class="pills"><span class="pill info">Agent 启动 1</span><span class="pill">调度尝试 2</span></div>
+                </div>
+                <button class="button details-toggle" type="button" aria-expanded="false" aria-controls="job24-detail">查看详情</button>
+              </div>
+              <div class="job-detail" id="job24-detail" hidden>
+                <div class="rail" aria-label="Job 进度：实现中"><div class="rail-step done"><span class="rail-dot">✓</span>调度</div><div class="rail-step done"><span class="rail-dot">✓</span>策略</div><div class="rail-step done"><span class="rail-dot">✓</span>Session</div><div class="rail-step active"><span class="rail-dot">•</span>实现</div><div class="rail-step"><span class="rail-dot">•</span>检查</div><div class="rail-step"><span class="rail-dot">•</span>发布</div></div>
+                <dl class="facts"><div class="fact"><dt>CHECKPOINT</dt><dd><code>implementation_started</code></dd></div><div class="fact"><dt>BLOCKED AT LAYER</dt><dd>—</dd></div><div class="fact"><dt>REASON</dt><dd>—</dd></div><div class="fact"><dt>SESSION AVAILABILITY</dt><dd class="good">可用 · sess_61f2…</dd></div><div class="fact"><dt>LAST MEANINGFUL PROGRESS</dt><dd>WorkTree 已就绪；Agent 执行实现步骤 · 34 秒前</dd></div><div class="fact"><dt>NEXT RETRY</dt><dd>—</dd></div><div class="fact"><dt>RETRY PROGRESS</dt><dd>本次已有有效进展</dd></div><div class="fact"><dt>WORKSPACE LABEL（本机安全）</dt><dd>pi-agent-web · WT issue-24</dd></div></dl>
+                <div class="next-row"><div class="next-copy"><strong>下一步：等待实现到达检查 checkpoint</strong><span>暂停不会强杀执行中的 Git 命令，将在下一个安全 checkpoint 生效。</span></div><div class="job-actions"><button class="button job-action" type="button" data-action="pause" data-target="#24 · gh_c39e…">暂停</button></div></div>
+              </div>
+            </article>
+
+            <article class="job-card" data-kind="release" aria-labelledby="job25-title">
+              <div class="job-summary">
+                <div class="job-identity">
+                  <div class="job-title" id="job25-title"><a href="#issue-25">#25</a><span class="truncate">补充 unattended runner 测试</span></div>
+                  <div class="job-meta">yolk-pi-web/pi-agent-web · trace gh_d55f… · 更新于 10:44:48</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">Agent 运行状态</span>
+                  <div class="status-value"><span class="dot info"></span>发布中</div>
+                  <div class="status-help"><strong>Session 可用</strong> · 检查已通过</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">调度状态</span>
+                  <div class="status-value"><span class="dot ok"></span>Lease 活跃 · 心跳正常</div>
+                  <div class="pills"><span class="pill ok">检查通过</span><span class="pill info">发布 checkpoint</span></div>
+                </div>
+                <button class="button details-toggle" type="button" aria-expanded="false" aria-controls="job25-detail">查看详情</button>
+              </div>
+              <div class="job-detail" id="job25-detail" hidden>
+                <div class="rail" aria-label="Job 进度：检查通过，发布中"><div class="rail-step done"><span class="rail-dot">✓</span>调度</div><div class="rail-step done"><span class="rail-dot">✓</span>策略</div><div class="rail-step done"><span class="rail-dot">✓</span>Session</div><div class="rail-step done"><span class="rail-dot">✓</span>实现</div><div class="rail-step done"><span class="rail-dot">✓</span>检查</div><div class="rail-step active"><span class="rail-dot">•</span>发布</div></div>
+                <dl class="facts"><div class="fact"><dt>CHECKPOINT</dt><dd><code>publish_started</code></dd></div><div class="fact"><dt>BLOCKED AT LAYER</dt><dd>—</dd></div><div class="fact"><dt>REASON</dt><dd>—</dd></div><div class="fact"><dt>SESSION AVAILABILITY</dt><dd class="good">可用 · sess_a833…</dd></div><div class="fact"><dt>LAST MEANINGFUL PROGRESS</dt><dd>验证通过，进入发布 reconciliation · 12 秒前</dd></div><div class="fact"><dt>NEXT RETRY</dt><dd>—</dd></div><div class="fact"><dt>RETRY PROGRESS</dt><dd>本次已有有效进展</dd></div><div class="fact"><dt>WORKSPACE LABEL（本机安全）</dt><dd>pi-agent-web · WT issue-25</dd></div></dl>
+                <div class="next-row"><div class="next-copy"><strong>下一步：等待发布完成</strong><span>暂停将在下一个安全 checkpoint 生效；已产生的外部副作用不会自动回滚。</span></div><div class="job-actions"><button class="button job-action" type="button" data-action="pause" data-target="#25 · gh_d55f…">暂停</button></div></div>
+              </div>
+            </article>
+
+            <article class="job-card" data-kind="terminal" aria-labelledby="job21-title">
+              <div class="job-summary">
+                <div class="job-identity">
+                  <div class="job-title" id="job21-title"><a href="#issue-21">#21</a><span class="truncate">修正文档中的自动化说明</span></div>
+                  <div class="job-meta">yolk-pi-web/pi-agent-web · trace gh_91cc… · 完成于 10:36:02</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">Agent 运行状态</span>
+                  <div class="status-value"><span class="dot ok"></span>已完成</div>
+                  <div class="status-help">检查通过 · PR #104 已发布</div>
+                </div>
+                <div class="status-block">
+                  <span class="status-label">调度状态</span>
+                  <div class="status-value"><span class="dot ok"></span>终态 · 不再调度</div>
+                  <div class="pills"><span class="pill ok">PR #104</span><span class="pill">Agent 启动 1</span></div>
+                </div>
+                <button class="button details-toggle" type="button" aria-expanded="false" aria-controls="job21-detail">查看详情</button>
+              </div>
+              <div class="job-detail" id="job21-detail" hidden>
+                <div class="rail" aria-label="Job 进度：全部完成"><div class="rail-step done"><span class="rail-dot">✓</span>调度</div><div class="rail-step done"><span class="rail-dot">✓</span>策略</div><div class="rail-step done"><span class="rail-dot">✓</span>Session</div><div class="rail-step done"><span class="rail-dot">✓</span>实现</div><div class="rail-step done"><span class="rail-dot">✓</span>检查</div><div class="rail-step done"><span class="rail-dot">✓</span>发布</div></div>
+                <dl class="facts"><div class="fact"><dt>CHECKPOINT</dt><dd><code>publish_completed</code></dd></div><div class="fact"><dt>BLOCKED AT LAYER</dt><dd>—</dd></div><div class="fact"><dt>REASON</dt><dd>—</dd></div><div class="fact"><dt>SESSION AVAILABILITY</dt><dd class="good">审计可用 · sess_b120…</dd></div><div class="fact"><dt>LAST MEANINGFUL PROGRESS</dt><dd>PR #104 创建并关联 Issue · 10:36:02</dd></div><div class="fact"><dt>NEXT RETRY</dt><dd>— · 终态</dd></div><div class="fact"><dt>RETRY PROGRESS</dt><dd>有效 Agent 运行 1 · 无进展重试 0</dd></div><div class="fact"><dt>WORKSPACE LABEL（本机安全）</dt><dd>pi-agent-web · WT issue-21</dd></div></dl>
+                <div class="next-row"><div class="next-copy"><strong>下一步：无需操作</strong><span>终态保留安全审计摘要；不会显示绝对路径、Issue 正文或评论。</span></div><div class="job-actions"><a class="button" href="#pr-104">查看 PR #104</a></div></div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="state-panel" id="loadingState" aria-live="polite"><div class="skeleton"><span>正在读取 scheduler 与 Agent 安全 projection…</span><div class="skeleton-line"></div><div class="skeleton-line"></div></div></div>
+        <div class="state-panel" id="emptyState"><div><div class="state-icon" aria-hidden="true">◌</div><strong>当前没有 job</strong><br><span>启用后只处理新的已验证 delivery；不会自动回扫历史 Issue。</span></div></div>
+      </section>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="dialog-backdrop" id="dialogBackdrop" hidden>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogBody">
+      <h2 id="dialogTitle">确认操作</h2>
+      <p id="dialogBody"></p>
+      <div class="dialog-actions"><button class="button" id="dialogCancel" type="button">取消</button><button class="button primary" id="dialogConfirm" type="button">确认</button></div>
+    </section>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const prototype = document.getElementById('prototype');
+    const themeToggle = document.getElementById('themeToggle');
+    const narrowToggle = document.getElementById('narrowToggle');
+    const listState = document.getElementById('listState');
+    const normalContent = document.getElementById('normalContent');
+    const loadingState = document.getElementById('loadingState');
+    const emptyState = document.getElementById('emptyState');
+    const refreshButton = document.getElementById('refreshButton');
+    const toast = document.getElementById('toast');
+    const backdrop = document.getElementById('dialogBackdrop');
+    const dialogTitle = document.getElementById('dialogTitle');
+    const dialogBody = document.getElementById('dialogBody');
+    const dialogConfirm = document.getElementById('dialogConfirm');
+    const dialogCancel = document.getElementById('dialogCancel');
+    let pendingAction = null;
+    let lastTrigger = null;
+    let toastTimer = null;
+
+    function showToast(message) {
+      clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.hidden = false;
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 2600);
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const dark = root.classList.toggle('dark');
+      themeToggle.setAttribute('aria-pressed', String(dark));
+      showToast(dark ? '已切换深色主题' : '已切换浅色主题');
+    });
+
+    narrowToggle.addEventListener('click', () => {
+      const narrow = prototype.classList.toggle('force-narrow');
+      narrowToggle.setAttribute('aria-pressed', String(narrow));
+      showToast(narrow ? '已切换 390px 窄屏预览' : '已恢复宽屏预览');
+    });
+
+    function applyListState(value) {
+      loadingState.classList.remove('active');
+      emptyState.classList.remove('active');
+      normalContent.hidden = false;
+      normalContent.classList.remove('stale');
+      refreshButton.disabled = false;
+      document.querySelectorAll('.job-action').forEach(button => button.disabled = false);
+      if (value === 'loading') {
+        normalContent.hidden = true;
+        loadingState.classList.add('active');
+        refreshButton.disabled = true;
+      } else if (value === 'empty') {
+        normalContent.hidden = true;
+        emptyState.classList.add('active');
+      } else if (value === 'stale') {
+        normalContent.classList.add('stale');
+        document.querySelectorAll('.job-action').forEach(button => button.disabled = true);
+      }
+    }
+    listState.addEventListener('change', event => applyListState(event.target.value));
+
+    document.querySelectorAll('.filter-button').forEach(button => {
+      button.addEventListener('click', () => {
+        const filter = button.dataset.filter;
+        document.querySelectorAll('.filter-button').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+        document.querySelectorAll('.job-card').forEach(card => {
+          const show = filter === 'all' || card.dataset.kind === filter;
+          card.hidden = !show;
+        });
+      });
+    });
+
+    document.querySelectorAll('.details-toggle').forEach(button => {
+      button.addEventListener('click', () => {
+        const panel = document.getElementById(button.getAttribute('aria-controls'));
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.textContent = expanded ? '查看详情' : '收起详情';
+        panel.hidden = expanded;
+      });
+    });
+
+    refreshButton.addEventListener('click', () => {
+      refreshButton.disabled = true;
+      refreshButton.textContent = '刷新中…';
+      setTimeout(() => {
+        listState.value = 'normal';
+        applyListState('normal');
+        refreshButton.textContent = '↻ 刷新状态';
+        showToast('状态已刷新；未唤醒 scheduler 或创建 job');
+      }, 700);
+    });
+
+    function openDialog(button) {
+      const action = button.dataset.action;
+      const target = button.dataset.target;
+      pendingAction = action;
+      lastTrigger = button;
+      const copy = {
+        retry: ['重试此 job？', `目标：${target}。会重新唤醒同一 durable job，并从安全 checkpoint reconciliation；不会跳过策略。`, '确认重试'],
+        pause: ['暂停此 job？', `目标：${target}。暂停请求会在安全 checkpoint 生效；不会强杀执行中的 Git 命令。`, '确认暂停'],
+        resume: ['恢复此 job？', `目标：${target}。确认后重新入队到下一个安全 checkpoint。`, '确认恢复']
+      }[action];
+      dialogTitle.textContent = copy[0];
+      dialogBody.textContent = copy[1];
+      dialogConfirm.textContent = copy[2];
+      backdrop.hidden = false;
+      dialogCancel.focus();
+    }
+    function closeDialog() {
+      backdrop.hidden = true;
+      pendingAction = null;
+      if (lastTrigger) lastTrigger.focus();
+    }
+    document.querySelectorAll('.job-action').forEach(button => button.addEventListener('click', () => openDialog(button)));
+    dialogCancel.addEventListener('click', closeDialog);
+    backdrop.addEventListener('click', event => { if (event.target === backdrop) closeDialog(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !backdrop.hidden) closeDialog(); });
+    dialogConfirm.addEventListener('click', () => {
+      const actionLabel = { retry: '重试', pause: '暂停', resume: '恢复' }[pendingAction];
+      dialogConfirm.disabled = true;
+      dialogConfirm.textContent = '处理中…';
+      setTimeout(() => {
+        dialogConfirm.disabled = false;
+        closeDialog();
+        showToast(`${actionLabel}操作已受理；正在刷新真实状态`);
+      }, 650);
+    });
+  </script>
+</body>
+</html>

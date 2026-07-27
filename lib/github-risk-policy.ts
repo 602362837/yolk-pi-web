@@ -1,5 +1,5 @@
 /**
- * github-risk-policy — docs + small-bugfix classification for unattended P1 (GHA-07).
+ * github-risk-policy — docs + small-bugfix classification for unattended P1 (GHA-07 / GHA-CLOSE-01).
  *
  * Profile: riskProfile = "docs-and-small-bugfix"
  *
@@ -19,7 +19,14 @@
  * - binary / symlink / submodule
  * - uncertain classification or over-limit diffs
  *
- * Stages: pre (plan/intent), plan (declared files), final (actual diff).
+ * Stages (distinct fact sources — GHA-CLOSE-01 contract):
+ * - pre: operator config / claim / structured owner auth / high-confidence scope hints.
+ *   Empty files → explicit deferred (not allowed_docs). Title is advisory only.
+ * - plan: runner-owned structured plan evidence + declared files. Empty files → deferred.
+ *   issueTitlePreview must never be copied into planText by callers.
+ * - final: actual Git diff + structured small-bugfix/validation evidence only.
+ *   Empty diff → blocked_empty_diff. Free-text title/plan hints never override safe actual diffs.
+ *
  * Issue text cannot change this policy or validation commands.
  *
  * Residual risk: classification only gates publish. Full agent may already have
@@ -42,6 +49,22 @@ export type GithubRiskPolicyStage = "pre" | "plan" | "final";
 
 export type GithubRiskPolicyDecision = "allow" | "block";
 
+/**
+ * Wire-compatible outcome. `defer` is represented as decision=allow + deferred=true
+ * so older consumers that only check decision keep working; projection/UI must not
+ * render deferred empty-plan as allowed_docs.
+ */
+export type GithubRiskPolicyOutcome = "allow" | "block" | "defer";
+
+export type GithubRiskPolicyEvidenceSource =
+  | "none"
+  | "config"
+  | "issue_title"
+  | "plan_text"
+  | "declared_files"
+  | "actual_diff"
+  | "structured_small_bugfix";
+
 export type GithubRiskPolicyClass =
   | "docs"
   | "small_bugfix"
@@ -63,7 +86,9 @@ export type GithubRiskPolicyClass =
 export type GithubRiskPolicyReasonCode =
   | "allowed_docs"
   | "allowed_small_bugfix"
+  | "deferred_no_declared_files"
   | "blocked_ui_interaction"
+  | "blocked_manual_ui_approval"
   | "blocked_workflow_ci"
   | "blocked_release_publish"
   | "blocked_secret_auth"
@@ -78,6 +103,10 @@ export type GithubRiskPolicyReasonCode =
   | "blocked_uncertain"
   | "blocked_empty_diff"
   | "blocked_risk_profile";
+
+export type GithubRiskPolicyDeferredReason =
+  | "no_declared_files"
+  | "awaiting_actual_diff";
 
 export interface GithubRiskPolicyLimits {
   maxFiles: number;
@@ -105,10 +134,15 @@ export interface GithubRiskPolicyInput {
   limits: GithubRiskPolicyLimits;
   files: readonly GithubRiskPolicyFileChange[];
   /**
-   * Optional free-text plan/title signals (never treated as trusted commands).
-   * Used only as fail-closed hints for UI / release / secret keywords.
+   * Runner-owned / structured plan evidence only.
+   * Must NOT be a copy of issueTitlePreview. Untrusted free text may still be
+   * scanned as high-confidence fail-closed hints at pre/plan, never as commands.
    */
   planText?: string | null;
+  /**
+   * Untrusted Issue title preview (safe truncated). Advisory evidence only;
+   * projected with evidenceSource=issue_title when it contributes to a decision.
+   */
   issueTitlePreview?: string | null;
   /**
    * When true, caller asserts the change is an explicit small bugfix with
@@ -120,6 +154,8 @@ export interface GithubRiskPolicyInput {
 
 export interface GithubRiskPolicyResult {
   decision: GithubRiskPolicyDecision;
+  /** Prefer this over decision alone when deferred empty pre/plan is possible. */
+  outcome: GithubRiskPolicyOutcome;
   classification: GithubRiskPolicyClass;
   reasonCode: GithubRiskPolicyReasonCode;
   stage: GithubRiskPolicyStage;
@@ -131,6 +167,13 @@ export interface GithubRiskPolicyResult {
   /** Safe paths that triggered the block (truncated). */
   blockedPaths: string[];
   message: string;
+  /** True when pre/plan has no declared files and continues to a later gate. */
+  deferred: boolean;
+  deferredReason: GithubRiskPolicyDeferredReason | null;
+  /** Which evidence channel drove the decision (for projection / audit). */
+  evidenceSource: GithubRiskPolicyEvidenceSource;
+  policyId: string;
+  policyVersion: string;
 }
 
 const DOC_PATH_RE =
@@ -160,6 +203,7 @@ const BINARY_EXT_RE =
 const SUBMODULE_PATH_RE = /(?:^|\/)\.gitmodules$/i;
 
 // Note: JS \b is ASCII-word only; CJK keywords must not rely on \b alone.
+// "模型" alone is NOT a secret/auth token — Chinese product copy uses it for models.
 const PLAN_UI_HINT_RE =
   /(?:\b(?:ui|ux|prototype|visual|layout|css)\b|settings\s*ui|html\s*原型|交互|界面|页面|组件|弹窗|设置页)/i;
 const PLAN_RELEASE_HINT_RE =
@@ -225,14 +269,19 @@ function classifyPath(file: GithubRiskPolicyFileChange): GithubRiskPolicyClass {
   return "uncertain";
 }
 
-function reasonForClass(classification: GithubRiskPolicyClass): GithubRiskPolicyReasonCode {
+function reasonForClass(
+  classification: GithubRiskPolicyClass,
+  options?: { manualUiApproval?: boolean },
+): GithubRiskPolicyReasonCode {
   switch (classification) {
     case "docs":
       return "allowed_docs";
     case "small_bugfix":
       return "allowed_small_bugfix";
     case "ui_interaction":
-      return "blocked_ui_interaction";
+      return options?.manualUiApproval
+        ? "blocked_manual_ui_approval"
+        : "blocked_ui_interaction";
     case "workflow_ci":
       return "blocked_workflow_ci";
     case "release_publish":
@@ -267,7 +316,11 @@ function messageFor(
   decision: GithubRiskPolicyDecision,
   classification: GithubRiskPolicyClass,
   stage: GithubRiskPolicyStage,
+  options?: { deferred?: boolean; manualUiApproval?: boolean },
 ): string {
+  if (options?.deferred) {
+    return `Stage ${stage}: no declared files yet; deferred to a later gate under docs-and-small-bugfix (not an allowed_docs publish decision).`;
+  }
   if (decision === "allow") {
     return classification === "docs"
       ? `Stage ${stage}: documentation changes are allowed under docs-and-small-bugfix.`
@@ -275,7 +328,9 @@ function messageFor(
   }
   switch (classification) {
     case "ui_interaction":
-      return `Stage ${stage}: UI/interaction/user-visible structure changes are blocked (manual HTML approval).`;
+      return options?.manualUiApproval
+        ? `Stage ${stage}: high-confidence UI/interaction scope requires manual HTML approval (blocked_manual_ui_approval).`
+        : `Stage ${stage}: UI/interaction/user-visible structure changes are blocked (manual HTML approval).`;
     case "workflow_ci":
       return `Stage ${stage}: workflow/CI/Actions changes are blocked.`;
     case "release_publish":
@@ -316,6 +371,64 @@ function planTextHints(
   return null;
 }
 
+interface HintHit {
+  classification: GithubRiskPolicyClass;
+  evidenceSource: Extract<
+    GithubRiskPolicyEvidenceSource,
+    "plan_text" | "issue_title"
+  >;
+}
+
+/**
+ * High-confidence free-text hints for pre/plan only.
+ * planText (runner-owned) is preferred over untrusted issue title.
+ * final stage must not call this for publish decisions over actual diffs.
+ */
+function resolvePrePlanHint(input: {
+  planText?: string | null;
+  issueTitlePreview?: string | null;
+}): HintHit | null {
+  const fromPlan = planTextHints(input.planText);
+  if (fromPlan) {
+    return { classification: fromPlan, evidenceSource: "plan_text" };
+  }
+  const fromTitle = planTextHints(input.issueTitlePreview);
+  if (fromTitle) {
+    return { classification: fromTitle, evidenceSource: "issue_title" };
+  }
+  return null;
+}
+
+function baseResultFields(input: {
+  stage: GithubRiskPolicyStage;
+  riskProfile: GithubAutomationRiskProfile;
+  maxFiles: number;
+  maxChangedLines: number;
+  fileCount: number;
+  changedLines: number;
+}): Pick<
+  GithubRiskPolicyResult,
+  | "stage"
+  | "riskProfile"
+  | "fileCount"
+  | "changedLines"
+  | "maxFiles"
+  | "maxChangedLines"
+  | "policyId"
+  | "policyVersion"
+> {
+  return {
+    stage: input.stage,
+    riskProfile: input.riskProfile,
+    fileCount: input.fileCount,
+    changedLines: input.changedLines,
+    maxFiles: input.maxFiles,
+    maxChangedLines: input.maxChangedLines,
+    policyId: GITHUB_RISK_POLICY_ID,
+    policyVersion: GITHUB_RISK_POLICY_VERSION,
+  };
+}
+
 /**
  * Evaluate docs-and-small-bugfix policy for a stage.
  * Fail closed on uncertain classification.
@@ -340,35 +453,22 @@ export function evaluateGithubRiskPolicy(
   if (riskProfile !== "docs-and-small-bugfix") {
     return {
       decision: "block",
+      outcome: "block",
       classification: "uncertain",
       reasonCode: "blocked_risk_profile",
-      stage,
-      riskProfile: GITHUB_RISK_POLICY_PROFILE,
-      fileCount: 0,
-      changedLines: 0,
-      maxFiles,
-      maxChangedLines,
+      ...baseResultFields({
+        stage,
+        riskProfile: GITHUB_RISK_POLICY_PROFILE,
+        maxFiles,
+        maxChangedLines,
+        fileCount: 0,
+        changedLines: 0,
+      }),
       blockedPaths: [],
       message: "Only riskProfile=docs-and-small-bugfix is allowed for unattended publish.",
-    };
-  }
-
-  // Plan-text fail-closed hints (do not parse as commands).
-  const hint =
-    planTextHints(input.planText) ?? planTextHints(input.issueTitlePreview);
-  if (hint) {
-    return {
-      decision: "block",
-      classification: hint,
-      reasonCode: reasonForClass(hint),
-      stage,
-      riskProfile,
-      fileCount: input.files.length,
-      changedLines: 0,
-      maxFiles,
-      maxChangedLines,
-      blockedPaths: [],
-      message: messageFor("block", hint, stage),
+      deferred: false,
+      deferredReason: null,
+      evidenceSource: "config",
     };
   }
 
@@ -379,44 +479,90 @@ export function evaluateGithubRiskPolicy(
     }))
     .filter((f) => f.path.length > 0);
 
+  // final: free-text title/plan hints never override actual diffs. Empty → block.
+  // pre/plan: high-confidence hints may fail closed before / without files.
+  if (stage === "pre" || stage === "plan") {
+    const hint = resolvePrePlanHint({
+      planText: input.planText,
+      issueTitlePreview: input.issueTitlePreview,
+    });
+    if (hint) {
+      const manualUiApproval = hint.classification === "ui_interaction";
+      return {
+        decision: "block",
+        outcome: "block",
+        classification: hint.classification,
+        reasonCode: reasonForClass(hint.classification, { manualUiApproval }),
+        ...baseResultFields({
+          stage,
+          riskProfile,
+          maxFiles,
+          maxChangedLines,
+          fileCount: files.length,
+          changedLines: 0,
+        }),
+        blockedPaths: [],
+        message: messageFor("block", hint.classification, stage, {
+          manualUiApproval,
+        }),
+        deferred: false,
+        deferredReason: null,
+        evidenceSource: hint.evidenceSource,
+      };
+    }
+  }
+
   if (files.length === 0 && stage === "final") {
     return {
       decision: "block",
+      outcome: "block",
       classification: "empty",
       reasonCode: "blocked_empty_diff",
-      stage,
-      riskProfile,
-      fileCount: 0,
-      changedLines: 0,
-      maxFiles,
-      maxChangedLines,
+      ...baseResultFields({
+        stage,
+        riskProfile,
+        maxFiles,
+        maxChangedLines,
+        fileCount: 0,
+        changedLines: 0,
+      }),
       blockedPaths: [],
       message: messageFor("block", "empty", stage),
+      deferred: false,
+      deferredReason: null,
+      evidenceSource: "actual_diff",
     };
   }
 
-  // pre/plan with no files yet is allowed only if plan-text hints are not blocked.
-  // Runner uses stage=plan before the full agent creates any diff; final gate still
-  // fail-closes empty/uncertain/out-of-policy changes after implementation.
+  // pre/plan with no files: explicit deferred — not allowed_docs.
   if (files.length === 0 && (stage === "pre" || stage === "plan")) {
     return {
       decision: "allow",
-      classification: "docs",
-      reasonCode: "allowed_docs",
-      stage,
-      riskProfile,
-      fileCount: 0,
-      changedLines: 0,
-      maxFiles,
-      maxChangedLines,
+      outcome: "defer",
+      classification: "empty",
+      reasonCode: "deferred_no_declared_files",
+      ...baseResultFields({
+        stage,
+        riskProfile,
+        maxFiles,
+        maxChangedLines,
+        fileCount: 0,
+        changedLines: 0,
+      }),
       blockedPaths: [],
-      message: `Stage ${stage}: no files yet; deferred to final gate under ${riskProfile}.`,
+      message: messageFor("allow", "empty", stage, { deferred: true }),
+      deferred: true,
+      deferredReason:
+        stage === "pre" ? "no_declared_files" : "awaiting_actual_diff",
+      evidenceSource: "none",
     };
   }
 
   let changedLines = 0;
   const classes = new Set<GithubRiskPolicyClass>();
   const blockedPaths: string[] = [];
+  const evidenceSource: GithubRiskPolicyEvidenceSource =
+    stage === "final" ? "actual_diff" : "declared_files";
 
   for (const file of files) {
     const cls = classifyPath(file);
@@ -443,16 +589,22 @@ export function evaluateGithubRiskPolicy(
     ) {
       return {
         decision: "block",
+        outcome: "block",
         classification: cls,
         reasonCode: reasonForClass(cls),
-        stage,
-        riskProfile,
-        fileCount: files.length,
-        changedLines,
-        maxFiles,
-        maxChangedLines,
+        ...baseResultFields({
+          stage,
+          riskProfile,
+          maxFiles,
+          maxChangedLines,
+          fileCount: files.length,
+          changedLines,
+        }),
         blockedPaths: [file.path.slice(0, 200)],
         message: messageFor("block", cls, stage),
+        deferred: false,
+        deferredReason: null,
+        evidenceSource,
       };
     }
   }
@@ -460,16 +612,22 @@ export function evaluateGithubRiskPolicy(
   if (files.length > maxFiles || changedLines > maxChangedLines) {
     return {
       decision: "block",
+      outcome: "block",
       classification: "over_limit",
       reasonCode: "blocked_over_limit",
-      stage,
-      riskProfile,
-      fileCount: files.length,
-      changedLines,
-      maxFiles,
-      maxChangedLines,
+      ...baseResultFields({
+        stage,
+        riskProfile,
+        maxFiles,
+        maxChangedLines,
+        fileCount: files.length,
+        changedLines,
+      }),
       blockedPaths: files.slice(0, 8).map((f) => f.path.slice(0, 200)),
       message: messageFor("block", "over_limit", stage),
+      deferred: false,
+      deferredReason: null,
+      evidenceSource,
     };
   }
 
@@ -480,16 +638,22 @@ export function evaluateGithubRiskPolicy(
   if (hasUncertain) {
     return {
       decision: "block",
+      outcome: "block",
       classification: "uncertain",
       reasonCode: "blocked_uncertain",
-      stage,
-      riskProfile,
-      fileCount: files.length,
-      changedLines,
-      maxFiles,
-      maxChangedLines,
+      ...baseResultFields({
+        stage,
+        riskProfile,
+        maxFiles,
+        maxChangedLines,
+        fileCount: files.length,
+        changedLines,
+      }),
       blockedPaths,
       message: messageFor("block", "uncertain", stage),
+      deferred: false,
+      deferredReason: null,
+      evidenceSource,
     };
   }
 
@@ -497,74 +661,104 @@ export function evaluateGithubRiskPolicy(
     // Non-docs source changes require explicit small-bugfix assertion.
     return {
       decision: "block",
+      outcome: "block",
       classification: "uncertain",
       reasonCode: "blocked_uncertain",
-      stage,
-      riskProfile,
-      fileCount: files.length,
-      changedLines,
-      maxFiles,
-      maxChangedLines,
+      ...baseResultFields({
+        stage,
+        riskProfile,
+        maxFiles,
+        maxChangedLines,
+        fileCount: files.length,
+        changedLines,
+      }),
       blockedPaths,
       message:
         `Stage ${stage}: non-docs changes require explicitSmallBugfix with targeted verification; fail closed.`,
+      deferred: false,
+      deferredReason: null,
+      evidenceSource,
     };
   }
 
   if (hasBugfix) {
     return {
       decision: "allow",
+      outcome: "allow",
       classification: "small_bugfix",
       reasonCode: "allowed_small_bugfix",
-      stage,
-      riskProfile,
-      fileCount: files.length,
-      changedLines,
-      maxFiles,
-      maxChangedLines,
+      ...baseResultFields({
+        stage,
+        riskProfile,
+        maxFiles,
+        maxChangedLines,
+        fileCount: files.length,
+        changedLines,
+      }),
       blockedPaths: [],
       message: messageFor("allow", "small_bugfix", stage),
+      deferred: false,
+      deferredReason: null,
+      evidenceSource: "structured_small_bugfix",
     };
   }
 
   if (hasDocs) {
     return {
       decision: "allow",
+      outcome: "allow",
       classification: "docs",
       reasonCode: "allowed_docs",
-      stage,
-      riskProfile,
-      fileCount: files.length,
-      changedLines,
-      maxFiles,
-      maxChangedLines,
+      ...baseResultFields({
+        stage,
+        riskProfile,
+        maxFiles,
+        maxChangedLines,
+        fileCount: files.length,
+        changedLines,
+      }),
       blockedPaths: [],
       message: messageFor("allow", "docs", stage),
+      deferred: false,
+      deferredReason: null,
+      evidenceSource,
     };
   }
 
   return {
     decision: "block",
+    outcome: "block",
     classification: "uncertain",
     reasonCode: "blocked_uncertain",
-    stage,
-    riskProfile,
-    fileCount: files.length,
-    changedLines,
-    maxFiles,
-    maxChangedLines,
+    ...baseResultFields({
+      stage,
+      riskProfile,
+      maxFiles,
+      maxChangedLines,
+      fileCount: files.length,
+      changedLines,
+    }),
     blockedPaths,
     message: messageFor("block", "uncertain", stage),
+    deferred: false,
+    deferredReason: null,
+    evidenceSource,
   };
 }
 
 /**
  * Convenience: final gate must be allow before publisher may push.
+ * Deferred pre/plan outcomes never satisfy publish.
  */
 export function assertGithubRiskPolicyAllowsPublish(
   result: GithubRiskPolicyResult,
 ): void {
-  if (result.decision !== "allow" || result.stage !== "final") {
+  if (
+    result.decision !== "allow" ||
+    result.outcome !== "allow" ||
+    result.deferred ||
+    result.stage !== "final"
+  ) {
     throw new Error(
       `Publish blocked by risk policy (${result.reasonCode}): ${result.message}`,
     );
@@ -574,6 +768,7 @@ export function assertGithubRiskPolicyAllowsPublish(
 /** Safe projection for Settings / jobs (no paths beyond truncated list). */
 export function toGithubRiskPolicySafeProjection(result: GithubRiskPolicyResult): {
   decision: GithubRiskPolicyDecision;
+  outcome: GithubRiskPolicyOutcome;
   classification: GithubRiskPolicyClass;
   reasonCode: GithubRiskPolicyReasonCode;
   stage: GithubRiskPolicyStage;
@@ -583,9 +778,15 @@ export function toGithubRiskPolicySafeProjection(result: GithubRiskPolicyResult)
   maxFiles: number;
   maxChangedLines: number;
   blockedPathCount: number;
+  deferred: boolean;
+  deferredReason: GithubRiskPolicyDeferredReason | null;
+  evidenceSource: GithubRiskPolicyEvidenceSource;
+  policyId: string;
+  policyVersion: string;
 } {
   return {
     decision: result.decision,
+    outcome: result.outcome,
     classification: result.classification,
     reasonCode: result.reasonCode,
     stage: result.stage,
@@ -595,5 +796,20 @@ export function toGithubRiskPolicySafeProjection(result: GithubRiskPolicyResult)
     maxFiles: result.maxFiles,
     maxChangedLines: result.maxChangedLines,
     blockedPathCount: result.blockedPaths.length,
+    deferred: result.deferred,
+    deferredReason: result.deferredReason,
+    evidenceSource: result.evidenceSource,
+    policyId: result.policyId,
+    policyVersion: result.policyVersion,
   };
+}
+
+/**
+ * True when the policy result is an explicit pre/plan defer (empty declared files).
+ * Callers must not treat this as allowed_docs publish permission.
+ */
+export function isGithubRiskPolicyDeferred(
+  result: GithubRiskPolicyResult,
+): boolean {
+  return result.deferred === true || result.outcome === "defer";
 }

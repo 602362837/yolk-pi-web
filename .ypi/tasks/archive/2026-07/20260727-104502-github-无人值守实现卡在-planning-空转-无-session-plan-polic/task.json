@@ -1,0 +1,2215 @@
+{
+  "schemaVersion": 1,
+  "id": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+  "title": "GitHub 无人值守实现卡在 planning 空转：无 session、plan policy 误拦、调度自旋与可观测性闭环",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-27T02:45:02.021Z",
+  "updatedAt": "2026-07-27T04:28:48.815Z",
+  "completedAt": "2026-07-27T04:28:48.784Z",
+  "contextIds": [
+    "pi_019fa172-013a-707c-8875-a0b5c7b1c083"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-0e8f72efd1f13d4ae1e6c8a1",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T02:45:32.780Z",
+      "finishedAt": "2026-07-27T03:05:02.744Z",
+      "runner": "sdk",
+      "childSessionId": "019fa176-9bf8-7049-8f73-710978605f86",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T02-45-32-792Z_019fa176-9bf8-7049-8f73-710978605f86.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa176-9bf8-7049-8f73-710978605f86",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成完整规划并进入 `awaiting_approval`，未修改生产代码。\n\n### 根因链\n\n1. 旧版本将空 plan diff 错判为 `blocked_uncertain`；“模型”并未命中 secret 正则。\n2. retry 后，已处理的 Owner adoption comment 被反复 idempotent replay，提前截断 runner continuation。\n3. scheduler 将无进展的 `running` 重新置为 `queued`，每次 lease 都增加 attempt，形成自旋。\n4. 后续还有潜在断链：缺失 WorkTree `spaceId` 会导致 Session bootstrap 失败；长 lease 无 fencing；共享 `process.env` scrub 会影响 publisher。\n5. UI 缺少 Session、有效进展和阻塞层事实，把 scheduler activity 误报成 Agent 工作。\n\n### 规划产物\n\n目录：\n\n`.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/`\n\n已产出：\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `github-unattended-job-observability-prototype.html`\n- `design.md`\n- `implement.md`\n- `implementation-plan.json`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n- `review.md`\n- `summary.md`\n\nImplementation Plan 已通过 Studio domain mutation 保存，共 8 个子任务；task 已迁移至 `awaiting_approval`。\n\n### 验证\n\n- `test:github-publish-policy`：24 passed\n- `test:github-unattended`：18 passed、1 failed  \n  现存失败：permission/installation 场景意外得到 `implementer_error`，已列为实现前 blocker。\n- UI 设计员已完成 HTML/JS 自检。\n- 未 commit、push 或 merge。\n\n### 主会话需要决定\n\n1. 请用户审批 HTML 原型，尤其是“Agent 状态 / scheduler 状态”双层展示。\n2. 审批 `plan-review.md` 中的完整修复范围。\n3. 批准前不要进入 implementing 或派 implementer。\n4. 建议立即对 #22 执行 per-job pause 止血；完整修复、重启并核对 build provenance 后，才做 reconcile + 单次 retry。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T02:45:32.780Z",
+        "updatedAt": "2026-07-27T03:05:02.744Z",
+        "eventCount": 25391,
+        "lastTextPreview": "已完成完整规划并进入 `awaiting_approval`，未修改生产代码。\n\n### 根因链\n\n1. 旧版本将空 plan diff 错判为 `blocked_uncertain`；“模型”并未命中 secret 正则。\n2. retry 后，已处理的 Owner adoption comment 被反复 idempotent replay，提前截断 runner continuation。\n3. scheduler 将无进展的 `running` 重新置为 `queued`，每次 lease 都增加 attempt，形成自旋。\n4. 后续还有潜在断链：缺失 WorkTree `spaceId` 会导致 Session bootstrap 失败；长 lease 无 fencing；共享 `process.env` scrub 会影响 publisher。\n5. UI 缺少 Session、有效进展和阻塞层事实，把 scheduler activity 误报成 Agent 工作。\n\n### 规划产物\n\n目录：\n\n`.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/`\n\n已产出：\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `github-unattended-job-observability-prototype.html`\n- `design.md`\n- `implement.md`\n- `implementation-plan.json`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n- `review.md`\n- `summary.md`\n\nImplementation Plan 已通过 Studio domain mutation 保存，共 8 个子任务；task 已迁移至 `awaiting_approval`。\n\n### 验证\n\n- `test:github-publish-policy`：24 passed\n- `test:github-unattended`：18 passed、1 failed  \n  现存失败：permission/installation 场景意外得到 `implementer_error`，已列为实现前 blocker。\n- UI 设计员已完成 HTML/JS 自检。\n- 未 commit、push 或 merge。\n\n### 主会话需要决定\n\n1. 请用户审批 HTML 原型，尤其是“Agent 状态 / scheduler 状态”双层展示。\n2. 审批 `plan-review.md` 中的完整修复范围。\n3. 批准前不要进入 implementing 或派 implementer。\n4. 建议立即对 #22 执行 per-job pause 止血；完整修复、重启并核对 build provenance 后，才做 reconcile + 单次 retry。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:03:34.377Z",
+            "toolCallId": "call_2d5wRJTcmaPoBcA1QvybHKz4|fc_09f3230d81a171b1016a66ca8347d0819985a62fecc44eca0b",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/summary.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T03:03:48.787Z",
+            "toolCallId": "call_BtDmL9xIeGav0547wkOyXowZ|fc_09f3230d81a171b1016a66ca8e0d88819981a62dbb513fdd40",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 - <<'PY'\\nfrom pathlib import Path\\nimport re, json\\nroot=Path('.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic')\\nmissing=[]\\nfor f in ['plan-review.md','brief.md','prd.md','ui.md','design.md','implement.md','checks.md','handoff.md']:\\n    text=(root/f).read_text()\\n    for p in re.findall(r'\\\\[[^\\\\]]+\\\\]\\\\(([^)]+)\\\\)', text):\\n        if '://' in p or p.startswith('#'): continue\\n        target=(root/p.split('#',1)[0]).resolve()\\n        if not target.exists(): missing.append((f,p))\\nassert not missing, missing\\njson.loads((root/'implementation-plan.json').read_text())\\nfor f in root.iterdir():\\n    if f.suffix in {'.md','.json','.html'}:\\n        data=f.read_text()\\n        assert '\\\\x00' not in data\\nprint('artifact links/json/text: ok')\\nPY\\nps -p 10846 -o pid=,stat= 2>/dev/null || true\\njq '{status,currentMember,subagents:(.subagents|map({member,status,runId:.id}))}' .ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/task.json\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:03:48.792Z",
+            "toolCallId": "call_BtDmL9xIeGav0547wkOyXowZ|fc_09f3230d81a171b1016a66ca8e0d88819981a62dbb513fdd40",
+            "toolName": "bash",
+            "text": "YPI Studio child sessions may not mutate .ypi/tasks/**/task.json via shell commands. Report the desired task update to the parent session.",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T03:04:09.697Z",
+            "text": "已完成完整规划并进入 `awaiting_approval`，未修改生产代码。\n\n### 根因链\n\n1. 旧版本将空 plan diff 错判为 `blocked_uncertain`；“模型”并未命中 secret 正则。\n2. retry 后，已处理的 Owner adoption comment 被反复 idempotent replay，提前截断 runner continuation。\n3. scheduler 将无进展的 `running` 重新置为 `queued`，每次 lease 都增加 attempt，形成自旋。\n4. 后续还有潜在断链：缺失 WorkTree `spaceId` 会导致 Session bootstrap 失败；长 lease 无 fencing；共享 `process.env` scrub 会影响 publisher。\n5. UI 缺少 Session、有效进展和阻塞层事实，把 scheduler activity 误报成 Agent 工作。\n\n### 规划产物\n\n目录：\n\n`.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/`\n\n已产出：\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `github-unattended-job-observability-prototype.html`\n- `design.md`\n- `implement.md`\n- `implementation-plan.json`\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n- `review.md`\n- `summary.md`\n\nImplementation Plan 已通过 Studio domain mutation 保存，共 8 个子任务；task 已迁移至 `awaiting_approval`。\n\n### 验证\n\n- `test:github-publish-policy`：24 passed\n- `test:github-unattended`：18 passed、1 failed  \n  现存失败：permission/installation 场景意外得到 `implementer_error`，已列为实现前 blocker。\n- UI 设计员已完成 HTML/JS 自检。\n- 未 commit、push 或 merge。\n\n### 主会话需要决定\n\n1. 请用户审批 HTML 原型，尤其是“Agent 状态 / scheduler 状态”双层展示。\n2. 审批 `plan-review.md` 中的完整修复范围。\n3. 批准前不要进入 implementing 或派 implementer。\n4. 建议立即对 #22 执行 per-job pause 止血；完整修复、重启并核对 build provenance 后，才做 reconcile + 单次 retry。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T03:04:09.698Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1313,
+        "tokens": 1014,
+        "tokenSource": "usage",
+        "tps": 136.57,
+        "firstTokenAt": "2026-07-27T03:04:02.110Z",
+        "lastTokenAt": "2026-07-27T03:04:09.535Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-0e8f72efd1f13d4ae1e6c8a1",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/architect-0e8f72efd1f13d4ae1e6c8a1.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T02:45:32.780Z",
+        "finishedAt": "2026-07-27T03:05:02.707Z",
+        "updatedAt": "2026-07-27T03:05:02.707Z",
+        "itemCount": 217,
+        "messageCount": 1,
+        "toolCallCount": 106,
+        "stderrBytes": 0,
+        "bytes": 762437,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa176-9bf8-7049-8f73-710978605f86",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T02-45-32-792Z_019fa176-9bf8-7049-8f73-710978605f86.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-952ec7927d78766253be983b",
+      "subtaskId": "GHA-CLOSE-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T03:22:04.358Z",
+      "finishedAt": "2026-07-27T03:30:12.814Z",
+      "runner": "sdk",
+      "childSessionId": "019fa198-0cd8-7e88-b9d8-3f276cd34d1f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-22-04-376Z_019fa198-0cd8-7e88-b9d8-3f276cd34d1f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa198-0cd8-7e88-b9d8-3f276cd34d1f",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — GHA-CLOSE-01\n\n#### Files Changed\n\n- `lib/github-risk-policy.ts` — stage fact sources; title ≠ planText; pre/plan empty → `outcome=defer` + `deferred_no_declared_files` (not `allowed_docs`); final empty → `blocked_empty_diff`; final ignores free-text title over actual diffs; UI title/plan → `blocked_manual_ui_approval`; evidenceSource/policyVersion on result\n- `lib/github-full-agent-profile.ts` — `GITHUB_UNATTENDED_POLICY_VERSION` → `\"1.1\"`\n- `lib/github-diff-policy.ts` — docs for evidence split; `isGithubFinalDiffAllowed` rejects deferred\n- `lib/github-automation-runner.ts` — plan gate no longer copies `issueTitlePreview` into `planText`\n- `lib/github-automation-types.ts` — frozen observability/disposition contracts (`blockedAtLayer`, `retryability`, `sessionAvailability`, progress counts, legacy defaults, helpers)\n- `lib/github-automation-store.ts` — additive optional job progress/block fields\n- `lib/github-automation-projection.ts` — additive dual-layer job fields + conservative legacy derivation; policy projection uses live policy version\n- `scripts/test-github-publish-policy.mjs` — table-driven stage/title/defer/retryability tests\n- `scripts/test-github-unattended.mjs` — stop copying title into planText\n\n#### Verification\n\n- `npm run test:github-publish-policy` — **28 passed / 0 failed**\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (11 pre-existing warnings)\n- `npm run test:github-unattended` — **18 passed / 1 failed** (pre-existing `permission_missing…` → `implementer_error`; out of GHA-CLOSE-01 scope)\n\n#### Notes / Risks\n\n- Deferred empty plan is wire-compat `decision=allow` + `deferred=true`; UI/events must not show `allowed_docs`.\n- Projection observability is contract-only; full runner/sidecar enrichment is GHA-CLOSE-04.\n- Pre-existing unattended red light remains for GHA-CLOSE-07.\n- No Studio task-status tool in this member runtime — **parent should mark GHA-CLOSE-01 done**.\n- No commit/push.\n\n#### Main session next\n\n1. Checker local review for GHA-CLOSE-01  \n2. Claim **GHA-CLOSE-02** and/or **GHA-CLOSE-03**",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T03:22:04.358Z",
+        "updatedAt": "2026-07-27T03:30:12.814Z",
+        "eventCount": 1897,
+        "lastTextPreview": "### Implementation Complete — GHA-CLOSE-01\n\n#### Files Changed\n\n- `lib/github-risk-policy.ts` — stage fact sources; title ≠ planText; pre/plan empty → `outcome=defer` + `deferred_no_declared_files` (not `allowed_docs`); final empty → `blocked_empty_diff`; final ignores free-text title over actual diffs; UI title/plan → `blocked_manual_ui_approval`; evidenceSource/policyVersion on result\n- `lib/github-full-agent-profile.ts` — `GITHUB_UNATTENDED_POLICY_VERSION` → `\"1.1\"`\n- `lib/github-diff-policy.ts` — docs for evidence split; `isGithubFinalDiffAllowed` rejects deferred\n- `lib/github-automation-runner.ts` — plan gate no longer copies `issueTitlePreview` into `planText`\n- `lib/github-automation-types.ts` — frozen observability/disposition contracts (`blockedAtLayer`, `retryability`, `sessionAvailability`, progress counts, legacy defaults, helpers)\n- `lib/github-automation-store.ts` — additive optional job progress/block fields\n- `lib/github-automation-projection.ts` — additive dual-layer job fields + conservative legacy derivation; policy projection uses live policy version\n- `scripts/test-github-publish-policy.mjs` — table-driven stage/title/defer/retryability tests\n- `scripts/test-github-unattended.mjs` — stop copying title into planText\n\n#### Verification\n\n- `npm run test:github-publish-policy` — **28 passed / 0 failed**\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (11 pre-existing warnings)\n- `npm run test:github-unattended` — **18 passed / 1 failed** (pre-existing `permission_missing…` → `implementer_error`; out of GHA-CLOSE-01 scope)\n\n#### Notes / Risks\n\n- Deferred empty plan is wire-compat `decision=allow` + `deferred=true`; UI/events must not show `allowed_docs`.\n- Projection observability is contract-only; full runner/sidecar enrichment is GHA-CLOSE-04.\n- Pre-existing unattended red light remains for GHA-CLOSE-07.\n- No Studio task-status tool in this member runtime — **parent should mark GHA-CLOSE-01 done**.\n- No commit/push.\n\n#### Main session next\n\n1. Checker local review for GHA-CLOSE-01  \n2. Claim **GHA-CLOSE-02** and/or **GHA-CLOSE-03**",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:29:46.461Z",
+            "toolCallId": "call-c7f304a3-b54d-45f3-843d-fb5970d293d5-44|fc_c05b4c14-bd37-9b0f-aded-23994a9fa483_0",
+            "toolName": "bash",
+            "text": "blocked_manual_ui_approval ui_interaction plan_text block\n{\n  decision: 'allow',\n  outcome: 'defer',\n  classification: 'empty',\n  reasonCode: 'deferred_no_declared_files',\n  stage: 'plan',\n  riskProfile: 'docs-and-small-bugfix',\n  fileCount: 0,\n  changedLines: 0,\n  maxFiles: 12,\n  maxChangedLines: 500,\n  policyId: 'docs-and-small-bugfix',\n  policyVersion: '1.1',\n  blockedPaths: [],\n  message: 'Stage plan: no declared files yet; deferred to a later gate under docs-and-small-bugfix (not an allowed_docs publish decision).',\n  deferred: true,\n  deferredReason: 'awaiting_actual_diff',\n  evidenceSource: 'none'\n}\n(node:27869) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n{\n  \"attempt\": 279,\n  \"schedulerState\": \"queued\",\n  \"agentExecutionState\": \"unknown\",\n  \"sessionAvailability\": \"unknown_legacy\",\n  \"counts\": {\n    \"schedulerRuns\": 279,\n    \"agentRuns\": 0,\n    \"noProgressRuns\": 0,\n    \"meaningfulProgress\": 0\n  },\n  \"blockedAtLayer\": null,\n  \"retryability\": \"automatic\"\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T03:29:57.067Z",
+            "toolCallId": "call-bfbcc589-a8bd-4434-a1d7-95dee4935a86-45|fc_81264aaf-b6ed-971c-90fa-949ee52a705c_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg -n \\\"planText:\\\" lib/ scripts/ --glob '*.{ts,mjs}' | head -30; npm run test:github-publish-policy 2>&1 | tail -15\",\n  \"timeout\": 90\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:29:58.425Z",
+            "toolCallId": "call-bfbcc589-a8bd-4434-a1d7-95dee4935a86-45|fc_81264aaf-b6ed-971c-90fa-949ee52a705c_0",
+            "toolName": "bash",
+            "text": "lib/github-automation-runner.ts:765:          planText: null,\nlib/github-risk-policy.ts:486:      planText: input.planText,\nscripts/test-github-unattended.mjs:939:    planText: null,\nscripts/test-github-publish-policy.mjs:189:    planText: \"需要改 Settings 页面交互\",\nscripts/test-github-publish-policy.mjs:198:    planText: \"prepare npm publish release\",\nscripts/test-github-publish-policy.mjs:222:      planText: null,\nscripts/test-github-publish-policy.mjs:239:    planText: null,\nscripts/test-github-publish-policy.mjs:249:    planText: null,\nscripts/test-github-publish-policy.mjs:262:    planText: null,\nscripts/test-github-publish-policy.mjs:275:    planText: null,\nscripts/test-github-publish-policy.mjs:288:    planText: \"需要改 Settings 页面交互\",\nscripts/test-github-publish-policy.mjs:298:    planText: null,\nlib/github-diff-policy.ts:319:    planText: input.planText ?? null,\nok - PR body has exactly one same-repo Fixes #N and blocks cross-repo\nok - selectReusableGithubPr prefers open same head/base\nok - credential-free remote URL never embeds token\nok - publisher target validation rejects main head and mismatched repo\nok - askpass helper is 0700-ish and cleanup removes token file\nok - publish refuses without final/checker/validation gates\nok - createOrReuse PR reuses existing open PR and never embeds token\nok - createOrReuse creates PR when none exists; body has Fixes #N\nok - push uses askpass env and credential-free origin; no force\nok - publisher forbidden flags helper lists force/main protections\nok - end-to-end publishGithubAutomationChange with mocks\nok - skills document App author, machine assignee, residual risk, Fixes contract\nok - publisher and policy modules redact and avoid shell Issue interpolation\n\npassed=28 failed=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T03:30:12.806Z",
+            "text": "### Implementation Complete — GHA-CLOSE-01\n\n#### Files Changed\n\n- `lib/github-risk-policy.ts` — stage fact sources; title ≠ planText; pre/plan empty → `outcome=defer` + `deferred_no_declared_files` (not `allowed_docs`); final empty → `blocked_empty_diff`; final ignores free-text title over actual diffs; UI title/plan → `blocked_manual_ui_approval`; evidenceSource/policyVersion on result\n- `lib/github-full-agent-profile.ts` — `GITHUB_UNATTENDED_POLICY_VERSION` → `\"1.1\"`\n- `lib/github-diff-policy.ts` — docs for evidence split; `isGithubFinalDiffAllowed` rejects deferred\n- `lib/github-automation-runner.ts` — plan gate no longer copies `issueTitlePreview` into `planText`\n- `lib/github-automation-types.ts` — frozen observability/disposition contracts (`blockedAtLayer`, `retryability`, `sessionAvailability`, progress counts, legacy defaults, helpers)\n- `lib/github-automation-store.ts` — additive optional job progress/block fields\n- `lib/github-automation-projection.ts` — additive dual-layer job fields + conservative legacy derivation; policy projection uses live policy version\n- `scripts/test-github-publish-policy.mjs` — table-driven stage/title/defer/retryability tests\n- `scripts/test-github-unattended.mjs` — stop copying title into planText\n\n#### Verification\n\n- `npm run test:github-publish-policy` — **28 passed / 0 failed**\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (11 pre-existing warnings)\n- `npm run test:github-unattended` — **18 passed / 1 failed** (pre-existing `permission_missing…` → `implementer_error`; out of GHA-CLOSE-01 scope)\n\n#### Notes / Risks\n\n- Deferred empty plan is wire-compat `decision=allow` + `deferred=true`; UI/events must not show `allowed_docs`.\n- Projection observability is contract-only; full runner/sidecar enrichment is GHA-CLOSE-04.\n- Pre-existing unattended red light remains for GHA-CLOSE-07.\n- No Studio task-status tool in this member runtime — **parent should mark GHA-CLOSE-01 done**.\n- No commit/push.\n\n#### Main session next\n\n1. Checker local review for GHA-CLOSE-01  \n2. Claim **GHA-CLOSE-02** and/or **GHA-CLOSE-03**",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T03:30:12.808Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2752,
+        "tokens": 927,
+        "tokenSource": "usage",
+        "tps": 1.97,
+        "firstTokenAt": "2026-07-27T03:22:22.836Z",
+        "lastTokenAt": "2026-07-27T03:30:12.790Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-952ec7927d78766253be983b",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/implementer-952ec7927d78766253be983b.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T03:22:04.358Z",
+        "finishedAt": "2026-07-27T03:30:12.811Z",
+        "updatedAt": "2026-07-27T03:30:12.811Z",
+        "itemCount": 105,
+        "messageCount": 7,
+        "toolCallCount": 46,
+        "stderrBytes": 0,
+        "bytes": 224202,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa198-0cd8-7e88-b9d8-3f276cd34d1f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-22-04-376Z_019fa198-0cd8-7e88-b9d8-3f276cd34d1f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-aca2041da7ba9af4a187ac3f",
+      "subtaskId": "GHA-CLOSE-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T03:30:25.768Z",
+      "finishedAt": "2026-07-27T03:38:24.133Z",
+      "runner": "sdk",
+      "childSessionId": "019fa19f-b372-7232-be18-160feb881071",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-30-25-778Z_019fa19f-b372-7232-be18-160feb881071.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa19f-b372-7232-be18-160feb881071",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — GHA-CLOSE-03\n\n#### Files Changed\n\n- `lib/github-automation-worktree.ts` — `spaceId` on ensure result; `resolveGithubAutomationWorktreeSpaceId()` (sync + pathKey read-back) for create/reuse\n- `lib/github-automation-runner.ts` — persist `spaceId`; repair legacy sidecars; parent Session bootstrap requires `projectId+spaceId`; bootstrap failure → visible `blocked` / `session_bootstrap_transient` (no silent Agent-active); no shared `process.env` scrub\n- `lib/github-automation-session.ts` — `buildGithubUnattendedScrubbedEnv()` copy; bootstrap requires paired ids; full-agent uses `toolEnv` (no `delete process.env`)\n- `lib/ypi-studio-child-session-runner.ts` — optional `toolEnv` → bash `spawnHook` with scrubbed env via `createBashToolDefinition` override\n- `lib/agent-session-bootstrap.ts` — comment: do not use `beforeStart` to mutate shared env\n- `scripts/test-github-unattended-runner.mjs` — spaceId / bootstrap pair / env preserve / no-delete-process.env regressions\n- `scripts/test-github-unattended.mjs` — permission/installation fixture seeds `spaceId` + real Studio task so publish path is exercised\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** (fixed prior `permission_missing` red) |\n| `npm run test:project-space-session-index` | store group green |\n| `npm run test:studio-sdk-runner` | pass |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| `npm run lint` | 0 errors (11 pre-existing warnings) |\n\n#### Notes / Risks\n\n- Env isolation is **per-run scrubbed copy for bash spawn**, not a full OS sandbox or separate Node host process. Same-user file/network residual risk remains (by design).\n- Child session still inherits parent `projectId/spaceId` from parent JSONL header (existing path); bootstrap now **must** write those headers first.\n- Shared with GHA-CLOSE-02: `lib/github-automation-runner.ts` — coordinate merge if both land.\n- **Studio tool unavailable here** — parent should mark GHA-CLOSE-03 `done` via `ypi_studio_task(update_implementation_subtask)`.\n- No commit/push.\n\n#### Decisions needed from main session\n\n- Mark GHA-CLOSE-03 done and continue GHA-CLOSE-02 / 04 as planned.\n- Optional later: true isolated SDK **child process** host if bash-only env scrub is insufficient product-wise.",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T03:30:25.768Z",
+        "updatedAt": "2026-07-27T03:38:24.133Z",
+        "eventCount": 2898,
+        "lastTextPreview": "### Implementation Complete — GHA-CLOSE-03\n\n#### Files Changed\n\n- `lib/github-automation-worktree.ts` — `spaceId` on ensure result; `resolveGithubAutomationWorktreeSpaceId()` (sync + pathKey read-back) for create/reuse\n- `lib/github-automation-runner.ts` — persist `spaceId`; repair legacy sidecars; parent Session bootstrap requires `projectId+spaceId`; bootstrap failure → visible `blocked` / `session_bootstrap_transient` (no silent Agent-active); no shared `process.env` scrub\n- `lib/github-automation-session.ts` — `buildGithubUnattendedScrubbedEnv()` copy; bootstrap requires paired ids; full-agent uses `toolEnv` (no `delete process.env`)\n- `lib/ypi-studio-child-session-runner.ts` — optional `toolEnv` → bash `spawnHook` with scrubbed env via `createBashToolDefinition` override\n- `lib/agent-session-bootstrap.ts` — comment: do not use `beforeStart` to mutate shared env\n- `scripts/test-github-unattended-runner.mjs` — spaceId / bootstrap pair / env preserve / no-delete-process.env regressions\n- `scripts/test-github-unattended.mjs` — permission/installation fixture seeds `spaceId` + real Studio task so publish path is exercised\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** (fixed prior `permission_missing` red) |\n| `npm run test:project-space-session-index` | store group green |\n| `npm run test:studio-sdk-runner` | pass |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| `npm run lint` | 0 errors (11 pre-existing warnings) |\n\n#### Notes / Risks\n\n- Env isolation is **per-run scrubbed copy for bash spawn**, not a full OS sandbox or separate Node host process. Same-user file/network residual risk remains (by design).\n- Child session still inherits parent `projectId/spaceId` from parent JSONL header (existing path); bootstrap now **must** write those headers first.\n- Shared with GHA-CLOSE-02: `lib/github-automation-runner.ts` — coordinate merge if both land.\n- **Studio tool unavailable here** — parent should mark GHA-CLOSE-03 `done` via `ypi_studio_task(update_implementation_subtask)`.\n- No commit/push.\n\n#### Decisions needed from main session\n\n- Mark GHA-CLOSE-03 done and continue GHA-CLOSE-02 / 04 as planned.\n- Optional later: true isolated SDK **child process** host if bash-only env scrub is insufficient product-wise.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:38:02.257Z",
+            "toolCallId": "call-cc74e779-782a-4ade-b6a0-0058584f6efa-76|fc_27b5d4d1-dd84-9325-8753-a6c0d24ffc52_0",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/github-automation-runner.ts.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T03:38:04.702Z",
+            "toolCallId": "call-ae0394ca-fba7-4585-b96d-0aa3ecd33ab1-77|fc_d3f8758b-823a-957a-9cba-49528870f646_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run test:github-unattended-runner 2>&1 | tail -30; npm run test:github-unattended 2>&1 | tail -30; node_modules/.bin/tsc --noEmit 2>&1; echo tsc_exit=$?\",\n  \"timeout\": 180\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:38:12.538Z",
+            "toolCallId": "call-ae0394ca-fba7-4585-b96d-0aa3ecd33ab1-77|fc_d3f8758b-823a-957a-9cba-49528870f646_0",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.3 test:github-unattended-runner\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended-runner.mjs\n\n(node:35506) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - full-agent profile is not sandboxed and keeps residual risk codes\nok - scrubGithubAutomationOwnedSecretsFromEnv removes App/machine env keys\nok - validation commands come from config only; Issue cannot set them\nok - branch name is deterministic and not derived from Issue title\nok - resolve project root requires Project Registry membership\nok - ensureGithubAutomationWorktree creates and reuses one path per generation\nok - ensure unattended Studio task records owner+policy without interactive grant\nok - UI fail-closed policyGrant cannot authorize implementing\nok - start gates require unattended mode, complete claim, allowlist root\nok - queue without unattended parks at accepted_waiting_automation (P0 path)\nok - pause request and retry wake keep injectsCommentText=false\nok - TEST-04 structured pause/retry never accept free-text comment injection\nok - runner state refuses secret markers\nok - source modules document residual risk and do not claim host isolation\nok - resolveGithubAutomationWorktreeSpaceId read-back works after ensure\nok - bootstrapGithubAutomationAgentSession requires projectId+spaceId pair\nok - buildGithubUnattendedScrubbedEnv is a copy and preserves process.env\nok - session/runner sources no longer delete shared process.env\n\npassed=18 failed=0\n\n> @alan-zhao/yolk-pi-web@0.8.3 test:github-unattended\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended.mjs\n\n(node:36085) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - full-agent residual risk is explicit and not a sandbox claim\nok - nonowner authorization never starts unattended implementation\nok - incomplete assignee claim never starts full agent\nok - malicious Issue excerpt stays untrusted; secrets are not injected into prompt/env/task\nok - stale plan revision invalidates unattended implementing authorization\nok - high-risk final diff blocks publish; docs final diff can allow\nok - singleStep restart reuses one WorkTree/task and does not fork generation\nok - E2E docs path: owner+claim → worktree → validation → one unmerged PR\nok - E2E high-risk path blocks at final policy and never opens PR\nok - 429 github_rate_limited maps to retryable publish error\nok - permission_missing and installation_missing block without fallback identity\nok - unknown publish outcome reconciles existing PR without token leak\nok - pause at checkpoint does not inject comment text; wake resumes same job\nok - retry from plan-policy blocked rolls back to studio_task_ready so session can start\nok - TEST-04 owner comment free text never enters prompt/task/runner/validation\nok - automation store under PI_CODING_AGENT_DIR has no credential sentinels\nok - App client rate-limit and auth failures never embed tokens in errors\nok - docs state P1 default-off, full-agent residual risk, low-priv recommendation\nok - source modules keep residual risk wording and no host-isolation claim\n\npassed=19 failed=0\ntsc_exit=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T03:38:24.118Z",
+            "text": "### Implementation Complete — GHA-CLOSE-03\n\n#### Files Changed\n\n- `lib/github-automation-worktree.ts` — `spaceId` on ensure result; `resolveGithubAutomationWorktreeSpaceId()` (sync + pathKey read-back) for create/reuse\n- `lib/github-automation-runner.ts` — persist `spaceId`; repair legacy sidecars; parent Session bootstrap requires `projectId+spaceId`; bootstrap failure → visible `blocked` / `session_bootstrap_transient` (no silent Agent-active); no shared `process.env` scrub\n- `lib/github-automation-session.ts` — `buildGithubUnattendedScrubbedEnv()` copy; bootstrap requires paired ids; full-agent uses `toolEnv` (no `delete process.env`)\n- `lib/ypi-studio-child-session-runner.ts` — optional `toolEnv` → bash `spawnHook` with scrubbed env via `createBashToolDefinition` override\n- `lib/agent-session-bootstrap.ts` — comment: do not use `beforeStart` to mutate shared env\n- `scripts/test-github-unattended-runner.mjs` — spaceId / bootstrap pair / env preserve / no-delete-process.env regressions\n- `scripts/test-github-unattended.mjs` — permission/installation fixture seeds `spaceId` + real Studio task so publish path is exercised\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** (fixed prior `permission_missing` red) |\n| `npm run test:project-space-session-index` | store group green |\n| `npm run test:studio-sdk-runner` | pass |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| `npm run lint` | 0 errors (11 pre-existing warnings) |\n\n#### Notes / Risks\n\n- Env isolation is **per-run scrubbed copy for bash spawn**, not a full OS sandbox or separate Node host process. Same-user file/network residual risk remains (by design).\n- Child session still inherits parent `projectId/spaceId` from parent JSONL header (existing path); bootstrap now **must** write those headers first.\n- Shared with GHA-CLOSE-02: `lib/github-automation-runner.ts` — coordinate merge if both land.\n- **Studio tool unavailable here** — parent should mark GHA-CLOSE-03 `done` via `ypi_studio_task(update_implementation_subtask)`.\n- No commit/push.\n\n#### Decisions needed from main session\n\n- Mark GHA-CLOSE-03 done and continue GHA-CLOSE-02 / 04 as planned.\n- Optional later: true isolated SDK **child process** host if bash-only env scrub is insufficient product-wise.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T03:38:24.126Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3111,
+        "tokens": 749,
+        "tokenSource": "usage",
+        "tps": 1.59,
+        "firstTokenAt": "2026-07-27T03:30:34.068Z",
+        "lastTokenAt": "2026-07-27T03:38:24.092Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-aca2041da7ba9af4a187ac3f",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/implementer-aca2041da7ba9af4a187ac3f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T03:30:25.768Z",
+        "finishedAt": "2026-07-27T03:38:24.127Z",
+        "updatedAt": "2026-07-27T03:38:24.127Z",
+        "itemCount": 166,
+        "messageCount": 6,
+        "toolCallCount": 78,
+        "stderrBytes": 0,
+        "bytes": 340447,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019fa19f-b372-7232-be18-160feb881071",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-30-25-778Z_019fa19f-b372-7232-be18-160feb881071.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-ff33e5594af6c0ee13e3d6f8",
+      "subtaskId": "GHA-CLOSE-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T03:30:25.751Z",
+      "finishedAt": "2026-07-27T03:45:54.835Z",
+      "runner": "sdk",
+      "childSessionId": "019fa19f-b370-706d-82b6-887fafa36ed4",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-30-25-776Z_019fa19f-b370-706d-82b6-887fafa36ed4.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa19f-b370-706d-82b6-887fafa36ed4",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — GHA-CLOSE-02\n\n#### Files Changed\n\n- `lib/github-automation-types.ts` — `buildGithubAutomationBlockFingerprint`, unattended continuation phase helpers\n- `lib/github-automation-store.ts` — lease heartbeat/fencing, `pendingCommand`, fenced job writes, process epoch\n- `lib/github-automation-scheduler.ts` — explicit disposition, no-progress backoff (no immediate queued park), inFlight-aware stale reconcile, heartbeat under lease\n- `lib/github-issue-triage-runner.ts` — `remote_confirmed` command does **not** cut off active unattended phases; `pendingCommand` consume; fall through to runner\n- `scripts/test-github-automation.mjs` — 4 GHA-CLOSE-02 regressions (fallthrough ×20, no-spin, fencing, inFlight)\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **98 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** (incl. prior red light fixed in tree) |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| `npm run lint` | pass (0 errors; pre-existing warnings only) |\n\n#### Notes / Risks\n\n- **Out of scope (GHA-CLOSE-03+)**: Session/spaceId bootstrap, isolated SDK host env, safe projection UI, #22 operator reconcile runbook — not done here.\n- **#22 recovery** still needs deploy/restart + operator pause/reconcile/retry (GHA-CLOSE-05); this change stops the command-replay spin once new code is live.\n- **Disposition adoption is additive**: handlers without `disposition` get conservative inference; status-only commands on non-unattended phases use `waiting/external`.\n- Could not call `ypi_studio_task(update_implementation_subtask)` from this environment — **main session should mark GHA-CLOSE-02 `done`**.\n\n#### Decisions needed from main session\n\n1. Mark **GHA-CLOSE-02 done** in Studio plan.\n2. Proceed to **GHA-CLOSE-03** (or checker local review on 02 first, per plan).\n3. Do **not** operator-retry #22 until 02–05 + full process restart.",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T03:30:25.751Z",
+        "updatedAt": "2026-07-27T03:45:54.835Z",
+        "eventCount": 3277,
+        "lastTextPreview": "### Implementation Complete — GHA-CLOSE-02\n\n#### Files Changed\n\n- `lib/github-automation-types.ts` — `buildGithubAutomationBlockFingerprint`, unattended continuation phase helpers\n- `lib/github-automation-store.ts` — lease heartbeat/fencing, `pendingCommand`, fenced job writes, process epoch\n- `lib/github-automation-scheduler.ts` — explicit disposition, no-progress backoff (no immediate queued park), inFlight-aware stale reconcile, heartbeat under lease\n- `lib/github-issue-triage-runner.ts` — `remote_confirmed` command does **not** cut off active unattended phases; `pendingCommand` consume; fall through to runner\n- `scripts/test-github-automation.mjs` — 4 GHA-CLOSE-02 regressions (fallthrough ×20, no-spin, fencing, inFlight)\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **98 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** (incl. prior red light fixed in tree) |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| `npm run lint` | pass (0 errors; pre-existing warnings only) |\n\n#### Notes / Risks\n\n- **Out of scope (GHA-CLOSE-03+)**: Session/spaceId bootstrap, isolated SDK host env, safe projection UI, #22 operator reconcile runbook — not done here.\n- **#22 recovery** still needs deploy/restart + operator pause/reconcile/retry (GHA-CLOSE-05); this change stops the command-replay spin once new code is live.\n- **Disposition adoption is additive**: handlers without `disposition` get conservative inference; status-only commands on non-unattended phases use `waiting/external`.\n- Could not call `ypi_studio_task(update_implementation_subtask)` from this environment — **main session should mark GHA-CLOSE-02 `done`**.\n\n#### Decisions needed from main session\n\n1. Mark **GHA-CLOSE-02 done** in Studio plan.\n2. Proceed to **GHA-CLOSE-03** (or checker local review on 02 first, per plan).\n3. Do **not** operator-retry #22 until 02–05 + full process restart.",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T03:45:16.198Z",
+            "toolCallId": "call-cd4ed462-250d-488e-9c9c-a8704c98b584-71|fc_300e5c3d-141b-92f6-a379-8c4627d9f300_1",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node_modules/.bin/tsc --noEmit 2>&1 | head -40; npm run lint 2>&1 | tail -30\",\n  \"timeout\": 180\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:45:18.796Z",
+            "toolCallId": "call-cd4ed462-250d-488e-9c9c-a8704c98b584-70|fc_300e5c3d-141b-92f6-a379-8c4627d9f300_0",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.3 test:github-unattended\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended.mjs\n\n(node:39732) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - full-agent residual risk is explicit and not a sandbox claim\nok - nonowner authorization never starts unattended implementation\nok - incomplete assignee claim never starts full agent\nok - malicious Issue excerpt stays untrusted; secrets are not injected into prompt/env/task\nok - stale plan revision invalidates unattended implementing authorization\nok - high-risk final diff blocks publish; docs final diff can allow\nok - singleStep restart reuses one WorkTree/task and does not fork generation\nok - E2E docs path: owner+claim → worktree → validation → one unmerged PR\nok - E2E high-risk path blocks at final policy and never opens PR\nok - 429 github_rate_limited maps to retryable publish error\nok - permission_missing and installation_missing block without fallback identity\nok - unknown publish outcome reconciles existing PR without token leak\nok - pause at checkpoint does not inject comment text; wake resumes same job\nok - retry from plan-policy blocked rolls back to studio_task_ready so session can start\nok - TEST-04 owner comment free text never enters prompt/task/runner/validation\nok - automation store under PI_CODING_AGENT_DIR has no credential sentinels\nok - App client rate-limit and auth failures never embed tokens in errors\nok - docs state P1 default-off, full-agent residual risk, low-priv recommendation\nok - source modules keep residual risk wording and no host-isolation claim\n\npassed=19 failed=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:45:38.110Z",
+            "toolCallId": "call-cd4ed462-250d-488e-9c9c-a8704c98b584-71|fc_300e5c3d-141b-92f6-a379-8c4627d9f300_1",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.3 lint\n> eslint .\n\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/archive/2026-07/20260714-100411-完善计费模块与模型价格配置/pre01-verification.mjs\n  14:33  warning  'readFileSync' is defined but never used  @typescript-eslint/no-unused-vars\n  87:12  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/components/ChatMinimap.tsx\n  158:9  warning  The 'scrollToMinimapRatio' function makes the dependencies of useCallback Hook (at line 191) change on every render. Move it inside the useCallback callback. Alternatively, wrap the definition of 'scrollToMinimapRatio' in its own useCallback() Hook  react-hooks/exhaustive-deps\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/antigravity-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  127:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/grok-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  128:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/scripts/test-model-prices.mjs\n  17:22  warning  'mkdirSync' is defined but never used                         @typescript-eslint/no-unused-vars\n  35:3   warning  'MODEL_PRICE_MAX_VALUE' is assigned a value but never used    @typescript-eslint/no-unused-vars\n  46:3   warning  'getModelsJsonBackupPath' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  78:10  warning  'assertStringNotContains' is defined but never used           @typescript-eslint/no-unused-vars\n\n✖ 11 problems (0 errors, 11 warnings)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T03:45:54.821Z",
+            "text": "### Implementation Complete — GHA-CLOSE-02\n\n#### Files Changed\n\n- `lib/github-automation-types.ts` — `buildGithubAutomationBlockFingerprint`, unattended continuation phase helpers\n- `lib/github-automation-store.ts` — lease heartbeat/fencing, `pendingCommand`, fenced job writes, process epoch\n- `lib/github-automation-scheduler.ts` — explicit disposition, no-progress backoff (no immediate queued park), inFlight-aware stale reconcile, heartbeat under lease\n- `lib/github-issue-triage-runner.ts` — `remote_confirmed` command does **not** cut off active unattended phases; `pendingCommand` consume; fall through to runner\n- `scripts/test-github-automation.mjs` — 4 GHA-CLOSE-02 regressions (fallthrough ×20, no-spin, fencing, inFlight)\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **98 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** (incl. prior red light fixed in tree) |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| `npm run lint` | pass (0 errors; pre-existing warnings only) |\n\n#### Notes / Risks\n\n- **Out of scope (GHA-CLOSE-03+)**: Session/spaceId bootstrap, isolated SDK host env, safe projection UI, #22 operator reconcile runbook — not done here.\n- **#22 recovery** still needs deploy/restart + operator pause/reconcile/retry (GHA-CLOSE-05); this change stops the command-replay spin once new code is live.\n- **Disposition adoption is additive**: handlers without `disposition` get conservative inference; status-only commands on non-unattended phases use `waiting/external`.\n- Could not call `ypi_studio_task(update_implementation_subtask)` from this environment — **main session should mark GHA-CLOSE-02 `done`**.\n\n#### Decisions needed from main session\n\n1. Mark **GHA-CLOSE-02 done** in Studio plan.\n2. Proceed to **GHA-CLOSE-03** (or checker local review on 02 first, per plan).\n3. Do **not** operator-retry #22 until 02–05 + full process restart.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T03:45:54.828Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 3008,
+        "tokens": 869,
+        "tokenSource": "usage",
+        "tps": 0.99,
+        "firstTokenAt": "2026-07-27T03:31:14.235Z",
+        "lastTokenAt": "2026-07-27T03:45:54.795Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-ff33e5594af6c0ee13e3d6f8",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/implementer-ff33e5594af6c0ee13e3d6f8.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T03:30:25.751Z",
+        "finishedAt": "2026-07-27T03:45:54.828Z",
+        "updatedAt": "2026-07-27T03:45:54.828Z",
+        "itemCount": 161,
+        "messageCount": 13,
+        "toolCallCount": 72,
+        "stderrBytes": 0,
+        "bytes": 396275,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019fa19f-b370-706d-82b6-887fafa36ed4",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-30-25-776Z_019fa19f-b370-706d-82b6-887fafa36ed4.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-df3174a11deadd6ecb6a29ad",
+      "subtaskId": "GHA-CLOSE-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T03:46:07.067Z",
+      "finishedAt": "2026-07-27T03:53:29.195Z",
+      "runner": "sdk",
+      "childSessionId": "019fa1ae-1077-7a37-9ee7-141e817c8871",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-46-07-095Z_019fa1ae-1077-7a37-9ee7-141e817c8871.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa1ae-1077-7a37-9ee7-141e817c8871",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/github-automation-provenance.ts` — **new** process/package/build/policy provenance helpers\n- `lib/github-automation-projection.ts` — dual-layer job observability + status `runtimeProvenance`; runner sidecar enrichment; safe `workspaceLabel` / `sessionIdShort` / `evaluatedProvenance`\n- `lib/github-automation-scheduler.ts` — stamp `evaluatedCodeRevision` / `evaluatedPolicyVersion` on blocked dispositions\n- `lib/github-automation-runner.ts` — stamp provenance on blocked persists; increment `agentRunCount` after Session bootstrap; mark session bootstrap layer\n- `scripts/test-github-automation.mjs` — GHA-CLOSE-04 forbidden-key / #22 / active / legacy / status / stamp tests\n- `docs/modules/api.md`, `docs/modules/library.md` — additive wire docs\n\n#### Verification\n\n- `npm run test:github-automation` — **104 passed / 0 failed**\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (11 pre-existing warnings)\n\n#### Notes / Risks\n\n- Jobs UI (GHA-CLOSE-06) not updated; additive fields are ignored-safe for old clients.\n- `sessionIdShort` is opaque only (no Session deep link) per plan.\n- Block stamps are best-effort additive; legacy blocks keep `evaluatedProvenance: null` (not fake current runtime).\n- Could not call `ypi_studio_task(update_implementation_subtask)` from this harness — **parent should mark GHA-CLOSE-04 done**.\n\n#### Handoff to main session\n\n- GHA-CLOSE-04 complete; next is **GHA-CLOSE-05** (legacy/#22 reconcile) then UI after HTML approval.\n- No commit/push performed.",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T03:46:07.067Z",
+        "updatedAt": "2026-07-27T03:53:29.195Z",
+        "eventCount": 1768,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/github-automation-provenance.ts` — **new** process/package/build/policy provenance helpers\n- `lib/github-automation-projection.ts` — dual-layer job observability + status `runtimeProvenance`; runner sidecar enrichment; safe `workspaceLabel` / `sessionIdShort` / `evaluatedProvenance`\n- `lib/github-automation-scheduler.ts` — stamp `evaluatedCodeRevision` / `evaluatedPolicyVersion` on blocked dispositions\n- `lib/github-automation-runner.ts` — stamp provenance on blocked persists; increment `agentRunCount` after Session bootstrap; mark session bootstrap layer\n- `scripts/test-github-automation.mjs` — GHA-CLOSE-04 forbidden-key / #22 / active / legacy / status / stamp tests\n- `docs/modules/api.md`, `docs/modules/library.md` — additive wire docs\n\n#### Verification\n\n- `npm run test:github-automation` — **104 passed / 0 failed**\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (11 pre-existing warnings)\n\n#### Notes / Risks\n\n- Jobs UI (GHA-CLOSE-06) not updated; additive fields are ignored-safe for old clients.\n- `sessionIdShort` is opaque only (no Session deep link) per plan.\n- Block stamps are best-effort additive; legacy blocks keep `evaluatedProvenance: null` (not fake current runtime).\n- Could not call `ypi_studio_task(update_implementation_subtask)` from this harness — **parent should mark GHA-CLOSE-04 done**.\n\n#### Handoff to main session\n\n- GHA-CLOSE-04 complete; next is **GHA-CLOSE-05** (legacy/#22 reconcile) then UI after HTML approval.\n- No commit/push performed.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:53:11.360Z",
+            "toolCallId": "call-7558f6ea-0083-4c5b-bbc2-2d8cc84c82ae-51|fc_c20ec314-6c3d-9851-ae46-719b12c978a0_0",
+            "toolName": "bash",
+            "text": "ok - IMP-05 sentinel scan over setup projection + config GET\nok - GHCRED-06 local store first-save permissions generation and restart-import\nok - GHCRED-06 partial rotation atomic generation and blank-preserve\nok - GHCRED-06 env overlay matrix blank fallback and invalid local masking\nok - GHCRED-06 local webhook HMAC pass/fail and env secret override\nok - GHCRED-06 installation token cache clears after local rotation and delete\nok - GHCRED-06 fail-closed malformed future symlink oversize non-RSA and concurrent upsert\nok - GHCRED-06 credentials route GET/PUT/DELETE contracts and sentinel isolation\nok - GHCRED-06 setup/status source semantics and non-credential surfaces stay clean\nok - CMD-03 command parser targets @AppBot / /ypi and legacy adopt\nok - CMD-03 receipt/status builders are Chinese and secret-free\nok - CMD-03 exact owner adopt uses GET comment and writes receipt once\nok - CMD-03 non-owner / global paused / status are fail-closed\nok - TEST-04 g1-g80 self-loop: 100 App edits stay audit-only with zero mutations\nok - TEST-04 exact comment TOCTOU: superseded, author mismatch, historical adopt ignored\nok - TEST-04 pause/continue commands never clear global paused or inject free text\nok - TEST-04 deleted comment + closed lifecycle + schema v1 missing fields fail closed\nok - TEST-04 command effect crash-intent recovers without double side effect\nok - GHA-CLOSE-02 remote_confirmed adoption on planning falls through to runner\nok - GHA-CLOSE-02 no-progress disposition parks retry_due instead of queued spin\nok - GHA-CLOSE-02 lease heartbeat + fencing reject stale owner write\nok - GHA-CLOSE-02 inFlight jobs are skipped by stale-running reconcile\nok - GHA-CLOSE-04 runtime provenance is browser-safe and stable in-process\nok - GHA-CLOSE-04 #22-shaped job projects no Session / policy layer / no Agent active\nok - GHA-CLOSE-04 active session projects Agent implementing + opaque session id\nok - GHA-CLOSE-04 legacy job without additive fields stays unknown_legacy / not active\nok - GHA-CLOSE-04 status projection includes runtimeProvenance and job dual-layer fields\nok - GHA-CLOSE-04 blocked persist stamps evaluated provenance via scheduler disposition\n\npassed=104 failed=0\n---\n---\n\n> @alan-zhao/yolk-pi-web@0.8.3 lint\n> eslint .\n\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/archive/2026-07/20260714-100411-完善计费模块与模型价格配置/pre01-verification.mjs\n  14:33  warning  'readFileSync' is defined but never used  @typescript-eslint/no-unused-vars\n  87:12  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/components/ChatMinimap.tsx\n  158:9  warning  The 'scrollToMinimapRatio' function makes the dependencies of useCallback Hook (at line 191) change on every render. Move it inside the useCallback callback. Alternatively, wrap the definition of 'scrollToMinimapRatio' in its own useCallback() Hook  react-hooks/exhaustive-deps\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/antigravity-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  127:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/grok-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  128:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/scripts/test-model-prices.mjs\n  17:22  warning  'mkdirSync' is defined but never used                         @typescript-eslint/no-unused-vars\n  35:3   warning  'MODEL_PRICE_MAX_VALUE' is assigned a value but never used    @typescript-eslint/no-unused-vars\n  46:3   warning  'getModelsJsonBackupPath' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  78:10  warning  'assertStringNotContains' is defined but never used           @typescript-eslint/no-unused-vars\n\n✖ 11 problems (0 errors, 11 warnings)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T03:53:17.282Z",
+            "toolCallId": "call-0530c149-560e-4ac4-a715-070af39e41f0-52|fc_8d39ba83-c992-97de-8ba8-966d58c937fc_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg -n \\\"runtimeProvenance|GithubAutomationStatus|interface.*Status|jobs\\\\?:\\\" components/GithubAutomationConfig.tsx | head -40; node_modules/.bin/tsc --noEmit 2>&1 | rg -i \\\"github-automation-projection|GithubAutomationConfig|error TS\\\" | head -30; echo exit:$?\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T03:53:19.280Z",
+            "toolCallId": "call-0530c149-560e-4ac4-a715-070af39e41f0-52|fc_8d39ba83-c992-97de-8ba8-966d58c937fc_0",
+            "toolName": "bash",
+            "text": "114:interface RepositoryStatusProjection extends RepositorySafeProjection {\n149:interface StatusProjection {\nexit:0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T03:53:29.185Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/github-automation-provenance.ts` — **new** process/package/build/policy provenance helpers\n- `lib/github-automation-projection.ts` — dual-layer job observability + status `runtimeProvenance`; runner sidecar enrichment; safe `workspaceLabel` / `sessionIdShort` / `evaluatedProvenance`\n- `lib/github-automation-scheduler.ts` — stamp `evaluatedCodeRevision` / `evaluatedPolicyVersion` on blocked dispositions\n- `lib/github-automation-runner.ts` — stamp provenance on blocked persists; increment `agentRunCount` after Session bootstrap; mark session bootstrap layer\n- `scripts/test-github-automation.mjs` — GHA-CLOSE-04 forbidden-key / #22 / active / legacy / status / stamp tests\n- `docs/modules/api.md`, `docs/modules/library.md` — additive wire docs\n\n#### Verification\n\n- `npm run test:github-automation` — **104 passed / 0 failed**\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (11 pre-existing warnings)\n\n#### Notes / Risks\n\n- Jobs UI (GHA-CLOSE-06) not updated; additive fields are ignored-safe for old clients.\n- `sessionIdShort` is opaque only (no Session deep link) per plan.\n- Block stamps are best-effort additive; legacy blocks keep `evaluatedProvenance: null` (not fake current runtime).\n- Could not call `ypi_studio_task(update_implementation_subtask)` from this harness — **parent should mark GHA-CLOSE-04 done**.\n\n#### Handoff to main session\n\n- GHA-CLOSE-04 complete; next is **GHA-CLOSE-05** (legacy/#22 reconcile) then UI after HTML approval.\n- No commit/push performed.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T03:53:29.187Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2014,
+        "tokens": 619,
+        "tokenSource": "usage",
+        "tps": 1.42,
+        "firstTokenAt": "2026-07-27T03:46:12.260Z",
+        "lastTokenAt": "2026-07-27T03:53:29.165Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-df3174a11deadd6ecb6a29ad",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/implementer-df3174a11deadd6ecb6a29ad.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T03:46:07.067Z",
+        "finishedAt": "2026-07-27T03:53:29.191Z",
+        "updatedAt": "2026-07-27T03:53:29.191Z",
+        "itemCount": 115,
+        "messageCount": 5,
+        "toolCallCount": 53,
+        "stderrBytes": 0,
+        "bytes": 326626,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa1ae-1077-7a37-9ee7-141e817c8871",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-46-07-095Z_019fa1ae-1077-7a37-9ee7-141e817c8871.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-eb8f697432983b7fe791cfdb",
+      "subtaskId": "GHA-CLOSE-05",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T03:53:42.994Z",
+      "finishedAt": "2026-07-27T04:01:42.885Z",
+      "runner": "sdk",
+      "childSessionId": "019fa1b5-0566-74f0-a064-3ea75866c805",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-53-43-014Z_019fa1b5-0566-74f0-a064-3ea75866c805.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa1b5-0566-74f0-a064-3ea75866c805",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — GHA-CLOSE-05\n\n#### Files Changed\n\n- `lib/github-automation-runner.ts` — idempotent legacy/#22 reconcile:\n  - `reconcileGithubAutomationLegacyJob` / `consumeGithubAutomationLegacyPendingCommand` / `repairGithubAutomationRunnerSpaceBinding` / `resolveGithubAutomationSafeRecoveryCheckpoint`\n  - `isGithubAutomationDeterministicBlockUnchanged`\n  - `wakeGithubUnattendedJobForRetry` runs reconcile first; preserves `generation` + `attempt`; no g2 / no history delete / no policy skip\n- `lib/github-automation-projection.ts` — retry/resume runs reconcile; deterministic block → `retry_conditions_unchanged`; actions get live runtime provenance\n- `scripts/test-github-automation.mjs` — 4 GHA-CLOSE-05 fixtures (idempotent reconcile, same-gen retry, unchanged-block deny, pre-schema pendingCommand)\n- `docs/operations/troubleshooting.md` — #22 stop-bleed + recover runbook\n- `docs/integrations/github-app-automation-setup.md` — FAQ + operator steps\n- `docs/modules/library.md` / `docs/modules/api.md` — reconcile-on-retry notes\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **108 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n| `npm run lint` | **0 errors** (11 pre-existing warnings) |\n\n#### Notes / Risks\n\n- Reconcile is **best-effort** on `spaceId` (needs Project Registry + real WorkTree path); missing registry leaves `spaceId` null until ensure/reuse later.\n- Deterministic retry deny needs **both** `blockFingerprint` and evaluated provenance matching live process; legacy blocks without stamps still allow one re-eval after deploy.\n- **Did not** pause/retry real #22 (per task boundary).\n- No Studio tool here — **parent should mark GHA-CLOSE-05 `done`** via `ypi_studio_task(update_implementation_subtask)`.\n- No commit/push.\n\n#### Decisions / next for main session\n\n1. Mark **GHA-CLOSE-05 done**.\n2. **GHA-CLOSE-06** still needs explicit HTML prototype approval before Jobs UI.\n3. Operator #22: pause → full restart → confirm `runtimeProvenance` → single retry (reconcile is automatic on retry/resume).",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T03:53:42.994Z",
+        "updatedAt": "2026-07-27T04:01:42.885Z",
+        "eventCount": 1967,
+        "lastTextPreview": "### Implementation Complete — GHA-CLOSE-05\n\n#### Files Changed\n\n- `lib/github-automation-runner.ts` — idempotent legacy/#22 reconcile:\n  - `reconcileGithubAutomationLegacyJob` / `consumeGithubAutomationLegacyPendingCommand` / `repairGithubAutomationRunnerSpaceBinding` / `resolveGithubAutomationSafeRecoveryCheckpoint`\n  - `isGithubAutomationDeterministicBlockUnchanged`\n  - `wakeGithubUnattendedJobForRetry` runs reconcile first; preserves `generation` + `attempt`; no g2 / no history delete / no policy skip\n- `lib/github-automation-projection.ts` — retry/resume runs reconcile; deterministic block → `retry_conditions_unchanged`; actions get live runtime provenance\n- `scripts/test-github-automation.mjs` — 4 GHA-CLOSE-05 fixtures (idempotent reconcile, same-gen retry, unchanged-block deny, pre-schema pendingCommand)\n- `docs/operations/troubleshooting.md` — #22 stop-bleed + recover runbook\n- `docs/integrations/github-app-automation-setup.md` — FAQ + operator steps\n- `docs/modules/library.md` / `docs/modules/api.md` — reconcile-on-retry notes\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **108 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n| `npm run lint` | **0 errors** (11 pre-existing warnings) |\n\n#### Notes / Risks\n\n- Reconcile is **best-effort** on `spaceId` (needs Project Registry + real WorkTree path); missing registry leaves `spaceId` null until ensure/reuse later.\n- Deterministic retry deny needs **both** `blockFingerprint` and evaluated provenance matching live process; legacy blocks without stamps still allow one re-eval after deploy.\n- **Did not** pause/retry real #22 (per task boundary).\n- No Studio tool here — **parent should mark GHA-CLOSE-05 `done`** via `ypi_studio_task(update_implementation_subtask)`.\n- No commit/push.\n\n#### Decisions / next for main session\n\n1. Mark **GHA-CLOSE-05 done**.\n2. **GHA-CLOSE-06** still needs explicit HTML prototype approval before Jobs UI.\n3. Operator #22: pause → full restart → confirm `runtimeProvenance` → single retry (reconcile is automatic on retry/resume).",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T04:01:23.319Z",
+            "toolCallId": "call-11ee3356-5f46-461d-a738-8a407a638a68-45|fc_dea39ede-9a34-9f48-9e43-4a487d0c2fdc_0",
+            "toolName": "bash",
+            "text": "idx 27311\n'github-automation/jobs/[jobId]/` | GET, POST | Safe single-job projection (same dual-layer observability fields as status jobs: scheduler/Agent/session/blocked layer/progress/workspace label/evaluated provenance — never sessionFile/worktreePath); POST `{ action: \"retry\"\\\\|\"pause\"\\\\|\"resume\" }` is state-gated, rate-limited, and may wake the durable job without client-supplied phase/repo/policy/token/command. These are **per-job** controls (same semantic class as Owner `@AppBot 暂停/继续`); they do not '",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T04:01:30.352Z",
+            "toolCallId": "call-17b0efe0-acd5-4fad-a4fc-306b8f7ead00-46|fc_68c7c29d-b83a-9db2-8905-496149ba2156_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"python3 << 'PY'\\nfrom pathlib import Path\\npath = Path('docs/modules/api.md')\\ntext = path.read_text()\\nold = 'POST `{ action: \\\"retry\\\"\\\\\\\\|\\\"pause\\\"\\\\\\\\|\\\"resume\\\" }` is state-gated, rate-limited, and may wake the durable job without client-supplied phase/repo/policy/token/command. These are **per-job** controls (same semantic class as Owner `@AppBot 暂停/继续`); they do not clear global `config.paused`. Pause does not force-kill in-flight Git commands. `no-store`.'\\nnew = 'POST `{ action: \\\"retry\\\"\\\\\\\\|\\\"pause\\\"\\\\\\\\|\\\"resume\\\" }` is state-gated, rate-limited, and may wake the durable job without client-supplied phase/repo/policy/token/command. Retry/resume first run **idempotent legacy reconcile** (consume remote_confirmed owner commands, repair WorkTree `spaceId`, normalize safe checkpoint; preserve generation/`attempt`; never skip policy or create g2). Deterministic blocks with unchanged fingerprint + evaluated provenance return `not_allowed` / `retry_conditions_unchanged`. These are **per-job** controls (same semantic class as Owner `@AppBot 暂停/继续`); they do not clear global `config.paused`. Pause does not force-kill in-flight Git commands. `no-store`.'\\nif old not in text:\\n    raise SystemExit('not found')\\npath.write_text(text.replace(old, new, 1))\\nprint('api.md updated')\\nPY\\n# Sanity: ensure isGithubAutomationDeterministicBlockUnchanged with empty runtime strings doesn't false-positive deny when options empty strings\\n# Current evaluate passes runtime always from projection - good.\\n# Double-check projection import of isGithubAutomationDeterministicBlockUnchanged works with jiti\\nnode --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON -e '\\nimport { createJiti } from \\\"jiti\\\";\\nimport { join, dirname } from \\\"path\\\";\\nimport { fileURLToPath } from \\\"url\\\";\\nconst root = process.cwd();\\nconst jiti = createJiti(join(root, \\\"package.json\\\"), { interopDefault: true });\\nconst r = jiti(join(root, \\\"lib/github-automation-runner.ts\\\"));\\nconsole.log(typeof r.reconcileGithubAutomationLegacyJob, typeof r.isGithubAutomationDeterministicBlockUnchanged);\\n' 2>&1 | tail -5\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T04:01:31.580Z",
+            "toolCallId": "call-17b0efe0-acd5-4fad-a4fc-306b8f7ead00-46|fc_68c7c29d-b83a-9db2-8905-496149ba2156_0",
+            "toolName": "bash",
+            "text": "api.md updated\n(node:47899) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nfunction function",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T04:01:42.875Z",
+            "text": "### Implementation Complete — GHA-CLOSE-05\n\n#### Files Changed\n\n- `lib/github-automation-runner.ts` — idempotent legacy/#22 reconcile:\n  - `reconcileGithubAutomationLegacyJob` / `consumeGithubAutomationLegacyPendingCommand` / `repairGithubAutomationRunnerSpaceBinding` / `resolveGithubAutomationSafeRecoveryCheckpoint`\n  - `isGithubAutomationDeterministicBlockUnchanged`\n  - `wakeGithubUnattendedJobForRetry` runs reconcile first; preserves `generation` + `attempt`; no g2 / no history delete / no policy skip\n- `lib/github-automation-projection.ts` — retry/resume runs reconcile; deterministic block → `retry_conditions_unchanged`; actions get live runtime provenance\n- `scripts/test-github-automation.mjs` — 4 GHA-CLOSE-05 fixtures (idempotent reconcile, same-gen retry, unchanged-block deny, pre-schema pendingCommand)\n- `docs/operations/troubleshooting.md` — #22 stop-bleed + recover runbook\n- `docs/integrations/github-app-automation-setup.md` — FAQ + operator steps\n- `docs/modules/library.md` / `docs/modules/api.md` — reconcile-on-retry notes\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **108 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n| `npm run lint` | **0 errors** (11 pre-existing warnings) |\n\n#### Notes / Risks\n\n- Reconcile is **best-effort** on `spaceId` (needs Project Registry + real WorkTree path); missing registry leaves `spaceId` null until ensure/reuse later.\n- Deterministic retry deny needs **both** `blockFingerprint` and evaluated provenance matching live process; legacy blocks without stamps still allow one re-eval after deploy.\n- **Did not** pause/retry real #22 (per task boundary).\n- No Studio tool here — **parent should mark GHA-CLOSE-05 `done`** via `ypi_studio_task(update_implementation_subtask)`.\n- No commit/push.\n\n#### Decisions / next for main session\n\n1. Mark **GHA-CLOSE-05 done**.\n2. **GHA-CLOSE-06** still needs explicit HTML prototype approval before Jobs UI.\n3. Operator #22: pause → full restart → confirm `runtimeProvenance` → single retry (reconcile is automatic on retry/resume).",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T04:01:42.876Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2459,
+        "tokens": 779,
+        "tokenSource": "usage",
+        "tps": 1.65,
+        "firstTokenAt": "2026-07-27T03:53:50.965Z",
+        "lastTokenAt": "2026-07-27T04:01:42.745Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-eb8f697432983b7fe791cfdb",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/implementer-eb8f697432983b7fe791cfdb.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T03:53:42.994Z",
+        "finishedAt": "2026-07-27T04:01:42.880Z",
+        "updatedAt": "2026-07-27T04:01:42.880Z",
+        "itemCount": 102,
+        "messageCount": 4,
+        "toolCallCount": 47,
+        "stderrBytes": 0,
+        "bytes": 309378,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa1b5-0566-74f0-a064-3ea75866c805",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T03-53-43-014Z_019fa1b5-0566-74f0-a064-3ea75866c805.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-0d29de4606218e0fad61c0a1",
+      "subtaskId": "GHA-CLOSE-06",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T04:01:54.960Z",
+      "finishedAt": "2026-07-27T04:07:02.276Z",
+      "runner": "sdk",
+      "childSessionId": "019fa1bc-8723-755b-9605-9d48c1583843",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T04-01-54-979Z_019fa1bc-8723-755b-9605-9d48c1583843.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa1bc-8723-755b-9605-9d48c1583843",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — GHA-CLOSE-06\n\n#### Files Changed\n\n- `components/GithubAutomationConfig.tsx` — Jobs UI rewritten to dual-layer Agent vs scheduler status; consumes server projection only; expand/rail/facts/filters/stale/provenance; no “第 N 次” / skip-policy\n- `app/globals.css` — job card summary grid, status pair, rail, facts, filters, stale badge, narrow ≤640/390 styles\n- `docs/modules/frontend.md` — `GithubAutomationConfig` Jobs 运行实况 (GHA-CLOSE-06) behavior documented\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (existing repo warnings only)\n- Browser 390px / light-dark manual smoke — **not run here** (needs host UI); structure follows approved HTML prototype\n\n#### Notes / Risks\n\n- Missing additive projection fields → **conservative** `unknown` / `unknown_legacy` (never invents Agent active from `phase`/`status`/`attempt`)\n- Aggregate “调度中/策略阻塞/…” counts are UI-derived from server enums (not a new API field)\n- No Session deep-link added (per plan)\n- **Could not call** `ypi_studio_task(update_implementation_subtask)` — tool not available in this member runtime; main session should mark **GHA-CLOSE-06 = done**\n\n#### Main session next\n\n1. Mark GHA-CLOSE-06 done in Studio plan  \n2. Checker local review  \n3. Proceed GHA-CLOSE-07 (cross-layer regression)",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T04:01:54.960Z",
+        "updatedAt": "2026-07-27T04:07:02.276Z",
+        "eventCount": 1255,
+        "lastTextPreview": "### Implementation Complete — GHA-CLOSE-06\n\n#### Files Changed\n\n- `components/GithubAutomationConfig.tsx` — Jobs UI rewritten to dual-layer Agent vs scheduler status; consumes server projection only; expand/rail/facts/filters/stale/provenance; no “第 N 次” / skip-policy\n- `app/globals.css` — job card summary grid, status pair, rail, facts, filters, stale badge, narrow ≤640/390 styles\n- `docs/modules/frontend.md` — `GithubAutomationConfig` Jobs 运行实况 (GHA-CLOSE-06) behavior documented\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (existing repo warnings only)\n- Browser 390px / light-dark manual smoke — **not run here** (needs host UI); structure follows approved HTML prototype\n\n#### Notes / Risks\n\n- Missing additive projection fields → **conservative** `unknown` / `unknown_legacy` (never invents Agent active from `phase`/`status`/`attempt`)\n- Aggregate “调度中/策略阻塞/…” counts are UI-derived from server enums (not a new API field)\n- No Session deep-link added (per plan)\n- **Could not call** `ypi_studio_task(update_implementation_subtask)` — tool not available in this member runtime; main session should mark **GHA-CLOSE-06 = done**\n\n#### Main session next\n\n1. Mark GHA-CLOSE-06 done in Studio plan  \n2. Checker local review  \n3. Proceed GHA-CLOSE-07 (cross-layer regression)",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T04:06:44.526Z",
+            "toolCallId": "call-37c11bff-78fb-4f23-911f-92d4301f9b53-28|fc_d4b9dca7-5cb1-9af5-84dd-563e2f19b5b9_0",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/components/GithubAutomationConfig.tsx.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T04:06:47.269Z",
+            "toolCallId": "call-5e7d075e-5d7b-4411-bbe7-d0eb849452cc-29|fc_83af3d2d-731a-9fb5-aab7-d1fd5712fb34_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node_modules/.bin/tsc --noEmit 2>&1 | head -40; echo EXIT:$?; rg -n \\\"第 \\\\$\\\\{job\\\\.attempt\\\\}|第 .* 次\\\" components/GithubAutomationConfig.tsx || echo \\\"no legacy attempt wording\\\"\",\n  \"timeout\": 90\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T04:06:49.648Z",
+            "toolCallId": "call-5e7d075e-5d7b-4411-bbe7-d0eb849452cc-29|fc_83af3d2d-731a-9fb5-aab7-d1fd5712fb34_0",
+            "toolName": "bash",
+            "text": "EXIT:0\n171:   * UI labels as \"调度尝试\", never \"第 N 次执行\" / Agent runs.\n4509:                                。不可将其直接翻译为“Agent 正在运行 / 第 N 次执行”。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T04:07:02.269Z",
+            "text": "### Implementation Complete — GHA-CLOSE-06\n\n#### Files Changed\n\n- `components/GithubAutomationConfig.tsx` — Jobs UI rewritten to dual-layer Agent vs scheduler status; consumes server projection only; expand/rail/facts/filters/stale/provenance; no “第 N 次” / skip-policy\n- `app/globals.css` — job card summary grid, status pair, rail, facts, filters, stale badge, narrow ≤640/390 styles\n- `docs/modules/frontend.md` — `GithubAutomationConfig` Jobs 运行实况 (GHA-CLOSE-06) behavior documented\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (existing repo warnings only)\n- Browser 390px / light-dark manual smoke — **not run here** (needs host UI); structure follows approved HTML prototype\n\n#### Notes / Risks\n\n- Missing additive projection fields → **conservative** `unknown` / `unknown_legacy` (never invents Agent active from `phase`/`status`/`attempt`)\n- Aggregate “调度中/策略阻塞/…” counts are UI-derived from server enums (not a new API field)\n- No Session deep-link added (per plan)\n- **Could not call** `ypi_studio_task(update_implementation_subtask)` — tool not available in this member runtime; main session should mark **GHA-CLOSE-06 = done**\n\n#### Main session next\n\n1. Mark GHA-CLOSE-06 done in Studio plan  \n2. Checker local review  \n3. Proceed GHA-CLOSE-07 (cross-layer regression)",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T04:07:02.271Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1645,
+        "tokens": 621,
+        "tokenSource": "usage",
+        "tps": 2.14,
+        "firstTokenAt": "2026-07-27T04:02:11.965Z",
+        "lastTokenAt": "2026-07-27T04:07:02.268Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-0d29de4606218e0fad61c0a1",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/implementer-0d29de4606218e0fad61c0a1.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T04:01:54.960Z",
+        "finishedAt": "2026-07-27T04:07:02.271Z",
+        "updatedAt": "2026-07-27T04:07:02.271Z",
+        "itemCount": 68,
+        "messageCount": 4,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 220333,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa1bc-8723-755b-9605-9d48c1583843",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T04-01-54-979Z_019fa1bc-8723-755b-9605-9d48c1583843.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-b8b0d557da8b514a84efceb8",
+      "subtaskId": "GHA-CLOSE-07",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T04:07:14.461Z",
+      "finishedAt": "2026-07-27T04:13:19.822Z",
+      "runner": "sdk",
+      "childSessionId": "019fa1c1-6731-74ad-a12e-3274a97f7a53",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T04-07-14-481Z_019fa1c1-6731-74ad-a12e-3274a97f7a53.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa1c1-6731-74ad-a12e-3274a97f7a53",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-github-automation.mjs` — 新增 **GHA-CLOSE-07** 跨层回归：\n  - sanitized #22 fixture（reconcile → 有限 tick 无自旋 / 不伪 active）\n  - Jobs UI 双层文案契约（`尚未启动 Agent` / `调度尝试` / 不能跳过策略）\n  - 安全故障注入（无共享 `process.env` 删除、App/machine scrub、publisher 边界）\n  - session bootstrap 可见 blocker（`creating` + `bootstrapping`，非 implementing）\n  - policy matrix 交叉（「模型」defer / empty final / UI final block）\n- `docs/integrations/github-app-automation-setup.md` — 仅去掉 trailing whitespace，满足 `git diff --check`\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **113 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed**（原 `permission_missing…→implementer_error` 红灯已消失） |\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\n| `npm run test:github-publish-policy` | **28 passed / 0 failed** |\n| `npm run test:project-space-session-index -- --group all` | **54 passed / 0 failed** |\n| `npm run test:studio-sdk-runner` | **passed** |\n| `npm run lint` | **0 errors**（11 个既有 warnings） |\n| `node_modules/.bin/tsc --noEmit` | **0** |\n| `git diff --check` | **clean** |\n\nStudio：`GHA-CLOSE-07` 已标 **done**（7/8；next = GHA-CLOSE-08）。\n\n#### Notes / Risks\n\n- GHA-CLOSE-07 为验证子任务：本轮只补测试 + whitespace 门禁，不改生产逻辑。\n- 未做真实浏览器 390px/明暗主题手工 smoke；UI 以源码契约 + 既有 GHA-CLOSE-06 实现为准。\n- 未对现场 #22 做 pause/reconcile/retry mutation；需 operator 在完整重启后按 runbook 执行。\n- **GHA-CLOSE-08**（文档/checker 最终门禁）尚未开始；不要 commit/push。\n\n#### Decisions for main session\n\n1. 派发/执行 **GHA-CLOSE-08** 文档收尾与独立 checker 签收。  \n2. 生产恢复 #22：pause → 完整重启 → provenance 核对 → reconcile → 单次 retry（复用 g1）。",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T04:07:14.461Z",
+        "updatedAt": "2026-07-27T04:13:19.822Z",
+        "eventCount": 2215,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-github-automation.mjs` — 新增 **GHA-CLOSE-07** 跨层回归：\n  - sanitized #22 fixture（reconcile → 有限 tick 无自旋 / 不伪 active）\n  - Jobs UI 双层文案契约（`尚未启动 Agent` / `调度尝试` / 不能跳过策略）\n  - 安全故障注入（无共享 `process.env` 删除、App/machine scrub、publisher 边界）\n  - session bootstrap 可见 blocker（`creating` + `bootstrapping`，非 implementing）\n  - policy matrix 交叉（「模型」defer / empty final / UI final block）\n- `docs/integrations/github-app-automation-setup.md` — 仅去掉 trailing whitespace，满足 `git diff --check`\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **113 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed**（原 `permission_missing…→implementer_error` 红灯已消失） |\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\n| `npm run test:github-publish-policy` | **28 passed / 0 failed** |\n| `npm run test:project-space-session-index -- --group all` | **54 passed / 0 failed** |\n| `npm run test:studio-sdk-runner` | **passed** |\n| `npm run lint` | **0 errors**（11 个既有 warnings） |\n| `node_modules/.bin/tsc --noEmit` | **0** |\n| `git diff --check` | **clean** |\n\nStudio：`GHA-CLOSE-07` 已标 **done**（7/8；next = GHA-CLOSE-08）。\n\n#### Notes / Risks\n\n- GHA-CLOSE-07 为验证子任务：本轮只补测试 + whitespace 门禁，不改生产逻辑。\n- 未做真实浏览器 390px/明暗主题手工 smoke；UI 以源码契约 + 既有 GHA-CLOSE-06 实现为准。\n- 未对现场 #22 做 pause/reconcile/retry mutation；需 operator 在完整重启后按 runbook 执行。\n- **GHA-CLOSE-08**（文档/checker 最终门禁）尚未开始；不要 commit/push。\n\n#### Decisions for main session\n\n1. 派发/执行 **GHA-CLOSE-08** 文档收尾与独立 checker 签收。  \n2. 生产恢复 #22：pause → 完整重启 → provenance 核对 → reconcile → 单次 retry（复用 g1）。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T04:13:00.323Z",
+            "toolCallId": "call-5c7d326b-5780-480c-b266-fd16fb4eead3-38|fc_5093a1a7-f469-9b6d-8a4b-661bcbec1739_0",
+            "toolName": "bash",
+            "text": "73:function isBindBody(value: unknown): value is { cwd: string; contextId: string; action?: string } {\n77:    && (value as { action?: unknown }).action === \"bind\";\n81: * Map domain helper failures for Phase 1 widget decision actions to stable HTTP + code.\n166:    // Explicit widget decision actions must match before loose transition bodies so\n1233:export interface YpiStudioTaskImplementationSubtaskUpdateBody {\n\n\nCommand exited with code 1",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T04:13:08.552Z",
+            "toolCallId": "call-2abe6ffb-dcd3-488b-8057-771daa0995fb-40|fc_d085aa1e-c293-9c76-873b-628a575cbf19_0",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON -e '\\nimport { createJiti } from \\\"jiti\\\";\\nimport { join } from \\\"path\\\";\\nconst jiti = createJiti(join(process.cwd(), \\\"package.json\\\"), { interopDefault: true });\\nconst tasks = jiti(\\\"./lib/ypi-studio-tasks.ts\\\");\\nconst cwd = process.cwd();\\nconst taskId = \\\"20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic\\\";\\nconst detail = tasks.updateYpiStudioImplementationSubtask(taskId, {\\n  cwd,\\n  action: \\\"update_implementation_subtask\\\",\\n  subtaskId: \\\"GHA-CLOSE-07\\\",\\n  status: \\\"done\\\",\\n  message: \\\"Cross-layer regression green: GitHub suites, session/index, lint/tsc; added GHA-CLOSE-07 sanitized #22/no-spin/UI/security fixtures. permission_missing red light resolved (19/19). Docs trailing whitespace fixed for git diff --check.\\\",\\n  validation: [\\n    \\\"npm run test:github-automation => 113 passed\\\",\\n    \\\"npm run test:github-unattended => 19 passed\\\",\\n    \\\"npm run test:github-unattended-runner => 18 passed\\\",\\n    \\\"npm run test:github-publish-policy => 28 passed\\\",\\n    \\\"npm run test:project-space-session-index -- --group all => 54 passed\\\",\\n    \\\"npm run test:studio-sdk-runner => passed\\\",\\n    \\\"npm run lint => 0 errors (11 pre-existing warnings)\\\",\\n    \\\"tsc --noEmit => 0\\\",\\n    \\\"git diff --check => clean after trailing-ws fix\\\",\\n  ],\\n  contextId: \\\"pi_019fa172-013a-707c-8875-a0b5c7b1c083\\\",\\n});\\nconst prog = detail.task?.implementationProgress || detail.implementationProgress;\\nconst plan = detail.task?.implementationPlan || detail.implementationPlan;\\nconsole.log(JSON.stringify({\\n  status: detail.task?.status || detail.status,\\n  progress: prog && { done: prog.done, total: prog.total, active: prog.active, next: prog.next },\\n  sub: prog?.subtasks?.[\\\"GHA-CLOSE-07\\\"] || prog?.byId?.[\\\"GHA-CLOSE-07\\\"] || null,\\n  keys: Object.keys(detail).slice(0, 20),\\n}, null, 2));\\n' 2>&1 | tail -80\\n\",\n  \"timeout\": 60\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T04:13:08.705Z",
+            "toolCallId": "call-2abe6ffb-dcd3-488b-8057-771daa0995fb-40|fc_d085aa1e-c293-9c76-873b-628a575cbf19_0",
+            "toolName": "bash",
+            "text": "(node:59699) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\n{\n  \"status\": \"implementing\",\n  \"progress\": {},\n  \"sub\": {\n    \"id\": \"GHA-CLOSE-07\",\n    \"status\": \"done\",\n    \"updatedAt\": \"2026-07-27T04:13:08.688Z\",\n    \"startedAt\": \"2026-07-27T04:07:09.341Z\",\n    \"finishedAt\": \"2026-07-27T04:13:08.688Z\",\n    \"attempts\": 1,\n    \"runIds\": [\n      \"implementer-b8b0d557da8b514a84efceb8\"\n    ],\n    \"lastRunId\": \"implementer-b8b0d557da8b514a84efceb8\",\n    \"currentRunId\": \"implementer-b8b0d557da8b514a84efceb8\",\n    \"claimedAt\": \"2026-07-27T04:07:09.341Z\",\n    \"claimedByContextId\": \"pi_019fa172-013a-707c-8875-a0b5c7b1c083\",\n    \"summary\": \"Cross-layer regression green: GitHub suites, session/index, lint/tsc; added GHA-CLOSE-07 sanitized #22/no-spin/UI/security fixtures. permission_missing red light resolved (19/19). Docs trailing whitespace fixed for git diff --check.\",\n    \"validation\": [\n      \"npm run test:github-automation => 113 passed\",\n      \"npm run test:github-unattended => 19 passed\",\n      \"npm run test:github-unattended-runner => 18 passed\",\n      \"npm run test:github-publish-policy => 28 passed\",\n      \"npm run test:project-space-session-index -- --group all => 54 passed\",\n      \"npm run test:studio-sdk-runner => passed\",\n      \"npm run lint => 0 errors (11 pre-existing warnings)\",\n      \"tsc --noEmit => 0\",\n      \"git diff --check => clean after trailing-ws fix\"\n    ]\n  },\n  \"keys\": [\n    \"key\",\n    \"id\",\n    \"title\",\n    \"workflowId\",\n    \"workflowName\",\n    \"status\",\n    \"cwd\",\n    \"pathLabel\",\n    \"createdAt\",\n    \"updatedAt\",\n    \"completedAt\",\n    \"currentMember\",\n    \"contextIds\",\n    \"progress\",\n    \"archived\",\n    \"archiveMonth\",\n    \"archivedAt\",\n    \"archiveReason\",\n    \"knowledgePath\",\n    \"readError\"\n  ]\n}",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T04:13:19.813Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-github-automation.mjs` — 新增 **GHA-CLOSE-07** 跨层回归：\n  - sanitized #22 fixture（reconcile → 有限 tick 无自旋 / 不伪 active）\n  - Jobs UI 双层文案契约（`尚未启动 Agent` / `调度尝试` / 不能跳过策略）\n  - 安全故障注入（无共享 `process.env` 删除、App/machine scrub、publisher 边界）\n  - session bootstrap 可见 blocker（`creating` + `bootstrapping`，非 implementing）\n  - policy matrix 交叉（「模型」defer / empty final / UI final block）\n- `docs/integrations/github-app-automation-setup.md` — 仅去掉 trailing whitespace，满足 `git diff --check`\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **113 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed**（原 `permission_missing…→implementer_error` 红灯已消失） |\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\n| `npm run test:github-publish-policy` | **28 passed / 0 failed** |\n| `npm run test:project-space-session-index -- --group all` | **54 passed / 0 failed** |\n| `npm run test:studio-sdk-runner` | **passed** |\n| `npm run lint` | **0 errors**（11 个既有 warnings） |\n| `node_modules/.bin/tsc --noEmit` | **0** |\n| `git diff --check` | **clean** |\n\nStudio：`GHA-CLOSE-07` 已标 **done**（7/8；next = GHA-CLOSE-08）。\n\n#### Notes / Risks\n\n- GHA-CLOSE-07 为验证子任务：本轮只补测试 + whitespace 门禁，不改生产逻辑。\n- 未做真实浏览器 390px/明暗主题手工 smoke；UI 以源码契约 + 既有 GHA-CLOSE-06 实现为准。\n- 未对现场 #22 做 pause/reconcile/retry mutation；需 operator 在完整重启后按 runbook 执行。\n- **GHA-CLOSE-08**（文档/checker 最终门禁）尚未开始；不要 commit/push。\n\n#### Decisions for main session\n\n1. 派发/执行 **GHA-CLOSE-08** 文档收尾与独立 checker 签收。  \n2. 生产恢复 #22：pause → 完整重启 → provenance 核对 → reconcile → 单次 retry（复用 g1）。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T04:13:19.815Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2130,
+        "tokens": 640,
+        "tokenSource": "usage",
+        "tps": 1.79,
+        "firstTokenAt": "2026-07-27T04:07:22.733Z",
+        "lastTokenAt": "2026-07-27T04:13:19.792Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-b8b0d557da8b514a84efceb8",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/implementer-b8b0d557da8b514a84efceb8.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T04:07:14.461Z",
+        "finishedAt": "2026-07-27T04:13:19.819Z",
+        "updatedAt": "2026-07-27T04:13:19.819Z",
+        "itemCount": 97,
+        "messageCount": 11,
+        "toolCallCount": 41,
+        "stderrBytes": 0,
+        "bytes": 229841,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa1c1-6731-74ad-a12e-3274a97f7a53",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T04-07-14-481Z_019fa1c1-6731-74ad-a12e-3274a97f7a53.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-35eaa22021c4f56398f7fbfe",
+      "subtaskId": "GHA-CLOSE-08",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T04:13:30.922Z",
+      "finishedAt": "2026-07-27T04:18:05.944Z",
+      "runner": "sdk",
+      "childSessionId": "019fa1c7-25bd-7b27-b7dd-1df326814688",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T04-13-30-941Z_019fa1c7-25bd-7b27-b7dd-1df326814688.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa1c7-25bd-7b27-b7dd-1df326814688",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete — GHA-CLOSE-08\n\nDocumentation/navigation + final validation only. No production code, no commit/push.\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — P1 durable SM: disposition/no-spin, counts, command once, policy stages, Session `projectId+spaceId`, env copy isolation, lease fencing, provenance, #22 same-gen recovery\n- `docs/integrations/README.md` — observability/recovery section, modules/tests, layered rollback\n- `docs/integrations/github-app-automation-setup.md` — #22 FAQ + table (dual-layer UI, full restart, reconcile, `retry_conditions_unchanged`)\n- `docs/modules/api.md` — status/jobs projection, provenance, command fall-through, legacy reconcile\n- `docs/modules/library.md` — scheduler disposition/fencing, worktree spaceId, scrubbed env copy, invariants\n- `docs/operations/troubleshooting.md` — test matrix + cross-links (runbook already present)\n- `AGENTS.md` — navigation only (disposition/lease/Jobs UI/reconcile + runner test)\n- `.ypi/tasks/.../handoff.md` — final handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `test:github-automation` | **113 / 0** |\n| `test:github-unattended` | **19 / 0** |\n| `test:github-unattended-runner` | **18 / 0** |\n| `test:github-publish-policy` | **28 / 0** |\n| `lint` | **0 errors** (11 pre-existing warnings) |\n| `tsc --noEmit` | **pass** |\n| `git diff --check` (docs + AGENTS) | **pass** |\n\n#### Notes / Risks\n\n- No `ypi_studio_task` tool in this member env — **parent must mark GHA-CLOSE-08 done** (plan 8/8).\n- Live #22 recovery still operator-owned after deploy + **full `ypi` restart**.\n- Optional independent checker spot-check of docs vs `checks.md` before release.",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T04:13:30.922Z",
+        "updatedAt": "2026-07-27T04:18:05.944Z",
+        "eventCount": 1453,
+        "lastTextPreview": "### Implementation Complete — GHA-CLOSE-08\n\nDocumentation/navigation + final validation only. No production code, no commit/push.\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — P1 durable SM: disposition/no-spin, counts, command once, policy stages, Session `projectId+spaceId`, env copy isolation, lease fencing, provenance, #22 same-gen recovery\n- `docs/integrations/README.md` — observability/recovery section, modules/tests, layered rollback\n- `docs/integrations/github-app-automation-setup.md` — #22 FAQ + table (dual-layer UI, full restart, reconcile, `retry_conditions_unchanged`)\n- `docs/modules/api.md` — status/jobs projection, provenance, command fall-through, legacy reconcile\n- `docs/modules/library.md` — scheduler disposition/fencing, worktree spaceId, scrubbed env copy, invariants\n- `docs/operations/troubleshooting.md` — test matrix + cross-links (runbook already present)\n- `AGENTS.md` — navigation only (disposition/lease/Jobs UI/reconcile + runner test)\n- `.ypi/tasks/.../handoff.md` — final handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `test:github-automation` | **113 / 0** |\n| `test:github-unattended` | **19 / 0** |\n| `test:github-unattended-runner` | **18 / 0** |\n| `test:github-publish-policy` | **28 / 0** |\n| `lint` | **0 errors** (11 pre-existing warnings) |\n| `tsc --noEmit` | **pass** |\n| `git diff --check` (docs + AGENTS) | **pass** |\n\n#### Notes / Risks\n\n- No `ypi_studio_task` tool in this member env — **parent must mark GHA-CLOSE-08 done** (plan 8/8).\n- Live #22 recovery still operator-owned after deploy + **full `ypi` restart**.\n- Optional independent checker spot-check of docs vs `checks.md` before release.",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T04:17:57.723Z",
+            "text": "Validation is green. Updating the task handoff artifact next.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T04:17:57.724Z",
+            "toolCallId": "call-d0e5ccd2-42a0-427b-bd4b-a08bea0b282a-38|fc_2a973d95-0c64-9e7e-b054-1509658c7882_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/handoff.md\",\n  \"content\": \"# Architect / Implementer Handoff — GHA-CLOSE-08\\n\\n## Status\\n\\n- **Subtask:** GHA-CLOSE-08 (文档、回滚与最终门禁)\\n- **Result:** done (docs + final verification)\\n- **Production code in this subtask:** none (documentation/navigation only)\\n- **No** `commit` / `push` / `merge`\\n\\n## Files Changed (this subtask)\\n\\n| Path | Summary |\\n| --- | --- |\\n| `docs/architecture/overview.md` | Expanded P1 unattended: disposition no-spin SM, counts, command once, policy stages, WorkTree Session binding, env copy isolation, lease fencing, runtime provenance, #22 same-generation recovery |\\n| `docs/integrations/README.md` | P1 observability/disposition/recovery section; key modules + test matrix; layered rollback without history rewrite |\\n| `docs/integrations/github-app-automation-setup.md` | Operator #22 FAQ + table: dual-layer UI, full restart, reconcile, `retry_conditions_unchanged`, doc cross-links |\\n| `docs/modules/api.md` | Status/jobs safe projection, provenance, command fall-through, legacy reconcile on retry, test suite list |\\n| `docs/modules/library.md` | Scheduler disposition/fencing; worktree spaceId; session scrubbed env copy; automation invariants + tests |\\n| `docs/operations/troubleshooting.md` | Test matrix + architecture/setup cross-links (runbook already present from GHA-CLOSE-05) |\\n| `AGENTS.md` | Navigation only: disposition/lease/Jobs UI/reconcile + provenance/troubleshoot pointers; `test:github-unattended-runner` |\\n\\nAlready accurate from earlier subtasks (no edit required this pass):\\n\\n- `docs/modules/frontend.md` — Jobs dual-layer UI (GHA-CLOSE-06)\\n- `docs/operations/troubleshooting.md` — full #22 stop-bleed / recovery section (GHA-CLOSE-05)\\n\\n## Validation\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:github-automation` | **113 passed / 0 failed** |\\n| `npm run test:github-unattended` | **19 passed / 0 failed** |\\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\\n| `npm run test:github-publish-policy` | **28 passed / 0 failed** |\\n| `npm run lint` | **0 errors** (11 pre-existing warnings, unrelated) |\\n| `node_modules/.bin/tsc --noEmit` | **pass** (empty output, exit 0) |\\n| `git diff --check` (GHA-CLOSE-08 docs + AGENTS) | **pass** |\\n\\n## Acceptance vs GHA-CLOSE-08\\n\\n| Acceptance | Evidence |\\n| --- | --- |\\n| 用户可仅从文档判断卡在哪一层及下一步 | architecture P1 SM + dual-layer fields; troubleshooting #22 runbook; setup FAQ |\\n| rollback 可分别关闭 UI 增强、自动 retry、unattended，而不删历史 | integrations README rollback steps 1–6 |\\n| 无未审批产品决定被实现 | docs only; no new product knobs; skip-policy still forbidden |\\n\\n## Remaining risks / main session\\n\\n1. **Studio tool:** this member environment has no `ypi_studio_task` tool; parent must mark GHA-CLOSE-08 **done** and close the plan (8/8) if not already.\\n2. **#22 live recovery** is still an operator action after deploy: pause → full restart → provenance check → single retry. Docs describe it; do not auto-mutate production job state from this subtask.\\n3. **Checker localReview** was required on the plan; independent checker may still want to spot-check docs vs `checks.md` matrix.\\n4. Production package still needs **full process restart** before trusting #22 recovery against a live install.\\n\\n## Decisions needed from main session\\n\\n1. Mark GHA-CLOSE-08 done / plan complete in Studio.\\n2. Operator: deploy + restart `ypi`, then execute #22 recovery runbook once.\\n3. Optional: independent checker pass on docs/diff before release.\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T04:17:57.756Z",
+            "toolCallId": "call-d0e5ccd2-42a0-427b-bd4b-a08bea0b282a-38|fc_2a973d95-0c64-9e7e-b054-1509658c7882_0",
+            "toolName": "write",
+            "text": "Successfully wrote 3398 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T04:18:05.930Z",
+            "text": "### Implementation Complete — GHA-CLOSE-08\n\nDocumentation/navigation + final validation only. No production code, no commit/push.\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — P1 durable SM: disposition/no-spin, counts, command once, policy stages, Session `projectId+spaceId`, env copy isolation, lease fencing, provenance, #22 same-gen recovery\n- `docs/integrations/README.md` — observability/recovery section, modules/tests, layered rollback\n- `docs/integrations/github-app-automation-setup.md` — #22 FAQ + table (dual-layer UI, full restart, reconcile, `retry_conditions_unchanged`)\n- `docs/modules/api.md` — status/jobs projection, provenance, command fall-through, legacy reconcile\n- `docs/modules/library.md` — scheduler disposition/fencing, worktree spaceId, scrubbed env copy, invariants\n- `docs/operations/troubleshooting.md` — test matrix + cross-links (runbook already present)\n- `AGENTS.md` — navigation only (disposition/lease/Jobs UI/reconcile + runner test)\n- `.ypi/tasks/.../handoff.md` — final handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `test:github-automation` | **113 / 0** |\n| `test:github-unattended` | **19 / 0** |\n| `test:github-unattended-runner` | **18 / 0** |\n| `test:github-publish-policy` | **28 / 0** |\n| `lint` | **0 errors** (11 pre-existing warnings) |\n| `tsc --noEmit` | **pass** |\n| `git diff --check` (docs + AGENTS) | **pass** |\n\n#### Notes / Risks\n\n- No `ypi_studio_task` tool in this member env — **parent must mark GHA-CLOSE-08 done** (plan 8/8).\n- Live #22 recovery still operator-owned after deploy + **full `ypi` restart**.\n- Optional independent checker spot-check of docs vs `checks.md` before release.",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T04:18:05.938Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 2173,
+        "tokens": 514,
+        "tokenSource": "usage",
+        "tps": 1.95,
+        "firstTokenAt": "2026-07-27T04:13:42.988Z",
+        "lastTokenAt": "2026-07-27T04:18:05.923Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-35eaa22021c4f56398f7fbfe",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/implementer-35eaa22021c4f56398f7fbfe.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T04:13:30.922Z",
+        "finishedAt": "2026-07-27T04:18:05.938Z",
+        "updatedAt": "2026-07-27T04:18:05.938Z",
+        "itemCount": 88,
+        "messageCount": 6,
+        "toolCallCount": 39,
+        "stderrBytes": 0,
+        "bytes": 267513,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa1c7-25bd-7b27-b7dd-1df326814688",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T04-13-30-941Z_019fa1c7-25bd-7b27-b7dd-1df326814688.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-abd1449274c0df250ad99b6f",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-27T04:18:17.435Z",
+      "finishedAt": "2026-07-27T04:20:42.563Z",
+      "runner": "sdk",
+      "childSessionId": "019fa1cb-84f1-7071-98b6-4b5a39ac097d",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T04-18-17-457Z_019fa1cb-84f1-7071-98b6-4b5a39ac097d.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa172-013a-707c-8875-a0b5c7b1c083",
+        "childSessionId": "019fa1cb-84f1-7071-98b6-4b5a39ac097d",
+        "model": "grok-cli/grok-4.5",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Findings Fixed\n- None（本轮只审查 + 复跑验证，未改生产代码）\n\n#### Remaining Findings\n- **非阻塞：** 未做真实浏览器 390px/明暗 smoke；#22 现场恢复仍靠 operator runbook；env 隔离是 scrubbed copy + bash `spawnHook`（满足 R13「等价 per-run env」，非独立 SDK host 子进程）；部分 runner 路径靠 scheduler 推导 disposition。\n- **阻塞：** None\n\n#### Verification（本轮复跑）\n| Command | Result |\n| --- | --- |\n| `test:github-publish-policy` | 28/0 |\n| `test:github-unattended` | 19/0（规划期 permission 红灯已消） |\n| `test:github-unattended-runner` | 18/0 |\n| `test:github-automation` | 113/0（含 CLOSE-02/04/05/07） |\n| `lint` | 0 errors（11 既有 warnings） |\n| `tsc --noEmit` | pass |\n| `git diff --check` | pass |\n\n#### Root-cause closure\n| 链 | 结论 |\n| --- | --- |\n| 空 plan / title≠planText | Pass |\n| remote_confirmed 截断 → fall-through + pendingCommand | Pass |\n| no-progress 禁止立即 queued 自旋 | Pass |\n| projectId+spaceId / bootstrap 可见失败 | Pass |\n| lease fencing + 不删共享 `process.env` | Pass |\n| dual-layer projection +「尚未启动 Agent」「调度尝试」 | Pass |\n| #22 reconcile runbook、无 skip-policy | Pass |\n| UI 批准 | `approvalGrant` 2026-07-27T03:21:41Z `user-widget` 后才 implementing |\n\n#### Verdict\n**Pass** — 可进入 **review**（不回 implementing）。\n\n#### Artifacts\n- 更新：`.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/review.md`\n\n#### Main session\n1. Transition **checking → review**（本 harness 无 `ypi_studio_task`）。\n2. Operator：部署 + **完整重启** → 核对 `runtimeProvenance` → #22 **单次** retry（复用 g1）。\n3. 可选：Jobs 窄屏目视。\n4. **未** commit / push / merge。",
+      "model": "grok-cli/grok-4.5",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "grok-cli/grok-4.5",
+          "arg": "grok-cli/grok-4.5",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-27T04:18:17.435Z",
+        "updatedAt": "2026-07-27T04:20:42.563Z",
+        "eventCount": 1310,
+        "lastTextPreview": "### Check Complete\n\n#### Findings Fixed\n- None（本轮只审查 + 复跑验证，未改生产代码）\n\n#### Remaining Findings\n- **非阻塞：** 未做真实浏览器 390px/明暗 smoke；#22 现场恢复仍靠 operator runbook；env 隔离是 scrubbed copy + bash `spawnHook`（满足 R13「等价 per-run env」，非独立 SDK host 子进程）；部分 runner 路径靠 scheduler 推导 disposition。\n- **阻塞：** None\n\n#### Verification（本轮复跑）\n| Command | Result |\n| --- | --- |\n| `test:github-publish-policy` | 28/0 |\n| `test:github-unattended` | 19/0（规划期 permission 红灯已消） |\n| `test:github-unattended-runner` | 18/0 |\n| `test:github-automation` | 113/0（含 CLOSE-02/04/05/07） |\n| `lint` | 0 errors（11 既有 warnings） |\n| `tsc --noEmit` | pass |\n| `git diff --check` | pass |\n\n#### Root-cause closure\n| 链 | 结论 |\n| --- | --- |\n| 空 plan / title≠planText | Pass |\n| remote_confirmed 截断 → fall-through + pendingCommand | Pass |\n| no-progress 禁止立即 queued 自旋 | Pass |\n| projectId+spaceId / bootstrap 可见失败 | Pass |\n| lease fencing + 不删共享 `process.env` | Pass |\n| dual-layer projection +「尚未启动 Agent」「调度尝试」 | Pass |\n| #22 reconcile runbook、无 skip-policy | Pass |\n| UI 批准 | `approvalGrant` 2026-07-27T03:21:41Z `user-widget` 后才 implementing |\n\n#### Verdict\n**Pass** — 可进入 **review**（不回 implementing）。\n\n#### Artifacts\n- 更新：`.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/review.md`\n\n#### Main session\n1. Transition **checking → review**（本 harness 无 `ypi_studio_task`）。\n2. Operator：部署 + **完整重启** → 核对 `runtimeProvenance` → #22 **单次** retry（复用 g1）。\n3. 可选：Jobs 窄屏目视。\n4. **未** commit / push / merge。",
+        "itemsPreview": [
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T04:20:33.496Z",
+            "text": "验收结论为通过。正在更新 `review.md` 验收产物。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-27T04:20:33.498Z",
+            "toolCallId": "call-c8c138be-1fcb-4253-a34d-b9d94d23838e-31|fc_47011664-3906-9932-b5bb-a922fc4a1f0c_0",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \"/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/review.md\",\n  \"content\": \"# Review：GitHub 无人值守 planning 空转闭环（GHA-CLOSE-01…08）\\n\\n**Checker:** 检查员  \\n**At:** 2026-07-27  \\n**Scope:** 全计划 8/8 子任务终验（非局部 subtask）  \\n**Verdict:** **Pass**（可进入 review / 用户验收；不阻塞回 implementing）\\n\\n---\\n\\n## Check Complete\\n\\n### Findings Fixed\\n\\n- None（本轮仅审查与复跑验证，未改生产代码）\\n\\n### Remaining Findings\\n\\n#### 非阻塞\\n\\n1. **真实浏览器 390px / 明暗主题手工 smoke 未在本机 UI 跑完**  \\n   证据：GHA-CLOSE-06/07 报告；以源码 + `GHA-CLOSE-07 Jobs UI source` 契约测试替代。建议 operator 在 Settings Jobs 做一次窄屏目视。\\n\\n2. **#22 现场恢复仍是 operator 动作**  \\n   代码与 runbook 已具备；本任务边界不自动 pause/retry 生产 job。部署后需：pause → 完整重启 → `runtimeProvenance` → 单次 retry。\\n\\n3. **env 隔离实现为 scrubbed env copy + bash `spawnHook`，非独立 SDK host 子进程**  \\n   满足 PRD R13「隔离子进程**或等价** per-run env」；架构文档已写清「非 OS sandbox」。同用户磁盘 residual risk 仍明示。\\n\\n4. **runner 部分路径仍主要返回 `wakeAgain`，显式 `disposition` 由 scheduler 保守推导**  \\n   `applyHandlerDisposition` + no-progress 测试覆盖 #22 自旋根因；非必须返工。\\n\\n#### 阻塞\\n\\n- **None**\\n\\n### Root-cause closure matrix\\n\\n| 根因 | 实现证据 | 测试证据 |\\n| --- | --- | --- |\\n| RC-1 空 plan 误拦 / title≠planText | `github-risk-policy` pre/plan empty → `defer`；runner `planText: null` + `issueTitlePreview` 分离 | publish-policy: empty plan defer、「模型」非 secret、UI title block |\\n| RC-2 remote_confirmed 截断 runner | `runOwnerIntentIfPresent` active phase → `return null` fall-through + `pendingCommand` consumed | GHA-CLOSE-02 fallthrough；CLOSE-05 pre-schema consume once |\\n| RC-3 scheduler 无进展自旋 | `applyHandlerDisposition`：无 disposition/无 progress → `retry_due`/`runner_no_progress`，禁止立即 queued | GHA-CLOSE-02 no-progress；CLOSE-07 #22 finite ticks |\\n| RC-4 spaceId / Session 绑定 | worktree ensure 返回 `spaceId`；bootstrap 成对强制；失败可见 blocker | unattended-runner spaceId/bootstrap pair；CLOSE-07 bootstrap projection |\\n| RC-5 lease / env | lease heartbeat+fencing；scrubbed copy，不删共享 `process.env` | CLOSE-02 fencing；unattended-runner env preserve |\\n| RC-6 projection/UI 假 active | dual-layer fields + UI「尚未启动 Agent」「调度尝试」 | CLOSE-04 #22 projection；CLOSE-07 UI 契约；组件文案 |\\n\\n### 需求 / checks.md 抽样\\n\\n| 项 | 结论 |\\n| --- | --- |\\n| R1–R4 policy stage / empty / 模型 / UI gate | Pass |\\n| R5 command 一次消费 + continuation | Pass |\\n| R6–R10 disposition / counts / fingerprint / pause / lease | Pass（scheduler 推导 + 测试） |\\n| R11–R13 Session / WorkTree / env | Pass |\\n| R14–R16 safe projection / dual-layer UI / provenance | Pass |\\n| R17 #22 reconcile runbook 不跳 gate | Pass（docs + CLOSE-05/07） |\\n| R18 publisher / residual risk / no secrets | Pass |\\n| UI 原型门禁 | Pass：`approvalGrant` 2026-07-27T03:21:41Z `user-widget` 批准计划包（含 HTML 产物）后才 implementing |\\n| 规划期 `test:github-unattended` 红灯 | Pass：现 19/19，含 permission/installation block |\\n\\n### Verification（本轮独立复跑）\\n\\n| Command | Result |\\n| --- | --- |\\n| `npm run test:github-publish-policy` | **28 passed / 0 failed** |\\n| `npm run test:github-unattended` | **19 passed / 0 failed** |\\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\\n| `npm run test:github-automation` | **113 passed / 0 failed** |\\n| `npm run lint` | **0 errors**（11 pre-existing warnings，无关） |\\n| `node_modules/.bin/tsc --noEmit` | **pass**（exit 0） |\\n| `git diff --check` | **pass** |\\n\\n未本轮重跑（GHA-CLOSE-07 已绿且本轮无相关改动）：`test:project-space-session-index`、`test:studio-sdk-runner`。\\n\\n### Security invariants\\n\\n- 无 skip-policy 动作；确定性 block 条件未变 → `retry_conditions_unchanged`\\n- projection forbidden keys / 无 path/body/secret 路径有测试\\n- Agent 无 server publisher；不 force/main auto-merge\\n- full-agent residual risk 文案保留\\n- 共享 `process.env` 不被 GitHub unattended 路径删除\\n\\n### Verdict\\n\\n**Pass** — 根因链、契约、测试、文档与 Jobs 双层文案已闭合；可 transition **checking → review**（或 workflow 规定的用户验收态）。  \\n不要求回 implementing。  \\n**未** commit / push / merge。  \\n本 harness **无** `ypi_studio_task`：请主会话写 review 态并关闭计划。\\n\\n---\\n\\n## Handoff to main session\\n\\n### Artifacts produced\\n\\n- 更新：`.ypi/tasks/20260727-104502-…/review.md`（本文件）\\n\\n### Production code changed by checker\\n\\n- None\\n\\n### Decisions needed\\n\\n1. Transition 任务到 **review**（或 completed / user_acceptance，按 feature-dev 流程）。\\n2. Operator：部署修复版 → **完整重启** `ypi` → 确认 `runtimeProvenance` → 对 #22 **单次** retry（复用 g1）。\\n3. 可选：Settings Jobs 390px 明暗主题目视一次。\\n\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-27T04:20:33.725Z",
+            "toolCallId": "call-c8c138be-1fcb-4253-a34d-b9d94d23838e-31|fc_47011664-3906-9932-b5bb-a922fc4a1f0c_0",
+            "toolName": "write",
+            "text": "Successfully wrote 4050 bytes to /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-27T04:20:42.551Z",
+            "text": "### Check Complete\n\n#### Findings Fixed\n- None（本轮只审查 + 复跑验证，未改生产代码）\n\n#### Remaining Findings\n- **非阻塞：** 未做真实浏览器 390px/明暗 smoke；#22 现场恢复仍靠 operator runbook；env 隔离是 scrubbed copy + bash `spawnHook`（满足 R13「等价 per-run env」，非独立 SDK host 子进程）；部分 runner 路径靠 scheduler 推导 disposition。\n- **阻塞：** None\n\n#### Verification（本轮复跑）\n| Command | Result |\n| --- | --- |\n| `test:github-publish-policy` | 28/0 |\n| `test:github-unattended` | 19/0（规划期 permission 红灯已消） |\n| `test:github-unattended-runner` | 18/0 |\n| `test:github-automation` | 113/0（含 CLOSE-02/04/05/07） |\n| `lint` | 0 errors（11 既有 warnings） |\n| `tsc --noEmit` | pass |\n| `git diff --check` | pass |\n\n#### Root-cause closure\n| 链 | 结论 |\n| --- | --- |\n| 空 plan / title≠planText | Pass |\n| remote_confirmed 截断 → fall-through + pendingCommand | Pass |\n| no-progress 禁止立即 queued 自旋 | Pass |\n| projectId+spaceId / bootstrap 可见失败 | Pass |\n| lease fencing + 不删共享 `process.env` | Pass |\n| dual-layer projection +「尚未启动 Agent」「调度尝试」 | Pass |\n| #22 reconcile runbook、无 skip-policy | Pass |\n| UI 批准 | `approvalGrant` 2026-07-27T03:21:41Z `user-widget` 后才 implementing |\n\n#### Verdict\n**Pass** — 可进入 **review**（不回 implementing）。\n\n#### Artifacts\n- 更新：`.ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/review.md`\n\n#### Main session\n1. Transition **checking → review**（本 harness 无 `ypi_studio_task`）。\n2. Operator：部署 + **完整重启** → 核对 `runtimeProvenance` → #22 **单次** retry（复用 g1）。\n3. 可选：Jobs 窄屏目视。\n4. **未** commit / push / merge。",
+            "model": "grok-cli/grok-4.5",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-27T04:20:42.559Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1559,
+        "tokens": 566,
+        "tokenSource": "usage",
+        "tps": 4.09,
+        "firstTokenAt": "2026-07-27T04:18:24.235Z",
+        "lastTokenAt": "2026-07-27T04:20:42.550Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-abd1449274c0df250ad99b6f",
+        "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260727-104502-github-_-planning-_-_-session-plan-polic/checker-abd1449274c0df250ad99b6f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-27T04:18:17.435Z",
+        "finishedAt": "2026-07-27T04:20:42.560Z",
+        "updatedAt": "2026-07-27T04:20:42.560Z",
+        "itemCount": 72,
+        "messageCount": 4,
+        "toolCallCount": 32,
+        "stderrBytes": 0,
+        "bytes": 216825,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa1cb-84f1-7071-98b6-4b5a39ac097d",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-27T04-18-17-457Z_019fa1cb-84f1-7071-98b6-4b5a39ac097d.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-27T03:02:52.571Z",
+      "contextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-27T03:21:41.781Z",
+      "contextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+      "inputHash": "7576e4a857a6164893b7b491",
+      "source": "user-widget"
+    },
+    "archivedAt": "2026-07-27T04:28:48.815Z",
+    "archiveReason": "Accepted and archived from session widget",
+    "knowledgeEntryId": "20260727-122848-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+    "knowledgePath": ".ypi/knowledge/20260727-122848-github-无人值守实现卡在-planning-空转-无-session-plan-polic.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-27T03:02:52.567Z",
+    "sourceArtifact": "implement.md",
+    "summary": "修复 GitHub P1 无人值守从策略语义、命令消费、调度/租约、Session/WorkTree 绑定到安全可观测 UI 的完整闭环，并以 #22 现场快照做回归。",
+    "strategy": "先冻结状态/策略契约，再并行修复调度链与 Session 链；随后补安全投影、恢复工具和已批准 UI，最后进行跨层回归与文档检查。",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "contract",
+          "title": "契约冻结",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "GHA-CLOSE-01"
+          ]
+        },
+        {
+          "id": "core",
+          "title": "核心链路并行修复",
+          "relation": "parallel",
+          "dependencies": [
+            "GHA-CLOSE-01"
+          ],
+          "subtaskIds": [
+            "GHA-CLOSE-02",
+            "GHA-CLOSE-03"
+          ]
+        },
+        {
+          "id": "projection",
+          "title": "投影与恢复",
+          "relation": "serial",
+          "dependencies": [
+            "GHA-CLOSE-02",
+            "GHA-CLOSE-03"
+          ],
+          "subtaskIds": [
+            "GHA-CLOSE-04",
+            "GHA-CLOSE-05",
+            "GHA-CLOSE-06"
+          ]
+        },
+        {
+          "id": "verification",
+          "title": "回归与交付",
+          "relation": "serial",
+          "dependencies": [
+            "GHA-CLOSE-06"
+          ],
+          "subtaskIds": [
+            "GHA-CLOSE-07",
+            "GHA-CLOSE-08"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "GHA-CLOSE-01",
+        "title": "冻结 policy / runner / observability 语义契约",
+        "phase": "design",
+        "description": "把 pre/plan/final、block/retry/defer、scheduler attempt 与 Agent execution 的含义落成纯类型和迁移兼容契约。",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/github-risk-policy.ts",
+          "lib/github-diff-policy.ts",
+          "lib/github-automation-store.ts",
+          "lib/github-automation-runner.ts",
+          "lib/github-automation-projection.ts",
+          "lib/github-automation-types.ts"
+        ],
+        "instructions": [
+          "将 issueTitlePreview 与可信 plan evidence 分离；不得再把 title 复制成 planText。",
+          "pre/plan 无文件使用显式 deferred 语义，不伪装为 allowed_docs；final 只信实际 diff 与结构化 small-bugfix 证据。",
+          "定义 blockedAtLayer、retryability、sessionAvailability、meaningful progress、代码/策略版本字段和旧记录缺省值。",
+          "保留 docs-and-small-bugfix、UI 手工原型审批、full-agent 非沙箱边界。"
+        ],
+        "acceptance": [
+          "标题含“模型”不会命中 secret/auth；OAuth/凭据等高风险提示仍按明确上下文 fail closed。",
+          "空 plan 不阻塞 session 前推进，空 final 仍阻止发布。",
+          "确定性 block 与可恢复 retry_due 有不重叠的服务端语义。"
+        ],
+        "validation": [
+          "npm run test:github-publish-policy",
+          "新增 policy stage/table-driven 单元回归"
+        ],
+        "risks": [
+          "放松标题提示可能把真实 UI 任务推迟到 final 才拦截；需高置信 UI hint + 最终路径门禁双层保护。"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 100,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "GHA-CLOSE-02",
+        "title": "修复 owner command 消费、调度无进展自旋与租约 fencing",
+        "phase": "core-runner",
+        "description": "让 comment delivery 只消费一次，runner continuation 不再被 idempotent replay 截断，并让 scheduler 对无进展、backoff、长 Agent lease 有可证明行为。",
+        "order": 2,
+        "dependsOn": [
+          "GHA-CLOSE-01"
+        ],
+        "dependencies": [
+          "GHA-CLOSE-01"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/github-issue-triage-runner.ts",
+          "lib/github-automation-scheduler.ts",
+          "lib/github-automation-store.ts",
+          "lib/github-automation-runner.ts",
+          "lib/github-automation-comments.ts",
+          "scripts/test-github-automation.mjs",
+          "scripts/test-github-unattended.mjs"
+        ],
+        "instructions": [
+          "把 delivery audit identity 与 pending command work item 分离；remote_confirmed command replay 对 active job 必须继续 runner，而不是返回 running job。",
+          "handler 返回显式 progressed/waiting/retry_due/blocked/terminal disposition 与 progress revision。",
+          "无 checkpoint/progress 变化时禁止立即 queued；采用有上限指数退避，重复确定性 gate 结果稳定 blocked。",
+          "attempt 保留兼容但定义为 scheduler lease runs；新增 agentRunCount/noProgressRunCount。",
+          "租约增加 heartbeat、live-owner 检查和 fencing token；stale reconcile 跳过本进程 inFlight，lease 丢失时停止当前执行。",
+          "singleStep 仅在真实前进后 wake；pause/global pause/concurrency 保持现有边界。"
+        ],
+        "acceptance": [
+          "#22 的已处理 adoption comment 不再截断 studio_task_ready continuation。",
+          "同 checkpoint 无进展不会每 2 秒 job_started；attempt 不再无界增长。",
+          "超过 5 分钟的合法 full-agent run 不会被第二进程接管。",
+          "blocked/retry_due 均稳定记录 next action 与 backoff。"
+        ],
+        "validation": [
+          "npm run test:github-automation",
+          "npm run test:github-unattended",
+          "新增 fake-clock 双进程 lease/no-progress 回归"
+        ],
+        "risks": [
+          "command 消费迁移若错误可能漏掉新的 pause/continue；必须用 pending command id/version 与 effect 双重核对。",
+          "fencing 变更涉及多写者 CAS，需保证旧 schema 可读。"
+        ],
+        "parallelGroup": "core",
+        "parallelizable": true,
+        "member": "implementer",
+        "priority": 95,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "GHA-CLOSE-03",
+        "title": "闭合 WorkTree space、parent Session 与 child runner 隔离",
+        "phase": "session-binding",
+        "description": "保证进入 implementing 后一定能创建可归属的 parent Session，child session 继承 worktree space，并且不通过全局 process.env 删除来隔离凭据。",
+        "order": 3,
+        "dependsOn": [
+          "GHA-CLOSE-01"
+        ],
+        "dependencies": [
+          "GHA-CLOSE-01"
+        ],
+        "relation": "parallel",
+        "files": [
+          "lib/github-automation-worktree.ts",
+          "lib/github-automation-runner.ts",
+          "lib/github-automation-session.ts",
+          "lib/agent-session-bootstrap.ts",
+          "lib/ypi-studio-child-session-runner.ts",
+          "lib/project-registry.ts",
+          "lib/project-space-session-lifecycle.ts",
+          "scripts/test-github-unattended.mjs",
+          "scripts/test-ypi-studio-sdk-runner.mjs"
+        ],
+        "instructions": [
+          "worktree ensure/reuse 必须解析并持久化 projectId+spaceId；runner sidecar additive 保存 spaceId。",
+          "bootstrap 同时传 projectId/spaceId，失败不得静默继续成“像在实现”；进入稳定 retry_due 或 blocked_session_bootstrap。",
+          "child header 继承 parent project/space 并写入 worktree 本地 session index；main space 不吸收 worktree session。",
+          "禁止在共享 Next 进程删除 process.env；GitHub unattended SDK host 使用隔离子进程/等价 per-run env 边界，传入 scrubbed env 副本并在服务进程保留 publisher credentials。",
+          "保留 full-agent host residual risk、不注入 App/machine secrets、agent 无 server publisher capability。"
+        ],
+        "acceptance": [
+          "registered worktree 下 parent Session 可在对应 space 列表出现，main space 不出现。",
+          "runner sidecar、task binding、JSONL header、session index 对同一 project/space/session 一致。",
+          "session bootstrap 错误可见且不继续宣称 Agent active。",
+          "agent run 后 server publisher 仍能解析原 effective App credentials。"
+        ],
+        "validation": [
+          "npm run test:project-space-session-index",
+          "npm run test:studio-sdk-runner",
+          "新增 projectId-without-spaceId、env preserve、worktree ownership 回归"
+        ],
+        "risks": [
+          "引入隔离 SDK host 会影响取消、usage 与 child session 审计；必须复用现有 child JSONL/sidecar wire，不新增 secret IPC。"
+        ],
+        "parallelGroup": "core",
+        "parallelizable": true,
+        "member": "implementer",
+        "priority": 95,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "GHA-CLOSE-04",
+        "title": "增加安全运行实况 projection 与代码版本闭环",
+        "phase": "api-observability",
+        "description": "服务端统一派生 scheduler、Agent、阻塞层、进展和 build/policy provenance，前端不猜状态。",
+        "order": 4,
+        "dependsOn": [
+          "GHA-CLOSE-02",
+          "GHA-CLOSE-03"
+        ],
+        "dependencies": [
+          "GHA-CLOSE-02",
+          "GHA-CLOSE-03"
+        ],
+        "relation": "barrier",
+        "files": [
+          "lib/github-automation-projection.ts",
+          "lib/github-automation-runner.ts",
+          "lib/github-automation-scheduler.ts",
+          "app/api/github-automation/status/route.ts",
+          "app/api/github-automation/jobs/[jobId]/route.ts",
+          "docs/modules/api.md",
+          "docs/modules/library.md"
+        ],
+        "instructions": [
+          "添加 browser-safe schedulerState/agentExecutionState/sessionAvailability/blockedAtLayer/lastMeaningfulProgress/agentRunCount/noProgressRunCount/workspaceLabel。",
+          "投影 packageVersion、Next buildId/codeRevision、process epoch/start time、policyVersion；block 记录 evaluated provenance。",
+          "只返回 allowlisted 摘要和 opaque id，不返回 worktree/session file/绝对路径/Issue 正文/tool payload。",
+          "旧 job/runner 以 unknown/legacy 明示降级，不假装 active。"
+        ],
+        "acceptance": [
+          "operator 能从一个 job projection 定位 scheduler、policy、Studio、Session、Agent、validation、publisher 中的阻塞层。",
+          "运行中构建与阻塞时构建可比较，源码/安装包/未重启差异可见。",
+          "现有客户端忽略 additive 字段时继续工作。"
+        ],
+        "validation": [
+          "npm run test:github-automation",
+          "projection forbidden-key/sentinel 测试",
+          "GET /api/github-automation/status no-store smoke"
+        ],
+        "risks": [
+          "进展摘要容易泄露内容；只允许固定枚举+计数+时间，不透传字符串。"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 90,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "GHA-CLOSE-05",
+        "title": "实现既有卡死 job 的兼容恢复与 operator runbook",
+        "phase": "migration-recovery",
+        "description": "不改写历史审计、不跳过 gate，安全归一化 #22 类 legacy job 并要求修复部署后显式重试。",
+        "order": 5,
+        "dependsOn": [
+          "GHA-CLOSE-04"
+        ],
+        "dependencies": [
+          "GHA-CLOSE-04"
+        ],
+        "relation": "serial",
+        "files": [
+          "lib/github-automation-runner.ts",
+          "lib/github-automation-projection.ts",
+          "app/api/github-automation/jobs/[jobId]/route.ts",
+          "docs/operations/troubleshooting.md",
+          "docs/integrations/github-app-automation-setup.md"
+        ],
+        "instructions": [
+          "提供幂等 reconcile：消费已 remote_confirmed 的旧 command、解析 spaceId、保留 legacy attempt、计算安全恢复 checkpoint。",
+          "确定性 block 只在 code/policy/input fingerprint 变化或 operator 明确 retry 后重评一次；不提供 skip policy。",
+          "#22 先 pause 止血，部署并完整重启，再 reconcile + 单次 retry；复用原 g1 worktree/branch/task。",
+          "不自动删除 job/events/worktree/task/session，也不新建 generation。"
+        ],
+        "acceptance": [
+          "同一恢复动作可重复调用且不重复 command、generation、worktree 或 PR。",
+          "未部署新 build 时 UI 明确不允许盲目 retry 自旋。",
+          "恢复后若仍是 UI/高风险范围，稳定 blocked_manual_ui_approval 而非启动发布。"
+        ],
+        "validation": [
+          "#22 sanitized fixture recovery script",
+          "重复 reconcile/retry idempotency 测试"
+        ],
+        "risks": [
+          "自动恢复错误 checkpoint 可能重复 agent/publish；publisher 与 runId/PR 幂等门禁必须复核。"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 85,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "GHA-CLOSE-06",
+        "title": "按批准原型改造 Jobs 真实性 UI",
+        "phase": "frontend",
+        "description": "实现双层状态、详情诊断、stale/窄屏/a11y，并保持 retry/pause/resume 既有业务动作。",
+        "order": 6,
+        "dependsOn": [
+          "GHA-CLOSE-04",
+          "GHA-CLOSE-05"
+        ],
+        "dependencies": [
+          "GHA-CLOSE-04",
+          "GHA-CLOSE-05"
+        ],
+        "relation": "serial",
+        "files": [
+          "components/GithubAutomationConfig.tsx",
+          "app/globals.css",
+          "docs/modules/frontend.md",
+          ".ypi/tasks/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic/github-unattended-job-observability-prototype.html"
+        ],
+        "instructions": [
+          "必须先取得用户对 HTML 原型的明确批准。",
+          "首屏分别显示 Agent 状态与 scheduler 状态；无 session 固定显示尚未启动 Agent。",
+          "将 attempt 文案改为调度尝试，显示 Agent 启动/有效进展/无进展重试。",
+          "展开显示阶段轨道、checkpoint、block layer、reason、next retry、safe session/workspace label、build provenance。",
+          "stale 快照禁用 mutation；只消费服务端 projection/actions，不推断、不新增跳过 gate。"
+        ],
+        "acceptance": [
+          "#22 不再显示像正在实现，首屏可见策略/调度阻塞和 Session 不存在。",
+          "implementing/checking/publishing/terminal 状态可区分，375px 无页面横向滚动。",
+          "键盘、焦点、状态非颜色单通道、reduced-motion 通过。"
+        ],
+        "validation": [
+          "人工按批准 HTML 逐态比对",
+          "浏览器明暗主题与 390px 窄屏 smoke",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "若前端保留旧 phase fallback，可能再次制造假 active；unknown 必须保守显示。"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "priority": 80,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "GHA-CLOSE-07",
+        "title": "补齐 #22 跨层回归、故障注入与发布前验证",
+        "phase": "verification",
+        "description": "用真实字段形状但无敏感内容的 fixture 验证 policy→runner→scheduler→session→projection→UI 闭环。",
+        "order": 7,
+        "dependsOn": [
+          "GHA-CLOSE-06"
+        ],
+        "dependencies": [
+          "GHA-CLOSE-06"
+        ],
+        "relation": "barrier",
+        "files": [
+          "scripts/test-github-automation.mjs",
+          "scripts/test-github-unattended.mjs",
+          "scripts/test-github-unattended-runner.mjs",
+          "scripts/test-github-publish-policy.mjs",
+          "scripts/test-project-space-session-index.mjs"
+        ],
+        "instructions": [
+          "覆盖 title 含模型、空 plan defer、final empty block、UI final block。",
+          "覆盖 remote_confirmed command replay 后 runner 继续、相同 checkpoint 无进展退避、attempt 不暴涨。",
+          "覆盖长 lease heartbeat/fencing、pause/global pause/singleStep/concurrency。",
+          "覆盖 projectId+spaceId、parent/child JSONL/index 归属、session bootstrap failure。",
+          "覆盖 no session 时 safe projection/UI 不显示 Agent active；禁止 secret/path/content 泄漏。",
+          "修复或明确当前 test:github-unattended 的 permission_missing 场景失败，不得忽略。"
+        ],
+        "acceptance": [
+          "三个 GitHub 套件、session/index focused tests、lint、tsc 全绿。",
+          "故障注入可证明不会自动 push/main/merge，不注入 App/machine secrets。",
+          "sanitized #22 fixture 在有限 tick 内达到 stable block 或 implementing，绝不无限 queued/running。"
+        ],
+        "validation": [
+          "npm run test:github-automation",
+          "npm run test:github-unattended",
+          "npm run test:github-unattended-runner",
+          "npm run test:github-publish-policy",
+          "npm run test:project-space-session-index",
+          "npm run test:studio-sdk-runner",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit"
+        ],
+        "risks": [
+          "时间/多进程测试易抖动；使用 fake clock、临时 PI_CODING_AGENT_DIR 和确定性 lease fixture。"
+        ],
+        "parallelizable": false,
+        "member": "checker",
+        "priority": 75,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "GHA-CLOSE-08",
+        "title": "更新架构/模块/运维文档并执行最终门禁",
+        "phase": "handoff",
+        "description": "记录新状态语义、恢复流程、版本/重启要求和 rollback，完成独立 checker 审核。",
+        "order": 8,
+        "dependsOn": [
+          "GHA-CLOSE-07"
+        ],
+        "dependencies": [
+          "GHA-CLOSE-07"
+        ],
+        "relation": "serial",
+        "files": [
+          "docs/architecture/overview.md",
+          "docs/integrations/README.md",
+          "docs/integrations/github-app-automation-setup.md",
+          "docs/modules/api.md",
+          "docs/modules/frontend.md",
+          "docs/modules/library.md",
+          "docs/operations/troubleshooting.md",
+          "AGENTS.md"
+        ],
+        "instructions": [
+          "文档明确 running/attempt/session/blocked/retry_due 口径、build provenance 与完整重启要求。",
+          "记录 #22 恢复 runbook、no-history-rewrite、same-generation/worktree reuse。",
+          "保留 full-agent residual risk、低权限 OS/container 建议、server publisher、无 auto-merge。",
+          "checker 独立核对需求矩阵、UI 批准记录、diff、测试和安全 projection。"
+        ],
+        "acceptance": [
+          "用户可仅从文档判断卡在哪一层及下一步。",
+          "rollback 可分别关闭 UI 增强、自动 retry、unattended，而不删历史。",
+          "无未审批产品决定被实现。"
+        ],
+        "validation": [
+          "文档链接检查",
+          "git diff --check",
+          "checker 逐项签收 checks.md"
+        ],
+        "risks": [
+          "AGENTS.md 只更新导航，不塞入细节。"
+        ],
+        "parallelizable": false,
+        "member": "checker",
+        "priority": 70,
+        "failurePolicy": "block_dependents",
+        "retry": {
+          "maxAttempts": 1
+        },
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-27T04:28:48.815Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 8,
+      "skipped": 0
+    },
+    "subtasks": {
+      "GHA-CLOSE-01": {
+        "id": "GHA-CLOSE-01",
+        "status": "done",
+        "updatedAt": "2026-07-27T03:30:12.815Z",
+        "startedAt": "2026-07-27T03:21:57.941Z",
+        "finishedAt": "2026-07-27T03:30:12.814Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-952ec7927d78766253be983b"
+        ],
+        "lastRunId": "implementer-952ec7927d78766253be983b",
+        "claimedAt": "2026-07-27T03:21:57.941Z",
+        "claimedByContextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+        "summary": "### Implementation Complete — GHA-CLOSE-01\n\n#### Files Changed\n\n- `lib/github-risk-policy.ts` — stage fact sources; title ≠ planText; pre/plan empty → `outcome=defer` + `deferred_no_declared_files` (not `allowed_docs`); final empty → `blocked_empty_diff`; final ignores free-text title over actual diffs; UI title/plan → `blocked_manual_ui_approval`; evidenceSource/policyVersion on result\n- `lib/github-full-agent-profile.ts` — `GITHUB_UNATTENDED_POLICY_VERSION` → `\"1.1\"`\n- `lib/github-diff-policy.ts` — docs for evidence split; `isGithubFinalDiffAllowed` rejects deferred\n- `lib/github-automation-runner.ts` — plan gate no longer copies `issueTitlePreview` into `planText`\n- `lib/github-automation-types.ts` — frozen observability/disposition contracts (`blockedAtLayer`, `retryability`, `sessionAvailability`, progress counts, legacy defaults, helpers)\n- `lib/github-automation-store.ts` — additive optional job progress/block fields\n- `lib/github-automation-projection.ts` — additive dual-layer job fields + conservative legacy derivation; policy projection uses live policy version\n- `scripts/test-github-publish-policy.mjs` — table-driven stage/title/defer/retryability tests\n- `scripts/test-github-unattended.mjs` — stop copying title into planText\n\n#### Verification\n\n- `npm run test:github-publish-policy` — **28 passed / 0 failed**\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (11 pre-existing warnings)\n- `npm run test:github-unattended` — **18 passed / 1 failed** (pre-existing `permission_missing…` → `implementer_error`; out of GHA-CLOSE-01 scope)\n\n#### Notes / Risks\n\n- Deferred empty plan is wire-compat `decision=allow` + `deferred=true`; UI/events must not show `allowed_docs`.\n- Projection observability is contract-only; full runner/sidecar enrichment is GHA-CLOSE-04.\n- Pre-existing unattended red light remains for GHA-CLOSE-07.\n- No Studio task-status tool in this member runtime — **parent should mark GHA-CLOSE-01 done**.\n- No commit/push.\n\n#### Main session next\n\n1. Checker local review for GHA-CLOSE-01  \n2. Claim **GHA-CLOSE-02** and/or **GHA-CLOSE-03**"
+      },
+      "GHA-CLOSE-02": {
+        "id": "GHA-CLOSE-02",
+        "status": "done",
+        "updatedAt": "2026-07-27T03:45:54.836Z",
+        "startedAt": "2026-07-27T03:30:19.208Z",
+        "finishedAt": "2026-07-27T03:45:54.835Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-ff33e5594af6c0ee13e3d6f8"
+        ],
+        "lastRunId": "implementer-ff33e5594af6c0ee13e3d6f8",
+        "claimedAt": "2026-07-27T03:30:19.208Z",
+        "claimedByContextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+        "summary": "### Implementation Complete — GHA-CLOSE-02\n\n#### Files Changed\n\n- `lib/github-automation-types.ts` — `buildGithubAutomationBlockFingerprint`, unattended continuation phase helpers\n- `lib/github-automation-store.ts` — lease heartbeat/fencing, `pendingCommand`, fenced job writes, process epoch\n- `lib/github-automation-scheduler.ts` — explicit disposition, no-progress backoff (no immediate queued park), inFlight-aware stale reconcile, heartbeat under lease\n- `lib/github-issue-triage-runner.ts` — `remote_confirmed` command does **not** cut off active unattended phases; `pendingCommand` consume; fall through to runner\n- `scripts/test-github-automation.mjs` — 4 GHA-CLOSE-02 regressions (fallthrough ×20, no-spin, fencing, inFlight)\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **98 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** (incl. prior red light fixed in tree) |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| `npm run lint` | pass (0 errors; pre-existing warnings only) |\n\n#### Notes / Risks\n\n- **Out of scope (GHA-CLOSE-03+)**: Session/spaceId bootstrap, isolated SDK host env, safe projection UI, #22 operator reconcile runbook — not done here.\n- **#22 recovery** still needs deploy/restart + operator pause/reconcile/retry (GHA-CLOSE-05); this change stops the command-replay spin once new code is live.\n- **Disposition adoption is additive**: handlers without `disposition` get conservative inference; status-only commands on non-unattended phases use `waiting/external`.\n- Could not call `ypi_studio_task(update_implementation_subtask)` from this environment — **main session should mark GHA-CLOSE-02 `done`**.\n\n#### Decisions needed from main session\n\n1. Mark **GHA-CLOSE-02 done** in Studio plan.\n2. Proceed to **GHA-CLOSE-03** (or checker local review on 02 first, per plan).\n3. Do **not** operator-retry #22 until 02–05 + full process restart."
+      },
+      "GHA-CLOSE-03": {
+        "id": "GHA-CLOSE-03",
+        "status": "done",
+        "updatedAt": "2026-07-27T03:38:24.134Z",
+        "startedAt": "2026-07-27T03:30:19.208Z",
+        "finishedAt": "2026-07-27T03:38:24.133Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-aca2041da7ba9af4a187ac3f"
+        ],
+        "lastRunId": "implementer-aca2041da7ba9af4a187ac3f",
+        "claimedAt": "2026-07-27T03:30:19.208Z",
+        "claimedByContextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+        "summary": "### Implementation Complete — GHA-CLOSE-03\n\n#### Files Changed\n\n- `lib/github-automation-worktree.ts` — `spaceId` on ensure result; `resolveGithubAutomationWorktreeSpaceId()` (sync + pathKey read-back) for create/reuse\n- `lib/github-automation-runner.ts` — persist `spaceId`; repair legacy sidecars; parent Session bootstrap requires `projectId+spaceId`; bootstrap failure → visible `blocked` / `session_bootstrap_transient` (no silent Agent-active); no shared `process.env` scrub\n- `lib/github-automation-session.ts` — `buildGithubUnattendedScrubbedEnv()` copy; bootstrap requires paired ids; full-agent uses `toolEnv` (no `delete process.env`)\n- `lib/ypi-studio-child-session-runner.ts` — optional `toolEnv` → bash `spawnHook` with scrubbed env via `createBashToolDefinition` override\n- `lib/agent-session-bootstrap.ts` — comment: do not use `beforeStart` to mutate shared env\n- `scripts/test-github-unattended-runner.mjs` — spaceId / bootstrap pair / env preserve / no-delete-process.env regressions\n- `scripts/test-github-unattended.mjs` — permission/installation fixture seeds `spaceId` + real Studio task so publish path is exercised\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** (fixed prior `permission_missing` red) |\n| `npm run test:project-space-session-index` | store group green |\n| `npm run test:studio-sdk-runner` | pass |\n| `node_modules/.bin/tsc --noEmit` | pass |\n| `npm run lint` | 0 errors (11 pre-existing warnings) |\n\n#### Notes / Risks\n\n- Env isolation is **per-run scrubbed copy for bash spawn**, not a full OS sandbox or separate Node host process. Same-user file/network residual risk remains (by design).\n- Child session still inherits parent `projectId/spaceId` from parent JSONL header (existing path); bootstrap now **must** write those headers first.\n- Shared with GHA-CLOSE-02: `lib/github-automation-runner.ts` — coordinate merge if both land.\n- **Studio tool unavailable here** — parent should mark GHA-CLOSE-03 `done` via `ypi_studio_task(update_implementation_subtask)`.\n- No commit/push.\n\n#### Decisions needed from main session\n\n- Mark GHA-CLOSE-03 done and continue GHA-CLOSE-02 / 04 as planned.\n- Optional later: true isolated SDK **child process** host if bash-only env scrub is insufficient product-wise."
+      },
+      "GHA-CLOSE-04": {
+        "id": "GHA-CLOSE-04",
+        "status": "done",
+        "updatedAt": "2026-07-27T03:53:29.196Z",
+        "startedAt": "2026-07-27T03:46:01.796Z",
+        "finishedAt": "2026-07-27T03:53:29.195Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-df3174a11deadd6ecb6a29ad"
+        ],
+        "lastRunId": "implementer-df3174a11deadd6ecb6a29ad",
+        "claimedAt": "2026-07-27T03:46:01.796Z",
+        "claimedByContextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/github-automation-provenance.ts` — **new** process/package/build/policy provenance helpers\n- `lib/github-automation-projection.ts` — dual-layer job observability + status `runtimeProvenance`; runner sidecar enrichment; safe `workspaceLabel` / `sessionIdShort` / `evaluatedProvenance`\n- `lib/github-automation-scheduler.ts` — stamp `evaluatedCodeRevision` / `evaluatedPolicyVersion` on blocked dispositions\n- `lib/github-automation-runner.ts` — stamp provenance on blocked persists; increment `agentRunCount` after Session bootstrap; mark session bootstrap layer\n- `scripts/test-github-automation.mjs` — GHA-CLOSE-04 forbidden-key / #22 / active / legacy / status / stamp tests\n- `docs/modules/api.md`, `docs/modules/library.md` — additive wire docs\n\n#### Verification\n\n- `npm run test:github-automation` — **104 passed / 0 failed**\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (11 pre-existing warnings)\n\n#### Notes / Risks\n\n- Jobs UI (GHA-CLOSE-06) not updated; additive fields are ignored-safe for old clients.\n- `sessionIdShort` is opaque only (no Session deep link) per plan.\n- Block stamps are best-effort additive; legacy blocks keep `evaluatedProvenance: null` (not fake current runtime).\n- Could not call `ypi_studio_task(update_implementation_subtask)` from this harness — **parent should mark GHA-CLOSE-04 done**.\n\n#### Handoff to main session\n\n- GHA-CLOSE-04 complete; next is **GHA-CLOSE-05** (legacy/#22 reconcile) then UI after HTML approval.\n- No commit/push performed."
+      },
+      "GHA-CLOSE-05": {
+        "id": "GHA-CLOSE-05",
+        "status": "done",
+        "updatedAt": "2026-07-27T04:01:42.885Z",
+        "startedAt": "2026-07-27T03:53:37.844Z",
+        "finishedAt": "2026-07-27T04:01:42.885Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-eb8f697432983b7fe791cfdb"
+        ],
+        "lastRunId": "implementer-eb8f697432983b7fe791cfdb",
+        "claimedAt": "2026-07-27T03:53:37.844Z",
+        "claimedByContextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+        "summary": "### Implementation Complete — GHA-CLOSE-05\n\n#### Files Changed\n\n- `lib/github-automation-runner.ts` — idempotent legacy/#22 reconcile:\n  - `reconcileGithubAutomationLegacyJob` / `consumeGithubAutomationLegacyPendingCommand` / `repairGithubAutomationRunnerSpaceBinding` / `resolveGithubAutomationSafeRecoveryCheckpoint`\n  - `isGithubAutomationDeterministicBlockUnchanged`\n  - `wakeGithubUnattendedJobForRetry` runs reconcile first; preserves `generation` + `attempt`; no g2 / no history delete / no policy skip\n- `lib/github-automation-projection.ts` — retry/resume runs reconcile; deterministic block → `retry_conditions_unchanged`; actions get live runtime provenance\n- `scripts/test-github-automation.mjs` — 4 GHA-CLOSE-05 fixtures (idempotent reconcile, same-gen retry, unchanged-block deny, pre-schema pendingCommand)\n- `docs/operations/troubleshooting.md` — #22 stop-bleed + recover runbook\n- `docs/integrations/github-app-automation-setup.md` — FAQ + operator steps\n- `docs/modules/library.md` / `docs/modules/api.md` — reconcile-on-retry notes\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **108 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed** |\n| `node_modules/.bin/tsc --noEmit` | **pass** |\n| `npm run lint` | **0 errors** (11 pre-existing warnings) |\n\n#### Notes / Risks\n\n- Reconcile is **best-effort** on `spaceId` (needs Project Registry + real WorkTree path); missing registry leaves `spaceId` null until ensure/reuse later.\n- Deterministic retry deny needs **both** `blockFingerprint` and evaluated provenance matching live process; legacy blocks without stamps still allow one re-eval after deploy.\n- **Did not** pause/retry real #22 (per task boundary).\n- No Studio tool here — **parent should mark GHA-CLOSE-05 `done`** via `ypi_studio_task(update_implementation_subtask)`.\n- No commit/push.\n\n#### Decisions / next for main session\n\n1. Mark **GHA-CLOSE-05 done**.\n2. **GHA-CLOSE-06** still needs explicit HTML prototype approval before Jobs UI.\n3. Operator #22: pause → full restart → confirm `runtimeProvenance` → single retry (reconcile is automatic on retry/resume)."
+      },
+      "GHA-CLOSE-06": {
+        "id": "GHA-CLOSE-06",
+        "status": "done",
+        "updatedAt": "2026-07-27T04:07:02.277Z",
+        "startedAt": "2026-07-27T04:01:49.795Z",
+        "finishedAt": "2026-07-27T04:07:02.276Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-0d29de4606218e0fad61c0a1"
+        ],
+        "lastRunId": "implementer-0d29de4606218e0fad61c0a1",
+        "claimedAt": "2026-07-27T04:01:49.795Z",
+        "claimedByContextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+        "summary": "### Implementation Complete — GHA-CLOSE-06\n\n#### Files Changed\n\n- `components/GithubAutomationConfig.tsx` — Jobs UI rewritten to dual-layer Agent vs scheduler status; consumes server projection only; expand/rail/facts/filters/stale/provenance; no “第 N 次” / skip-policy\n- `app/globals.css` — job card summary grid, status pair, rail, facts, filters, stale badge, narrow ≤640/390 styles\n- `docs/modules/frontend.md` — `GithubAutomationConfig` Jobs 运行实况 (GHA-CLOSE-06) behavior documented\n\n#### Verification\n\n- `node_modules/.bin/tsc --noEmit` — **pass**\n- `npm run lint` — **0 errors** (existing repo warnings only)\n- Browser 390px / light-dark manual smoke — **not run here** (needs host UI); structure follows approved HTML prototype\n\n#### Notes / Risks\n\n- Missing additive projection fields → **conservative** `unknown` / `unknown_legacy` (never invents Agent active from `phase`/`status`/`attempt`)\n- Aggregate “调度中/策略阻塞/…” counts are UI-derived from server enums (not a new API field)\n- No Session deep-link added (per plan)\n- **Could not call** `ypi_studio_task(update_implementation_subtask)` — tool not available in this member runtime; main session should mark **GHA-CLOSE-06 = done**\n\n#### Main session next\n\n1. Mark GHA-CLOSE-06 done in Studio plan  \n2. Checker local review  \n3. Proceed GHA-CLOSE-07 (cross-layer regression)"
+      },
+      "GHA-CLOSE-07": {
+        "id": "GHA-CLOSE-07",
+        "status": "done",
+        "updatedAt": "2026-07-27T04:13:19.823Z",
+        "startedAt": "2026-07-27T04:07:09.341Z",
+        "finishedAt": "2026-07-27T04:13:19.822Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-b8b0d557da8b514a84efceb8"
+        ],
+        "lastRunId": "implementer-b8b0d557da8b514a84efceb8",
+        "claimedAt": "2026-07-27T04:07:09.341Z",
+        "claimedByContextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `scripts/test-github-automation.mjs` — 新增 **GHA-CLOSE-07** 跨层回归：\n  - sanitized #22 fixture（reconcile → 有限 tick 无自旋 / 不伪 active）\n  - Jobs UI 双层文案契约（`尚未启动 Agent` / `调度尝试` / 不能跳过策略）\n  - 安全故障注入（无共享 `process.env` 删除、App/machine scrub、publisher 边界）\n  - session bootstrap 可见 blocker（`creating` + `bootstrapping`，非 implementing）\n  - policy matrix 交叉（「模型」defer / empty final / UI final block）\n- `docs/integrations/github-app-automation-setup.md` — 仅去掉 trailing whitespace，满足 `git diff --check`\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `npm run test:github-automation` | **113 passed / 0 failed** |\n| `npm run test:github-unattended` | **19 passed / 0 failed**（原 `permission_missing…→implementer_error` 红灯已消失） |\n| `npm run test:github-unattended-runner` | **18 passed / 0 failed** |\n| `npm run test:github-publish-policy` | **28 passed / 0 failed** |\n| `npm run test:project-space-session-index -- --group all` | **54 passed / 0 failed** |\n| `npm run test:studio-sdk-runner` | **passed** |\n| `npm run lint` | **0 errors**（11 个既有 warnings） |\n| `node_modules/.bin/tsc --noEmit` | **0** |\n| `git diff --check` | **clean** |\n\nStudio：`GHA-CLOSE-07` 已标 **done**（7/8；next = GHA-CLOSE-08）。\n\n#### Notes / Risks\n\n- GHA-CLOSE-07 为验证子任务：本轮只补测试 + whitespace 门禁，不改生产逻辑。\n- 未做真实浏览器 390px/明暗主题手工 smoke；UI 以源码契约 + 既有 GHA-CLOSE-06 实现为准。\n- 未对现场 #22 做 pause/reconcile/retry mutation；需 operator 在完整重启后按 runbook 执行。\n- **GHA-CLOSE-08**（文档/checker 最终门禁）尚未开始；不要 commit/push。\n\n#### Decisions for main session\n\n1. 派发/执行 **GHA-CLOSE-08** 文档收尾与独立 checker 签收。  \n2. 生产恢复 #22：pause → 完整重启 → provenance 核对 → reconcile → 单次 retry（复用 g1）。",
+        "validation": [
+          "npm run test:github-automation => 113 passed",
+          "npm run test:github-unattended => 19 passed",
+          "npm run test:github-unattended-runner => 18 passed",
+          "npm run test:github-publish-policy => 28 passed",
+          "npm run test:project-space-session-index -- --group all => 54 passed",
+          "npm run test:studio-sdk-runner => passed",
+          "npm run lint => 0 errors (11 pre-existing warnings)",
+          "tsc --noEmit => 0",
+          "git diff --check => clean after trailing-ws fix"
+        ]
+      },
+      "GHA-CLOSE-08": {
+        "id": "GHA-CLOSE-08",
+        "status": "done",
+        "updatedAt": "2026-07-27T04:18:05.945Z",
+        "startedAt": "2026-07-27T04:13:25.825Z",
+        "finishedAt": "2026-07-27T04:18:05.944Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-35eaa22021c4f56398f7fbfe"
+        ],
+        "lastRunId": "implementer-35eaa22021c4f56398f7fbfe",
+        "claimedAt": "2026-07-27T04:13:25.825Z",
+        "claimedByContextId": "pi_019fa172-013a-707c-8875-a0b5c7b1c083",
+        "summary": "### Implementation Complete — GHA-CLOSE-08\n\nDocumentation/navigation + final validation only. No production code, no commit/push.\n\n#### Files Changed\n\n- `docs/architecture/overview.md` — P1 durable SM: disposition/no-spin, counts, command once, policy stages, Session `projectId+spaceId`, env copy isolation, lease fencing, provenance, #22 same-gen recovery\n- `docs/integrations/README.md` — observability/recovery section, modules/tests, layered rollback\n- `docs/integrations/github-app-automation-setup.md` — #22 FAQ + table (dual-layer UI, full restart, reconcile, `retry_conditions_unchanged`)\n- `docs/modules/api.md` — status/jobs projection, provenance, command fall-through, legacy reconcile\n- `docs/modules/library.md` — scheduler disposition/fencing, worktree spaceId, scrubbed env copy, invariants\n- `docs/operations/troubleshooting.md` — test matrix + cross-links (runbook already present)\n- `AGENTS.md` — navigation only (disposition/lease/Jobs UI/reconcile + runner test)\n- `.ypi/tasks/.../handoff.md` — final handoff artifact\n\n#### Verification\n\n| Command | Result |\n| --- | --- |\n| `test:github-automation` | **113 / 0** |\n| `test:github-unattended` | **19 / 0** |\n| `test:github-unattended-runner` | **18 / 0** |\n| `test:github-publish-policy` | **28 / 0** |\n| `lint` | **0 errors** (11 pre-existing warnings) |\n| `tsc --noEmit` | **pass** |\n| `git diff --check` (docs + AGENTS) | **pass** |\n\n#### Notes / Risks\n\n- No `ypi_studio_task` tool in this member env — **parent must mark GHA-CLOSE-08 done** (plan 8/8).\n- Live #22 recovery still operator-owned after deploy + **full `ypi` restart**.\n- Optional independent checker spot-check of docs vs `checks.md` before release."
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-27T03:21:57.941Z",
+        "subtaskId": "GHA-CLOSE-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T03:30:19.208Z",
+        "subtaskId": "GHA-CLOSE-02",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T03:30:19.208Z",
+        "subtaskId": "GHA-CLOSE-03",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T03:46:01.796Z",
+        "subtaskId": "GHA-CLOSE-04",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T03:53:37.844Z",
+        "subtaskId": "GHA-CLOSE-05",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T04:01:49.795Z",
+        "subtaskId": "GHA-CLOSE-06",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T04:07:09.341Z",
+        "subtaskId": "GHA-CLOSE-07",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-27T04:13:08.688Z",
+        "subtaskId": "GHA-CLOSE-07",
+        "from": "running",
+        "to": "done",
+        "message": "Cross-layer regression green: GitHub suites, session/index, lint/tsc; added GHA-CLOSE-07 sanitized #22/no-spin/UI/security fixtures. permission_missing red light resolved (19/19). Docs trailing whitespace fixed for git diff --check."
+      },
+      {
+        "at": "2026-07-27T04:13:25.825Z",
+        "subtaskId": "GHA-CLOSE-08",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

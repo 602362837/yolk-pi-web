@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-27T01:30:07.547Z",
+  "updatedAt": "2026-07-27T04:28:48.815Z",
   "entries": [
+    {
+      "id": "20260727-122848-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+      "title": "GitHub 无人值守实现卡在 planning 空转：无 session、plan policy 误拦、调度自旋与可观测性闭环",
+      "taskId": "20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+      "taskKey": "archived:2026-07:20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+      "workflowId": "feature-dev",
+      "summary": "规划已完成，task 已进入 `awaiting_approval`，生产实现尚未开始。 审批入口：[plan-review.md](plan-review.md)。 必须先批准：[HTML 原型](github-unattended-job-observability-prototype.html)。 完整修复覆盖 policy、command/state machine、scheduler/lease、Session/WorkTree/env、safe projection/UI、#22 recovery 与回归测试；禁止仅改正则或手工解锁 job。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260727-104502-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
+      "knowledgePath": ".ypi/knowledge/20260727-122848-github-无人值守实现卡在-planning-空转-无-session-plan-polic.md",
+      "createdAt": "2026-07-27T04:28:48.815Z",
+      "archivedAt": "2026-07-27T04:28:48.815Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260727-093007-修复-github-自动化评论自触发循环-并建立-开发者指令响应闭环",
       "title": "修复 GitHub 自动化评论自触发循环，并建立 @ 开发者指令响应闭环",

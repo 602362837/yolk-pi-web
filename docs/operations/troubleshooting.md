@@ -685,7 +685,42 @@ P1 uses the **standard full agent** (file/bash/network). Owner gate, WorkTree, a
 - After `issues.closed`, active jobs park as `issue_closed` (blocked/paused); WorkTree is kept; reopen + explicit Owner/Settings continue is required.
 - Unknown push/PR outcomes must list existing head/base PRs before creating another.
 
+### Unattended planning spin / no Session (#22 class)
+
+Symptoms: Settings Jobs shows `planning` / `queued`/`running` with rising **调度尝试** (legacy `attempt`), checkpoint stuck at `studio_task_ready`, runner sidecar `sessionId` null, WorkTree `.ypi/sessions/index.v1.json` empty, Studio task still `intake`. This is **scheduler / policy / command replay**, not “Agent is implementing”.
+
+Root chain (fixed across GHA-CLOSE-01…05):
+
+1. Old plan gate treated empty plan as `blocked_uncertain`.
+2. After retry, already-handled Owner adoption (`owner_command` + `remote_confirmed`) was re-read every tick and cut off unattended runner continuation.
+3. Scheduler parked the still-`running` result as `queued` and re-leased about every 2s → attempt explosion without Session.
+4. Even after spin stop, missing WorkTree `spaceId` can still fail parent Session bootstrap.
+
+**Stop-bleed (before or while deploying fix):**
+
+1. Per-job **pause** on that job (`POST /api/github-automation/jobs/{jobId}` `{ "action":"pause" }`). If action race prevents a stable pause, set global `paused=true` in Settings.
+2. Do **not** keep retrying, do **not** hand-edit job/task JSON, do **not** delete job/events/WorkTree/task/session, do **not** create a new generation (g2).
+3. Deploy the fix package and **fully restart** `ypi` (hot reload is not enough). Confirm status `runtimeProvenance` (`packageVersion` / `buildId` / `codeRevision` / `policyVersion` / `processEpoch`) matches the fixed build.
+
+**Safe recovery (same generation / WorkTree / branch / task):**
+
+1. After restart, open the job once (GET status or job). Retry/resume paths run **idempotent legacy reconcile** first:
+   - mark already `remote_confirmed` owner commands as consumed (no re-side-effect);
+   - repair missing runner `spaceId` from Project Registry when `projectId` + WorkTree path exist;
+   - normalize checkpoint to last safe resume point (for #22: usually `studio_task_ready`);
+   - preserve legacy `attempt` as scheduler-run audit; never rewrite history events.
+2. Operator **single** `retry` (or `resume` if paused). Same `jobId` / `generation` / WorkTree / branch / Studio task.
+3. Allowed outcomes only:
+   - **stable policy/manual block** (e.g. real UI / high-risk scope) with **no Session** — correct; do not skip gate;
+   - **implementing** with parent Session in the **WorkTree space** (not main) and an auditable child run.
+4. Forbidden outcomes: queued/running jitter every ~2s, attempt skyrocketing, “实现中” without Session, new generation, deleted audit trail, manual skip-policy.
+
+**Deterministic block retry:** if the job is blocked with `retryability=operator_after_change` and the same `blockFingerprint` + evaluated build/policy provenance as the live process, Settings marks retry **`retry_conditions_unchanged`** — fix code/policy/input (and restart) before retrying. There is **no** “skip policy” action.
+
+**UI truthfulness:** prefer dual-layer fields (`agentExecutionState`, `sessionAvailability`, `blockedAtLayer`, `counts.schedulerRuns`) over raw `phase`/`status`/`attempt`. No Session ⇒ “尚未启动 Agent”, never “第 N 次执行 = Agent working”.
+
 ### Generation storm / Bot comment loop
+
 
 Symptoms: many deliveries for the same `repo#issue` with rising generation (historical g1–g80), sender App Bot, actions `issue_comment.edited` / `issues.labeled` / `assigned`, Settings recent jobs growing without new human opens.
 
@@ -707,10 +742,11 @@ Set `paused=true` and/or `enabled=false` or `mode=off`. Set `unattended.enabled=
 ```bash
 npm run test:github-automation
 npm run test:github-unattended
+npm run test:github-unattended-runner
 npm run test:github-publish-policy
 ```
 
-Must pass offline with temp agent dir + mocks (no real GitHub network / operator credentials).
+Must pass offline with temp agent dir + mocks (no real GitHub network / operator credentials). Architecture/status semantics: `docs/architecture/overview.md` (P1 durable state machine); operator setup recovery table: `docs/integrations/github-app-automation-setup.md`.
 
 ## Memory Diagnostic Snapshots
 

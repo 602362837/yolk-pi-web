@@ -39,7 +39,10 @@ import { GithubAutomationError } from "./github-automation-errors";
 
 const DIR_MODE = 0o700;
 const FILE_MODE = 0o600;
+/** Heartbeat must be fresher than this for an active lease owner. */
 const LOCK_STALE_MS = 60_000;
+/** How often active handlers should renew the dir lease (GHA-CLOSE-02). */
+export const GITHUB_AUTOMATION_LEASE_HEARTBEAT_MS = 15_000;
 const LOCK_RETRY_MIN_MS = 20;
 const LOCK_RETRY_MAX_MS = 80;
 const LOCK_MAX_WAIT_MS = 10_000;
@@ -47,6 +50,16 @@ const TITLE_MAX_CHARS = 120;
 const TRACE_ID_BYTES = 8;
 
 export const GITHUB_AUTOMATION_STORE_SCHEMA_VERSION = 1 as const;
+
+/** Process-local epoch for fencing (recreated when the module reloads). */
+const PROCESS_EPOCH =
+  typeof process.pid === "number"
+    ? `pe-${process.pid}-${Date.now().toString(36)}`
+    : `pe-unknown-${Date.now().toString(36)}`;
+
+export function getGithubAutomationProcessEpoch(): string {
+  return PROCESS_EPOCH;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -201,6 +214,10 @@ export interface GithubAutomationJobRecord {
   phase: GithubAutomationJobPhase;
   status: GithubAutomationJobStatus;
   generation: number;
+  /**
+   * Scheduler lease run count (legacy field name).
+   * GHA-CLOSE-01: interpret as schedulerRuns; never as Agent execution count.
+   */
   attempt: number;
   deliveryId: string | null;
   /** Safe truncated title. */
@@ -216,6 +233,52 @@ export interface GithubAutomationJobRecord {
   effects: GithubAutomationEffectMarker[];
   /** Checkpoint name for restart resume (first incomplete). */
   checkpoint: string | null;
+  // ── Additive GHA-CLOSE-01…02 fields (optional on disk; never rewrite history) ──
+  /** Opaque progress revision; only advances on meaningful checkpoint/session/run progress. */
+  progressRevision?: number;
+  /** Successful Agent session bootstrap / child start count. */
+  agentRunCount?: number;
+  /** Allowlisted meaningful progress event count. */
+  meaningfulProgressCount?: number;
+  /** Lease runs that produced no progressRevision change. */
+  noProgressRunCount?: number;
+  lastMeaningfulProgressAt?: string | null;
+  /** Allowlisted progress kind only — never free text. */
+  lastMeaningfulProgressKind?: string | null;
+  /** Product layer for stable blocks (policy_plan, session_bootstrap, …). */
+  blockedAtLayer?: string | null;
+  /** sha256 fingerprint for deterministic block re-evaluation. */
+  blockFingerprint?: string | null;
+  /** automatic | operator_after_change | operator | none */
+  retryability?: string | null;
+  /** Policy/code revision evaluated when the current block was decided. */
+  evaluatedPolicyVersion?: string | null;
+  evaluatedCodeRevision?: string | null;
+  /**
+   * Lease fencing token (GHA-CLOSE-02). Written under lease; stale owners must not write.
+   * Additive; missing on legacy records.
+   */
+  leaseFencingToken?: string | null;
+  /** Last lease heartbeat ISO time (scheduler/lease only — not meaningful progress). */
+  leaseHeartbeatAt?: string | null;
+  /**
+   * Pending owner command work item (GHA-CLOSE-02).
+   * Separates delivery audit identity (`deliveryId`) from one-shot command consumption.
+   */
+  pendingCommand?: GithubAutomationPendingCommand | null;
+}
+
+/**
+ * One-shot owner command work item (audit deliveryId remains separate).
+ * Exact comment/version is consumed at most once; active unattended jobs then fall through.
+ */
+export interface GithubAutomationPendingCommand {
+  deliveryId: string;
+  commentId: number;
+  versionHash: string;
+  commandKey: string;
+  state: "pending" | "consumed";
+  updatedAt: string;
 }
 
 export interface GithubAutomationIssueStateRecord {
@@ -973,12 +1036,28 @@ export async function appendGithubAutomationSafeEvent(
   }
 }
 
-// ─── Filesystem leases (mkdir exclusive) ─────────────────────────────────────
+// ─── Filesystem leases (mkdir exclusive) + fencing (GHA-CLOSE-02) ────────────
 
 interface LeaseOwner {
   ownerId: string;
   pid: number;
   createdAt: number;
+  /** Last heartbeat epoch ms; falls back to createdAt for legacy owner.json. */
+  heartbeatAt: number;
+  /** Opaque fencing token bound to this lease acquisition. */
+  fencingToken: string;
+  processEpoch: string;
+}
+
+function isLivePid(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // EPERM: process exists but belongs to another user — treat as live (fail closed).
+    return (err as NodeJS.ErrnoException | undefined)?.code === "EPERM";
+  }
 }
 
 async function readLeaseOwner(lockDir: string): Promise<LeaseOwner | null> {
@@ -998,15 +1077,39 @@ async function readLeaseOwner(lockDir: string): Promise<LeaseOwner | null> {
         ? raw.createdAt
         : null;
     if (!ownerId || pid === null || createdAt === null) return null;
-    return { ownerId, pid, createdAt };
+    const heartbeatAt =
+      typeof raw.heartbeatAt === "number" && Number.isFinite(raw.heartbeatAt)
+        ? raw.heartbeatAt
+        : createdAt;
+    const fencingToken =
+      typeof raw.fencingToken === "string" && raw.fencingToken.trim()
+        ? raw.fencingToken.trim()
+        : `legacy-${ownerId}-${createdAt}`;
+    const processEpoch =
+      typeof raw.processEpoch === "string" && raw.processEpoch.trim()
+        ? raw.processEpoch.trim()
+        : "legacy";
+    return { ownerId, pid, createdAt, heartbeatAt, fencingToken, processEpoch };
   } catch {
     return null;
   }
 }
 
-async function leaseAgeMs(lockDir: string): Promise<number | null> {
+async function writeLeaseOwner(lockDir: string, owner: LeaseOwner): Promise<void> {
+  await writeFile(
+    join(lockDir, "owner.json"),
+    `${JSON.stringify(owner)}\n`,
+    { encoding: "utf8", mode: FILE_MODE },
+  );
+}
+
+/**
+ * Age for stale decisions uses heartbeat (not only creation time).
+ * Legacy owner.json without heartbeat falls back to createdAt.
+ */
+async function leaseHeartbeatAgeMs(lockDir: string): Promise<number | null> {
   const owner = await readLeaseOwner(lockDir);
-  if (owner) return Date.now() - owner.createdAt;
+  if (owner) return Date.now() - owner.heartbeatAt;
   try {
     const st = await stat(lockDir);
     return Date.now() - st.mtimeMs;
@@ -1015,9 +1118,40 @@ async function leaseAgeMs(lockDir: string): Promise<number | null> {
   }
 }
 
-async function tryRemoveStaleLease(lockDir: string): Promise<boolean> {
-  const age = await leaseAgeMs(lockDir);
-  if (age === null || age < LOCK_STALE_MS) return false;
+/**
+ * Remove a lease only when heartbeat is stale AND (same-host PID is dead OR
+ * processEpoch is missing/legacy). Never remove solely because the directory is old
+ * while a live owner is still heartbeating.
+ */
+async function tryRemoveStaleLease(
+  lockDir: string,
+  staleMs: number = LOCK_STALE_MS,
+): Promise<boolean> {
+  const owner = await readLeaseOwner(lockDir);
+  if (!owner) {
+    const age = await leaseHeartbeatAgeMs(lockDir);
+    if (age === null || age < staleMs) return false;
+    try {
+      await rm(lockDir, { recursive: true, force: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const heartbeatAge = Date.now() - owner.heartbeatAt;
+  if (heartbeatAge < staleMs) return false;
+
+  // Live same-host PID with expired heartbeat: still refuse to steal until dead
+  // (owner may be mid-write). Cross-processEpoch + dead PID may be removed.
+  if (isLivePid(owner.pid) && owner.processEpoch === PROCESS_EPOCH) {
+    return false;
+  }
+  if (isLivePid(owner.pid) && owner.processEpoch !== PROCESS_EPOCH) {
+    // Different process epoch but PID still live (PID reuse risk): require longer stale.
+    if (heartbeatAge < staleMs * 2) return false;
+  }
+
   try {
     await rm(lockDir, { recursive: true, force: true });
     return true;
@@ -1029,6 +1163,14 @@ async function tryRemoveStaleLease(lockDir: string): Promise<boolean> {
 export interface GithubAutomationLeaseHandle {
   ownerId: string;
   lockDir: string;
+  fencingToken: string;
+  processEpoch: string;
+  pid: number;
+  createdAt: number;
+  /** Renew heartbeat; returns false if this owner no longer holds the lease. */
+  heartbeat: () => Promise<boolean>;
+  /** True when owner.json still matches this handle's fencing token. */
+  isHeld: () => Promise<boolean>;
   release: () => Promise<void>;
 }
 
@@ -1045,21 +1187,60 @@ async function acquireDirLease(
   while (true) {
     try {
       await mkdir(lockDir, { recursive: false, mode: DIR_MODE });
+      const now = Date.now();
+      const fencingToken = `ft-${randomUUID()}`;
       const owner: LeaseOwner = {
         ownerId,
         pid: process.pid,
-        createdAt: Date.now(),
+        createdAt: now,
+        heartbeatAt: now,
+        fencingToken,
+        processEpoch: PROCESS_EPOCH,
       };
-      await writeFile(
-        join(lockDir, "owner.json"),
-        `${JSON.stringify(owner)}\n`,
-        { encoding: "utf8", mode: FILE_MODE },
-      );
+      await writeLeaseOwner(lockDir, owner);
 
       let released = false;
+
+      const isHeld = async (): Promise<boolean> => {
+        if (released) return false;
+        const current = await readLeaseOwner(lockDir);
+        return Boolean(
+          current &&
+            current.ownerId === owner.ownerId &&
+            current.fencingToken === owner.fencingToken &&
+            current.createdAt === owner.createdAt,
+        );
+      };
+
+      const heartbeat = async (): Promise<boolean> => {
+        if (released) return false;
+        const current = await readLeaseOwner(lockDir);
+        if (
+          !current ||
+          current.ownerId !== owner.ownerId ||
+          current.fencingToken !== owner.fencingToken ||
+          current.createdAt !== owner.createdAt
+        ) {
+          return false;
+        }
+        const next: LeaseOwner = {
+          ...current,
+          heartbeatAt: Date.now(),
+        };
+        await writeLeaseOwner(lockDir, next);
+        owner.heartbeatAt = next.heartbeatAt;
+        return true;
+      };
+
       return {
         ownerId,
         lockDir,
+        fencingToken,
+        processEpoch: PROCESS_EPOCH,
+        pid: owner.pid,
+        createdAt: owner.createdAt,
+        heartbeat,
+        isHeld,
         release: async () => {
           if (released) return;
           released = true;
@@ -1068,6 +1249,7 @@ async function acquireDirLease(
             if (
               current &&
               current.ownerId === owner.ownerId &&
+              current.fencingToken === owner.fencingToken &&
               current.createdAt === owner.createdAt
             ) {
               await rm(lockDir, { recursive: true, force: true });
@@ -1080,11 +1262,8 @@ async function acquireDirLease(
     } catch (err) {
       if (!isNodeError(err) || err.code !== "EEXIST") throw err;
 
-      // Stale recovery with configured threshold.
-      const age = await leaseAgeMs(lockDir);
-      if (age !== null && age >= staleMs) {
-        await tryRemoveStaleLease(lockDir);
-      }
+      // Stale recovery: heartbeat age + live PID / fencing checks.
+      await tryRemoveStaleLease(lockDir, staleMs);
 
       if (Date.now() - startedAt > maxWaitMs) {
         throw new GithubAutomationError(
@@ -1096,6 +1275,65 @@ async function acquireDirLease(
       await sleep(jitteredRetryMs());
     }
   }
+}
+
+/**
+ * Write a job only if the fencing token still matches the on-disk lease (when provided).
+ * Prevents a stale owner from overwriting after lease loss.
+ */
+export async function writeGithubAutomationJobWithFencing(
+  job: GithubAutomationJobRecord,
+  fencing: { fencingToken: string; ownerId: string } | null | undefined,
+): Promise<GithubAutomationJobRecord> {
+  if (fencing?.fencingToken) {
+    const lockDir = getGithubAutomationJobLockDir(job.jobId);
+    const owner = await readLeaseOwner(lockDir);
+    if (
+      !owner ||
+      owner.fencingToken !== fencing.fencingToken ||
+      (fencing.ownerId && owner.ownerId !== fencing.ownerId)
+    ) {
+      throw new GithubAutomationError(
+        "internal_error",
+        "Job lease fencing token mismatch",
+        {
+          status: 409,
+          details: {
+            reason: "lease_fencing_mismatch",
+            jobId: job.jobId,
+          },
+        },
+      );
+    }
+  }
+  return writeGithubAutomationJob({
+    ...job,
+    leaseFencingToken: fencing?.fencingToken ?? job.leaseFencingToken ?? null,
+  });
+}
+
+/** Test helper: read raw lease owner for fencing/heartbeat assertions. */
+export async function _testReadGithubAutomationLeaseOwner(
+  lockDir: string,
+): Promise<LeaseOwner | null> {
+  return readLeaseOwner(lockDir);
+}
+
+/** Test helper: force a stale heartbeat without removing the lease dir. */
+export async function _testAgeGithubAutomationLeaseHeartbeat(
+  lockDir: string,
+  ageMs: number,
+): Promise<boolean> {
+  const owner = await readLeaseOwner(lockDir);
+  if (!owner) return false;
+  const next: LeaseOwner = {
+    ...owner,
+    heartbeatAt: Date.now() - Math.max(0, ageMs),
+    // Keep createdAt older too for legacy age paths.
+    createdAt: Date.now() - Math.max(0, ageMs),
+  };
+  await writeLeaseOwner(lockDir, next);
+  return true;
 }
 
 export async function withGithubAutomationIssueLease<T>(

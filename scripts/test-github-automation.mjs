@@ -8026,6 +8026,1584 @@ await test("TEST-04 command effect crash-intent recovers without double side eff
   credentials._testOverrideGithubAppCredentialEnv(null);
 });
 
+// ─── GHA-CLOSE-02: command fallthrough / no-spin / lease fencing ─────────────
+
+await test("GHA-CLOSE-02 remote_confirmed adoption on planning falls through to runner", async () => {
+  const { createHash } = await import("node:crypto");
+  const body = "@AppBot 采纳";
+  const commentBodySha256 = createHash("sha256").update(body, "utf8").digest("hex");
+  const commandKey = ownerIntent.buildGithubOwnerCommandKey({
+    repositoryId: 602362837,
+    issueNumber: 22022,
+    generation: 1,
+    commentId: 99001,
+    bodySha256: commentBodySha256,
+    command: "adopt",
+  });
+
+  const keyMaterial = makePrivateKeyFile();
+  credentials._testOverrideGithubAppCredentialEnv({
+    appId: "12345",
+    privateKeyFile: keyMaterial.keyPath,
+    webhookSecret: WEBHOOK_SECRET_SENTINEL,
+  });
+  client._testClearGithubAppInstallationTokenCache();
+
+  assignee._testOverrideMachineAssigneeCommandRunner(async ({ command, args }) => {
+    if (command === "gh" && args[0] === "auth") {
+      return {
+        code: 0,
+        stdout: "Logged in to github.com\nActive account: true\n",
+        stderr: "",
+      };
+    }
+    if (command === "gh" && args[0] === "api") {
+      return {
+        code: 0,
+        stdout: JSON.stringify({ login: "machine-user", id: 4242 }),
+        stderr: "",
+      };
+    }
+    return { code: 1, stdout: "", stderr: "unexpected" };
+  });
+
+  // Issue deliberately missing ypi:claimed / machine assignee so runner start gate
+  // returns incomplete_claim once command replay falls through.
+  const issueState = {
+    number: 22022,
+    title: "chat打开底部模型性能问题",
+    body: "docs only",
+    state: "open",
+    labels: [{ name: "ypi:decision-yes" }],
+    assignees: [],
+    user: { login: "reporter", id: 9 },
+  };
+  const ownerComment = {
+    id: 99001,
+    body,
+    user: { login: "owner-user", id: 12345, type: "User" },
+    updated_at: "2026-07-27T03:00:00Z",
+  };
+
+  client._testOverrideGithubAppClientFetch(async (url, init) => {
+    const u = String(url);
+    const method = (init?.method ?? "GET").toUpperCase();
+
+    if (u.endsWith("/app/installations/99/access_tokens") && method === "POST") {
+      return new Response(
+        JSON.stringify({
+          token: INSTALL_TOKEN_SENTINEL,
+          expires_at: new Date(Date.now() + 3600_000).toISOString(),
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (u.endsWith("/repos/602362837/yolk-pi-web") && method === "GET") {
+      return new Response(
+        JSON.stringify({
+          id: 602362837,
+          full_name: "602362837/yolk-pi-web",
+          owner: { id: 12345, login: "owner-user", type: "User" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (u.endsWith("/issues/22022") && method === "GET") {
+      return new Response(JSON.stringify(issueState), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (u.includes("/issues/comments/99001") && method === "GET") {
+      return new Response(JSON.stringify(ownerComment), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (u.includes("/comments") && (method === "POST" || method === "PATCH" || method === "GET")) {
+      return new Response(JSON.stringify(method === "GET" ? [] : { id: 1, body: "ok" }), {
+        status: method === "POST" ? 201 : 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ message: "not mocked", url: u }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+
+  const deliveryId = "del-gha-close-02-adopt-planning";
+  await store.writeGithubAutomationDelivery({
+    schemaVersion: 1,
+    deliveryId,
+    eventName: "issue_comment",
+    action: "created",
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    installationId: 99,
+    issueNumber: 22022,
+    issueTitlePreview: "chat打开底部模型性能问题",
+    senderLogin: "owner-user",
+    senderId: 12345,
+    senderType: "User",
+    commentId: 99001,
+    commentUpdatedAt: "2026-07-27T03:00:00Z",
+    commentBodySha256,
+    performedViaAppId: null,
+    actorSource: "human_actor",
+    disposition: "enqueued",
+    ignoreReason: null,
+    jobId: null,
+    receivedAt: new Date().toISOString(),
+    bodySha256Prefix: "abcd",
+  });
+
+  let job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22022,
+    installationId: 99,
+    deliveryId,
+    issueTitlePreview: "chat打开底部模型性能问题",
+    generation: 1,
+    phase: "planning",
+  });
+  job = {
+    ...job,
+    status: "running",
+    phase: "planning",
+    checkpoint: "studio_task_ready",
+    reasonCode: "retry_wake",
+    attempt: 8,
+    effects: store.upsertEffectMarker([], {
+      name: "owner_command",
+      status: "remote_confirmed",
+      remoteId: commandKey,
+      generation: 1,
+      reasonCode: "owner_authorized_unattended",
+    }),
+  };
+  await store.writeGithubAutomationJob(job);
+
+  await store.upsertGithubAutomationIssueState({
+    repositoryId: 602362837,
+    issueNumber: 22022,
+    activeJobId: job.jobId,
+    generation: 1,
+    claimStatus: "incomplete",
+    lastDeliveryId: deliveryId,
+  });
+
+  try {
+    const cfg = makeAllowlistedConfig();
+    cfg.enabled = true;
+    cfg.mode = "unattended";
+    cfg.paused = false;
+    cfg.unattended = { ...cfg.unattended, enabled: true };
+    cfg.repositories[0] = {
+      ...cfg.repositories[0],
+      installationId: 99,
+      projectRoot: agentDir,
+      ownerActorIds: [12345],
+    };
+
+    let last = null;
+    for (let i = 0; i < 20; i += 1) {
+      const current = await store.readGithubAutomationJob(job.jobId);
+      last = await triageRunner.githubIssueTriageJobHandler(
+        {
+          ...current,
+          status: "running",
+          phase: "planning",
+          checkpoint: current.checkpoint ?? "studio_task_ready",
+          deliveryId,
+        },
+        { config: cfg, ownerId: "test" },
+      );
+      const effects = last.job.effects.filter((e) => e.name === "owner_command");
+      assert.equal(effects.length, 1, "command side effect stays one-shot");
+    }
+
+    assert.ok(last);
+    // Runner reached after command fallthrough: incomplete claim gate blocks.
+    // Pre-fix spun forever with status still running and never entered runner.
+    assert.equal(last.job.status, "blocked");
+    assert.equal(last.job.reasonCode, "incomplete_claim");
+  } finally {
+    client._testOverrideGithubAppClientFetch(undefined);
+    client._testClearGithubAppInstallationTokenCache();
+    assignee._testOverrideMachineAssigneeCommandRunner(null);
+    credentials._testOverrideGithubAppCredentialEnv(null);
+  }
+});
+
+await test("GHA-CLOSE-02 no-progress disposition parks retry_due instead of queued spin", async () => {
+  scheduler._testResetGithubAutomationScheduler();
+  scheduler._testSetGithubAutomationSchedulerAuto(false);
+
+  // Drain / terminal-ize any leftover runnable jobs so this case is deterministic.
+  const existing = await store.listGithubAutomationJobs();
+  for (const j of existing) {
+    if (j.status === "queued" || j.status === "retry_due" || j.status === "running") {
+      await store.writeGithubAutomationJob({
+        ...j,
+        status: "cancelled",
+        phase: "completed",
+        reasonCode: "test_drain",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+    }
+  }
+
+  await config.writeGithubAutomationConfig({
+    ...makeAllowlistedConfig(),
+    enabled: true,
+    mode: "triage",
+    paused: false,
+  });
+
+  let job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22023,
+    installationId: 1,
+    deliveryId: "del-no-progress-spin",
+    issueTitlePreview: "no progress spin",
+    generation: 1,
+  });
+  job = {
+    ...job,
+    phase: "planning",
+    status: "queued",
+    checkpoint: "studio_task_ready",
+    reasonCode: "retry_wake",
+    attempt: 0,
+    progressRevision: 0,
+  };
+  await store.writeGithubAutomationJob(job);
+
+  // Handler returns the same running job without advancing checkpoint/revision.
+  scheduler.setGithubAutomationJobHandler(async (running) => ({
+    job: running,
+    wakeAgain: false,
+  }));
+
+  for (let i = 0; i < 5; i += 1) {
+    const cur = await store.readGithubAutomationJob(job.jobId);
+    if (cur.status === "retry_due") {
+      await store.writeGithubAutomationJob({
+        ...cur,
+        nextRetryAt: new Date(Date.now() - 1_000).toISOString(),
+      });
+    } else if (cur.status === "blocked") {
+      break;
+    }
+    const tick = await scheduler.tickGithubAutomationScheduler();
+    // Wait for fire-and-forget handler + disposition write.
+    const deadline = Date.now() + 2_000;
+    let after = cur;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 20));
+      after = await store.readGithubAutomationJob(job.jobId);
+      if (after.status === "retry_due" || after.status === "blocked") break;
+      if (tick.started === 0) break;
+    }
+    assert.notEqual(
+      after.status,
+      "queued",
+      "no-progress must not park immediately runnable queued",
+    );
+    assert.ok(
+      after.status === "retry_due" || after.status === "blocked" || after.status === "running",
+      `expected retry_due/blocked/running-in-flight, got ${after.status}`,
+    );
+    if (after.status === "retry_due" || after.status === "blocked") {
+      assert.equal(after.reasonCode, "runner_no_progress");
+      assert.ok(after.noProgressRunCount >= 1);
+    }
+  }
+
+  // Final settle
+  const settleDeadline = Date.now() + 2_000;
+  let finalJob = await store.readGithubAutomationJob(job.jobId);
+  while (
+    Date.now() < settleDeadline &&
+    finalJob.status === "running"
+  ) {
+    await new Promise((r) => setTimeout(r, 20));
+    finalJob = await store.readGithubAutomationJob(job.jobId);
+  }
+  assert.ok(finalJob.attempt >= 1);
+  assert.ok(finalJob.attempt <= 6, "attempt must not explode like the #22 spin");
+  assert.ok(
+    finalJob.status === "retry_due" || finalJob.status === "blocked",
+    `final status should be retry_due/blocked, got ${finalJob.status}`,
+  );
+  assert.equal(finalJob.reasonCode, "runner_no_progress");
+  assert.ok(
+    finalJob.noProgressRunCount >= 1 && finalJob.noProgressRunCount <= 8,
+    "noProgressRunCount should accumulate with cap path available",
+  );
+
+  scheduler.setGithubAutomationJobHandler(null);
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("GHA-CLOSE-02 lease heartbeat + fencing reject stale owner write", async () => {
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22024,
+    installationId: 1,
+    deliveryId: "del-lease-fence",
+    issueTitlePreview: "lease fence",
+    generation: 1,
+  });
+
+  let firstToken = null;
+  let secondToken = null;
+
+  await store.withGithubAutomationJobLease(job.jobId, async (lease) => {
+    firstToken = lease.fencingToken;
+    assert.ok(firstToken && firstToken.startsWith("ft-"));
+    const held = await lease.isHeld();
+    assert.equal(held, true);
+    const hb = await lease.heartbeat();
+    assert.equal(hb, true);
+
+    // Age heartbeat beyond stale threshold and kill-lookalike: mark pid dead by
+    // rewriting owner with a non-existent pid + stale heartbeat.
+    const lockDir = store.getGithubAutomationJobLockDir(job.jobId);
+    await store._testAgeGithubAutomationLeaseHeartbeat(lockDir, 120_000);
+    const owner = await store._testReadGithubAutomationLeaseOwner(lockDir);
+    assert.ok(owner);
+    // Force dead-looking PID so stale removal can proceed.
+    const deadOwner = {
+      ...owner,
+      pid: 2_147_000_000, // unlikely live
+      processEpoch: "other-epoch",
+      heartbeatAt: Date.now() - 120_000,
+    };
+    const { writeFile } = await import("node:fs/promises");
+    const { join: pathJoin } = await import("node:path");
+    await writeFile(
+      pathJoin(lockDir, "owner.json"),
+      `${JSON.stringify(deadOwner)}\n`,
+      { encoding: "utf8", mode: 0o600 },
+    );
+  });
+
+  // Second acquisition after stale removal.
+  await store.withGithubAutomationJobLease(
+    job.jobId,
+    async (lease) => {
+      secondToken = lease.fencingToken;
+      assert.ok(secondToken);
+      assert.notEqual(secondToken, firstToken);
+
+      // Fenced write with current token succeeds.
+      const ok = await store.writeGithubAutomationJobWithFencing(
+        {
+          ...(await store.readGithubAutomationJob(job.jobId)),
+          reasonCode: "fenced_ok",
+        },
+        { fencingToken: lease.fencingToken, ownerId: lease.ownerId },
+      );
+      assert.equal(ok.reasonCode, "fenced_ok");
+      assert.equal(ok.leaseFencingToken, lease.fencingToken);
+
+      // Stale token must be rejected.
+      let rejected = false;
+      try {
+        await store.writeGithubAutomationJobWithFencing(
+          {
+            ...(await store.readGithubAutomationJob(job.jobId)),
+            reasonCode: "should_not_write",
+          },
+          { fencingToken: firstToken, ownerId: "stale-owner" },
+        );
+      } catch (err) {
+        rejected = true;
+        assert.equal(err?.details?.reason ?? err?.code, "lease_fencing_mismatch");
+      }
+      assert.equal(rejected, true, "stale fencing token must not write");
+    },
+    { maxWaitMs: 2_000, staleMs: 1_000 },
+  );
+});
+
+await test("GHA-CLOSE-02 inFlight jobs are skipped by stale-running reconcile", async () => {
+  scheduler._testResetGithubAutomationScheduler();
+  scheduler._testSetGithubAutomationSchedulerAuto(false);
+
+  let job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22025,
+    installationId: 1,
+    deliveryId: "del-inflight-stale",
+    issueTitlePreview: "inflight",
+    generation: 1,
+  });
+  const old = new Date(Date.now() - 10 * 60_000).toISOString();
+  job = {
+    ...job,
+    status: "running",
+    phase: "implementing",
+    checkpoint: "implementing",
+    updatedAt: old,
+    leaseOwner: "other-owner",
+  };
+  await store.writeGithubAutomationJob(job);
+
+  // Simulate process-local inFlight so reconcile must not flip to retry_due.
+  const state = scheduler._testGetGithubAutomationSchedulerState();
+  state.inFlight.add(job.jobId);
+
+  await config.writeGithubAutomationConfig({
+    ...makeAllowlistedConfig(),
+    enabled: true,
+    mode: "triage",
+  });
+
+  await scheduler.tickGithubAutomationScheduler();
+  const after = await store.readGithubAutomationJob(job.jobId);
+  assert.equal(after.status, "running");
+  assert.notEqual(after.reasonCode, "stale_running_reconcile");
+
+  state.inFlight.delete(job.jobId);
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+// ─── GHA-CLOSE-04: safe projection + runtime provenance ──────────────────────
+
+await test("GHA-CLOSE-04 runtime provenance is browser-safe and stable in-process", async () => {
+  projection._testResetGithubAutomationRuntimeProvenanceCache();
+  const a = projection.getGithubAutomationRuntimeProvenance();
+  const b = projection.getGithubAutomationRuntimeProvenance();
+  assert.equal(typeof a.packageVersion, "string");
+  assert.ok(a.packageVersion.length > 0);
+  assert.equal(typeof a.buildId, "string");
+  assert.ok(a.buildId.length > 0);
+  assert.equal(typeof a.codeRevision, "string");
+  assert.ok(a.codeRevision.includes(a.packageVersion));
+  assert.ok(a.codeRevision.includes(a.buildId));
+  assert.equal(typeof a.processEpoch, "string");
+  assert.ok(a.processEpoch.startsWith("pe-"));
+  assert.equal(typeof a.processStartedAt, "string");
+  assert.equal(typeof a.policyVersion, "string");
+  assert.equal(a.codeRevision, b.codeRevision);
+  assert.equal(a.processEpoch, b.processEpoch);
+  assertNoSentinel(a, "runtime provenance");
+  projection.assertGithubAutomationProjectionSafe(a);
+});
+
+await test("GHA-CLOSE-04 #22-shaped job projects no Session / policy layer / no Agent active", async () => {
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22,
+    installationId: 999001,
+    deliveryId: "del-close04-22",
+    issueTitlePreview: "chat打开底部模型性能问题",
+    generation: 1,
+    phase: "planning",
+  });
+  const blocked = await store.writeGithubAutomationJob({
+    ...job,
+    status: "queued",
+    phase: "planning",
+    checkpoint: "studio_task_ready",
+    reasonCode: "retry_wake",
+    attempt: 279,
+    progressRevision: 0,
+    agentRunCount: 0,
+    noProgressRunCount: 40,
+    meaningfulProgressCount: 0,
+    blockedAtLayer: "policy_plan",
+    retryability: "operator_after_change",
+    evaluatedCodeRevision: "0.8.2/oldbuild#deadbeef01",
+    evaluatedPolicyVersion: "1.0",
+    lastMeaningfulProgressAt: null,
+    lastMeaningfulProgressKind: null,
+  });
+
+  // Sidecar without session — policy gate before implementing.
+  const runner = jiti(join(root, "lib/github-automation-runner.ts"));
+  runner.writeGithubAutomationRunnerState({
+    schemaVersion: 1,
+    jobId: blocked.jobId,
+    repositoryId: blocked.repositoryId,
+    issueNumber: blocked.issueNumber,
+    generation: blocked.generation,
+    checkpoint: "studio_task_ready",
+    worktreePath: "/Users/secret/worktrees/ypi-gha-issue-22-g1",
+    branchName: "ypi/gha/602362837/issue-22/g1",
+    baseRef: "main",
+    projectId: "prj_close04",
+    spaceId: "wt_close04",
+    taskId: "20260727-094902-task",
+    sessionId: null,
+    contextId: null,
+    sessionFile: "/Users/secret/sessions/issue-22.jsonl",
+    scopeFingerprint: "scope-fp",
+    ownerActorId: 1,
+    ownerCommentId: 99,
+    ownerCommentHash: "hash",
+    lastMember: null,
+    lastRunId: null,
+    pauseRequested: false,
+    updatedAt: new Date().toISOString(),
+    reasonCode: null,
+  });
+
+  const safe = projection.toGithubAutomationJobSafeProjection(blocked, {
+    claimStatus: "complete",
+    automationEnabled: true,
+    mode: "unattended",
+    globalPaused: false,
+    projectDisplayName: "yolk-pi-web",
+  });
+
+  assert.equal(safe.schedulerState, "queued");
+  assert.equal(safe.agentExecutionState, "not_started");
+  assert.equal(safe.sessionAvailability, "none");
+  assert.equal(safe.blockedAtLayer, "policy_plan");
+  assert.equal(safe.counts.schedulerRuns, 279);
+  assert.equal(safe.counts.agentRuns, 0);
+  assert.equal(safe.counts.noProgressRuns, 40);
+  assert.equal(safe.sessionIdShort, null);
+  assert.ok(safe.workspaceLabel);
+  assert.ok(safe.workspaceLabel.includes("issue-22"));
+  assert.ok(safe.workspaceLabel.includes("g1"));
+  assert.ok(!safe.workspaceLabel.includes("/Users/"));
+  assert.ok(!safe.workspaceLabel.includes("worktrees"));
+  assert.deepEqual(safe.evaluatedProvenance, {
+    codeRevision: "0.8.2/oldbuild#deadbeef01",
+    policyVersion: "1.0",
+  });
+
+  const serialized = JSON.stringify(safe);
+  assert.ok(!serialized.includes("/Users/secret"));
+  assert.ok(!serialized.includes("sessionFile"));
+  assert.ok(!serialized.includes("worktreePath"));
+  assert.ok(!serialized.includes("issue-22.jsonl"));
+  assertNoSentinel(safe, "#22 job projection");
+  projection.assertGithubAutomationProjectionSafe(safe);
+});
+
+await test("GHA-CLOSE-04 active session projects Agent implementing + opaque session id", async () => {
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 88,
+    installationId: 999001,
+    deliveryId: "del-close04-active",
+    issueTitlePreview: "docs fix",
+    generation: 1,
+    phase: "implementing",
+  });
+  const active = await store.writeGithubAutomationJob({
+    ...job,
+    status: "running",
+    phase: "implementing",
+    checkpoint: "implementing",
+    attempt: 3,
+    progressRevision: 4,
+    agentRunCount: 1,
+    noProgressRunCount: 0,
+    meaningfulProgressCount: 2,
+    lastMeaningfulProgressAt: new Date().toISOString(),
+    lastMeaningfulProgressKind: "session_created",
+  });
+
+  const runner = jiti(join(root, "lib/github-automation-runner.ts"));
+  runner.writeGithubAutomationRunnerState({
+    schemaVersion: 1,
+    jobId: active.jobId,
+    repositoryId: active.repositoryId,
+    issueNumber: active.issueNumber,
+    generation: active.generation,
+    checkpoint: "implementing",
+    worktreePath: "/var/folders/xx/secret-wt",
+    branchName: "ypi/gha/602362837/issue-88/g1",
+    baseRef: "main",
+    projectId: "prj_active",
+    spaceId: "wt_active",
+    taskId: "task-active",
+    sessionId: "sess_abcdef0123456789",
+    contextId: "ctx_active",
+    sessionFile: "/var/folders/xx/secret-sess.jsonl",
+    scopeFingerprint: null,
+    ownerActorId: 1,
+    ownerCommentId: 1,
+    ownerCommentHash: "h",
+    lastMember: "implementer",
+    lastRunId: "run-1",
+    pauseRequested: false,
+    updatedAt: new Date().toISOString(),
+    reasonCode: null,
+  });
+
+  const safe = projection.toGithubAutomationJobSafeProjection(active, {
+    claimStatus: "complete",
+    projectDisplayName: "yolk-pi-web",
+  });
+  assert.equal(safe.schedulerState, "leased");
+  assert.equal(safe.agentExecutionState, "implementing");
+  assert.equal(safe.sessionAvailability, "active");
+  assert.equal(safe.counts.agentRuns, 1);
+  assert.ok(safe.sessionIdShort);
+  assert.ok(!safe.sessionIdShort.includes("/"));
+  assert.ok(!JSON.stringify(safe).includes("/var/folders"));
+  assert.ok(!JSON.stringify(safe).includes("sessionFile"));
+  assert.equal(safe.lastMeaningfulProgress.kind, "session_created");
+  projection.assertGithubAutomationProjectionSafe(safe);
+});
+
+await test("GHA-CLOSE-04 legacy job without additive fields stays unknown_legacy / not active", async () => {
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 9,
+    installationId: 999001,
+    deliveryId: "del-close04-legacy",
+    issueTitlePreview: "legacy",
+    generation: 1,
+    phase: "planning",
+  });
+  // No progressRevision / agentRunCount / runner sidecar.
+  const safe = projection.toGithubAutomationJobSafeProjection(job, {
+    resolveRunner: true,
+  });
+  assert.equal(safe.sessionAvailability, "unknown_legacy");
+  assert.ok(
+    safe.agentExecutionState === "unknown" || safe.agentExecutionState === "not_started",
+  );
+  assert.notEqual(safe.agentExecutionState, "implementing");
+  assert.equal(safe.sessionIdShort, null);
+  assert.equal(safe.evaluatedProvenance, null);
+  assert.equal(safe.workspaceLabel, null);
+  projection.assertGithubAutomationProjectionSafe(safe);
+});
+
+await test("GHA-CLOSE-04 status projection includes runtimeProvenance and job dual-layer fields", async () => {
+  await config.writeGithubAutomationConfig({
+    ...config.createDefaultGithubAutomationConfig(),
+    enabled: true,
+    mode: "unattended",
+    unattended: {
+      ...config.createDefaultUnattendedConfig(),
+      enabled: true,
+    },
+    repositories: [
+      {
+        repositoryId: 602362837,
+        fullName: "602362837/yolk-pi-web",
+        installationId: 999001,
+        projectId: "prj_status_close04",
+        projectRoot: "/Users/secret/path/to/repo",
+        ownerActorIds: [],
+        assigneeIdentitySource: "machine-active-credential",
+        baseRef: "main",
+      },
+    ],
+  });
+
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22,
+    installationId: 999001,
+    deliveryId: "del-close04-status",
+    issueTitlePreview: "status job",
+    generation: 1,
+    phase: "planning",
+  });
+  await store.writeGithubAutomationJob({
+    ...job,
+    status: "blocked",
+    phase: "blocked",
+    checkpoint: "studio_task_ready",
+    reasonCode: "blocked_uncertain",
+    attempt: 8,
+    progressRevision: 1,
+    agentRunCount: 0,
+    blockedAtLayer: "policy_plan",
+    evaluatedCodeRevision: "legacy-rev",
+    evaluatedPolicyVersion: "1.0",
+  });
+
+  const status = await projection.buildGithubAutomationStatusProjection({
+    resolveLive: false,
+    assigneeProjection: {
+      login: "machine-op",
+      actorId: 4242,
+      identitySource: "gh",
+      checkedAt: new Date().toISOString(),
+      readiness: "ready",
+      assignable: true,
+      reasonCode: null,
+    },
+    appProjection: {
+      configured: true,
+      readiness: "ready",
+      appSlug: "ypi-test",
+      hasAppId: true,
+      hasPrivateKeyFile: true,
+      hasWebhookSecret: true,
+      checkedAt: new Date().toISOString(),
+    },
+    capability: types.deriveGithubAppCapability({
+      metadata: "read",
+      issues: "write",
+      pull_requests: "write",
+      contents: "write",
+    }),
+  });
+
+  assert.ok(status.runtimeProvenance);
+  assert.equal(typeof status.runtimeProvenance.packageVersion, "string");
+  assert.equal(typeof status.runtimeProvenance.codeRevision, "string");
+  assert.equal(typeof status.runtimeProvenance.policyVersion, "string");
+  assert.ok(status.jobs.length >= 1);
+  const j = status.jobs.find((x) => x.issueNumber === 22);
+  assert.ok(j);
+  assert.equal(j.agentExecutionState, "not_started");
+  assert.equal(j.sessionAvailability, "none");
+  assert.equal(j.blockedAtLayer, "policy_plan");
+  assert.equal(j.evaluatedProvenance?.codeRevision, "legacy-rev");
+  assert.ok("schedulerState" in j);
+  assert.ok("counts" in j);
+  assert.ok("workspaceLabel" in j);
+  assert.ok("sessionIdShort" in j);
+
+  const serialized = JSON.stringify(status);
+  assert.ok(!serialized.includes("/Users/secret/path/to/repo"));
+  assert.ok(!/"worktreePath"\s*:/.test(serialized));
+  assert.ok(!/"sessionFile"\s*:/.test(serialized));
+  assert.ok(!/"body"\s*:/.test(serialized));
+  assertNoSentinel(status, "status close04");
+  projection.assertGithubAutomationProjectionSafe(status);
+});
+
+await test("GHA-CLOSE-04 blocked persist stamps evaluated provenance via scheduler disposition", async () => {
+  scheduler._testResetGithubAutomationScheduler();
+  scheduler._testSetGithubAutomationSchedulerAuto(false);
+
+  // Drain leftover runnable jobs so this case is deterministic.
+  for (const j of await store.listGithubAutomationJobs()) {
+    if (j.status === "queued" || j.status === "retry_due" || j.status === "running") {
+      await store.writeGithubAutomationJob({
+        ...j,
+        status: "cancelled",
+        phase: "completed",
+        reasonCode: "test_drain",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+    }
+  }
+
+  await config.writeGithubAutomationConfig({
+    ...makeAllowlistedConfig(),
+    enabled: true,
+    mode: "triage",
+    paused: false,
+  });
+
+  let job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22040,
+    installationId: 1,
+    deliveryId: "del-close04-stamp",
+    issueTitlePreview: "stamp",
+    generation: 1,
+  });
+
+  scheduler.setGithubAutomationJobHandler(async (current) => ({
+    job: {
+      ...current,
+      status: "blocked",
+      phase: "blocked",
+      reasonCode: "blocked_manual_ui_approval",
+      checkpoint: "blocked",
+    },
+    wakeAgain: false,
+    disposition: {
+      kind: "blocked",
+      reasonCode: "blocked_manual_ui_approval",
+      layer: "policy_plan",
+      fingerprint: "bf_test_ui",
+      retryability: "operator_after_change",
+    },
+  }));
+
+  await scheduler.tickGithubAutomationScheduler();
+  const deadline = Date.now() + 3_000;
+  while (Date.now() < deadline) {
+    job = await store.readGithubAutomationJob(job.jobId);
+    if (job.status === "blocked") break;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.equal(job.status, "blocked");
+  assert.equal(job.blockedAtLayer, "policy_plan");
+  assert.ok(job.evaluatedCodeRevision);
+  assert.ok(job.evaluatedPolicyVersion);
+
+  const safe = projection.toGithubAutomationJobSafeProjection(job);
+  assert.equal(safe.blockedAtLayer, "policy_plan");
+  assert.ok(safe.evaluatedProvenance?.codeRevision);
+  assert.ok(safe.evaluatedProvenance?.policyVersion);
+  // Runtime provenance may differ from evaluated after future restarts; both present.
+  const runtime = projection.getGithubAutomationRuntimeProvenance();
+  assert.equal(typeof runtime.codeRevision, "string");
+
+  scheduler.setGithubAutomationJobHandler(null);
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+// ─── GHA-CLOSE-05: legacy/#22 reconcile + idempotent retry ───────────────────
+
+await test("GHA-CLOSE-05 #22-shaped legacy reconcile is idempotent and preserves generation/attempt", async () => {
+  const commandKey = "cmd-close05-adoption-key";
+  let job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 2205,
+    installationId: 999001,
+    deliveryId: "del-close05-22",
+    issueTitlePreview: "chat打开底部模型性能问题",
+    generation: 1,
+    phase: "planning",
+  });
+  job = await store.writeGithubAutomationJob({
+    ...job,
+    status: "queued",
+    phase: "planning",
+    checkpoint: "studio_task_ready",
+    reasonCode: "retry_wake",
+    attempt: 279,
+    progressRevision: 0,
+    agentRunCount: 0,
+    noProgressRunCount: 40,
+    meaningfulProgressCount: 0,
+    blockedAtLayer: "policy_plan",
+    retryability: "operator_after_change",
+    leaseOwner: "dead-owner",
+    leaseExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+    pendingCommand: {
+      deliveryId: "del-close05-22",
+      commentId: 4242,
+      versionHash: "deadbeef",
+      commandKey,
+      state: "pending",
+      updatedAt: new Date().toISOString(),
+    },
+    effects: store.upsertEffectMarker([], {
+      name: "owner_command",
+      status: "remote_confirmed",
+      remoteId: commandKey,
+      generation: 1,
+      reasonCode: "owner_authorized_unattended",
+    }),
+  });
+
+  const unattendedRunner = jiti(join(root, "lib/github-automation-runner.ts"));
+  unattendedRunner.writeGithubAutomationRunnerState({
+    schemaVersion: 1,
+    jobId: job.jobId,
+    repositoryId: job.repositoryId,
+    issueNumber: job.issueNumber,
+    generation: 1,
+    checkpoint: "studio_task_ready",
+    worktreePath: "/Users/secret/worktrees/ypi-gha-issue-22-g1",
+    branchName: "ypi/gha/602362837/issue-22/g1",
+    baseRef: "main",
+    projectId: "prj_close05",
+    // Missing spaceId — legacy sidecar shape.
+    spaceId: null,
+    taskId: "20260727-094902-task",
+    sessionId: null,
+    contextId: null,
+    sessionFile: null,
+    scopeFingerprint: "scope-fp",
+    ownerActorId: 1,
+    ownerCommentId: 99,
+    ownerCommentHash: "hash",
+    lastMember: null,
+    lastRunId: null,
+    pauseRequested: false,
+    updatedAt: new Date().toISOString(),
+    reasonCode: null,
+  });
+
+  const first = await unattendedRunner.reconcileGithubAutomationLegacyJob({
+    jobId: job.jobId,
+    config: makeAllowlistedConfig(),
+  });
+  assert.equal(first.code, "reconciled");
+  assert.equal(first.changed, true);
+  assert.ok(first.repairs.includes("pending_command_consumed"));
+  assert.ok(first.repairs.includes("checkpoint_normalized") || first.repairs.includes("blocked_layer_cleared_for_resume") || first.repairs.includes("lease_fields_cleared"));
+  assert.equal(first.generation, 1);
+  assert.equal(first.preservedAttempt, 279);
+  assert.equal(first.safeCheckpoint, "studio_task_ready");
+  assert.equal(first.job.generation, 1);
+  assert.equal(first.job.attempt, 279);
+  assert.equal(first.job.pendingCommand?.state, "consumed");
+  assert.equal(first.job.pendingCommand?.commandKey, commandKey);
+  assert.equal(first.job.leaseOwner, null);
+  // No Session invented.
+  const runnerAfter = unattendedRunner.readGithubAutomationRunnerState(job.jobId);
+  assert.equal(runnerAfter?.sessionId, null);
+  assert.equal(runnerAfter?.checkpoint, "studio_task_ready");
+  assert.equal(runnerAfter?.taskId, "20260727-094902-task");
+  assert.equal(runnerAfter?.branchName, "ypi/gha/602362837/issue-22/g1");
+  // spaceId may stay null without real Project Registry; repair is best-effort.
+  // Internal reconcile result may hold runner sidecar paths; wire projection must not.
+  const safe = projection.toGithubAutomationJobSafeProjection(first.job, {
+    claimStatus: "complete",
+    automationEnabled: true,
+    mode: "unattended",
+    globalPaused: false,
+    projectDisplayName: "yolk-pi-web",
+  });
+  const safeJson = JSON.stringify(safe);
+  assert.ok(!safeJson.includes("/Users/secret"));
+  assert.ok(!safeJson.includes("worktreePath"));
+  assert.ok(!safeJson.includes("sessionFile"));
+  projection.assertGithubAutomationProjectionSafe(safe);
+
+  const second = await unattendedRunner.reconcileGithubAutomationLegacyJob({
+    jobId: job.jobId,
+    config: makeAllowlistedConfig(),
+  });
+  assert.equal(second.code, "unchanged");
+  assert.equal(second.changed, false);
+  assert.equal(second.job.attempt, 279);
+  assert.equal(second.job.generation, 1);
+  assert.equal(second.job.pendingCommand?.state, "consumed");
+  // Still one owner_command effect — no duplicate side effect markers.
+  assert.equal(
+    second.job.effects.filter((e) => e.name === "owner_command").length,
+    1,
+  );
+});
+
+await test("GHA-CLOSE-05 retry wakes same generation after reconcile and does not reset attempt", async () => {
+  const commandKey = "cmd-close05-retry-key";
+  let job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22051,
+    installationId: 999001,
+    deliveryId: "del-close05-retry",
+    issueTitlePreview: "docs typo",
+    generation: 1,
+    phase: "planning",
+  });
+  job = await store.writeGithubAutomationJob({
+    ...job,
+    status: "paused",
+    phase: "paused",
+    checkpoint: "studio_task_ready",
+    reasonCode: "paused",
+    attempt: 12,
+    effects: store.upsertEffectMarker([], {
+      name: "owner_command",
+      status: "remote_confirmed",
+      remoteId: commandKey,
+      generation: 1,
+      reasonCode: "owner_authorized_unattended",
+    }),
+    pendingCommand: {
+      deliveryId: "del-close05-retry",
+      commentId: 7,
+      versionHash: "abc",
+      commandKey,
+      state: "pending",
+      updatedAt: new Date().toISOString(),
+    },
+  });
+
+  const unattendedRunner = jiti(join(root, "lib/github-automation-runner.ts"));
+  unattendedRunner.writeGithubAutomationRunnerState({
+    schemaVersion: 1,
+    jobId: job.jobId,
+    repositoryId: job.repositoryId,
+    issueNumber: job.issueNumber,
+    generation: 1,
+    checkpoint: "studio_task_ready",
+    worktreePath: null,
+    branchName: "ypi/gha/602362837/issue-22051/g1",
+    baseRef: "main",
+    projectId: "prj_close05b",
+    spaceId: "wt_close05b",
+    taskId: "task-close05-retry",
+    sessionId: null,
+    contextId: null,
+    sessionFile: null,
+    scopeFingerprint: null,
+    ownerActorId: 1,
+    ownerCommentId: 7,
+    ownerCommentHash: "h",
+    lastMember: null,
+    lastRunId: null,
+    pauseRequested: true,
+    updatedAt: new Date().toISOString(),
+    reasonCode: "paused",
+  });
+
+  const woken = await unattendedRunner.wakeGithubUnattendedJobForRetry({
+    job,
+    clearPause: true,
+    config: makeAllowlistedConfig(),
+  });
+  assert.equal(woken.generation, 1);
+  assert.equal(woken.attempt, 12);
+  assert.equal(woken.status, "queued");
+  assert.equal(woken.checkpoint, "studio_task_ready");
+  assert.equal(woken.pendingCommand?.state, "consumed");
+  assert.equal(
+    woken.effects.filter((e) => e.name === "owner_command").length,
+    1,
+  );
+  const runnerState = unattendedRunner.readGithubAutomationRunnerState(job.jobId);
+  assert.equal(runnerState?.pauseRequested, false);
+  assert.equal(runnerState?.generation, 1);
+  assert.equal(runnerState?.sessionId, null);
+});
+
+await test("GHA-CLOSE-05 deterministic block with unchanged provenance denies retry", async () => {
+  const unattendedRunner = jiti(join(root, "lib/github-automation-runner.ts"));
+  const runtime = projection.getGithubAutomationRuntimeProvenance();
+  let job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22052,
+    installationId: 999001,
+    deliveryId: "del-close05-block",
+    issueTitlePreview: "Settings 页面交互",
+    generation: 1,
+    phase: "blocked",
+  });
+  job = await store.writeGithubAutomationJob({
+    ...job,
+    status: "blocked",
+    phase: "blocked",
+    checkpoint: "blocked",
+    reasonCode: "blocked_manual_ui_approval",
+    retryability: "operator_after_change",
+    blockFingerprint: "bf_ui_settings",
+    evaluatedCodeRevision: runtime.codeRevision,
+    evaluatedPolicyVersion: runtime.policyVersion,
+    attempt: 3,
+  });
+
+  assert.equal(
+    unattendedRunner.isGithubAutomationDeterministicBlockUnchanged(job, {
+      codeRevision: runtime.codeRevision,
+      policyVersion: runtime.policyVersion,
+    }),
+    true,
+  );
+
+  const actions = projection.evaluateGithubAutomationJobActions(job, {
+    automationEnabled: true,
+    mode: "unattended",
+    globalPaused: false,
+    runtimeCodeRevision: runtime.codeRevision,
+    runtimePolicyVersion: runtime.policyVersion,
+  });
+  const retry = actions.find((a) => a.action === "retry");
+  assert.equal(retry?.available, false);
+  assert.equal(retry?.reasonCode, "retry_conditions_unchanged");
+
+  // Provenance change (deployed fix) allows re-evaluation.
+  const actionsAfterDeploy = projection.evaluateGithubAutomationJobActions(job, {
+    automationEnabled: true,
+    mode: "unattended",
+    globalPaused: false,
+    runtimeCodeRevision: `${runtime.codeRevision}-next`,
+    runtimePolicyVersion: runtime.policyVersion,
+  });
+  assert.equal(
+    actionsAfterDeploy.find((a) => a.action === "retry")?.available,
+    true,
+  );
+
+  // applyGithubAutomationJobAction must also refuse without spinning.
+  const denied = await projection.applyGithubAutomationJobAction({
+    jobId: job.jobId,
+    action: "retry",
+    wakeScheduler: false,
+  });
+  assert.equal(denied.ok, false);
+  assert.equal(denied.code, "not_allowed");
+  assert.match(String(denied.message), /retry_conditions_unchanged/);
+  const reloaded = await store.readGithubAutomationJob(job.jobId);
+  assert.equal(reloaded.status, "blocked");
+  assert.equal(reloaded.generation, 1);
+  assert.equal(reloaded.attempt, 3);
+});
+
+await test("GHA-CLOSE-05 pre-schema remote_confirmed without pendingCommand still consumes once", async () => {
+  const commandKey = "cmd-close05-legacy-no-pending";
+  let job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22053,
+    installationId: 999001,
+    deliveryId: "del-close05-legacy",
+    issueTitlePreview: "chat打开底部模型性能问题",
+    generation: 1,
+    phase: "planning",
+  });
+  job = await store.writeGithubAutomationJob({
+    ...job,
+    status: "queued",
+    phase: "planning",
+    checkpoint: "studio_task_ready",
+    reasonCode: "retry_wake",
+    attempt: 88,
+    // No pendingCommand field — pre-GHA-CLOSE-02 disk shape.
+    pendingCommand: null,
+    effects: store.upsertEffectMarker([], {
+      name: "owner_command",
+      status: "remote_confirmed",
+      remoteId: commandKey,
+      generation: 1,
+      reasonCode: "owner_authorized_unattended",
+    }),
+  });
+
+  const unattendedRunner = jiti(join(root, "lib/github-automation-runner.ts"));
+  const first = await unattendedRunner.reconcileGithubAutomationLegacyJob({
+    jobId: job.jobId,
+  });
+  assert.equal(first.changed, true);
+  assert.ok(first.repairs.includes("pending_command_consumed"));
+  assert.equal(first.job.pendingCommand?.state, "consumed");
+  assert.equal(first.job.pendingCommand?.commandKey, commandKey);
+  assert.equal(first.job.attempt, 88);
+  assert.equal(first.job.generation, 1);
+
+  const second = await unattendedRunner.reconcileGithubAutomationLegacyJob({
+    jobId: job.jobId,
+  });
+  assert.equal(second.changed, false);
+  assert.equal(second.job.pendingCommand?.state, "consumed");
+});
+
+// ─── GHA-CLOSE-07: cross-layer regression / fault injection / UI truth ───────
+
+await test("GHA-CLOSE-07 sanitized #22 fixture reaches stable no-spin state in finite ticks", async () => {
+  scheduler._testResetGithubAutomationScheduler();
+  scheduler._testSetGithubAutomationSchedulerAuto(false);
+
+  // Drain leftover runnable jobs so the #22 fixture is deterministic.
+  for (const j of await store.listGithubAutomationJobs()) {
+    if (j.status === "queued" || j.status === "retry_due" || j.status === "running") {
+      await store.writeGithubAutomationJob({
+        ...j,
+        status: "cancelled",
+        phase: "completed",
+        reasonCode: "test_drain",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+    }
+  }
+
+  await config.writeGithubAutomationConfig({
+    ...makeAllowlistedConfig(),
+    enabled: true,
+    mode: "unattended",
+    paused: false,
+    unattended: { ...makeAllowlistedConfig().unattended, enabled: true },
+  });
+
+  const commandKey = "cmd-close07-issue-22-adopt";
+  let job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22,
+    installationId: 999001,
+    deliveryId: "del-close07-22",
+    issueTitlePreview: "chat打开底部模型性能问题",
+    generation: 1,
+    phase: "planning",
+  });
+  job = await store.writeGithubAutomationJob({
+    ...job,
+    status: "queued",
+    phase: "planning",
+    checkpoint: "studio_task_ready",
+    reasonCode: "retry_wake",
+    attempt: 279,
+    progressRevision: 0,
+    agentRunCount: 0,
+    noProgressRunCount: 0,
+    meaningfulProgressCount: 0,
+    pendingCommand: {
+      deliveryId: "del-close07-22",
+      commentId: 99022,
+      versionHash: "vh-close07",
+      commandKey,
+      state: "pending",
+    },
+    effects: store.upsertEffectMarker([], {
+      name: "owner_command",
+      status: "remote_confirmed",
+      remoteId: commandKey,
+      generation: 1,
+      reasonCode: "owner_authorized_unattended",
+    }),
+  });
+
+  const unattendedRunner = jiti(join(root, "lib/github-automation-runner.ts"));
+  unattendedRunner.writeGithubAutomationRunnerState({
+    schemaVersion: 1,
+    jobId: job.jobId,
+    repositoryId: job.repositoryId,
+    issueNumber: job.issueNumber,
+    generation: job.generation,
+    checkpoint: "studio_task_ready",
+    worktreePath: "/Users/secret/worktrees/ypi-gha-issue-22-g1",
+    branchName: "ypi/gha/602362837/issue-22/g1",
+    baseRef: "main",
+    projectId: "prj_close07",
+    spaceId: null, // legacy missing spaceId — reconcile should attempt repair
+    taskId: "20260727-094902-task",
+    sessionId: null,
+    contextId: null,
+    sessionFile: null,
+    scopeFingerprint: "scope-fp-22",
+    ownerActorId: 1,
+    ownerCommentId: 99022,
+    ownerCommentHash: "hash-close07",
+    lastMember: null,
+    lastRunId: null,
+    pauseRequested: false,
+    updatedAt: new Date().toISOString(),
+    reasonCode: null,
+  });
+
+  // 1) Idempotent reconcile: consume adoption command, keep generation/attempt.
+  const reconciled = await unattendedRunner.reconcileGithubAutomationLegacyJob({
+    jobId: job.jobId,
+  });
+  assert.equal(reconciled.job.generation, 1);
+  assert.equal(reconciled.job.attempt, 279);
+  assert.equal(reconciled.job.pendingCommand?.state, "consumed");
+  assert.equal(reconciled.safeCheckpoint, "studio_task_ready");
+
+  // 2) Safe projection must not claim Agent active / Session present.
+  const preSafe = projection.toGithubAutomationJobSafeProjection(reconciled.job, {
+    claimStatus: "complete",
+    automationEnabled: true,
+    mode: "unattended",
+    globalPaused: false,
+    projectDisplayName: "yolk-pi-web",
+  });
+  assert.equal(preSafe.agentExecutionState, "not_started");
+  assert.equal(preSafe.sessionAvailability, "none");
+  assert.notEqual(preSafe.agentExecutionState, "implementing");
+  assert.equal(preSafe.counts.schedulerRuns, 279);
+  assert.equal(preSafe.counts.agentRuns, 0);
+  assert.ok(!JSON.stringify(preSafe).includes("/Users/secret"));
+  assert.ok(!JSON.stringify(preSafe).includes("sessionFile"));
+  assert.ok(!JSON.stringify(preSafe).includes("worktreePath"));
+  projection.assertGithubAutomationProjectionSafe(preSafe);
+
+  // 3) Finite scheduler ticks with a no-progress handler: never park immediately
+  // runnable queued, never explode attempt like the #22 spin.
+  scheduler.setGithubAutomationJobHandler(async (running) => ({
+    job: {
+      ...running,
+      checkpoint: "studio_task_ready",
+      // Explicitly no progressRevision change / disposition.
+    },
+    wakeAgain: false,
+  }));
+
+  const attemptCeiling = reconciled.job.attempt + 8;
+  let startedEvents = 0;
+  for (let i = 0; i < 12; i += 1) {
+    const cur = await store.readGithubAutomationJob(job.jobId);
+    if (cur.status === "retry_due") {
+      await store.writeGithubAutomationJob({
+        ...cur,
+        nextRetryAt: new Date(Date.now() - 1_000).toISOString(),
+      });
+    } else if (cur.status === "blocked" || cur.status === "completed" || cur.status === "cancelled") {
+      break;
+    }
+    const tick = await scheduler.tickGithubAutomationScheduler();
+    startedEvents += tick.started ?? 0;
+    const deadline = Date.now() + 2_000;
+    let after = cur;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 20));
+      after = await store.readGithubAutomationJob(job.jobId);
+      if (after.status === "retry_due" || after.status === "blocked") break;
+      if ((tick.started ?? 0) === 0) break;
+    }
+    assert.notEqual(
+      after.status,
+      "queued",
+      "#22-shaped no-progress must not park immediately runnable queued",
+    );
+    assert.ok(
+      after.attempt <= attemptCeiling,
+      `attempt must stay bounded (got ${after.attempt}, ceiling ${attemptCeiling})`,
+    );
+  }
+
+  const finalJob = await store.readGithubAutomationJob(job.jobId);
+  assert.ok(
+    finalJob.status === "retry_due" || finalJob.status === "blocked",
+    `expected stable retry_due/blocked, got ${finalJob.status}`,
+  );
+  assert.ok(
+    finalJob.reasonCode === "runner_no_progress" ||
+      finalJob.reasonCode === "incomplete_claim" ||
+      finalJob.reasonCode === "retry_wake",
+    `unexpected final reason ${finalJob.reasonCode}`,
+  );
+  assert.ok(finalJob.attempt <= attemptCeiling, "attempt must not explode across finite ticks");
+  assert.ok(startedEvents <= 10, `job_started-like starts must stay finite (got ${startedEvents})`);
+  assert.equal(finalJob.generation, 1, "must reuse g1, never invent g2");
+
+  const finalSafe = projection.toGithubAutomationJobSafeProjection(finalJob, {
+    claimStatus: "complete",
+    projectDisplayName: "yolk-pi-web",
+  });
+  assert.equal(finalSafe.sessionAvailability, "none");
+  assert.notEqual(finalSafe.agentExecutionState, "implementing");
+  assert.equal(finalSafe.counts.agentRuns, 0);
+  projection.assertGithubAutomationProjectionSafe(finalSafe);
+
+  scheduler.setGithubAutomationJobHandler(null);
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("GHA-CLOSE-07 Jobs UI source keeps dual-layer truth and never says 第 N 次执行", () => {
+  const ui = readFileSync(join(root, "components/GithubAutomationConfig.tsx"), "utf8");
+  const css = readFileSync(join(root, "app/globals.css"), "utf8");
+
+  // Dual-layer observability contract from GHA-CLOSE-06.
+  assert.ok(ui.includes("尚未启动 Agent"), "no-session primary label required");
+  assert.ok(ui.includes("调度尝试"), "attempt must be labeled as scheduler runs");
+  assert.ok(ui.includes("Agent 运行状态") || ui.includes("agentExecutionState"), "Agent layer present");
+  assert.ok(ui.includes("调度状态") || ui.includes("schedulerState"), "scheduler layer present");
+  assert.ok(ui.includes("sessionAvailability") || ui.includes("Session"), "session availability surface");
+  assert.ok(
+    ui.includes("不会唤醒 scheduler") || ui.includes("不唤醒 scheduler"),
+    "refresh must not enqueue/wake",
+  );
+  // Product copy must forbid skip-policy; never invent a skip action button.
+  assert.ok(
+    ui.includes("不能跳过策略") || ui.includes("不会跳过策略"),
+    "must state that policy cannot be skipped",
+  );
+  assert.ok(
+    !/跳过策略[\"'`]\s*[,)}]/.test(ui) && !ui.includes("skipPolicy") && !ui.includes("skip_policy"),
+    "must not invent skip-policy action id",
+  );
+  // Primary labels must not claim attempt is Agent execution. Diagnostic note may
+  // mention the anti-pattern "第 N 次执行" only to reject it.
+  assert.ok(
+    !/label:\s*[`'"]第\s*N\s*次/.test(ui) && !ui.includes("`第 ${") && !ui.includes("第 ${job.attempt} 次"),
+    "must not claim attempt is Agent execution in primary labels",
+  );
+  // Keep the explicit anti-pattern wording only in the diagnostic note, not as primary UI.
+  assert.ok(
+    ui.includes("不可将其直接翻译为“Agent 正在运行 / 第 N 次执行”") ||
+      ui.includes("不是 Agent 执行次数"),
+    "diagnostic must explain attempt ≠ Agent runs",
+  );
+  assert.ok(
+    css.includes("github-automation-job") || css.includes("github-automation-card"),
+    "reuse existing Settings card language",
+  );
+});
+
+await test("GHA-CLOSE-07 fault injection: no auto push/main/merge and no App/machine secret injection", () => {
+  const publisher = readFileSync(join(root, "lib/github-git-publisher.ts"), "utf8");
+  const runner = readFileSync(join(root, "lib/github-automation-runner.ts"), "utf8");
+  const session = readFileSync(join(root, "lib/github-automation-session.ts"), "utf8");
+  const profile = readFileSync(join(root, "lib/github-full-agent-profile.ts"), "utf8");
+  const skill = readFileSync(
+    join(root, ".pi/skills/github-issue-auto-implement/SKILL.md"),
+    "utf8",
+  );
+
+  // Publisher invariants: same-repo PR only, no force, no auto-merge, no main head.
+  assert.ok(/force/i.test(publisher));
+  assert.ok(/auto.?merge|mergeable|do not merge|never auto-merge/i.test(publisher + skill));
+  assert.ok(/main/.test(publisher));
+  assert.ok(
+    /credential-free|askpass|GITHUB_TOKEN|GH_TOKEN/i.test(publisher),
+    "publisher must keep credential-free remote + askpass path",
+  );
+
+  // Agent path must not own server publisher credentials or mutate shared process.env.
+  assert.ok(
+    !/delete process\.env/.test(runner) && !/delete process\.env/.test(session),
+    "must not scrub shared process.env",
+  );
+  assert.ok(
+    /scrubGithubAutomationOwnedSecretsFromEnv|buildGithubUnattendedScrubbedEnv/.test(
+      session + profile + runner,
+    ),
+    "must use scrubbed env copy / isolated boundary",
+  );
+  assert.ok(
+    /no server publisher|App publisher|do not push|must not push|不得 push|不 push/i.test(
+      skill + profile,
+    ) || /publishGithubAutomationChange/.test(runner),
+    "server publisher remains product-owned after final gates",
+  );
+
+  // Runtime scrub helper must drop App/machine sentinels from child env copies.
+  const scrubbed = jiti(join(root, "lib/github-full-agent-profile.ts")).scrubGithubAutomationOwnedSecretsFromEnv({
+    YPI_GITHUB_APP_ID: "12345",
+    YPI_GITHUB_APP_PRIVATE_KEY_FILE: "/tmp/secret.pem",
+    YPI_GITHUB_APP_WEBHOOK_SECRET: WEBHOOK_SECRET_SENTINEL,
+    GH_TOKEN: MACHINE_TOKEN_SENTINEL,
+    GITHUB_TOKEN: INSTALL_TOKEN_SENTINEL,
+    KEEP_ME: "ok",
+    PATH: "/usr/bin",
+  });
+  assert.equal(scrubbed.KEEP_ME, "ok");
+  assert.equal(scrubbed.PATH, "/usr/bin");
+  assert.equal(scrubbed.YPI_GITHUB_APP_ID, undefined);
+  assert.equal(scrubbed.YPI_GITHUB_APP_PRIVATE_KEY_FILE, undefined);
+  assert.equal(scrubbed.YPI_GITHUB_APP_WEBHOOK_SECRET, undefined);
+  assert.equal(scrubbed.GH_TOKEN, undefined);
+  assert.equal(scrubbed.GITHUB_TOKEN, undefined);
+  assertNoSentinel(scrubbed, "scrubbed child env");
+});
+
+await test("GHA-CLOSE-07 session bootstrap failure projects visible blocker, not Agent active", async () => {
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 22070,
+    installationId: 999001,
+    deliveryId: "del-close07-bootstrap",
+    issueTitlePreview: "docs: bootstrap fail",
+    generation: 1,
+    phase: "implementing",
+  });
+  const blocked = await store.writeGithubAutomationJob({
+    ...job,
+    status: "retry_due",
+    phase: "implementing",
+    checkpoint: "session_bootstrap",
+    reasonCode: "session_bootstrap_transient",
+    attempt: 4,
+    progressRevision: 1,
+    agentRunCount: 0,
+    noProgressRunCount: 1,
+    meaningfulProgressCount: 0,
+    blockedAtLayer: "session_bootstrap",
+    retryability: "automatic",
+    nextRetryAt: new Date(Date.now() + 30_000).toISOString(),
+  });
+
+  const unattendedRunner = jiti(join(root, "lib/github-automation-runner.ts"));
+  unattendedRunner.writeGithubAutomationRunnerState({
+    schemaVersion: 1,
+    jobId: blocked.jobId,
+    repositoryId: blocked.repositoryId,
+    issueNumber: blocked.issueNumber,
+    generation: blocked.generation,
+    checkpoint: "session_bootstrap",
+    worktreePath: "/tmp/ypi-gha-bootstrap-fail",
+    branchName: "ypi/gha/602362837/issue-22070/g1",
+    baseRef: "main",
+    projectId: "prj_boot",
+    // Missing spaceId pair is a binding failure surface.
+    spaceId: null,
+    taskId: "task-boot",
+    sessionId: null,
+    contextId: null,
+    sessionFile: null,
+    scopeFingerprint: null,
+    ownerActorId: 1,
+    ownerCommentId: 1,
+    ownerCommentHash: "h",
+    lastMember: null,
+    lastRunId: null,
+    pauseRequested: false,
+    updatedAt: new Date().toISOString(),
+    reasonCode: "session_bootstrap_transient",
+  });
+
+  const safe = projection.toGithubAutomationJobSafeProjection(blocked, {
+    claimStatus: "complete",
+    projectDisplayName: "yolk-pi-web",
+  });
+  assert.equal(safe.schedulerState, "backoff");
+  // Transient bootstrap failure is visible as creating/bootstrapping, never active implementing.
+  assert.equal(safe.sessionAvailability, "creating");
+  assert.equal(safe.agentExecutionState, "bootstrapping");
+  assert.notEqual(safe.agentExecutionState, "implementing");
+  assert.notEqual(safe.sessionAvailability, "active");
+  assert.equal(safe.blockedAtLayer, "session_bootstrap");
+  assert.equal(safe.counts.agentRuns, 0);
+  assert.ok(safe.nextRetryAt);
+  assert.ok(!JSON.stringify(safe).includes("/tmp/ypi-gha-bootstrap-fail"));
+  projection.assertGithubAutomationProjectionSafe(safe);
+});
+
+await test("GHA-CLOSE-07 policy matrix cross-check: 模型 defer + empty final block + UI final block", () => {
+  const risk = jiti(join(root, "lib/github-risk-policy.ts"));
+  const limits = {
+    maxFiles: 20,
+    maxChangedLines: 400,
+    maxSingleFileChangedLines: 200,
+  };
+
+  const modelPlan = risk.evaluateGithubRiskPolicy({
+    stage: "plan",
+    limits,
+    files: [],
+    issueTitlePreview: "chat打开底部模型性能问题",
+    planText: null,
+  });
+  assert.equal(modelPlan.outcome, "defer");
+  assert.notEqual(modelPlan.classification, "secret_auth");
+
+  const emptyFinal = risk.evaluateGithubRiskPolicy({
+    stage: "final",
+    limits,
+    files: [],
+  });
+  assert.equal(emptyFinal.reasonCode, "blocked_empty_diff");
+
+  const uiFinal = risk.evaluateGithubRiskPolicy({
+    stage: "final",
+    limits,
+    files: [{ path: "components/ChatInput.tsx", additions: 12, deletions: 3 }],
+    issueTitlePreview: "docs only",
+    planText: null,
+  });
+  assert.equal(uiFinal.decision, "block");
+  assert.ok(
+    uiFinal.classification === "ui_interaction" ||
+      uiFinal.reasonCode === "blocked_ui_path" ||
+      /ui/i.test(String(uiFinal.reasonCode)) ||
+      /ui/i.test(String(uiFinal.classification)),
+    `UI final path must fail closed, got ${uiFinal.reasonCode}/${uiFinal.classification}`,
+  );
+});
+
 // ─── Cleanup hooks ───────────────────────────────────────────────────────────
 
 scheduler._testResetGithubAutomationScheduler();

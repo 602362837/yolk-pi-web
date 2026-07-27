@@ -6,6 +6,9 @@
  * - Per-job filesystem lease so multiple processes do not run the same effect twice.
  * - Concurrency caps from config (P0 triage default 2).
  * - Never runs LLM/Git work inline on the webhook request thread; webhook only enqueues.
+ * - GHA-CLOSE-02: honor explicit job disposition (progressed/waiting/retry_due/blocked/
+ *   terminal); no-progress must not park immediately as runnable queued; lease heartbeat
+ *   + fencing; attempt remains scheduler lease-run count.
  *
  * GHA-02 ships orchestration + checkpoint resume hooks. Actual triage/claim effects
  * are registered by later phases via `setGithubAutomationJobHandler`.
@@ -14,15 +17,27 @@
 import { randomUUID } from "node:crypto";
 
 import { readGithubAutomationConfig } from "./github-automation-config";
-import type { GithubAutomationConfigV1 } from "./github-automation-types";
+import type {
+  GithubAutomationConfigV1,
+  GithubAutomationJobDisposition,
+} from "./github-automation-types";
+import {
+  classifyGithubAutomationRetryability,
+} from "./github-automation-types";
+import {
+  getGithubAutomationEvaluatedProvenance,
+} from "./github-automation-provenance";
 import {
   appendGithubAutomationSafeEvent,
+  GITHUB_AUTOMATION_LEASE_HEARTBEAT_MS,
   listGithubAutomationJobs,
   readGithubAutomationJob,
   withGithubAutomationJobLease,
   writeGithubAutomationJob,
+  writeGithubAutomationJobWithFencing,
   type GithubAutomationJobRecord,
   type GithubAutomationJobStatus,
+  type GithubAutomationLeaseHandle,
 } from "./github-automation-store";
 
 // ─── Handler registry ────────────────────────────────────────────────────────
@@ -31,18 +46,29 @@ export type GithubAutomationJobHandlerResult = {
   job: GithubAutomationJobRecord;
   /**
    * When true, scheduler will re-check queue soon (e.g. more work available).
-   * Default false.
+   * Default false. singleStep may set this only after real checkpoint progress.
    */
   wakeAgain?: boolean;
+  /**
+   * Explicit lease disposition (GHA-CLOSE-02). When absent, scheduler derives a
+   * conservative disposition from job status/progressRevision change.
+   */
+  disposition?: GithubAutomationJobDisposition;
 };
 
 /**
  * Job handler runs under job lease. GHA-02 default is a no-op advance to a safe
  * waiting checkpoint so webhook→enqueue→scheduler path is testable without GHA-03.
+ *
+ * Context includes the active lease handle so long handlers can heartbeat / fence.
  */
 export type GithubAutomationJobHandler = (
   job: GithubAutomationJobRecord,
-  context: { config: GithubAutomationConfigV1; ownerId: string },
+  context: {
+    config: GithubAutomationConfigV1;
+    ownerId: string;
+    lease?: GithubAutomationLeaseHandle;
+  },
 ) => Promise<GithubAutomationJobHandlerResult>;
 
 let _jobHandler: GithubAutomationJobHandler | null = null;
@@ -119,6 +145,32 @@ declare global {
 
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const STALE_RUNNING_MS = 5 * 60_000;
+/** Cap for consecutive no-progress lease runs before stable operator block. */
+const NO_PROGRESS_BLOCK_THRESHOLD = 8;
+/** Base backoff for runner_no_progress (ms); exponential with cap. */
+const NO_PROGRESS_BACKOFF_BASE_MS = 5_000;
+const NO_PROGRESS_BACKOFF_CAP_MS = 5 * 60_000;
+
+function computeNoProgressBackoffMs(noProgressRunCount: number): number {
+  const exp = Math.max(0, Math.min(10, noProgressRunCount - 1));
+  const raw = NO_PROGRESS_BACKOFF_BASE_MS * 2 ** exp;
+  const capped = Math.min(NO_PROGRESS_BACKOFF_CAP_MS, raw);
+  // Small deterministic jitter (±12.5%) without Math.random in hot path tests.
+  const jitter = Math.floor(capped * 0.125 * ((noProgressRunCount % 5) - 2) / 2);
+  return Math.max(NO_PROGRESS_BACKOFF_BASE_MS, capped + jitter);
+}
+
+function progressRevisionOf(job: GithubAutomationJobRecord): number {
+  return typeof job.progressRevision === "number" && Number.isFinite(job.progressRevision)
+    ? Math.max(0, Math.floor(job.progressRevision))
+    : 0;
+}
+
+function noProgressCountOf(job: GithubAutomationJobRecord): number {
+  return typeof job.noProgressRunCount === "number" && Number.isFinite(job.noProgressRunCount)
+    ? Math.max(0, Math.floor(job.noProgressRunCount))
+    : 0;
+}
 
 function getState(): SchedulerState {
   if (!globalThis.__piGithubAutomationScheduler) {
@@ -220,8 +272,12 @@ function isRunnableNow(
 
 async function markStaleRunningAsRetry(
   job: GithubAutomationJobRecord,
+  inFlight: Set<string>,
 ): Promise<GithubAutomationJobRecord> {
   if (job.status !== "running") return job;
+  // GHA-CLOSE-02: never steal a job that is actively running in this process.
+  if (inFlight.has(job.jobId)) return job;
+
   const updated = Date.parse(job.updatedAt);
   if (!Number.isFinite(updated) || Date.now() - updated < STALE_RUNNING_MS) {
     return job;
@@ -233,6 +289,8 @@ async function markStaleRunningAsRetry(
     reasonCode: "stale_running_reconcile",
     leaseOwner: null,
     leaseExpiresAt: null,
+    leaseFencingToken: null,
+    leaseHeartbeatAt: null,
     updatedAt: new Date().toISOString(),
   };
   await writeGithubAutomationJob(next);
@@ -248,6 +306,299 @@ async function markStaleRunningAsRetry(
     traceId: next.traceId,
   });
   return next;
+}
+
+/**
+ * Apply post-handler disposition. Never parks no-progress work as immediately
+ * runnable `queued` (the #22 scheduler spin root cause).
+ */
+async function applyHandlerDisposition(input: {
+  jobId: string;
+  before: GithubAutomationJobRecord;
+  after: GithubAutomationJobRecord;
+  result: GithubAutomationJobHandlerResult;
+  fencingToken: string;
+  ownerId: string;
+}): Promise<{ job: GithubAutomationJobRecord; wakeAgain: boolean; delayMs: number | null }> {
+  const { jobId, before, result, fencingToken, ownerId } = input;
+  let after = input.after;
+  const beforeRev = progressRevisionOf(before);
+  const afterRev = progressRevisionOf(after);
+  const progressed =
+    afterRev > beforeRev ||
+    (after.checkpoint != null &&
+      before.checkpoint != null &&
+      after.checkpoint !== before.checkpoint) ||
+    after.phase !== before.phase;
+
+  let disposition = result.disposition;
+  if (!disposition) {
+    if (isTerminalStatus(after.status)) {
+      disposition = {
+        kind: "terminal",
+        status:
+          after.status === "completed" ||
+          after.status === "cancelled" ||
+          after.status === "ignored"
+            ? after.status
+            : "completed",
+      };
+    } else if (after.status === "blocked") {
+      disposition = {
+        kind: "blocked",
+        reasonCode: after.reasonCode ?? "blocked",
+        layer: (after.blockedAtLayer as never) ?? "unknown",
+        fingerprint: after.blockFingerprint ?? "legacy",
+        retryability:
+          (after.retryability as never) ??
+          classifyGithubAutomationRetryability(after.reasonCode),
+      };
+    } else if (after.status === "retry_due") {
+      disposition = {
+        kind: "retry_due",
+        reasonCode: after.reasonCode ?? "retry_due",
+        nextRetryAt: after.nextRetryAt ?? new Date(Date.now() + 15_000).toISOString(),
+        retryClass: "unknown",
+      };
+    } else if (after.status === "paused") {
+      disposition = { kind: "waiting", wakeOn: "external" };
+    } else if (progressed) {
+      disposition = {
+        kind: "progressed",
+        progressRevision: afterRev,
+        checkpoint: after.checkpoint ?? after.phase,
+      };
+    } else if (after.status === "running") {
+      // Handler left status running without progress — treat as no-progress.
+      disposition = undefined;
+    } else if (after.status === "queued" && !progressed) {
+      // Handler re-queued without progress — still no-progress (prevent spin).
+      disposition = undefined;
+    } else {
+      disposition = { kind: "waiting", wakeOn: "timer" };
+    }
+  }
+
+  const writeFenced = async (job: GithubAutomationJobRecord) => {
+    try {
+      return await writeGithubAutomationJobWithFencing(job, {
+        fencingToken,
+        ownerId,
+      });
+    } catch {
+      // Lease lost: do not overwrite; return last known disk state.
+      return (await readGithubAutomationJob(jobId)) ?? job;
+    }
+  };
+
+  if (!disposition) {
+    // runner_no_progress: exponential backoff, then stable block.
+    const noProgress = noProgressCountOf(after) + 1;
+    const now = new Date().toISOString();
+    if (noProgress >= NO_PROGRESS_BLOCK_THRESHOLD) {
+      const evaluated = getGithubAutomationEvaluatedProvenance();
+      const blocked: GithubAutomationJobRecord = {
+        ...after,
+        status: "blocked",
+        reasonCode: "runner_no_progress",
+        blockedAtLayer: after.blockedAtLayer ?? "scheduler",
+        retryability: "operator",
+        noProgressRunCount: noProgress,
+        nextRetryAt: null,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        leaseFencingToken: null,
+        leaseHeartbeatAt: null,
+        evaluatedCodeRevision: evaluated.codeRevision,
+        evaluatedPolicyVersion: evaluated.policyVersion,
+        updatedAt: now,
+      };
+      after = await writeFenced(blocked);
+      await appendGithubAutomationSafeEvent({
+        at: now,
+        kind: "job_no_progress_blocked",
+        repositoryId: after.repositoryId,
+        issueNumber: after.issueNumber,
+        jobId: after.jobId,
+        deliveryId: after.deliveryId,
+        phase: after.phase,
+        reasonCode: "runner_no_progress",
+        traceId: after.traceId,
+        meta: { noProgressRunCount: noProgress },
+      });
+      return { job: after, wakeAgain: false, delayMs: null };
+    }
+
+    const delayMs = computeNoProgressBackoffMs(noProgress);
+    const nextRetryAt = new Date(Date.now() + delayMs).toISOString();
+    const retrying: GithubAutomationJobRecord = {
+      ...after,
+      status: "retry_due",
+      reasonCode: "runner_no_progress",
+      noProgressRunCount: noProgress,
+      nextRetryAt,
+      leaseOwner: null,
+      leaseExpiresAt: null,
+      leaseFencingToken: null,
+      leaseHeartbeatAt: null,
+      updatedAt: now,
+    };
+    after = await writeFenced(retrying);
+    await appendGithubAutomationSafeEvent({
+      at: now,
+      kind: "job_no_progress_backoff",
+      repositoryId: after.repositoryId,
+      issueNumber: after.issueNumber,
+      jobId: after.jobId,
+      deliveryId: after.deliveryId,
+      phase: after.phase,
+      reasonCode: "runner_no_progress",
+      traceId: after.traceId,
+      meta: {
+        noProgressRunCount: noProgress,
+        nextRetryAt,
+        delayMs,
+      },
+    });
+    return { job: after, wakeAgain: false, delayMs };
+  }
+
+  switch (disposition.kind) {
+    case "progressed": {
+      const now = new Date().toISOString();
+      // Always advance progressRevision so the next lease can detect real progress.
+      const nextRev = Math.max(
+        afterRev,
+        disposition.progressRevision,
+        beforeRev + 1,
+      );
+      const next: GithubAutomationJobRecord = {
+        ...after,
+        progressRevision: nextRev,
+        noProgressRunCount: 0,
+        meaningfulProgressCount:
+          (typeof after.meaningfulProgressCount === "number"
+            ? after.meaningfulProgressCount
+            : 0) + 1,
+        lastMeaningfulProgressAt: now,
+        lastMeaningfulProgressKind: "checkpoint_advanced",
+        // If handler left status running, park as queued for next checkpoint.
+        status:
+          after.status === "running"
+            ? "queued"
+            : after.status,
+        leaseOwner: after.status === "running" ? null : after.leaseOwner,
+        leaseExpiresAt: after.status === "running" ? null : after.leaseExpiresAt,
+        leaseFencingToken:
+          after.status === "running" ? null : after.leaseFencingToken,
+        leaseHeartbeatAt:
+          after.status === "running" ? null : after.leaseHeartbeatAt,
+        updatedAt: now,
+      };
+      after = await writeFenced(next);
+      return {
+        job: after,
+        wakeAgain: Boolean(result.wakeAgain),
+        delayMs: result.wakeAgain ? 0 : null,
+      };
+    }
+    case "waiting": {
+      const now = new Date().toISOString();
+      // Waiting must not be immediately runnable queued.
+      const next: GithubAutomationJobRecord = {
+        ...after,
+        status:
+          after.status === "running" || after.status === "queued"
+            ? disposition.wakeOn === "timer"
+              ? "retry_due"
+              : "paused"
+            : after.status,
+        reasonCode:
+          after.reasonCode && after.reasonCode !== "runner_no_progress"
+            ? after.reasonCode
+            : disposition.wakeOn === "agent"
+              ? "waiting_agent"
+              : disposition.wakeOn === "timer"
+                ? "waiting_timer"
+                : "waiting_external",
+        nextRetryAt:
+          disposition.wakeOn === "timer"
+            ? after.nextRetryAt ??
+              new Date(Date.now() + DEFAULT_POLL_INTERVAL_MS * 5).toISOString()
+            : after.nextRetryAt,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        leaseFencingToken: null,
+        leaseHeartbeatAt: null,
+        // waiting is not no-progress failure; do not inflate counter.
+        updatedAt: now,
+      };
+      after = await writeFenced(next);
+      return { job: after, wakeAgain: false, delayMs: null };
+    }
+    case "retry_due": {
+      const now = new Date().toISOString();
+      const next: GithubAutomationJobRecord = {
+        ...after,
+        status: "retry_due",
+        reasonCode: disposition.reasonCode,
+        nextRetryAt: disposition.nextRetryAt,
+        retryability: "automatic",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        leaseFencingToken: null,
+        leaseHeartbeatAt: null,
+        updatedAt: now,
+      };
+      after = await writeFenced(next);
+      const delay = Math.max(0, Date.parse(disposition.nextRetryAt) - Date.now());
+      return {
+        job: after,
+        wakeAgain: false,
+        delayMs: Number.isFinite(delay) ? delay : null,
+      };
+    }
+    case "blocked": {
+      const now = new Date().toISOString();
+      const evaluated = getGithubAutomationEvaluatedProvenance();
+      const next: GithubAutomationJobRecord = {
+        ...after,
+        status: "blocked",
+        reasonCode: disposition.reasonCode,
+        blockedAtLayer: disposition.layer,
+        blockFingerprint: disposition.fingerprint,
+        retryability: disposition.retryability,
+        nextRetryAt: null,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        leaseFencingToken: null,
+        leaseHeartbeatAt: null,
+        evaluatedCodeRevision:
+          after.evaluatedCodeRevision ?? evaluated.codeRevision,
+        evaluatedPolicyVersion:
+          after.evaluatedPolicyVersion ?? evaluated.policyVersion,
+        updatedAt: now,
+      };
+      after = await writeFenced(next);
+      return { job: after, wakeAgain: false, delayMs: null };
+    }
+    case "terminal": {
+      const now = new Date().toISOString();
+      const next: GithubAutomationJobRecord = {
+        ...after,
+        status: disposition.status,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        leaseFencingToken: null,
+        leaseHeartbeatAt: null,
+        updatedAt: now,
+      };
+      after = await writeFenced(next);
+      return { job: after, wakeAgain: false, delayMs: null };
+    }
+    default:
+      return { job: after, wakeAgain: Boolean(result.wakeAgain), delayMs: null };
+  }
 }
 
 // ─── Tick ────────────────────────────────────────────────────────────────────
@@ -300,10 +651,10 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
     scanned = jobs.length;
     const nowMs = Date.now();
 
-    // Reconcile stale running first.
+    // Reconcile stale running first (skip process-local inFlight — GHA-CLOSE-02).
     const reconciled: GithubAutomationJobRecord[] = [];
     for (const job of jobs) {
-      reconciled.push(await markStaleRunningAsRetry(job));
+      reconciled.push(await markStaleRunningAsRetry(job, state.inFlight));
     }
 
     const candidates = reconciled
@@ -387,28 +738,55 @@ async function runJobUnderLease(
       return;
     }
 
-    // Another process may have claimed running recently.
+    // Another process may have claimed running recently (fencing-aware).
     if (
       current.status === "running" &&
       current.leaseOwner &&
       current.leaseOwner !== lease.ownerId
     ) {
-      const updated = Date.parse(current.updatedAt);
-      if (Number.isFinite(updated) && Date.now() - updated < STALE_RUNNING_MS) {
+      const heartbeatAt = current.leaseHeartbeatAt
+        ? Date.parse(current.leaseHeartbeatAt)
+        : Date.parse(current.updatedAt);
+      if (
+        Number.isFinite(heartbeatAt) &&
+        Date.now() - heartbeatAt < STALE_RUNNING_MS
+      ) {
         return;
       }
     }
 
+    // Deterministic block with unchanged fingerprint: do not re-enter handler.
+    if (
+      current.status === "blocked" &&
+      current.blockFingerprint &&
+      current.retryability === "operator_after_change"
+    ) {
+      return;
+    }
+
     const now = new Date().toISOString();
+    const beforeSnapshot: GithubAutomationJobRecord = { ...current };
     const runningJob: GithubAutomationJobRecord = {
       ...current,
       status: "running",
+      // `attempt` = scheduler lease run count (never Agent execution count).
       attempt: current.attempt + 1,
       leaseOwner: lease.ownerId,
-      leaseExpiresAt: new Date(Date.now() + STALE_RUNNING_MS).toISOString(),
+      leaseExpiresAt: new Date(
+        Date.now() + Math.max(STALE_RUNNING_MS, GITHUB_AUTOMATION_LEASE_HEARTBEAT_MS * 4),
+      ).toISOString(),
+      leaseFencingToken: lease.fencingToken,
+      leaseHeartbeatAt: now,
       updatedAt: now,
     };
-    await writeGithubAutomationJob(runningJob);
+    try {
+      await writeGithubAutomationJobWithFencing(runningJob, {
+        fencingToken: lease.fencingToken,
+        ownerId: lease.ownerId,
+      });
+    } catch {
+      return;
+    }
     await appendGithubAutomationSafeEvent({
       at: now,
       kind: "job_started",
@@ -419,25 +797,92 @@ async function runJobUnderLease(
       phase: runningJob.phase,
       reasonCode: null,
       traceId: runningJob.traceId,
-      meta: { attempt: runningJob.attempt, ownerId: lease.ownerId },
+      meta: {
+        attempt: runningJob.attempt,
+        ownerId: lease.ownerId,
+        fencingToken: lease.fencingToken.slice(0, 12),
+      },
     });
 
-    const handler = getGithubAutomationJobHandler();
-    const result = await handler(runningJob, { config, ownerId });
-    // Handler is responsible for writing next status; if still "running", park as queued.
-    const after = await readGithubAutomationJob(jobId);
-    if (after && after.status === "running") {
-      const parked: GithubAutomationJobRecord = {
-        ...after,
-        status: "queued",
-        leaseOwner: null,
-        leaseExpiresAt: null,
-        updatedAt: new Date().toISOString(),
-      };
-      await writeGithubAutomationJob(parked);
-    }
-    if (result.wakeAgain) {
-      wakeGithubAutomationScheduler();
+    // Heartbeat loop for long Agent runs (GHA-CLOSE-02).
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+    const armHeartbeat = () => {
+      if (heartbeatTimer) return;
+      heartbeatTimer = setInterval(() => {
+        void (async () => {
+          const held = await lease.heartbeat();
+          if (!held) return;
+          try {
+            const latest = await readGithubAutomationJob(jobId);
+            if (!latest || latest.leaseFencingToken !== lease.fencingToken) return;
+            const hbAt = new Date().toISOString();
+            await writeGithubAutomationJobWithFencing(
+              {
+                ...latest,
+                leaseHeartbeatAt: hbAt,
+                leaseExpiresAt: new Date(
+                  Date.now() +
+                    Math.max(STALE_RUNNING_MS, GITHUB_AUTOMATION_LEASE_HEARTBEAT_MS * 4),
+                ).toISOString(),
+                // Heartbeat is NOT meaningful progress — do not touch progress fields.
+                updatedAt: latest.updatedAt,
+              },
+              {
+                fencingToken: lease.fencingToken,
+                ownerId: lease.ownerId,
+              },
+            );
+          } catch {
+            // lease lost or write race — ignore; handler will fail on next fenced write
+          }
+        })();
+      }, GITHUB_AUTOMATION_LEASE_HEARTBEAT_MS);
+      if (
+        typeof heartbeatTimer === "object" &&
+        heartbeatTimer &&
+        "unref" in heartbeatTimer
+      ) {
+        try {
+          (heartbeatTimer as NodeJS.Timeout).unref();
+        } catch {
+          // ignore
+        }
+      }
+    };
+    armHeartbeat();
+
+    try {
+      const handler = getGithubAutomationJobHandler();
+      const result = await handler(runningJob, {
+        config,
+        ownerId,
+        lease,
+      });
+
+      // Prefer disk state after handler writes; fall back to result.job.
+      const afterDisk = (await readGithubAutomationJob(jobId)) ?? result.job;
+
+      const applied = await applyHandlerDisposition({
+        jobId,
+        before: beforeSnapshot,
+        after: afterDisk,
+        result,
+        fencingToken: lease.fencingToken,
+        ownerId: lease.ownerId,
+      });
+
+      if (applied.wakeAgain) {
+        wakeGithubAutomationScheduler();
+      } else if (applied.delayMs != null && applied.delayMs >= 0) {
+        scheduleGithubAutomationScheduler(
+          Math.min(applied.delayMs, NO_PROGRESS_BACKOFF_CAP_MS),
+        );
+      }
+    } finally {
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
     }
   });
 }

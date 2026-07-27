@@ -276,6 +276,12 @@ await test("ensureGithubAutomationWorktree creates and reuses one path per gener
   assert.equal(first.created, true);
   assert.equal(existsSync(first.worktreePath), true);
   assert.match(first.branchName, /issue-7/);
+  assert.ok(first.projectId, "ensure must return projectId from Project Registry");
+  assert.ok(
+    first.spaceId && typeof first.spaceId === "string",
+    "ensure must resolve and return WorkTree spaceId (GHA-CLOSE-03)",
+  );
+  assert.match(String(first.spaceId), /^wt_/);
 
   const second = await worktree.ensureGithubAutomationWorktree({
     repository,
@@ -286,6 +292,8 @@ await test("ensureGithubAutomationWorktree creates and reuses one path per gener
   });
   assert.equal(second.reused, true);
   assert.equal(second.worktreePath, first.worktreePath);
+  assert.equal(second.projectId, first.projectId);
+  assert.equal(second.spaceId, first.spaceId, "reuse must keep the same spaceId");
 });
 
 // ─── Studio session binding ──────────────────────────────────────────────────
@@ -687,6 +695,120 @@ await test("source modules document residual risk and do not claim host isolatio
   const triage = readFileSync(join(root, "lib/github-issue-triage-runner.ts"), "utf8");
   assert.ok(!/from\s+["'][^"']*git-worktree/.test(triage));
   assert.ok(triage.includes("github-automation-runner"));
+});
+
+// ─── GHA-CLOSE-03: space binding + env isolation ─────────────────────────────
+
+await test("resolveGithubAutomationWorktreeSpaceId read-back works after ensure", async () => {
+  const repoPath = mkdtempSync(join(tmpdir(), "gha-close03-space-"));
+  gitInit(repoPath);
+  await registry.registerProject({ path: repoPath, displayName: "gha-close03-space" });
+
+  const repository = {
+    repositoryId: 602362837,
+    fullName: "602362837/yolk-pi-web",
+    installationId: 9,
+    projectRoot: repoPath,
+    ownerActorIds: [],
+    assigneeIdentitySource: "machine-active-credential",
+    baseRef: "main",
+  };
+
+  const wt = await worktree.ensureGithubAutomationWorktree({
+    repository,
+    issueNumber: 22,
+    generation: 1,
+  });
+  assert.ok(wt.projectId);
+  assert.ok(wt.spaceId);
+
+  const resolved = await worktree.resolveGithubAutomationWorktreeSpaceId({
+    projectId: wt.projectId,
+    repoRoot: wt.repoRoot,
+    worktreePath: wt.worktreePath,
+    branchName: wt.branchName,
+    baseRef: wt.baseRef,
+  });
+  assert.equal(resolved.spaceId, wt.spaceId);
+
+  // projectId without space resolution path must not invent ids.
+  const missing = await worktree.resolveGithubAutomationWorktreeSpaceId({
+    projectId: null,
+    repoRoot: wt.repoRoot,
+    worktreePath: wt.worktreePath,
+  });
+  assert.equal(missing.spaceId, null);
+  assert.equal(missing.spaceSynced, false);
+});
+
+await test("bootstrapGithubAutomationAgentSession requires projectId+spaceId pair", async () => {
+  await assert.rejects(
+    () =>
+      session.bootstrapGithubAutomationAgentSession({
+        worktreePath: agentDir,
+        projectId: "prj_only",
+        // spaceId intentionally omitted
+      }),
+    /projectId and spaceId/i,
+  );
+  await assert.rejects(
+    () =>
+      session.bootstrapGithubAutomationAgentSession({
+        worktreePath: agentDir,
+        spaceId: "wt_only",
+      }),
+    /projectId and spaceId/i,
+  );
+});
+
+await test("buildGithubUnattendedScrubbedEnv is a copy and preserves process.env", () => {
+  const marker = "YPI_GITHUB_APP_WEBHOOK_SECRET";
+  const previous = process.env[marker];
+  process.env[marker] = WEBHOOK_SECRET_SENTINEL;
+  process.env.GH_TOKEN = MACHINE_TOKEN_SENTINEL;
+  process.env.GHA_CLOSE03_KEEP = "keep-me";
+
+  try {
+    const scrubbed = session.buildGithubUnattendedScrubbedEnv(process.env);
+    assert.equal(scrubbed[marker], undefined);
+    assert.equal(scrubbed.GH_TOKEN, undefined);
+    assert.equal(scrubbed.GHA_CLOSE03_KEEP, "keep-me");
+
+    // Shared process.env must remain intact for server publisher credentials.
+    assert.equal(process.env[marker], WEBHOOK_SECRET_SENTINEL);
+    assert.equal(process.env.GH_TOKEN, MACHINE_TOKEN_SENTINEL);
+    assert.equal(process.env.GHA_CLOSE03_KEEP, "keep-me");
+
+    // Mutating the scrubbed copy must not affect process.env.
+    scrubbed.GHA_CLOSE03_KEEP = "mutated";
+    assert.equal(process.env.GHA_CLOSE03_KEEP, "keep-me");
+  } finally {
+    if (previous === undefined) delete process.env[marker];
+    else process.env[marker] = previous;
+    delete process.env.GH_TOKEN;
+    delete process.env.GHA_CLOSE03_KEEP;
+  }
+});
+
+await test("session/runner sources no longer delete shared process.env", () => {
+  const sessionSrc = readFileSync(join(root, "lib/github-automation-session.ts"), "utf8");
+  const runnerSrc = readFileSync(join(root, "lib/github-automation-runner.ts"), "utf8");
+  assert.ok(
+    !/delete\s+process\.env/.test(sessionSrc),
+    "session must not delete process.env keys",
+  );
+  assert.ok(
+    !/delete\s+process\.env/.test(runnerSrc),
+    "runner must not delete process.env keys",
+  );
+  assert.ok(
+    /buildGithubUnattendedScrubbedEnv|toolEnv/.test(sessionSrc),
+    "session must use scrubbed env copy / toolEnv path",
+  );
+  assert.ok(
+    /spaceId/.test(runnerSrc),
+    "runner must persist spaceId on WorkTree binding",
+  );
 });
 
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
