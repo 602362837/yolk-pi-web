@@ -785,9 +785,16 @@ export async function listGithubAutomationJobs(): Promise<GithubAutomationJobRec
   }
   const jobs: GithubAutomationJobRecord[] = [];
   for (const name of names) {
-    if (!name.endsWith(".json") || name.startsWith(".")) continue;
+    // Job records are `<jobId>.json` only. Full-agent sidecars are
+    // `<jobId>.runner.json` and must never be treated as job records
+    // (missing `effects` would crash status projection).
+    if (!name.endsWith(".json") || name.startsWith(".") || name.endsWith(".runner.json")) {
+      continue;
+    }
     const job = await readJsonFile<GithubAutomationJobRecord>(join(dir, name));
-    if (job && typeof job.jobId === "string") jobs.push(job);
+    if (job && typeof job.jobId === "string" && Array.isArray(job.effects)) {
+      jobs.push(job);
+    }
   }
   return jobs;
 }

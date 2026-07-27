@@ -1254,6 +1254,54 @@ function signedRequest(bodyObj, options = {}) {
   };
 }
 
+await test("listGithubAutomationJobs skips full-agent .runner.json sidecars", async () => {
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 2201,
+    installationId: 999001,
+    deliveryId: "runner-sidecar-list",
+    issueTitlePreview: "runner sidecar isolation",
+  });
+  const jobsDir = store.getGithubAutomationJobsDir();
+  const runnerPath = join(jobsDir, `${job.jobId}.runner.json`);
+  writeFileSync(
+    runnerPath,
+    JSON.stringify({
+      schemaVersion: 1,
+      jobId: job.jobId,
+      repositoryId: job.repositoryId,
+      issueNumber: job.issueNumber,
+      generation: job.generation,
+      checkpoint: "blocked",
+      worktreePath: "/tmp/ypi-gha-fake-worktree",
+      branchName: "ypi/gha/fake",
+      updatedAt: new Date().toISOString(),
+    }),
+    { mode: 0o600 },
+  );
+
+  const jobs = await store.listGithubAutomationJobs();
+  assert.equal(jobs.filter((j) => j.jobId === job.jobId).length, 1);
+  assert.ok(jobs.every((j) => Array.isArray(j.effects)));
+  assert.ok(
+    !jobs.some((j) => j.checkpoint === "blocked" && !Array.isArray(j.effects)),
+    "runner sidecar must not be returned as a job record",
+  );
+
+  const status = await projection.buildGithubAutomationStatusProjection({
+    resolveLive: false,
+  });
+  projection.assertGithubAutomationProjectionSafe(status);
+  assert.ok(status.jobs.some((j) => j.jobId === job.jobId));
+  assert.ok(
+    status.jobs.every((j) => typeof j.jobId === "string" && j.issueNumber > 0),
+  );
+
+  unlinkSync(runnerPath);
+  unlinkSync(store.getGithubAutomationJobPath(job.jobId));
+});
+
 await test("webhook signature verifies with timing-safe compare", () => {
   const raw = Buffer.from(JSON.stringify({ ok: true }), "utf8");
   const hex = webhookVerify.computeGithubWebhookSignatureHex(raw, WEBHOOK_SECRET_SENTINEL);

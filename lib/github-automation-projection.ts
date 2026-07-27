@@ -372,8 +372,9 @@ function effectRemoteId(
   job: GithubAutomationJobRecord,
   name: "pull_request" | "branch",
 ): string | null {
-  for (let i = job.effects.length - 1; i >= 0; i -= 1) {
-    const e = job.effects[i];
+  const effects = Array.isArray(job.effects) ? job.effects : [];
+  for (let i = effects.length - 1; i >= 0; i -= 1) {
+    const e = effects[i];
     if (e?.name === name && typeof e.remoteId === "string" && e.remoteId) {
       return e.remoteId;
     }
