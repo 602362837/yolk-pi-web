@@ -2407,6 +2407,33 @@
         "checks.md",
         "implement.md"
       ]
+    },
+    {
+      "id": "20260727-170946-修复-github-自动化手动重试空跑-handler-未注册-bootstrap-失败不可见-",
+      "title": "修复 GitHub 自动化手动重试空跑：handler 未注册 + bootstrap 失败不可见 + 30142 真实验收",
+      "taskId": "20260727-125847-修复-github-自动化手动重试空跑-handler-未注册-bootstrap-失败不可见-",
+      "taskKey": "archived:2026-07:20260727-125847-修复-github-自动化手动重试空跑-handler-未注册-bootstrap-失败不可见-",
+      "workflowId": "feature-dev",
+      "summary": "## Current status - Workflow: `feature-dev` - Task: `20260727-125847-修复-github-自动化手动重试空跑-handler-未注册-bootstrap-失败不可见-` - Subtask **GHR-06**: **done / PASS** (real 30142 Session-created evidence) - GHR-01…05 remain implemented; production async-module load gap closed in this rework - No commit / push / merge - **User 30141 ypi left running** (PID 16545; never killed) ## What was done in this rework ### A. Production root-cause fix `lib/github-automation-handler-runtime.ts` - Load path prefers dynamic `import()`, always awaits thenable namespaces from import/require (Next webpack async modules). - Named-export interop: direct / getter / default / thenable export values. - Fallback: call `registerGithubIssueTriageHandler()` then verify live registry kind=`github_issue_triage`. - Diagnostics stay allowlisted (`handler_module_export_missing` / `handler_module_load_failed`); no path/specifier…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260727-125847-修复-github-自动化手动重试空跑-handler-未注册-bootstrap-失败不可见-",
+      "knowledgePath": ".ypi/knowledge/20260727-170946-修复-github-自动化手动重试空跑-handler-未注册-bootstrap-失败不可见-.md",
+      "createdAt": "2026-07-27T09:09:46.353Z",
+      "archivedAt": "2026-07-27T09:09:46.353Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
     }
   ]
 }

@@ -1,0 +1,669 @@
+{
+  "schemaVersion": 1,
+  "id": "20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批",
+  "title": "Browser Share 绑定后零拦截全自动操作（取消 type/navigate 审批）",
+  "workflowId": "feature-dev",
+  "status": "awaiting_approval",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-24T08:28:05.397Z",
+  "updatedAt": "2026-07-24T08:40:58.045Z",
+  "completedAt": null,
+  "contextIds": [
+    "pi_019f9314-945a-7c9a-ae92-111b24f318b7"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-cf15e70c48aae8a72daa47c9",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T08:28:36.253Z",
+      "finishedAt": "2026-07-24T08:37:55.149Z",
+      "runner": "sdk",
+      "childSessionId": "019f933d-9c36-76c6-b77b-f6187bb1d3e6",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T08-28-36-278Z_019f933d-9c36-76c6-b77b-f6187bb1d3e6.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f9314-945a-7c9a-ae92-111b24f318b7",
+        "childSessionId": "019f933d-9c36-76c6-b77b-f6187bb1d3e6",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "架构规划已完成，未修改生产代码。\n\n### 已产出\n\n任务目录下已更新：\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `ui.md`\n- `implement.md`（BSFA-01～04，schemaVersion 2）\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 关键建议\n\n- `interactive` 保持 wire 兼容，产品语义改为「全自动」。\n- `readonly` 保留为「每次确认」严格模式。\n- 默认分享为全自动，四类操作全部直接排队。\n- 保留 approval API、拒绝和超时协议。\n- 增加 health capability，避免新扩展连接旧 Web 时误报全自动。\n\n### 验证\n\n- Implementation Plan JSON/schema 检查：通过\n- 规划产物非空/TBD 检查：通过\n- Markdown 尾随空白检查：通过\n- Chrome 扩展 `npm run build`：通过\n- 两个仓库均无生产代码改动\n\n### 当前阻塞\n\n任务仍为 `intake`。当前 delegated 环境没有 Studio dispatch/transition/update-plan 工具，无法：\n\n1. 指派 `ui-designer` 产出正式 HTML 原型；\n2. 保存 implementationPlan；\n3. transition 到 `planning` / `awaiting_approval`。\n\n主会话下一步应按 `handoff.md` 指派 UI 设计员，补齐 `browser-share-full-auto-prototype.html`，再提交用户审批。用户批准前不得实现。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T08:28:36.253Z",
+        "updatedAt": "2026-07-24T08:37:55.149Z",
+        "eventCount": 7361,
+        "lastTextPreview": "架构规划已完成，未修改生产代码。\n\n### 已产出\n\n任务目录下已更新：\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `ui.md`\n- `implement.md`（BSFA-01～04，schemaVersion 2）\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 关键建议\n\n- `interactive` 保持 wire 兼容，产品语义改为「全自动」。\n- `readonly` 保留为「每次确认」严格模式。\n- 默认分享为全自动，四类操作全部直接排队。\n- 保留 approval API、拒绝和超时协议。\n- 增加 health capability，避免新扩展连接旧 Web 时误报全自动。\n\n### 验证\n\n- Implementation Plan JSON/schema 检查：通过\n- 规划产物非空/TBD 检查：通过\n- Markdown 尾随空白检查：通过\n- Chrome 扩展 `npm run build`：通过\n- 两个仓库均无生产代码改动\n\n### 当前阻塞\n\n任务仍为 `intake`。当前 delegated 环境没有 Studio dispatch/transition/update-plan 工具，无法：\n\n1. 指派 `ui-designer` 产出正式 HTML 原型；\n2. 保存 implementationPlan；\n3. transition 到 `planning` / `awaiting_approval`。\n\n主会话下一步应按 `handoff.md` 指派 UI 设计员，补齐 `browser-share-full-auto-prototype.html`，再提交用户审批。用户批准前不得实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T08:37:26.462Z",
+            "toolCallId": "call_ERSyGAzqFQgiqb5AuPujXCJm|fc_09b8e9086406fb04016a63243517c0819a8041399a055bffc5",
+            "toolName": "write",
+            "text": "Successfully wrote 2206 bytes to .ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T08:37:42.620Z",
+            "toolCallId": "call_2J6OrCOUywJKguARlG2rLFG8|fc_09b8e9086406fb04016a63244d8be8819a8eac19f542052f2a",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"TASK='.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批'\\nif rg -n '[[:blank:]]+$' \\\"$TASK\\\"/{brief,prd,ui,design,implement,checks,plan-review,handoff}.md; then exit 1; fi\\nprintf '%s\\\\n' '-- artifacts --'\\nfor f in brief.md prd.md ui.md design.md implement.md checks.md plan-review.md handoff.md; do printf '%-16s %6s bytes\\\\n' \\\"$f\\\" \\\"$(wc -c < \\\"$TASK/$f\\\")\\\"; done\\nprintf '%s\\\\n' '-- repo status --'\\ngit status --short\\nprintf '%s\\\\n' '-- extension status --'\\ngit -C /Users/zyj/gitProjects/ypi-browser-share-extension status --short\\n\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T08:37:42.789Z",
+            "toolCallId": "call_2J6OrCOUywJKguARlG2rLFG8|fc_09b8e9086406fb04016a63244d8be8819a8eac19f542052f2a",
+            "toolName": "bash",
+            "text": "-- artifacts --\nbrief.md             4778 bytes\nprd.md               7056 bytes\nui.md                5155 bytes\ndesign.md            9858 bytes\nimplement.md        18551 bytes\nchecks.md            6478 bytes\nplan-review.md       5142 bytes\nhandoff.md           3274 bytes\n-- repo status --\n?? \".ypi/tasks/20260724-162805-browser-share-\\347\\273\\221\\345\\256\\232\\345\\220\\216\\351\\233\\266\\346\\213\\246\\346\\210\\252\\345\\205\\250\\350\\207\\252\\345\\212\\250\\346\\223\\215\\344\\275\\234-\\345\\217\\226\\346\\266\\210-type-navigate-\\345\\256\\241\\346\\211\\271/\"\n-- extension status --",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T08:37:55.132Z",
+            "text": "架构规划已完成，未修改生产代码。\n\n### 已产出\n\n任务目录下已更新：\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `ui.md`\n- `implement.md`（BSFA-01～04，schemaVersion 2）\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 关键建议\n\n- `interactive` 保持 wire 兼容，产品语义改为「全自动」。\n- `readonly` 保留为「每次确认」严格模式。\n- 默认分享为全自动，四类操作全部直接排队。\n- 保留 approval API、拒绝和超时协议。\n- 增加 health capability，避免新扩展连接旧 Web 时误报全自动。\n\n### 验证\n\n- Implementation Plan JSON/schema 检查：通过\n- 规划产物非空/TBD 检查：通过\n- Markdown 尾随空白检查：通过\n- Chrome 扩展 `npm run build`：通过\n- 两个仓库均无生产代码改动\n\n### 当前阻塞\n\n任务仍为 `intake`。当前 delegated 环境没有 Studio dispatch/transition/update-plan 工具，无法：\n\n1. 指派 `ui-designer` 产出正式 HTML 原型；\n2. 保存 implementationPlan；\n3. transition 到 `planning` / `awaiting_approval`。\n\n主会话下一步应按 `handoff.md` 指派 UI 设计员，补齐 `browser-share-full-auto-prototype.html`，再提交用户审批。用户批准前不得实现。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T08:37:55.139Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 782,
+        "tokens": 346,
+        "tokenSource": "usage",
+        "tps": 42.8,
+        "firstTokenAt": "2026-07-24T08:37:47.024Z",
+        "lastTokenAt": "2026-07-24T08:37:55.108Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-cf15e70c48aae8a72daa47c9",
+        "taskId": "20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-162805-browser-share-_-_-type-navigate-/architect-cf15e70c48aae8a72daa47c9.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T08:28:36.253Z",
+        "finishedAt": "2026-07-24T08:37:55.140Z",
+        "updatedAt": "2026-07-24T08:37:55.140Z",
+        "itemCount": 125,
+        "messageCount": 1,
+        "toolCallCount": 60,
+        "stderrBytes": 0,
+        "bytes": 435483,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f933d-9c36-76c6-b77b-f6187bb1d3e6",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T08-28-36-278Z_019f933d-9c36-76c6-b77b-f6187bb1d3e6.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "ui-designer-9113430195d03fe36dcec553",
+      "member": "ui-designer",
+      "status": "succeeded",
+      "startedAt": "2026-07-24T08:38:24.806Z",
+      "finishedAt": "2026-07-24T08:39:54.674Z",
+      "runner": "sdk",
+      "childSessionId": "019f9346-9736-76dc-8ce9-3dfc00e5b59f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T08-38-24-822Z_019f9346-9736-76dc-8ce9-3dfc00e5b59f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019f9314-945a-7c9a-ae92-111b24f318b7",
+        "childSessionId": "019f9346-9736-76dc-8ce9-3dfc00e5b59f",
+        "model": "google-antigravity/gemini-3.1-pro",
+        "modelSource": "memberConfig",
+        "thinking": "xhigh",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成 UI 设计员分配的任务，产出了 HTML 原型并解除了 UI 原型门禁。\n\n## 产出与修改文件\n1. **创建** `.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/browser-share-full-auto-prototype.html`\n   - 包含自包含 CSS/JS 的 HTML 原型。\n   - 覆盖 Chrome extension popup（创建分享、模式选择、已绑定）与 ypi BrowserShareControl（未绑定、已绑定全自动、已绑定严格模式）两个核心界面。\n   - 包含顶部状态切换器，可一键预览：1. 默认新建、2. Web版本过低、3. 全自动已绑定、4. 严格模式已绑定、5. Debugger 冲突 等 5 种交互与异常反馈场景。\n   - 满足所有要求的 a11y 与术语边界（主文案为「全自动 / 每次确认」，明确“需确认/自动执行”状态，不再隐藏 type/navigate）。\n\n2. **更新** `.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/ui.md`\n   - 将门禁状态更新为“已就绪”，加入了指向上述 HTML 文件的相对链接。\n\n3. **更新** `.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/plan-review.md`\n   - 移除了阻塞声明，更新审批清单关联了最新的 HTML 原型文件，并指引主会话进行下一步（等待转换状态）。\n\n## 验证与剩余风险\n- **验证**：打开 `browser-share-full-auto-prototype.html`，通过顶部 Tab 可以完整预览需求内指出的 UI 交互场景与文案（不涉及修改任何实际生产代码）。\n- **风险**：此原型使用了项目常见的界面组件样式抽象（如 CSS 变量及 Radio cards），但未来前端实现时，仍需直接映射到 React 真实组件并保证实际 Web 侧的 UI 无缝融合。\n\n## 主会话决策 / 下一步\n- **UI 原型门禁已解除**。\n- 如果主会话尚未保存 `implementationPlan`，请先保存 `implement.md` 的机器可读计划。\n- 主会话可以根据当前任务流 transition 到 `awaiting_approval`，向用户展示 `plan-review.md` 和 `browser-share-full-auto-prototype.html`，等待用户确认执行。",
+      "model": "google-antigravity/gemini-3.1-pro",
+      "thinking": "xhigh",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "ui-designer",
+        "member": "ui-designer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "google-antigravity/gemini-3.1-pro",
+          "arg": "google-antigravity/gemini-3.1-pro",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "xhigh",
+          "arg": "xhigh",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "xhigh",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-24T08:38:24.806Z",
+        "updatedAt": "2026-07-24T08:39:54.673Z",
+        "eventCount": 140,
+        "lastTextPreview": "已完成 UI 设计员分配的任务，产出了 HTML 原型并解除了 UI 原型门禁。\n\n## 产出与修改文件\n1. **创建** `.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/browser-share-full-auto-prototype.html`\n   - 包含自包含 CSS/JS 的 HTML 原型。\n   - 覆盖 Chrome extension popup（创建分享、模式选择、已绑定）与 ypi BrowserShareControl（未绑定、已绑定全自动、已绑定严格模式）两个核心界面。\n   - 包含顶部状态切换器，可一键预览：1. 默认新建、2. Web版本过低、3. 全自动已绑定、4. 严格模式已绑定、5. Debugger 冲突 等 5 种交互与异常反馈场景。\n   - 满足所有要求的 a11y 与术语边界（主文案为「全自动 / 每次确认」，明确“需确认/自动执行”状态，不再隐藏 type/navigate）。\n\n2. **更新** `.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/ui.md`\n   - 将门禁状态更新为“已就绪”，加入了指向上述 HTML 文件的相对链接。\n\n3. **更新** `.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/plan-review.md`\n   - 移除了阻塞声明，更新审批清单关联了最新的 HTML 原型文件，并指引主会话进行下一步（等待转换状态）。\n\n## 验证与剩余风险\n- **验证**：打开 `browser-share-full-auto-prototype.html`，通过顶部 Tab 可以完整预览需求内指出的 UI 交互场景与文案（不涉及修改任何实际生产代码）。\n- **风险**：此原型使用了项目常见的界面组件样式抽象（如 CSS 变量及 Radio cards），但未来前端实现时，仍需直接映射到 React 真实组件并保证实际 Web 侧的 UI 无缝融合。\n\n## 主会话决策 / 下一步\n- **UI 原型门禁已解除**。\n- 如果主会话尚未保存 `implementationPlan`，请先保存 `implement.md` 的机器可读计划。\n- 主会话可以根据当前任务流 transition 到 `awaiting_approval`，向用户展示 `plan-review.md` 和 `browser-share-full-auto-prototype.html`，等待用户确认执行。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T08:39:35.486Z",
+            "toolCallId": "hzx9kiqi",
+            "toolName": "read",
+            "text": "# 计划审批书 — Browser Share 绑定后全自动\n\n> **当前结论：架构规划已完成，但暂不可进入用户正式批准。** UI 原型门禁已触发；当前 delegated architect 环境没有 Studio member dispatch 工具，尚缺 `ui-designer` 产出的 HTML 原型。主会话必须先派 UI 设计员补齐，再把本文件更新为最终审批入口并 transition 到 `awaiting_approval`。\n\n## 方案摘要\n\n推荐保留 wire 兼容并改变主路径语义：\n\n1. `interactive` 技术值继续保留，但产品语义改为 **全自动**：click/type/scroll/navigate 全部直接 queued。\n2. `readonly` 技术值保留为可选 **每次确认（严格模式）**：四类 action 仍走既有 pending approval。\n3. 新分享默认全自动；Chrome extension popup 默认选择「全自动（推荐）」。\n4. approval API、pending/rejected/timeout 协议不删除，服务严格模式、旧客户端和在途命令。\n5. session/tab/debugger/敏感字段/http(s) 导航等安全边界不变；取消的是 ypi 产品内逐次审批，不是执行失败检查。\n6. health 增加 full-auto capability，避免新扩展连接旧 Web 后错误宣传全自动。\n\n## 规划产物\n\n| 产物 | 链接 | 内容 |\n| --- | --- | --- |\n| Brief | [brief.md](brief.md) | 问题、证据、目标、非目标、成功标准 |\n| PRD | [prd.md](prd.md) | R1–R13、模式表、用户验收场景 |\n| UI Brief | [ui.md](ui.md) | UI designer 输入、双表面、状态/a11y 门禁 |\n| Design | [design.md](design.md) | 权限策略、API/capability、数据流、兼容与回滚 |\n| Implement | [implement.md](implement.md) | BSFA-01…04 DAG、双仓文件与验证 |\n| Checks | [checks.md](checks.md) | 自动/手工/安全/兼容矩阵 |\n| HTML 原型 | `browser-share-full-auto-prototype.html` | **缺失：必须由 UI 设计员产出** |\n\n## 推荐默认行为\n\n| 项 | 推荐 |\n| --- | --- |\n| 新分享默认 | 全自动 |\n| 全自动命令 | click/type/scroll/navigate 全部自动 |\n| 更严格模式 | 保留“每次确认”，所有 action 逐次确认 |\n| raw wire | 保留 `interactive/readonly`，UI 不展示 raw 值 |\n| debugger 不可用 | 明确失败，不回退 |\n| 解绑/停止 | 立即失去授权并释放 debugger |\n| 旧 Web 能力不足 | 全自动创建 fail closed + 升级提示 |\n\n## Implementation Plan 一览\n\n| ID | 标题 | 依赖 | 主要边界 |\n| --- | --- | --- | --- |\n| BSFA-01 | Web 权限策略、集中校验、focused tests | — | 单一策略真相 |\n| BSFA-02 | Web API/tool/UI/docs 同步 | BSFA-01 + UI approval | operator 与面板一致 |\n| BSFA-03 | Chrome 扩展默认模式与 capability/UI | BSFA-01 + UI approval | 独立仓库 |\n| BSFA-04 | 双仓集成验证与文档收尾 | 01–03 | Chrome 手工矩阵 |\n\n建议 `maxConcurrency=2`：BSFA-01 完成后，BSFA-02 与 BSFA-03 文件不重叠，可并行；BSFA-04 收尾。\n\n## 兼容性说明\n\n- 无磁盘/JSONL 迁移；Browser Share 为进程内状态。\n- 现有 command/status/approval 路由与字段保持。\n- 新 Web 接受旧扩展模式值；旧扩展可能仍默认严格，需升级扩展获得默认全自动。\n- 新扩展通过 health capability 避免连接旧 Web 时作出错误承诺。\n- 运行中既有 command 不重写状态。\n\n## 风险与缓解\n\n| 风险 | 缓解 |\n| --- | --- |\n| 自动误操作 | 分享+绑定作为明确授权；当前 tab/session 限定；持续状态信号；stop/unbind。 |\n| API 绕过 tool 校验 | manager 集中校验 URL与payload。 |\n| UI/队列语义漂移 | manager 单一 policy + operator tests；UI读取 operator。 |\n| 双仓只更新一侧 | 独立 implementation subtask + 双仓 checker。 |\n| extension/Web 版本错配 | additive health capability，full auto fail closed。 |\n| strict/旧客户端回归 | approval/status 全保留。 |\n\n## 用户最终审批清单（UI 原型补齐后使用）\n\n- [ ] 同意默认 **全自动**，四类 action 不再逐次批准。\n- [ ] 同意保留「每次确认」严格模式，而非本期改成真正只读。\n- [ ] 同意 wire 继续使用 `interactive/readonly`，产品 UI 使用「全自动/每次确认」。\n- [ ] 批准 `browser-share-full-auto-prototype.html` 的 extension popup 与 ypi 面板设计。\n- [ ] 批准 BSFA-01…04 implementationPlan（maxConcurrency=2）。\n- [ ] 知悉 debugger/离线/执行失败/timeout 仍可能阻断；“零拦截”仅指取消逐次审批。\n- [ ] 知悉实现涉及当前 Web 仓库与独立 Chrome extension 仓库。\n\n## 主会话下一步\n\n1. transition `intake -> planning`（brief 已完成）。\n2. dispatch `ui-designer`，要求在本任务目录交付 `browser-share-full-auto-prototype.html` 并更新 [ui.md](ui.md)。\n3. UI 设计员完成后，复核/更新本审批书中的原型链接与门禁状态。\n4. 保存 [implement.md](implement.md) 的 machine-readable implementationPlan。\n5. transition `planning -> awaiting_approval`，向用户展示本审批书与 HTML 原型。\n6. 用户明确批准前停止；不得进入 implementing。\n\n**当前不得使用“确认后开始实现”话术，因为 HTML 原型尚未完成。**",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-24T08:39:45.495Z",
+            "toolCallId": "ipx8uga9",
+            "toolName": "edit",
+            "inputPreview": "{\n  \"edits\": [\n    {\n      \"newText\": \"> **当前结论：架构规划与 UI 原型均已完成，准备好进入用户正式批准。** UI 设计员已补齐 HTML 原型。请主会话审阅本文件及原型，并将任务 transition 到 `awaiting_approval` 以等待用户确认。\",\n      \"oldText\": \"> **当前结论：架构规划已完成，但暂不可进入用户正式批准。** UI 原型门禁已触发；当前 delegated architect 环境没有 Studio member dispatch 工具，尚缺 `ui-designer` 产出的 HTML 原型。主会话必须先派 UI 设计员补齐，再把本文件更新为最终审批入口并 transition 到 `awaiting_approval`。\"\n    },\n    {\n      \"newText\": \"| HTML 原型 | [browser-share-full-auto-prototype.html](browser-share-full-auto-prototype.html) | **已就绪**：覆盖两端 5 种交互状态 |\",\n      \"oldText\": \"| HTML 原型 | `browser-share-full-auto-prototype.html` | **缺失：必须由 UI 设计员产出** |\"\n    },\n    {\n      \"newText\": \"## 用户最终审批清单\\n\\n- [ ] 同意默认 **全自动**，四类 action 不再逐次批准。\\n- [ ] 同意保留「每次确认」严格模式，而非本期改成真正只读。\\n- [ ] 同意 wire 继续使用 `interactive/readonly`，产品 UI 使用「全自动/每次确认」。\\n- [ ] 批准 [browser-share-full-auto-prototype.html](browser-share-full-auto-prototype.html) 的 extension popup 与 ypi 面板设计。\\n- [ ] 批准 BSFA-01…04 implementationPlan（maxConcurrency=2）。\\n- [ ] 知悉 debugger/离线/执行失败/timeout 仍可能阻断；“零拦截”仅指取消逐次审批。\\n- [ ] 知悉实现涉及当前 Web 仓库与独立 Chrome extension 仓库。\\n\\n## 主会话下一步\\n\\n1. 主会话保存 [implement.md](implement.md) 的 machine-readable implementationPlan（如果尚未保存）。\\n2. transition `planning -> awaiting_approval`，向用户展示本审批书与 HTML 原型进行正式审批。\\n3. 用户明确批准前停止；不得进入 implementing。\",\n      \"oldText\": \"## 用户最终审批清单（UI 原型补齐后使用）\\n\\n- [ ] 同意默认 **全自动**，四类 action 不再逐次批准。\\n- [ ] 同意保留「每次确认」严格模式，而非本期改成真正只读。\\n- [ ] 同意 wire 继续使用 `interactive/readonly`，产品 UI 使用「全自动/每次确认」。\\n- [ ] 批准 `browser-share-full-auto-prototype.html` 的 extension popup 与 ypi 面板设计。\\n- [ ] 批准 BSFA-01…04 implementationPlan（maxConcurrency=2）。\\n- [ ] 知悉 debugger/离线/执行失败/timeout 仍可能阻断；“零拦截”仅指取消逐次审批。\\n- [ ] 知悉实现涉及当前 Web 仓库与独立 Chrome extension 仓库。\\n\\n## 主会话下一步\\n\\n1. transition `intake -> planning`（brief 已完成）。\\n2. dispatch `ui-designer`，要求在本任务目录交付 `browser-share-full-auto-prototype.html` 并更新 [ui.md](ui.md)。\\n3. UI 设计员完成后，复核/更新本审批书中的原型链接与门禁状态。\\n4. 保存 [implement.md](implement.md) 的 machine-readable implementationPlan。\\n5. transition `planning -> awaiting_approval`，向用户展示本审批书与 HTML 原型。\\n6. 用户明确批准前停止；不得进入 implementing。\\n\\n**当前不得使用“确认后开始实现”话术，因为 HTML 原型尚未完成。**\"\n    }\n  ],\n  \"path\": \".ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/plan-review.md\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-24T08:39:45.505Z",
+            "toolCallId": "ipx8uga9",
+            "toolName": "edit",
+            "text": "Successfully replaced 3 block(s) in .ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/plan-review.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-24T08:39:54.661Z",
+            "text": "已完成 UI 设计员分配的任务，产出了 HTML 原型并解除了 UI 原型门禁。\n\n## 产出与修改文件\n1. **创建** `.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/browser-share-full-auto-prototype.html`\n   - 包含自包含 CSS/JS 的 HTML 原型。\n   - 覆盖 Chrome extension popup（创建分享、模式选择、已绑定）与 ypi BrowserShareControl（未绑定、已绑定全自动、已绑定严格模式）两个核心界面。\n   - 包含顶部状态切换器，可一键预览：1. 默认新建、2. Web版本过低、3. 全自动已绑定、4. 严格模式已绑定、5. Debugger 冲突 等 5 种交互与异常反馈场景。\n   - 满足所有要求的 a11y 与术语边界（主文案为「全自动 / 每次确认」，明确“需确认/自动执行”状态，不再隐藏 type/navigate）。\n\n2. **更新** `.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/ui.md`\n   - 将门禁状态更新为“已就绪”，加入了指向上述 HTML 文件的相对链接。\n\n3. **更新** `.ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/plan-review.md`\n   - 移除了阻塞声明，更新审批清单关联了最新的 HTML 原型文件，并指引主会话进行下一步（等待转换状态）。\n\n## 验证与剩余风险\n- **验证**：打开 `browser-share-full-auto-prototype.html`，通过顶部 Tab 可以完整预览需求内指出的 UI 交互场景与文案（不涉及修改任何实际生产代码）。\n- **风险**：此原型使用了项目常见的界面组件样式抽象（如 CSS 变量及 Radio cards），但未来前端实现时，仍需直接映射到 React 真实组件并保证实际 Web 侧的 UI 无缝融合。\n\n## 主会话决策 / 下一步\n- **UI 原型门禁已解除**。\n- 如果主会话尚未保存 `implementationPlan`，请先保存 `implement.md` 的机器可读计划。\n- 主会话可以根据当前任务流 transition 到 `awaiting_approval`，向用户展示 `plan-review.md` 和 `browser-share-full-auto-prototype.html`，等待用户确认执行。",
+            "model": "google-antigravity/gemini-3.1-pro",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-24T08:39:54.664Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1198,
+        "tokens": 683,
+        "tokenSource": "usage",
+        "tps": 137.37,
+        "firstTokenAt": "2026-07-24T08:39:49.637Z",
+        "lastTokenAt": "2026-07-24T08:39:54.609Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "ui-designer-9113430195d03fe36dcec553",
+        "taskId": "20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批",
+        "member": "ui-designer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260724-162805-browser-share-_-_-type-navigate-/ui-designer-9113430195d03fe36dcec553.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-24T08:38:24.806Z",
+        "finishedAt": "2026-07-24T08:39:54.668Z",
+        "updatedAt": "2026-07-24T08:39:54.668Z",
+        "itemCount": 19,
+        "messageCount": 1,
+        "toolCallCount": 7,
+        "stderrBytes": 0,
+        "bytes": 43506,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019f9346-9736-76dc-8ce9-3dfc00e5b59f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-24T08-38-24-822Z_019f9346-9736-76dc-8ce9-3dfc00e5b59f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-24T08:40:58.045Z",
+      "contextId": "pi_019f9314-945a-7c9a-ae92-111b24f318b7",
+      "from": "planning",
+      "to": "awaiting_approval"
+    }
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-24T08:40:54.136Z",
+    "sourceArtifact": "implement.md",
+    "summary": "Browser Share binding becomes the default full-auto authorization point: interactive queues all four actions without per-command approval, readonly preserves strict approvals, and Web/Chrome extension surfaces stay capability-versioned and consistent.",
+    "strategy": "Implement and test the server policy first; then update Web and the independent Chrome extension in parallel after approved UI HTML; finish with cross-repo integration and real Chrome validation.",
+    "maxConcurrency": 2,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 2,
+      "groups": [
+        {
+          "id": "foundation",
+          "title": "foundation",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "BSFA-01"
+          ]
+        },
+        {
+          "id": "surfaces-parallel",
+          "title": "surfaces-parallel",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "BSFA-02",
+            "BSFA-03"
+          ]
+        },
+        {
+          "id": "integration",
+          "title": "integration",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "BSFA-04"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "BSFA-01",
+        "title": "Implement authoritative full-auto policy, centralized payload validation, and focused tests",
+        "phase": "foundation",
+        "order": 10,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "lib/browser-share-manager.ts",
+          "lib/browser-share-types.ts",
+          "scripts/test-browser-share-policy.mjs",
+          "package.json"
+        ],
+        "instructions": [
+          "Create one authoritative manager policy for initial command status and approval requirement; use it from enqueueCommand and operatorForShare.",
+          "Define interactive as full auto for click, type, scroll, and navigate; define readonly as strict per-command approval for all four types.",
+          "Normalize omitted create request permissionMode to interactive; only explicit readonly selects strict mode.",
+          "Move caller-independent payload checks into the manager so direct commands API callers cannot bypass tool checks: required elementId/text, finite scroll values, and http(s)-only normalized navigation URL.",
+          "Preserve approval API behavior, terminal idempotency, wait timeout, waiter notifications, unbind/rebind/stop failure, tombstones, retention, and diagnostic privacy.",
+          "Add a focused test script and package command covering policy tables, operator projections, payload rejection, cross-session approval, strict approve/reject, timeout/late-result, and lifecycle failure.",
+          "Do not change Browser Share action types, add shareId to agent tools, or modify production UI in this subtask."
+        ],
+        "acceptance": [
+          "Interactive commands start queued for all four action types and operator approvalRequiredCommands is empty.",
+          "Readonly commands start pending_approval for all four action types and retain approve/reject behavior.",
+          "Omitted permissionMode resolves to interactive.",
+          "Invalid or non-http(s) payloads fail before command insertion.",
+          "Focused tests pass without touching user Browser Share runtime state."
+        ],
+        "validation": [
+          "npm run test:browser-share-policy",
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint"
+        ],
+        "risks": [
+          "Policy and operator projection can drift if separate mappings remain.",
+          "Over-strict centralized validation could reject historically tolerated direct API payloads; tests must encode the documented contract.",
+          "Short timeout tests can be flaky if they assert exact timing rather than terminal state."
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "BSFA-02",
+        "title": "Align Web health capability, agent tools, BrowserShareControl, and documentation",
+        "phase": "web-surface",
+        "order": 20,
+        "dependsOn": [
+          "BSFA-01"
+        ],
+        "dependencies": [
+          "BSFA-01"
+        ],
+        "relation": "parallel",
+        "files": [
+          "app/api/browser-share/health/route.ts",
+          "components/BrowserShareControl.tsx",
+          "lib/browser-share-extension.ts",
+          "docs/architecture/browser-share.md",
+          "docs/modules/api.md",
+          "docs/modules/frontend.md",
+          "docs/modules/library.md"
+        ],
+        "instructions": [
+          "Add an additive health capability for interactive_full_auto_v1 (recommended boolean fullAutoInteractive plus a stable semantics token) and bump the health version consistently.",
+          "Update Browser Share tool descriptions, promptSnippet, and promptGuidelines: a bound interactive/full-auto share requires no per-command approval; readonly/strict still does; debugger failure remains fail-safe.",
+          "Implement the approved browser-share-full-auto-prototype.html in BrowserShareControl: product labels Full Auto/Every action confirmation, clear current tab/session authorization boundary, no empty approval area for full auto, strict pending cards preserved, and debugger/offline status priority retained.",
+          "Render auto/approval command lists from operator data rather than hard-coding command policy in the component.",
+          "Update architecture and module maps so API/operator/command lifecycle/default semantics match code.",
+          "Do not remove the approval route, pending_approval status, reject path, or terminal timeout."
+        ],
+        "acceptance": [
+          "Health callers can machine-detect full-auto interactive semantics.",
+          "Web UI and agent prompt no longer say type/navigate require approval in the default mode.",
+          "Strict mode still renders and operates approval cards.",
+          "Debugger detached/blocked/failed messaging remains visible and actions remain unavailable.",
+          "Documentation and code describe the same mode table."
+        ],
+        "validation": [
+          "npm run test:browser-share-policy",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "Manual compare against the user-approved HTML prototype"
+        ],
+        "risks": [
+          "Raw interactive/readonly names may leak into user-facing text and confuse users.",
+          "Removing the pending UI entirely would break strict mode and historical pending commands.",
+          "A green full-auto state could visually hide debugger failure unless error priority remains higher."
+        ],
+        "parallelizable": true,
+        "member": "implementer",
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "BSFA-03",
+        "title": "Make the Chrome extension default to capability-verified Full Auto and align popup copy",
+        "phase": "extension",
+        "order": 30,
+        "dependsOn": [
+          "BSFA-01"
+        ],
+        "dependencies": [
+          "BSFA-01"
+        ],
+        "relation": "parallel",
+        "files": [
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/src/popup/popup.html",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/src/popup/popup.css",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/src/popup/popup.js",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/src/service-worker/service-worker.js",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/README.md",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/INSTALL.md",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/scripts/validate.mjs"
+        ],
+        "instructions": [
+          "Implement the approved prototype mode selector with Full Auto recommended and selected by default, plus explicit Every action confirmation strict mode; keep real radio semantics and keyboard access.",
+          "When Full Auto is selected, require the new Web health capability before creating a share; fail closed with a clear update-yolk-pi-web message on old services. Strict mode may continue when existing persistentDebugger capability is available.",
+          "Send interactive for Full Auto and readonly for strict; keep active share mode fixed for its lifetime.",
+          "Align pending local operator projections, bound operator summary, allowed command text, badge title, and recent status with the server mode table.",
+          "Remove stale default-path copy claiming type/navigate still require ypi approval; retain strict-mode approval instructions and troubleshooting.",
+          "Keep debugger target activeShare.tabId, optional host permission rules, screenshot/snapshot sanitization, sensitive element refusal, long-poll execution, and detach lifecycle unchanged.",
+          "Strengthen validate.mjs only with stable structural/contract checks; avoid brittle full-copy snapshots."
+        ],
+        "acceptance": [
+          "A fresh popup defaults to Full Auto without an extra checkbox action.",
+          "Full Auto connected to a Web service without the capability cannot create a falsely advertised share.",
+          "Strict mode remains selectable and accurately describes ypi approval.",
+          "Popup after binding shows the same autoAllowed/approvalRequired scope returned by Web.",
+          "Extension validation passes and default host permissions remain narrow."
+        ],
+        "validation": [
+          "cd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build",
+          "cd /Users/zyj/gitProjects/ypi-browser-share-extension && git diff --check",
+          "Manual keyboard and 375px popup review against the approved HTML prototype"
+        ],
+        "risks": [
+          "A capability check applied to strict mode would unnecessarily break compatibility with old Web services.",
+          "Popup-local default and service-worker fallback can disagree if both do not map modes consistently.",
+          "Cross-repository changes can be omitted from the final review."
+        ],
+        "parallelizable": true,
+        "member": "implementer",
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "BSFA-04",
+        "title": "Run cross-repository integration, compatibility, lifecycle, and real Chrome validation",
+        "phase": "integration",
+        "order": 40,
+        "dependsOn": [
+          "BSFA-01",
+          "BSFA-02",
+          "BSFA-03"
+        ],
+        "dependencies": [
+          "BSFA-01",
+          "BSFA-02",
+          "BSFA-03"
+        ],
+        "relation": "serial",
+        "files": [
+          ".ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/checks.md",
+          ".ypi/tasks/20260724-162805-browser-share-绑定后零拦截全自动操作-取消-type-navigate-审批/handoff.md",
+          "docs/architecture/browser-share.md",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/README.md",
+          "/Users/zyj/gitProjects/ypi-browser-share-extension/INSTALL.md"
+        ],
+        "instructions": [
+          "Run all Web and extension validation commands and record exact results.",
+          "Execute checks.md M1-M7 with real Chrome when available; M1-M5 are required before claiming the feature complete.",
+          "Verify default full auto without opening either popup/panel during command execution, strict approve/reject, session isolation, debugger conflict, unbind/replace/stop/tab-close/not-found, and version capability mismatch.",
+          "Review both repository diffs for unrelated changes and stale permission copy; do not commit, push, or merge.",
+          "Update handoff.md with changed files per repository, validation evidence, manual gaps, rollback notes, and remaining risks.",
+          "If a product or security decision differs from the approved plan, stop and return to the main session rather than guessing."
+        ],
+        "acceptance": [
+          "Web focused tests, lint, typecheck, and diff check pass.",
+          "Extension build/validation and diff check pass.",
+          "Real Chrome proves type and navigate complete in default Full Auto with no pending_approval or Allow once action.",
+          "Strict and lifecycle/security regressions are verified or any environment blocker is explicitly documented.",
+          "Checker finds no blocker against PRD R1-R13 and the approved HTML prototype."
+        ],
+        "validation": [
+          "npm run test:browser-share-policy",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "git diff --check",
+          "cd /Users/zyj/gitProjects/ypi-browser-share-extension && npm run build",
+          "cd /Users/zyj/gitProjects/ypi-browser-share-extension && git diff --check",
+          "Manual Chrome checks M1-M7 from checks.md"
+        ],
+        "risks": [
+          "MV3 service-worker suspension can make a transport timeout look like an approval regression; inspect command states and heartbeat evidence.",
+          "Old extension/new Web and new extension/old Web require separate explicit checks.",
+          "Manual browser validation may be blocked by unavailable Chrome or a stale dev server; do not convert a gap into a pass."
+        ],
+        "parallelizable": false,
+        "member": "checker",
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-24T08:40:58.045Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 3,
+      "waiting": 0,
+      "ready": 1,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 0,
+      "skipped": 0
+    },
+    "subtasks": {
+      "BSFA-01": {
+        "id": "BSFA-01",
+        "status": "ready",
+        "updatedAt": "2026-07-24T08:40:54.136Z",
+        "attempts": 0,
+        "runIds": []
+      },
+      "BSFA-02": {
+        "id": "BSFA-02",
+        "status": "pending",
+        "updatedAt": "2026-07-24T08:40:54.136Z",
+        "attempts": 0,
+        "runIds": [],
+        "waitingOn": [
+          {
+            "id": "BSFA-01",
+            "title": "Implement authoritative full-auto policy, centralized payload validation, and focused tests",
+            "status": "ready"
+          }
+        ]
+      },
+      "BSFA-03": {
+        "id": "BSFA-03",
+        "status": "pending",
+        "updatedAt": "2026-07-24T08:40:54.136Z",
+        "attempts": 0,
+        "runIds": [],
+        "waitingOn": [
+          {
+            "id": "BSFA-01",
+            "title": "Implement authoritative full-auto policy, centralized payload validation, and focused tests",
+            "status": "ready"
+          }
+        ]
+      },
+      "BSFA-04": {
+        "id": "BSFA-04",
+        "status": "pending",
+        "updatedAt": "2026-07-24T08:40:54.136Z",
+        "attempts": 0,
+        "runIds": [],
+        "waitingOn": [
+          {
+            "id": "BSFA-01",
+            "title": "Implement authoritative full-auto policy, centralized payload validation, and focused tests",
+            "status": "ready"
+          },
+          {
+            "id": "BSFA-02",
+            "title": "Align Web health capability, agent tools, BrowserShareControl, and documentation",
+            "status": "pending"
+          },
+          {
+            "id": "BSFA-03",
+            "title": "Make the Chrome extension default to capability-verified Full Auto and align popup copy",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    "nextSubtaskId": "BSFA-01",
+    "nextSubtaskIds": [
+      "BSFA-01"
+    ]
+  }
+}

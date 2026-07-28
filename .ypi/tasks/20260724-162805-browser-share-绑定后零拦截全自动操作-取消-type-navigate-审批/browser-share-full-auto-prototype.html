@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browser Share 全自动原型</title>
+  <style>
+    :root {
+      --bg: #f9fafb;
+      --surface: #ffffff;
+      --border: #e5e7eb;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --danger: #ef4444;
+      --danger-bg: #fef2f2;
+      --danger-border: #f87171;
+      --success: #10b981;
+      --success-bg: #ecfdf5;
+      --warning: #f59e0b;
+      --warning-bg: #fffbeb;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    h1 { width: 100%; text-align: center; font-size: 1.5rem; margin-bottom: 0; }
+    .surface {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      width: 375px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .surface-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      background: #f3f4f6;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .surface-body {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .card-select {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      gap: 12px;
+    }
+    .card-select:hover { border-color: var(--primary); }
+    .card-select.active {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+    .card-select.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      border-color: var(--border);
+      background: var(--surface);
+    }
+    .card-select input[type="radio"] { margin-top: 2px; }
+    .card-select-content { flex: 1; }
+    .card-select-title { font-weight: 500; font-size: 0.95rem; margin-bottom: 4px; }
+    .card-select-desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
+    
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: var(--primary);
+      color: white;
+      text-align: center;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn:hover { background: var(--primary-hover); }
+    .btn:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+    
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { background: #f3f4f6; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    
+    .alert {
+      padding: 12px;
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .alert-danger { background: var(--danger-bg); border: 1px solid var(--danger-border); color: #991b1b; }
+    .alert-warning { background: var(--warning-bg); border: 1px solid #fcd34d; color: #92400e; }
+    .alert-success { background: var(--success-bg); border: 1px solid #6ee7b7; color: #065f46; }
+    
+    .section-title { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    .key-value { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
+    .key-value .key { color: var(--text-muted); }
+    .key-value .value { font-weight: 500; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+    
+    .pending-action {
+      border: 1px solid var(--warning);
+      background: var(--warning-bg);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .pending-action-title { font-weight: 600; font-size: 0.9rem; color: #92400e; margin-bottom: 8px; }
+    .pending-action-details { font-size: 0.85rem; color: #b45309; margin-bottom: 12px; font-family: monospace; }
+    .pending-action-actions { display: flex; gap: 8px; }
+    .pending-action-actions button { flex: 1; padding: 6px; font-size: 0.85rem; cursor: pointer; border-radius: 4px; border: none; font-weight: 500; }
+    .btn-allow { background: var(--success); color: white; }
+    .btn-allow:hover { background: #059669; }
+    .btn-reject { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+    .btn-reject:hover { background: var(--danger-bg); }
+    
+    .controls { width: 100%; display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+    .controls button { padding: 8px 16px; cursor: pointer; border: 1px solid var(--primary); background: white; color: var(--primary); border-radius: 20px; font-size: 0.9rem; }
+    .controls button.active { background: var(--primary); color: white; }
+
+    .recent-item { font-size: 0.85rem; padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+    .recent-item:last-child { border-bottom: none; }
+    .recent-status-queued { color: var(--warning); }
+    .recent-status-success { color: var(--success); }
+    .recent-status-failed { color: var(--danger); }
+    
+    .tag { display: inline-block; padding: 2px 6px; background: #e5e7eb; border-radius: 4px; font-size: 0.75rem; margin-right: 4px; }
+    
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <h1>Browser Share 全自动授权原型</h1>
+  
+  <div class="controls">
+    <button class="active" onclick="switchState('state-default')">1. 默认新建 (全自动)</button>
+    <button onclick="switchState('state-old-web')">2. Web版本过低</button>
+    <button onclick="switchState('state-auto-bound')">3. 全自动已绑定</button>
+    <button onclick="switchState('state-strict-bound')">4. 严格模式已绑定</button>
+    <button onclick="switchState('state-debugger-error')">5. Debugger 冲突</button>
+  </div>
+
+  <!-- A. Chrome Extension Popup -->
+  <div class="surface">
+    <div class="surface-header">
+      <span>Chrome 扩展 (Popup)</span>
+      <span style="font-size: 0.8rem; color: var(--text-muted);" id="ext-status-label">准备分享</span>
+    </div>
+    <div class="surface-body">
+      
+      <!-- 未分享状态 (新建) -->
+      <div id="ext-create-view">
+        <p style="font-size: 0.9rem; margin-top: 0;">将当前标签页授权给 ypi session：<br/><strong>github.com/alan-zhao/yolk-pi-web</strong></p>
+        
+        <div class="section-title">授权模式</div>
+        
+        <label class="card-select active" id="ext-mode-auto-card">
+          <input type="radio" name="ext-mode" checked onchange="updateExtMode(this)">
+          <div class="card-select-content">
+            <div class="card-select-title">全自动（推荐）</div>
+            <div class="card-select-desc">绑定后，Agent 可自动点击、输入、滚动和导航当前共享标签页。</div>
+            <div id="ext-upgrade-alert" class="alert alert-danger hidden" style="margin-top: 8px; margin-bottom: 0; padding: 8px;">
+              当前 Yolk Pi Web 不支持全自动，请更新 Web 或选择每次确认。
+            </div>
+          </div>
+        </label>
+        
+        <label class="card-select" id="ext-mode-strict-card">
+          <input type="radio" name="ext-mode" onchange="updateExtMode(this)">
+          <div class="card-select-content">
+            <div class="card-select-title">每次确认</div>
+            <div class="card-select-desc">所有操作会等待你在 ypi Browser Share 面板确认。</div>
+          </div>
+        </label>
+
+        <button class="btn" id="ext-share-btn">生成分享码</button>
+      </div>
+
+      <!-- 已绑定状态 -->
+      <div id="ext-bound-view" class="hidden">
+        <div class="alert alert-success" style="text-align: center; padding: 20px 10px;">
+          <div style="font-size: 2rem; margin-bottom: 10px;">✅</div>
+          <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 5px;">已连接到 Session</div>
+          <div style="font-family: monospace; font-size: 0.9rem;">a1b2c3d4</div>
+        </div>
+
+        <div class="key-value">
+          <span class="key">模式</span>
+          <span class="value" id="ext-bound-mode-text">全自动</span>
+        </div>
+        <div class="key-value">
+          <span class="key">范围</span>
+          <span class="value">仅当前标签页</span>
+        </div>
+
+        <div class="section-title">权限概览</div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;" id="ext-bound-permissions">
+          Agent 可自动执行: <span class="tag">click</span> <span class="tag">type</span> <span class="tag">scroll</span> <span class="tag">navigate</span>
+        </div>
+        
+        <button class="btn btn-outline btn-danger" style="color: var(--danger); border-color: var(--danger-border);">停止分享</button>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- B. ypi BrowserShareControl Panel -->
+  <div class="surface">
+    <div class="surface-header">
+      <span>ypi Web (Browser Share)</span>
+      <span style="font-size: 0.8rem; color: var(--success);" id="web-status-indicator">● 已连接</span>
+    </div>
+    <div class="surface-body">
+      
+      <!-- 未绑定状态提示 -->
+      <div id="web-unbound-view" class="hidden">
+        <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+          <div style="font-size: 2rem; margin-bottom: 10px;">🔗</div>
+          <p>当前 Session 尚未绑定浏览器</p>
+          <button class="btn btn-outline" style="margin-top: 10px;">输入分享码</button>
+        </div>
+      </div>
+
+      <!-- 已绑定视图 -->
+      <div id="web-bound-view">
+        <div class="key-value">
+          <span class="key">标签页</span>
+          <span class="value" title="https://github.com/alan-zhao/yolk-pi-web">github.com/alan-zhao/yolk-pi-web</span>
+        </div>
+        <div class="key-value">
+          <span class="key">模式</span>
+          <span class="value"><strong id="web-mode-text">全自动</strong></span>
+        </div>
+
+        <!-- Debugger 异常 (高优先级) -->
+        <div id="web-debugger-error" class="alert alert-danger hidden" style="margin-top: 16px;">
+          <strong>Debugger 断开</strong><br/>
+          请勿打开 Chrome 开发者工具或关闭共享标签页。Agent 操作已暂停。
+        </div>
+
+        <div class="section-title">权限设置</div>
+        <div style="font-size: 0.85rem; line-height: 1.5; margin-bottom: 16px;" id="web-permissions-desc">
+          <strong style="color: var(--success);">自动执行：</strong> click, type, scroll, navigate<br/>
+          <strong style="color: var(--text-muted);">需确认：</strong> 无
+        </div>
+
+        <!-- 严格模式: 待确认卡片 -->
+        <div id="web-pending-area" class="hidden">
+          <div class="section-title" style="color: #92400e;">待确认操作 (1)</div>
+          <div class="pending-action">
+            <div class="pending-action-title">type</div>
+            <div class="pending-action-details">elementId: "search-input"<br/>text: "Browser Share"</div>
+            <div class="pending-action-actions">
+              <button class="btn-allow">允许一次</button>
+              <button class="btn-reject">拒绝</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">最近操作</div>
+        <div id="web-recent-auto">
+          <div class="recent-item">
+            <span><span class="tag">navigate</span> https://github.com...</span>
+            <span class="recent-status-success">✓ 成功</span>
+          </div>
+          <div class="recent-item">
+            <span><span class="tag">click</span> elementId: "tab-pulls"</span>
+            <span class="recent-status-queued">○ 排队中</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px;">
+          <button class="btn btn-outline" style="color: var(--danger); border-color: var(--danger-border);">解除绑定</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function updateExtMode(radio) {
+      document.getElementById('ext-mode-auto-card').classList.remove('active');
+      document.getElementById('ext-mode-strict-card').classList.remove('active');
+      radio.closest('.card-select').classList.add('active');
+    }
+
+    function switchState(state) {
+      document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Reset
+      document.getElementById('ext-create-view').classList.remove('hidden');
+      document.getElementById('ext-bound-view').classList.add('hidden');
+      document.getElementById('ext-upgrade-alert').classList.add('hidden');
+      document.getElementById('ext-share-btn').disabled = false;
+      document.getElementById('ext-status-label').innerText = '准备分享';
+      
+      document.getElementById('web-unbound-view').classList.add('hidden');
+      document.getElementById('web-bound-view').classList.remove('hidden');
+      document.getElementById('web-debugger-error').classList.add('hidden');
+      document.getElementById('web-pending-area').classList.add('hidden');
+      document.getElementById('web-status-indicator').innerText = '● 已连接';
+      document.getElementById('web-status-indicator').style.color = 'var(--success)';
+
+      document.getElementById('ext-mode-auto-card').classList.remove('disabled');
+      const autoRadio = document.getElementById('ext-mode-auto-card').querySelector('input');
+      const strictRadio = document.getElementById('ext-mode-strict-card').querySelector('input');
+
+      if (state === 'state-default') {
+        autoRadio.checked = true;
+        updateExtMode(autoRadio);
+        document.getElementById('web-bound-view').classList.add('hidden');
+        document.getElementById('web-unbound-view').classList.remove('hidden');
+        document.getElementById('web-status-indicator').innerText = '○ 等待连接';
+        document.getElementById('web-status-indicator').style.color = 'var(--text-muted)';
+      } 
+      else if (state === 'state-old-web') {
+        autoRadio.checked = true;
+        updateExtMode(autoRadio);
+        document.getElementById('ext-mode-auto-card').classList.add('disabled');
+        document.getElementById('ext-upgrade-alert').classList.remove('hidden');
+        document.getElementById('ext-share-btn').disabled = true;
+        
+        document.getElementById('web-bound-view').classList.add('hidden');
+        document.getElementById('web-unbound-view').classList.remove('hidden');
+        document.getElementById('web-status-indicator').innerText = '○ 等待连接';
+        document.getElementById('web-status-indicator').style.color = 'var(--text-muted)';
+      }
+      else if (state === 'state-auto-bound') {
+        document.getElementById('ext-create-view').classList.add('hidden');
+        document.getElementById('ext-bound-view').classList.remove('hidden');
+        document.getElementById('ext-status-label').innerText = '分享中';
+        document.getElementById('ext-bound-mode-text').innerText = '全自动';
+        document.getElementById('ext-bound-permissions').innerHTML = 'Agent 可自动执行: <span class="tag">click</span> <span class="tag">type</span> <span class="tag">scroll</span> <span class="tag">navigate</span>';
+        
+        document.getElementById('web-mode-text').innerText = '全自动';
+        document.getElementById('web-permissions-desc').innerHTML = '<strong style="color: var(--success);">自动执行：</strong> click, type, scroll, navigate<br/><strong style="color: var(--text-muted);">需确认：</strong> 无';
+      }
+      else if (state === 'state-strict-bound') {
+        document.getElementById('ext-create-view').classList.add('hidden');
+        document.getElementById('ext-bound-view').classList.remove('hidden');
+        document.getElementById('ext-status-label').innerText = '分享中';
+        document.getElementById('ext-bound-mode-text').innerText = '每次确认';
+        document.getElementById('ext-bound-permissions').innerHTML = '所有操作 (click, type, scroll, navigate) 都需在 ypi 面板确认。';
+        
+        document.getElementById('web-mode-text').innerText = '每次确认';
+        document.getElementById('web-permissions-desc').innerHTML = '<strong style="color: var(--text-muted);">自动执行：</strong> 无<br/><strong style="color: var(--warning);">需确认：</strong> click, type, scroll, navigate';
+        document.getElementById('web-pending-area').classList.remove('hidden');
+      }
+      else if (state === 'state-debugger-error') {
+        switchState('state-auto-bound');
+        document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        document.getElementById('web-debugger-error').classList.remove('hidden');
+        document.getElementById('web-status-indicator').innerText = '● 异常';
+        document.getElementById('web-status-indicator').style.color = 'var(--danger)';
+      }
+    }
+  </script>
+</body>
+</html>
