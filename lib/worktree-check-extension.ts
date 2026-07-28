@@ -37,7 +37,15 @@ export function createWorktreeCheckTools(controller: WorktreeCheckExecutionContr
       retryOfCommandId: Type.Optional(Type.String({ maxLength: 128 })),
     }, { additionalProperties: false }),
     async execute(_id, params, signal) {
-      const result = await controller.execute(params as WorktreeCheckExecInput, signal);
+      const input = params as WorktreeCheckExecInput;
+      // Pi may resolve a tool cwd against the session root before invoking the
+      // tool. Convert only paths inside this fixed WorkTree back to the
+      // controller's relative-cwd contract; outside paths remain absolute and
+      // are rejected by the controller.
+      const cwd = input.cwd && isAbsolute(input.cwd)
+        ? relative(controller.worktreePath, input.cwd) || "."
+        : input.cwd;
+      const result = await controller.execute({ ...input, cwd }, signal);
       return textResult(JSON.stringify({ commandId: result.commandId, exitCode: result.exitCode, output: result.output, reasonCode: result.reasonCode, rejected: result.rejected }), result.rejected || result.reasonCode !== null);
     },
   });
