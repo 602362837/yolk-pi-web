@@ -33,6 +33,7 @@ import {
   safeGithubAutomationErrorMessage,
 } from "./github-automation-errors";
 import {
+  appendGithubAutomationSafeEvent,
   listGithubAutomationJobs,
   readGithubAutomationIssueState,
   readGithubAutomationJob,
@@ -80,7 +81,11 @@ import {
   isGithubAutomationDeterministicBlockUnchanged,
   type GithubAutomationRunnerStateV1,
 } from "./github-automation-runner";
-import { wakeGithubAutomationScheduler } from "./github-automation-scheduler";
+import {
+  isGithubAutomationProductionHandlerReadinessDisabled,
+  wakeGithubAutomationScheduler,
+} from "./github-automation-scheduler";
+import { ensureGithubAutomationJobHandlerReady } from "./github-automation-handler-runtime";
 import { getGithubAutomationRuntimeProvenance } from "./github-automation-provenance";
 
 export {
@@ -611,6 +616,29 @@ export function deriveGithubAutomationJobObservabilityFromRecord(
     ) {
       sessionAvailability = "failed";
       agentExecutionState = "failed";
+    } else if (
+      // Parent binding Session exists, but full-agent never produced meaningful
+      // agent work (IMP-001): do not claim Agent "implementing" from sessionId alone.
+      (job.reasonCode === "implementer_error" ||
+        job.reasonCode === "implementer_failed" ||
+        job.reasonCode === "full_agent_prompt_sentinel" ||
+        (job.blockedAtLayer === "agent" &&
+          (job.status === "blocked" || job.phase === "blocked"))) &&
+      (job.lastMeaningfulProgressKind == null ||
+        job.lastMeaningfulProgressKind === "session_created")
+    ) {
+      sessionAvailability = "active";
+      agentExecutionState = "failed";
+    } else if (
+      job.lastMeaningfulProgressKind === "session_created" &&
+      (job.phase === "paused" || job.status === "paused" || job.status === "blocked") &&
+      (typeof job.meaningfulProgressCount !== "number" ||
+        job.meaningfulProgressCount <= 1)
+    ) {
+      // Binding-only parent Session after bootstrap; Agent child not proven active.
+      sessionAvailability = "active";
+      agentExecutionState =
+        job.status === "blocked" || job.phase === "blocked" ? "failed" : "bootstrapping";
     } else {
       sessionAvailability = "active";
       if (job.phase === "checking") agentExecutionState = "checking";
@@ -719,7 +747,10 @@ export function deriveGithubAutomationJobObservabilityFromRecord(
       } else {
         blockedAtLayer = "unknown";
       }
-    } else if (job.reasonCode === "runner_no_progress") {
+    } else if (
+      job.reasonCode === "runner_no_progress" ||
+      job.reasonCode === "handler_not_ready"
+    ) {
       blockedAtLayer = "scheduler";
     } else {
       blockedAtLayer = "unknown";
@@ -1626,6 +1657,72 @@ export async function applyGithubAutomationJobAction(options: {
       });
     }
   } else if (options.action === "resume" || options.action === "retry") {
+    // GHR-01: ensure full triage/unattended handler is registry-ready BEFORE
+    // queue mutation + scheduler wake. Cold process without a webhook must still
+    // register the complete handler; readiness failure is visible, not silent.
+    // Explicit isolation tests may disable production readiness (default handler);
+    // those paths skip the gate so GHA-02/GHA-09 fixtures keep working.
+    if (!isGithubAutomationProductionHandlerReadinessDisabled()) {
+      const readiness = await ensureGithubAutomationJobHandlerReady();
+      if (readiness.kind === "not_ready") {
+        const now = new Date().toISOString();
+        next = await writeGithubAutomationJob({
+          ...working,
+          status: "retry_due",
+          reasonCode: "handler_not_ready",
+          blockedAtLayer: "scheduler",
+          retryability:
+            readiness.retryability === "operator" ? "operator" : "automatic",
+          nextRetryAt: new Date(Date.now() + 5_000).toISOString(),
+          // Preserve generation + attempt audit; no lease was taken.
+          attempt: working.attempt,
+          generation: working.generation,
+          updatedAt: now,
+        });
+        try {
+          const {
+            buildGithubAutomationHandlerNotReadyEventMeta,
+            shouldEmitGithubAutomationHandlerNotReadyEvent,
+          } = await import("./github-automation-handler-runtime");
+          if (shouldEmitGithubAutomationHandlerNotReadyEvent(readiness)) {
+            await appendGithubAutomationSafeEvent({
+              at: now,
+              kind: "github_automation_handler_not_ready",
+              repositoryId: next.repositoryId,
+              issueNumber: next.issueNumber,
+              jobId: next.jobId,
+              deliveryId: next.deliveryId,
+              phase: next.phase,
+              reasonCode: "handler_not_ready",
+              traceId: next.traceId,
+              meta: buildGithubAutomationHandlerNotReadyEventMeta(readiness),
+            });
+          }
+        } catch {
+          // Best-effort safe event; job reason is already durable.
+        }
+        // Still wake so tick can re-check readiness with backoff; tick will not
+        // take a business lease while not ready.
+        if (options.wakeScheduler !== false) {
+          wakeGithubAutomationScheduler();
+        }
+        const claimStatusNotReady = await resolveClaimStatus(next);
+        return {
+          ok: true,
+          code: "accepted",
+          message:
+            "Retry/resume accepted but handler runtime is not ready; job parked as handler_not_ready without a lease run",
+          job: toGithubAutomationJobSafeProjection(next, {
+            claimStatus: claimStatusNotReady,
+            automationEnabled: config.enabled,
+            mode: config.mode,
+            globalPaused: config.paused,
+          }),
+          partial: true,
+        };
+      }
+    }
+
     next = await wakeGithubUnattendedJobForRetry({
       job: working,
       clearPause: true,

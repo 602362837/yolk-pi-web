@@ -71,30 +71,168 @@ export type GithubAutomationJobHandler = (
   },
 ) => Promise<GithubAutomationJobHandlerResult>;
 
-let _jobHandler: GithubAutomationJobHandler | null = null;
+/**
+ * Live registry kind. Production readiness requires `github_issue_triage`.
+ * `default` / `custom` are never treated as production-ready by the readiness gate.
+ */
+export type GithubAutomationHandlerKind =
+  | "none"
+  | "default"
+  | "github_issue_triage"
+  | "custom";
+
+export type GithubAutomationHandlerRegistration =
+  | { kind: "none"; generation: 0; handler: null }
+  | {
+      kind: "default";
+      generation: number;
+      handler: GithubAutomationJobHandler;
+    }
+  | {
+      kind: "github_issue_triage";
+      generation: number;
+      handler: GithubAutomationJobHandler;
+    }
+  | {
+      kind: "custom";
+      generation: number;
+      handler: GithubAutomationJobHandler;
+    };
+
+interface HandlerRegistryState {
+  registration: GithubAutomationHandlerRegistration;
+  /** Monotonic generation bumped on every set (including null restore). */
+  generationCounter: number;
+  /**
+   * When true, tick/ensure will NOT auto-load the full triage handler.
+   * Used only by explicit GHA-02 isolation tests that exercise defaultJobHandler.
+   */
+  productionReadinessDisabled: boolean;
+}
+
+declare global {
+  var __piGithubAutomationHandlerRegistry: HandlerRegistryState | undefined;
+}
+
+function getHandlerRegistry(): HandlerRegistryState {
+  if (!globalThis.__piGithubAutomationHandlerRegistry) {
+    globalThis.__piGithubAutomationHandlerRegistry = {
+      registration: { kind: "none", generation: 0, handler: null },
+      generationCounter: 0,
+      productionReadinessDisabled: false,
+    };
+  }
+  return globalThis.__piGithubAutomationHandlerRegistry;
+}
+
+/** Live registry snapshot (authoritative for readiness). */
+export function getGithubAutomationJobHandlerRegistration(): GithubAutomationHandlerRegistration {
+  return getHandlerRegistry().registration;
+}
+
+export function isGithubAutomationProductionHandlerReady(): boolean {
+  return getHandlerRegistry().registration.kind === "github_issue_triage";
+}
 
 /**
- * Register the durable job handler (GHA-03+). Pass null to restore default.
+ * Register the durable job handler.
+ * - Pass the full triage handler via `registerGithubIssueTriageJobHandler()` in production.
+ * - Pass a custom function for focused tests (kind becomes `custom`, not production-ready).
+ * - Pass null to restore the default GHA-02 handler (isolated tests only).
  */
 export function setGithubAutomationJobHandler(
   handler: GithubAutomationJobHandler | null,
+  options?: { kind?: Exclude<GithubAutomationHandlerKind, "none"> },
 ): void {
-  _jobHandler = handler;
-}
-
-export function getGithubAutomationJobHandler(): GithubAutomationJobHandler {
-  return _jobHandler ?? defaultJobHandler;
+  const registry = getHandlerRegistry();
+  registry.generationCounter += 1;
+  const generation = registry.generationCounter;
+  if (!handler) {
+    registry.registration = {
+      kind: "default",
+      generation,
+      handler: defaultJobHandler,
+    };
+    return;
+  }
+  const kind = options?.kind ?? "custom";
+  if (kind === "github_issue_triage") {
+    registry.registration = {
+      kind: "github_issue_triage",
+      generation,
+      handler,
+    };
+    return;
+  }
+  if (kind === "default") {
+    registry.registration = {
+      kind: "default",
+      generation,
+      handler,
+    };
+    return;
+  }
+  registry.registration = {
+    kind: "custom",
+    generation,
+    handler,
+  };
 }
 
 /**
- * Default handler for GHA-02: mark job as awaiting claim_readiness without
- * performing remote GitHub mutations. GHA-03 replaces this with full claim/triage.
+ * Production registration path for the full triage/unattended handler.
+ * Records kind=`github_issue_triage` so readiness can verify the live registry.
+ */
+export function registerGithubIssueTriageJobHandler(
+  handler?: GithubAutomationJobHandler,
+): void {
+  // Lazy require via parameter keeps this module free of a static triage import.
+  // Callers that already hold the handler function pass it; readiness boundary
+  // may call with no arg after dynamic import of triage-runner.
+  if (handler) {
+    setGithubAutomationJobHandler(handler, { kind: "github_issue_triage" });
+    return;
+  }
+  // No-op if already ready; otherwise readiness module supplies the handler.
+  if (isGithubAutomationProductionHandlerReady()) return;
+}
+
+export function getGithubAutomationJobHandler(): GithubAutomationJobHandler {
+  const reg = getHandlerRegistry().registration;
+  if (reg.handler) return reg.handler;
+  return defaultJobHandler;
+}
+
+/**
+ * Test-only: allow defaultJobHandler isolation without production readiness gate.
+ * Production must never disable readiness.
+ */
+export function _testSetGithubAutomationProductionHandlerReadinessDisabled(
+  disabled: boolean,
+): void {
+  getHandlerRegistry().productionReadinessDisabled = disabled;
+}
+
+/** True only when isolation tests disabled the production readiness gate. */
+export function isGithubAutomationProductionHandlerReadinessDisabled(): boolean {
+  return getHandlerRegistry().productionReadinessDisabled === true;
+}
+
+export function _testResetGithubAutomationHandlerRegistry(): void {
+  globalThis.__piGithubAutomationHandlerRegistry = undefined;
+}
+
+/**
+ * Default handler for GHA-02 isolation tests: mark pure "received" jobs as
+ * awaiting claim_readiness. Production planning/continuation jobs must never
+ * fall through here unchanged (that produced runner_no_progress on #22).
  */
 async function defaultJobHandler(
   job: GithubAutomationJobRecord,
 ): Promise<GithubAutomationJobHandlerResult> {
   const now = new Date().toISOString();
-  // Only advance pure "received" jobs once; leave other phases untouched.
+  // Only advance pure "received" jobs once; leave other phases untouched
+  // only when production readiness is explicitly disabled for isolation tests.
   if (job.phase === "received" && job.status === "running") {
     const next: GithubAutomationJobRecord = {
       ...job,
@@ -119,6 +257,50 @@ async function defaultJobHandler(
     });
     return { job: next, wakeAgain: false };
   }
+
+  // Defensive: non-received production jobs must not return unchanged
+  // (scheduler would classify as runner_no_progress). Emit explicit disposition.
+  if (!getHandlerRegistry().productionReadinessDisabled) {
+    const nextRetryAt = new Date(Date.now() + 5_000).toISOString();
+    const next: GithubAutomationJobRecord = {
+      ...job,
+      status: "retry_due",
+      reasonCode: "handler_not_ready",
+      blockedAtLayer: "scheduler",
+      retryability: "automatic",
+      nextRetryAt,
+      updatedAt: now,
+    };
+    await writeGithubAutomationJob(next);
+    await appendGithubAutomationSafeEvent({
+      at: now,
+      kind: "github_automation_handler_not_ready",
+      repositoryId: next.repositoryId,
+      issueNumber: next.issueNumber,
+      jobId: next.jobId,
+      deliveryId: next.deliveryId,
+      phase: next.phase,
+      reasonCode: "handler_not_ready",
+      traceId: next.traceId,
+      meta: {
+        stage: "verify",
+        retryability: "automatic",
+        handlerKindExpected: "github_issue_triage",
+        diagnosticCode: "default_handler_defensive_fallback",
+      },
+    });
+    return {
+      job: next,
+      wakeAgain: false,
+      disposition: {
+        kind: "retry_due",
+        reasonCode: "handler_not_ready",
+        nextRetryAt,
+        retryClass: "runtime",
+      },
+    };
+  }
+
   return { job, wakeAgain: false };
 }
 
@@ -211,6 +393,8 @@ export function _testResetGithubAutomationScheduler(): void {
   state.pollIntervalMs = DEFAULT_POLL_INTERVAL_MS;
   // Drop global so next getState recreates clean owner id if desired.
   globalThis.__piGithubAutomationScheduler = undefined;
+  // Handler registry is independent; tests that need a clean registry call
+  // _testResetGithubAutomationHandlerRegistry() and/or setGithubAutomationJobHandler(null).
 }
 
 export function _testSetGithubAutomationSchedulerAuto(auto: boolean): void {
@@ -243,14 +427,23 @@ function isRunnableNow(
   if (isTerminalStatus(job.status)) return false;
   if (job.status === "paused") return false;
 
-  // GHA-02 default handler parks jobs at claim_readiness until GHA-03 registers
-  // a real triage handler. Custom handlers may clear this reasonCode.
+  // GHA-02 default handler parks jobs at claim_readiness until a real triage
+  // handler is registered. Custom/full handlers may clear this reasonCode.
+  const reg = getHandlerRegistry().registration;
   if (
     job.reasonCode === "awaiting_claim_handler" &&
     job.phase !== "received" &&
-    _jobHandler === null
+    reg.kind !== "github_issue_triage" &&
+    reg.kind !== "custom"
   ) {
     return false;
+  }
+
+  // handler_not_ready: honor nextRetryAt backoff; never immediately re-lease.
+  if (job.reasonCode === "handler_not_ready" && job.status === "retry_due") {
+    if (!job.nextRetryAt) return true;
+    const t = Date.parse(job.nextRetryAt);
+    return !Number.isFinite(t) || t <= nowMs;
   }
 
   if (job.status === "queued") return true;
@@ -614,6 +807,10 @@ export interface GithubAutomationSchedulerTickResult {
 /**
  * Single scheduler tick: reconcile + start up to concurrency limit.
  * Safe to call from webhook after enqueue (fire-and-forget) or timer.
+ *
+ * Final defensive gate (GHR-01): ensure full triage handler readiness BEFORE
+ * any business lease/attempt. When not ready, never process production jobs
+ * through defaultJobHandler (that became runner_no_progress on #22).
  */
 export async function tickGithubAutomationScheduler(): Promise<GithubAutomationSchedulerTickResult> {
   const state = getState();
@@ -644,6 +841,33 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
         errors: 0,
         inFlight: state.inFlight.size,
       };
+    }
+
+    // Production readiness gate — lease happens only after this succeeds.
+    // Explicit isolation tests set productionReadinessDisabled; custom test
+    // handlers (kind=custom) are left alone and never treated as production ready.
+    const registry = getHandlerRegistry();
+    const regKind = registry.registration.kind;
+    if (!registry.productionReadinessDisabled && regKind !== "custom") {
+      if (regKind !== "github_issue_triage") {
+        const ready = await ensureHandlerReadyForTick();
+        if (ready.kind === "not_ready") {
+          await surfaceHandlerNotReadyWithoutLease(ready);
+          state.lastTickAt = new Date().toISOString();
+          state.lastError = "handler_not_ready";
+          // Bounded re-check; do not spin.
+          scheduleGithubAutomationScheduler(
+            Math.max(5_000, getHandlerNotReadyBackoffMs(ready)),
+          );
+          return {
+            scanned: 0,
+            started: 0,
+            skipped: 0,
+            errors: 0,
+            inFlight: state.inFlight.size,
+          };
+        }
+      }
     }
 
     const maxConcurrency = Math.max(1, config.triage.maxConcurrency);
@@ -723,6 +947,144 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
     throw err;
   } finally {
     state.running = false;
+  }
+}
+
+/**
+ * Lazy dynamic import of readiness module so tests that disable production
+ * readiness never need the triage runner graph.
+ */
+async function ensureHandlerReadyForTick(): Promise<
+  | { kind: "ready"; handlerKind: "github_issue_triage"; generation: number }
+  | {
+      kind: "not_ready";
+      reasonCode: "handler_not_ready";
+      stage: "load" | "register" | "verify";
+      retryability: "automatic" | "operator";
+      diagnosticCode: string;
+    }
+> {
+  // Fast path without loading readiness module when registry already ready.
+  if (isGithubAutomationProductionHandlerReady()) {
+    const reg = getGithubAutomationJobHandlerRegistration();
+    if (reg.kind === "github_issue_triage") {
+      return {
+        kind: "ready",
+        handlerKind: "github_issue_triage",
+        generation: reg.generation,
+      };
+    }
+  }
+  const runtime = await loadHandlerRuntimeModuleAsync();
+  return runtime.ensureGithubAutomationJobHandlerReady();
+}
+
+function loadHandlerRuntimeModuleSync():
+  | typeof import("./github-automation-handler-runtime")
+  | null {
+  try {
+    // Prefer require so jiti/CJS tests share the same module instance + globals.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("./github-automation-handler-runtime") as typeof import("./github-automation-handler-runtime");
+  } catch {
+    return null;
+  }
+}
+
+async function loadHandlerRuntimeModuleAsync(): Promise<
+  typeof import("./github-automation-handler-runtime")
+> {
+  const sync = loadHandlerRuntimeModuleSync();
+  if (sync) return sync;
+  return import("./github-automation-handler-runtime");
+}
+
+function getHandlerNotReadyBackoffMs(state: {
+  retryability: "automatic" | "operator";
+}): number {
+  return state.retryability === "operator" ? 30_000 : 5_000;
+}
+
+/**
+ * Surface handler_not_ready on runnable jobs WITHOUT taking a business lease
+ * and WITHOUT incrementing attempt. Deduped safe events only.
+ */
+async function surfaceHandlerNotReadyWithoutLease(state: {
+  kind: "not_ready";
+  reasonCode: "handler_not_ready";
+  stage: "load" | "register" | "verify";
+  retryability: "automatic" | "operator";
+  diagnosticCode: string;
+}): Promise<void> {
+  let runtime: typeof import("./github-automation-handler-runtime");
+  try {
+    runtime = await loadHandlerRuntimeModuleAsync();
+  } catch {
+    return;
+  }
+  const shouldEmit =
+    runtime.shouldEmitGithubAutomationHandlerNotReadyEvent(state);
+  const meta = runtime.buildGithubAutomationHandlerNotReadyEventMeta(state);
+  const backoffMs = runtime.getGithubAutomationHandlerNotReadyBackoffMs(state);
+  const nextRetryAt = new Date(Date.now() + backoffMs).toISOString();
+  const now = new Date().toISOString();
+
+  let jobs: GithubAutomationJobRecord[] = [];
+  try {
+    jobs = await listGithubAutomationJobs();
+  } catch {
+    return;
+  }
+
+  for (const job of jobs) {
+    if (isTerminalStatus(job.status) || job.status === "paused") continue;
+    // Only touch jobs that would otherwise be eligible for a lease soon.
+    if (
+      job.status !== "queued" &&
+      job.status !== "retry_due" &&
+      job.status !== "running"
+    ) {
+      continue;
+    }
+    // Never rewrite a pure received job that isolation tests still want default for
+    // when readiness is disabled — this path only runs when readiness is ON.
+
+    const next: GithubAutomationJobRecord = {
+      ...job,
+      // Keep status retry_due so isRunnableNow honors nextRetryAt.
+      status: job.status === "running" ? job.status : "retry_due",
+      reasonCode: "handler_not_ready",
+      blockedAtLayer: "scheduler",
+      retryability: state.retryability === "operator" ? "operator" : "automatic",
+      nextRetryAt: job.status === "running" ? job.nextRetryAt : nextRetryAt,
+      // Do NOT touch attempt — no business lease acquired.
+      updatedAt: now,
+    };
+    try {
+      // Best-effort unfenced write: we intentionally do not hold the job lease.
+      await writeGithubAutomationJob(next);
+    } catch {
+      // ignore single-job write races
+    }
+
+    if (shouldEmit) {
+      try {
+        await appendGithubAutomationSafeEvent({
+          at: now,
+          kind: "github_automation_handler_not_ready",
+          repositoryId: job.repositoryId,
+          issueNumber: job.issueNumber,
+          jobId: job.jobId,
+          deliveryId: job.deliveryId,
+          phase: job.phase,
+          reasonCode: "handler_not_ready",
+          traceId: job.traceId,
+          meta,
+        });
+      } catch {
+        // ignore
+      }
+    }
   }
 }
 
@@ -922,22 +1284,43 @@ export function scheduleGithubAutomationScheduler(delayMs?: number): void {
 }
 
 /**
+ * Best-effort pre-warm of full handler readiness (GHR-01).
+ * Tick remains the final lease gate; this only starts load earlier on wake/ensure.
+ * Never throws into the caller.
+ */
+function prewarmGithubAutomationHandlerReadiness(): void {
+  const registry = getHandlerRegistry();
+  if (registry.productionReadinessDisabled) return;
+  if (registry.registration.kind === "github_issue_triage") return;
+  if (registry.registration.kind === "custom") return;
+  void loadHandlerRuntimeModuleAsync()
+    .then((runtime) => runtime.ensureGithubAutomationJobHandlerReady())
+    .catch(() => {
+      // Tick will surface handler_not_ready without a lease.
+    });
+}
+
+/**
  * Immediate wake: schedule tick ASAP. Safe from webhook after enqueue.
  * Does not block; does not run LLM/Git in the caller stack beyond a microtask tick.
+ * Also pre-warms full handler readiness so cold Settings retry does not depend on a webhook.
  */
 export function wakeGithubAutomationScheduler(): void {
   const state = getState();
   state.wakeGeneration += 1;
   state.started = true;
+  prewarmGithubAutomationHandlerReadiness();
   armTimer(0);
 }
 
 /**
  * Lazy ensure: start background polling if not already started.
  * Reconciles queue without requiring an inbound webhook.
+ * Shares the same readiness boundary as wake/tick (GHR-01).
  */
 export function ensureGithubAutomationScheduler(): void {
   const state = getState();
+  prewarmGithubAutomationHandlerReadiness();
   if (state.started && state.timer) return;
   state.started = true;
   armTimer(0);

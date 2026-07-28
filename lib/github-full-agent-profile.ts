@@ -164,7 +164,9 @@ export function containsGithubAutomationSecretInjectionMarker(
     /\bghu_[A-Za-z0-9_]{10,}/.test(text) ||
     /\bgithub_pat_[A-Za-z0-9_]{10,}/.test(text) ||
     /x-hub-signature-256/i.test(text) ||
-    /installation[_\s-]?token/i.test(text)
+    // Assignment/header forms only — do not match natural-language warnings like
+    // "do not request installation tokens" (IMP-001 false positive).
+    /installation[_\s-]?token\s*[:=]/i.test(text)
   );
 }
 

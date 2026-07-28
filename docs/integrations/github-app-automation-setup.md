@@ -392,14 +392,15 @@ export YPI_GITHUB_APP_SLUG="your-app-slug"
 
 ### 无人值守 job 卡在 planning、attempt 暴涨、没有 Session
 
-这是 durable scheduler / 命令幂等 / 策略门禁问题，不是 Sidebar 漏列 Session。Settings Jobs 应显示双层状态（Agent vs 调度）；无 Session 时主文案是「尚未启动 Agent / Session 不存在」，`attempt` 只表示「调度尝试」。
+这是 durable scheduler / **handler readiness** / 命令幂等 / 策略门禁 / Session bootstrap 问题，不是 Sidebar 漏列 Session。Settings Jobs 应显示双层状态（Agent vs 调度）；无 Session 时主文案是「尚未启动 Agent / Session 不存在」，`attempt` 只表示「调度尝试」。
 
 1. **止血**：对该 job pause；若不稳定再开全局 `paused`，停止 attempt 增长。
-2. **部署 + 完整重启** `ypi`（热更新不够），用 status 的 `runtimeProvenance`（package/build/code/process/policy）确认新 build/policy 已加载。
-3. **单次 retry**：服务端会先做幂等 legacy reconcile（消费已确认的 Owner command、解析 WorkTree `spaceId`、归一到安全 checkpoint、保留 generation/legacy attempt），**复用原 generation / WorkTree / branch / Studio task**。
-4. **预期**：稳定策略/人工阻断（无 Session），或进入 implementing 并在 **WorkTree space** 出现 parent Session。
-5. **禁止**：跳过策略、手工改 job/task、删除审计、新建 g2、在未重启旧进程上反复 retry、把「调度尝试 N」当成 Agent 在跑。
+2. **部署 + 完整重启** `ypi`（热更新不够），用 status 的 `runtimeProvenance`（package/build/code/process/policy）确认新 build/policy 已加载；隔离共享同一 agent dir 的其他 ypi 调度进程。
+3. **单次 retry**：服务端会先做幂等 legacy reconcile（消费已确认的 Owner command、解析 WorkTree `spaceId`、归一到安全 checkpoint、保留 generation/legacy attempt），再 **ensure 完整 triage/unattended handler**（冷启动无 webhook 也可注册），然后 wake，**复用原 generation / WorkTree / branch / Studio task**。
+4. **预期**：稳定策略/人工阻断（无 Session）；或 `handler_not_ready` / 带 allowlisted `bootstrapCode` 的 Session 启动失败（可见、不伪装成 Agent 在跑）；或进入 implementing 并在 **WorkTree space** 出现 parent Session（safe `unattended_session_created` + agentRuns≥1）。
+5. **禁止**：跳过策略、手工改 job/task、删除审计、新建 g2、在未重启旧进程上反复 retry、把「调度尝试 N」当成 Agent 在跑、把 fixture 全绿当成 #22 类回归已修。
 6. 若 retry 显示条件未变（`retry_conditions_unchanged`），先改 code/policy/input 并重启，再重试。
+7. **#22 空跑回归验收**：离线 `npm run test:github-*` 只是前置；最终须在直接监听端口（约定 **30142**）对真实同 generation job 做 pause→**一次** retry 并交叉核对 Session 证据（`npm run verify:github-automation-30142`，默认只读；真实 mutation 需显式确认）。失败、无 Session、provenance 不可信时不得宣称已修。
 
 完整 runbook：`docs/operations/troubleshooting.md` →「Unattended planning spin / no Session」；架构语义：`docs/architecture/overview.md` P1 章节。
 
@@ -418,7 +419,7 @@ export YPI_GITHUB_APP_SLUG="your-app-slug"
 | 允许仓库是空的 | 正常，需要你手动关联，不会默认塞任何仓库 |
 | 无人值守按钮不可用 | 先完成 checklist；若要自动 PR，还需 Contents / Pull requests 权限 |
 | 想立刻停掉 | 在设置里打开全局 **paused**，或 `enabled=false` / 改回「仅 Triage」；**不要**指望 Issue 评论解除/设置全局暂停；不必删除本机凭据与历史 delivery/job |
-| Jobs 显示 planning/第 N 次但无 Session（#22 类） | 先 per-job pause（必要时全局 paused）止血；完整部署并**重启** `ypi`；确认 status `runtimeProvenance`；再对同一 job 单次 retry（系统会幂等 reconcile：消费旧 adoption command、补 spaceId、保留 generation/attempt/WorkTree）；不要手改 JSON、不要建 g2、不要删历史、不要跳过策略；无 Session 时应显示“尚未启动 Agent”；条件未变时的 retry 可能是 `retry_conditions_unchanged` |
+| Jobs 显示 planning/第 N 次但无 Session（#22 类） | 先 per-job pause（必要时全局 paused）止血；完整部署并**重启** `ypi`；隔离共享 agent-dir 的其他调度进程；确认 status `runtimeProvenance`；再对同一 job **单次** retry（幂等 reconcile + full handler ensure + 补 spaceId、保留 generation/attempt/WorkTree）；观察 `handler_not_ready` / typed `session_bootstrap_*` / Session-created 证据；不要手改 JSON、不要建 g2、不要删历史、不要跳过策略；无 Session 时应显示“尚未启动 Agent”；条件未变时的 retry 可能是 `retry_conditions_unchanged`；**fixture 绿 ≠ 已修**，#22 空跑类最终以 30142 真实验收为准 |
 | Bot 评论反复编辑 / generation 暴涨 | 确认已部署含 self/Bot 入口过滤的版本；打开全局 paused 止血；检查 deliveries 忽略原因为 `self_app_event`/`bot_actor_event`；**不要**批量删除 g1–gN 审计来“修复” |
 | 发了「采纳」无 receipt | 需 `@AppBot` 或 `/ypi` 定向（等待采纳阶段的裸肯定语除外）；确认是 Owner 人类账号、非 Bot；确认非全局 paused |
 | `@机器Assignee` 无反应 | 预期：默认不把机器 Assignee 当自动化目标 |

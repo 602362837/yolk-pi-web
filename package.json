@@ -1,6 +1,6 @@
 {
   "name": "@alan-zhao/yolk-pi-web",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "yolk pi web WebChat workspace for the pi coding agent",
   "license": "MIT",
   "repository": {
@@ -114,6 +114,9 @@
     "test:github-unattended": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended.mjs",
     "test:github-unattended-runner": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended-runner.mjs",
     "test:github-publish-policy": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-publish-policy.mjs",
+    "test:github-handler-runtime": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-handler-runtime.mjs",
+    "test:github-session-bootstrap": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-session-bootstrap.mjs",
+    "verify:github-automation-30142": "node scripts/verify-github-automation-30142.mjs",
     "test:web-credential-store": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-web-credential-store.mjs",
     "test:web-model-runtime": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-web-model-runtime.mjs",
     "test:oauth-accounts": "node scripts/run-oauth-account-tests.mjs",

@@ -687,37 +687,76 @@ P1 uses the **standard full agent** (file/bash/network). Owner gate, WorkTree, a
 
 ### Unattended planning spin / no Session (#22 class)
 
-Symptoms: Settings Jobs shows `planning` / `queued`/`running` with rising **调度尝试** (legacy `attempt`), checkpoint stuck at `studio_task_ready`, runner sidecar `sessionId` null, WorkTree `.ypi/sessions/index.v1.json` empty, Studio task still `intake`. This is **scheduler / policy / command replay**, not “Agent is implementing”.
+Symptoms: Settings Jobs shows `planning` / `queued`/`running` with rising **调度尝试** (legacy `attempt`), checkpoint stuck at `studio_task_ready`, runner sidecar `sessionId` null, WorkTree `.ypi/sessions/index.v1.json` empty, Studio task still `intake`. This is **scheduler / handler readiness / policy / command replay / Session bootstrap**, not “Agent is implementing”.
 
-Root chain (fixed across GHA-CLOSE-01…05):
+Root chain (fixed across GHA-CLOSE-01…05 and GHR handler/bootstrap readiness):
 
 1. Old plan gate treated empty plan as `blocked_uncertain`.
 2. After retry, already-handled Owner adoption (`owner_command` + `remote_confirmed`) was re-read every tick and cut off unattended runner continuation.
 3. Scheduler parked the still-`running` result as `queued` and re-leased about every 2s → attempt explosion without Session.
 4. Even after spin stop, missing WorkTree `spaceId` can still fail parent Session bootstrap.
+5. **Handler readiness gap:** Settings retry/resume used to wake the scheduler without ensuring the full triage/unattended handler was registered (webhook-only ensure). After restart with no new webhook, planning jobs fell through `defaultJobHandler` and became `runner_no_progress` without Session.
+6. **Bootstrap opacity:** raw SDK/jiti/fs failures were sanitized to `Internal GitHub automation error` first, then regex-classified, so retryability and disposition could be wrong or collapsed back to no-progress.
+7. **Empty parent Session + instant `implementer_error` (IMP-001):** parent bootstrap is binding-only (JSONL may have only header/model). Full-agent child used to die in preflight because the security bullet “installation tokens” false-positive-matched `/installation[_\s-]?token/i`. Fix: assignment-only sentinel + envelope wording + typed `full_agent_prompt_sentinel` meta. **Do not treat `sessionId!=null` alone as Agent implementing** when `lastMeaningfulProgressKind=session_created` and implementer failed.
 
 **Stop-bleed (before or while deploying fix):**
 
 1. Per-job **pause** on that job (`POST /api/github-automation/jobs/{jobId}` `{ "action":"pause" }`). If action race prevents a stable pause, set global `paused=true` in Settings.
 2. Do **not** keep retrying, do **not** hand-edit job/task JSON, do **not** delete job/events/WorkTree/task/session, do **not** create a new generation (g2).
-3. Deploy the fix package and **fully restart** `ypi` (hot reload is not enough). Confirm status `runtimeProvenance` (`packageVersion` / `buildId` / `codeRevision` / `policyVersion` / `processEpoch`) matches the fixed build.
+3. Deploy the fix package and **fully restart** `ypi` (hot reload is not enough). Confirm status `runtimeProvenance` (`packageVersion` / `buildId` / `codeRevision` / `policyVersion` / `processEpoch`) matches the fixed build. Stop or isolate **other** `ypi` processes that share the same `PI_CODING_AGENT_DIR` so a later proof port cannot race the job.
 
 **Safe recovery (same generation / WorkTree / branch / task):**
 
-1. After restart, open the job once (GET status or job). Retry/resume paths run **idempotent legacy reconcile** first:
+1. After restart, open the job once (GET status or job). Retry/resume paths run **idempotent legacy reconcile** first, then **`ensureGithubAutomationJobHandlerReady()`** before queue mutation/wake:
    - mark already `remote_confirmed` owner commands as consumed (no re-side-effect);
    - repair missing runner `spaceId` from Project Registry when `projectId` + WorkTree path exist;
    - normalize checkpoint to last safe resume point (for #22: usually `studio_task_ready`);
-   - preserve legacy `attempt` as scheduler-run audit; never rewrite history events.
-2. Operator **single** `retry` (or `resume` if paused). Same `jobId` / `generation` / WorkTree / branch / Studio task.
+   - preserve legacy `attempt` as scheduler-run audit; never rewrite history events;
+   - cold process without webhook still loads the full `github_issue_triage` handler; tick itself re-checks readiness before lease.
+2. Operator **single** `retry` (or `resume` if paused). Same `jobId` / `generation` / WorkTree / branch / Studio task. Do not loop retry, and do not pair resume+retry.
 3. Allowed outcomes only:
    - **stable policy/manual block** (e.g. real UI / high-risk scope) with **no Session** — correct; do not skip gate;
-   - **implementing** with parent Session in the **WorkTree space** (not main) and an auditable child run.
-4. Forbidden outcomes: queued/running jitter every ~2s, attempt skyrocketing, “实现中” without Session, new generation, deleted audit trail, manual skip-policy.
+   - **implementing** with parent Session in the **WorkTree space** (not main), safe `unattended_session_created` (or equivalent Session proof), runner `sessionId!=null`, and dual-layer projection `sessionAvailability=active|ended` with `counts.agentRuns>=1`.
+4. Visible failure outcomes (diagnose; **do not claim “fixed”** if the goal was Session start):
+   - `handler_not_ready` / event `github_automation_handler_not_ready` — load/register/verify stage; **attempt must not have increased** for that readiness failure (no business lease); Session none; blocked layer scheduler. Bounded backoff/dedupe — not a new spin.
+   - `session_bootstrap_failed` / `session_bootstrap_transient` + `unattended_session_bootstrap_failed` with allowlisted `bootstrapCode`/`stage`/`retryable` — reason must **not** fold into `runner_no_progress` after scheduler apply; meta must not be only generic internal error.
+5. Forbidden outcomes: queued/running jitter every ~2s, attempt skyrocketing, “实现中” without Session, silent default-handler no-progress, new generation, deleted audit trail, manual skip-policy.
 
 **Deterministic block retry:** if the job is blocked with `retryability=operator_after_change` and the same `blockFingerprint` + evaluated build/policy provenance as the live process, Settings marks retry **`retry_conditions_unchanged`** — fix code/policy/input (and restart) before retrying. There is **no** “skip policy” action.
 
-**UI truthfulness:** prefer dual-layer fields (`agentExecutionState`, `sessionAvailability`, `blockedAtLayer`, `counts.schedulerRuns`) over raw `phase`/`status`/`attempt`. No Session ⇒ “尚未启动 Agent”, never “第 N 次执行 = Agent working”.
+**UI truthfulness:** prefer dual-layer fields (`agentExecutionState`, `sessionAvailability`, `blockedAtLayer`, `counts.schedulerRuns`) over raw `phase`/`status`/`attempt`. No Session ⇒ “尚未启动 Agent”, never “第 N 次执行 = Agent working”. Handler/bootstrap use the **existing** Jobs fields only (no UI redesign required).
+
+#### When offline tests are not enough (30142 regression proof)
+
+Focused suites under temp agent dir prove control flow and privacy; they **do not** by themselves prove the production empty-run class is fixed. For that regression class, operators/checkers use a **direct** release-candidate listener (convention port **30142**):
+
+```bash
+npm run build   # never bare next build for release candidate
+# isolate other shared-agent-dir ypi schedulers first
+PI_CODING_AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" \
+  node bin/pi-web.js --port 30142 --no-open
+
+# read-only baseline (no mutation)
+npm run verify:github-automation-30142 -- \
+  --job-id job_1278854433_22_g1_01a6cdde \
+  --base-url http://localhost:30142
+
+# GHR-06 only: exactly one retry after operator confirmation
+npm run verify:github-automation-30142 -- \
+  --job-id job_1278854433_22_g1_01a6cdde \
+  --base-url http://localhost:30142 \
+  --confirm-single-retry --pause-first --post-proof-pause
+```
+
+Hard rules for claiming the regression fixed:
+
+- Health/status must be answered by the 30142 PID with matching `runtimeProvenance`; **reject HTTP 301/302** attribution.
+- Exactly one retry POST; expected safe sequence includes `unattended_retry_wake` → `job_started` → `unattended_implementing` → `unattended_session_created`.
+- Cross-check job API, status, safe events, runner sidecar, and WorkTree Session header `projectId+spaceId`.
+- Same generation / WorkTree / branch / task / history; attempt not reset; pause immediately after Session proof so Issue business work is not part of the automation fix.
+- Any `handler_not_ready`, bootstrap failure, `runner_no_progress`, generic internal-only diagnostic, missing Session, provenance mismatch, redirect, or g2 ⇒ **FAIL — do not claim fixed**.
+
+Ordinary operator recovery for a single stuck job still follows pause → single retry above; 30142 theatre is the mandatory bar for the historical “tests green but production still empty-runs” regression class, not for every day-to-day block.
 
 ### Generation storm / Bot comment loop
 
@@ -744,9 +783,13 @@ npm run test:github-automation
 npm run test:github-unattended
 npm run test:github-unattended-runner
 npm run test:github-publish-policy
+npm run test:github-handler-runtime
+npm run test:github-session-bootstrap
 ```
 
-Must pass offline with temp agent dir + mocks (no real GitHub network / operator credentials). Architecture/status semantics: `docs/architecture/overview.md` (P1 durable state machine); operator setup recovery table: `docs/integrations/github-app-automation-setup.md`.
+Must pass offline with temp agent dir + mocks (no real GitHub network / operator credentials). Handler-runtime suite covers cold Settings retry without webhook, concurrent ensure, load/register/verify faults → `handler_not_ready` without lease/attempt/`runner_no_progress`. Session-bootstrap suite covers typed bootstrap catch → disposition preservation, success Session event/counters, and #22-shaped finite-tick control flow. Architecture/status semantics: `docs/architecture/overview.md` (P1 durable state machine + handler readiness + bootstrap observability); operator setup recovery table: `docs/integrations/github-app-automation-setup.md`.
+
+**Important:** offline suite green is a **precondition**, not completion, for the #22-class manual-retry empty-run regression. That class still requires the 30142 same-generation Session proof described above (`npm run verify:github-automation-30142`, default read-only).
 
 ## Memory Diagnostic Snapshots
 

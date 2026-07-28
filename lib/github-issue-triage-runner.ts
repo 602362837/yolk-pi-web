@@ -2672,10 +2672,13 @@ export const githubIssueTriageJobHandler: GithubAutomationJobHandler = async (
 
 /**
  * Register the GHA-03 triage handler on the durable scheduler.
- * Safe to call multiple times.
+ * Safe to call multiple times. Records kind=`github_issue_triage` so the
+ * readiness boundary can verify the live registry (GHR-01).
  */
 export function registerGithubIssueTriageHandler(): void {
-  setGithubAutomationJobHandler(githubIssueTriageJobHandler);
+  setGithubAutomationJobHandler(githubIssueTriageJobHandler, {
+    kind: "github_issue_triage",
+  });
 }
 
 /**

@@ -151,6 +151,28 @@ await test("scrubGithubAutomationOwnedSecretsFromEnv removes App/machine env key
     profile.containsGithubAutomationSecretInjectionMarker({ ok: true }),
     false,
   );
+  // IMP-001: natural-language security warnings must not trip the sentinel.
+  assert.equal(
+    profile.containsGithubAutomationSecretInjectionMarker(
+      "Do not request or expect App private keys, JWTs, installation tokens, webhook secrets",
+    ),
+    false,
+  );
+  assert.equal(
+    profile.containsGithubAutomationSecretInjectionMarker(
+      "Do not request App installation credentials",
+    ),
+    false,
+  );
+  // Assignment/header forms still fail closed.
+  assert.equal(
+    profile.containsGithubAutomationSecretInjectionMarker("installation_token=ghs_abcdefghij"),
+    true,
+  );
+  assert.equal(
+    profile.containsGithubAutomationSecretInjectionMarker("installation-token: ghs_abcdefghij"),
+    true,
+  );
 });
 
 // ─── Validation broker ───────────────────────────────────────────────────────
@@ -345,6 +367,12 @@ await test("ensure unattended Studio task records owner+policy without interacti
   assert.ok(prompt.includes("UNTRUSTED_GITHUB_ISSUE_DATA"));
   assert.ok(prompt.includes("not sandboxed") || prompt.includes("Residual risk"));
   assert.ok(!prompt.includes(INSTALL_TOKEN_SENTINEL));
+  // IMP-001: standard envelope must not trip secret-injection preflight.
+  assert.equal(
+    profile.containsGithubAutomationSecretInjectionMarker(prompt),
+    false,
+    "full-agent envelope must not false-positive secret sentinel",
+  );
   assert.throws(
     () =>
       session.buildGithubFullAgentPromptEnvelope({
@@ -749,7 +777,10 @@ await test("bootstrapGithubAutomationAgentSession requires projectId+spaceId pai
         projectId: "prj_only",
         // spaceId intentionally omitted
       }),
-    /projectId and spaceId/i,
+    (err) =>
+      err?.name === "AgentSessionBootstrapError" &&
+      err.bootstrapCode === "session_binding_invalid" &&
+      /projectId and spaceId/i.test(String(err.message)),
   );
   await assert.rejects(
     () =>
@@ -757,7 +788,94 @@ await test("bootstrapGithubAutomationAgentSession requires projectId+spaceId pai
         worktreePath: agentDir,
         spaceId: "wt_only",
       }),
-    /projectId and spaceId/i,
+    (err) =>
+      err?.name === "AgentSessionBootstrapError" &&
+      err.bootstrapCode === "session_binding_invalid",
+  );
+});
+
+await test("GHR-02 classifyAgentSessionBootstrapFailure is typed before sanitize", async () => {
+  // Lightweight errors module only — must not pull rpc-manager / session graph.
+  const bootstrap = jiti(join(root, "lib/agent-session-bootstrap-errors.ts"));
+  const errors = jiti(join(root, "lib/github-automation-errors.ts"));
+
+  const moduleMissing = Object.assign(new Error("Cannot find module 'x'"), {
+    code: "MODULE_NOT_FOUND",
+  });
+  const classifiedMissing = bootstrap.classifyAgentSessionBootstrapFailure(
+    moduleMissing,
+    "runtime_start",
+  );
+  assert.equal(classifiedMissing.bootstrapCode, "session_runtime_module_missing");
+  assert.equal(classifiedMissing.stage, "runtime_load");
+  assert.equal(classifiedMissing.retryability, "operator");
+  assert.equal(classifiedMissing.reasonCode, "session_bootstrap_failed");
+  assert.equal(
+    classifiedMissing.safeMessage.includes("module"),
+    true,
+  );
+  assert.ok(!classifiedMissing.safeMessage.includes("Cannot find module"));
+  assert.ok(!classifiedMissing.safeMessage.includes("/Users/"));
+  assert.ok(!classifiedMissing.safeMessage.includes("x"));
+
+  // Sanitizer must never invent Internal… when typed safeMessage is present.
+  const typed = new bootstrap.AgentSessionBootstrapError("raw path /Volumes/secret", 500, {
+    bootstrapCode: "session_runtime_module_missing",
+    stage: "runtime_load",
+    retryability: "operator",
+  });
+  assert.equal(
+    errors.safeGithubAutomationErrorMessage(typed),
+    typed.safeMessage,
+  );
+  assert.ok(!errors.safeGithubAutomationErrorMessage(typed).includes("/Volumes/"));
+
+  const busy = Object.assign(new Error("resource busy"), { code: "EBUSY" });
+  const classifiedBusy = bootstrap.classifyAgentSessionBootstrapFailure(
+    busy,
+    "runtime_start",
+  );
+  assert.equal(classifiedBusy.reasonCode, "session_bootstrap_transient");
+  assert.equal(classifiedBusy.retryability, "automatic");
+  assert.equal(classifiedBusy.bootstrapCode, "session_runtime_start_failed");
+
+  // Never classify from already-sanitized generic text.
+  const generic = new Error("Internal GitHub automation error");
+  const classifiedGeneric = bootstrap.classifyAgentSessionBootstrapFailure(
+    generic,
+    "runtime_start",
+  );
+  assert.equal(classifiedGeneric.bootstrapCode, "session_unknown");
+  assert.equal(classifiedGeneric.reasonCode, "session_bootstrap_failed");
+  assert.equal(classifiedGeneric.retryability, "operator");
+});
+
+await test("GHR-02 runner bootstrap catch returns explicit disposition (not no-progress)", async () => {
+  const runnerSrc = readFileSync(join(root, "lib/github-automation-runner.ts"), "utf8");
+  assert.ok(
+    /classifyAgentSessionBootstrapFailure/.test(runnerSrc),
+    "runner must classify bootstrap failures before sanitize",
+  );
+  assert.ok(
+    /unattended_session_created/.test(runnerSrc),
+    "runner must emit path-free session-created evidence",
+  );
+  assert.ok(
+    /bootstrapCode/.test(runnerSrc) && /retryable/.test(runnerSrc),
+    "bootstrap failure events must carry allowlisted typed meta",
+  );
+  // Must not regex the already-sanitized message for ENOENT/EACCES/timeout.
+  assert.ok(
+    !/safeGithubAutomationErrorMessage\(err\)[\s\S]{0,120}\/ENOENT\|EACCES/.test(
+      runnerSrc,
+    ),
+    "must not classify bootstrap retryability from sanitized message regex",
+  );
+  assert.ok(
+    /disposition:\s*blockedDisposition|disposition:\s*retryDueDisposition/.test(
+      runnerSrc,
+    ),
+    "known stop branches must return explicit disposition",
   );
 });
 

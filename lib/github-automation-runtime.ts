@@ -43,6 +43,7 @@ import {
 import {
   ensureGithubAutomationScheduler,
   wakeGithubAutomationScheduler,
+  _testSetGithubAutomationProductionHandlerReadinessDisabled,
 } from "./github-automation-scheduler";
 import {
   assertValidGithubWebhookSignature,
@@ -50,36 +51,34 @@ import {
   readCappedWebhookRawBody,
 } from "./github-webhook-verify";
 import { loadGithubAppCredentials } from "./github-app-credentials";
-import { registerGithubIssueTriageHandler } from "./github-issue-triage-runner";
+import {
+  ensureGithubAutomationJobHandlerReady,
+  _testResetGithubAutomationHandlerRuntime,
+  _testSetGithubAutomationHandlerAutoRegisterDisabled,
+} from "./github-automation-handler-runtime";
 import { reconcileGithubPullRequestEvent } from "./github-pr-lifecycle";
 
-let _triageHandlerRegistered = false;
-let _triageAutoRegisterDisabled = false;
-
-/** Ensure GHA-03 claim/triage handler is bound exactly once per process. */
-function ensureGithubIssueTriageHandlerRegistered(): void {
-  if (_triageAutoRegisterDisabled) return;
-  if (_triageHandlerRegistered) return;
-  registerGithubIssueTriageHandler();
-  _triageHandlerRegistered = true;
-}
-
-/** Test helper: allow re-registration after scheduler handler reset. */
+/**
+ * Test helper: reset readiness control after scheduler handler reset.
+ * Does not trust a private module boolean as production authority (GHR-01).
+ */
 export function _testResetGithubIssueTriageHandlerRegistration(): void {
-  _triageHandlerRegistered = false;
+  _testResetGithubAutomationHandlerRuntime();
 }
 
 /**
  * Test helper: disable auto-register so GHA-02 default handler tests stay isolated.
- * Production always auto-registers on webhook accept.
+ * Also disables the production readiness gate on the scheduler so defaultJobHandler
+ * can still exercise pure "received" jobs without loading the full triage graph.
  */
 export function _testSetGithubIssueTriageAutoRegisterDisabled(
   disabled: boolean,
 ): void {
-  _triageAutoRegisterDisabled = disabled;
-  if (disabled) {
-    _triageHandlerRegistered = false;
-  }
+  // Reset first so subsequent disable/enable flags are not wiped by a full
+  // control-state rebuild (GHR-01 isolation for default-handler tests).
+  _testResetGithubAutomationHandlerRuntime();
+  _testSetGithubAutomationHandlerAutoRegisterDisabled(disabled);
+  _testSetGithubAutomationProductionHandlerReadinessDisabled(disabled);
 }
 
 // ─── Response types (safe) ───────────────────────────────────────────────────
@@ -559,7 +558,9 @@ export async function acceptGithubAutomationWebhook(
 
   try {
     await ensureGithubAutomationStoreLayout();
-    ensureGithubIssueTriageHandlerRegistered();
+    // GHR-01: single readiness authority (registry kind/generation). Never rely
+    // on a private module boolean after HMR/reset.
+    await ensureGithubAutomationJobHandlerReady();
 
     // 1) Capped raw body
     const rawBody = await readCappedWebhookRawBody(

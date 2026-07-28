@@ -666,7 +666,8 @@ export function classifyGithubAutomationRetryability(
     reasonCode.includes("transient") ||
     reasonCode.includes("lease") ||
     reasonCode === "retry_wake" ||
-    reasonCode === "session_bootstrap_transient"
+    reasonCode === "session_bootstrap_transient" ||
+    reasonCode === "handler_not_ready"
   ) {
     return "automatic";
   }

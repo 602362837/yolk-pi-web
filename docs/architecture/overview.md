@@ -511,12 +511,34 @@ Each scheduler lease must end in an explicit disposition:
 
 Missing disposition or unchanged `progressRevision` is `runner_no_progress` → bounded backoff, then stable block. **Never** park no-progress work as immediately runnable `queued` (the #22 spin class).
 
+**Known outcomes must return an explicit disposition** so the scheduler cannot rewrite them to `runner_no_progress`. That includes `handler_not_ready`, incomplete claim, plan/final policy blocks, Session bootstrap hard/transient failures, implementer recoverable retries, waiting/paused, and terminal PR/completed. `runner_no_progress` remains only the unknown-handler-bug fallback when progress truly did not change and no disposition was supplied.
+
+#### Handler readiness (single authority)
+
+Business job execution requires the full `github_issue_triage` handler (claim/triage + unattended continuation). Readiness is **not** a webhook-only private boolean:
+
+- Authority lives in the **scheduler registry** (`handlerKind` + generation) via `lib/github-automation-handler-runtime.ts` → `ensureGithubAutomationJobHandlerReady()`.
+- Process-global single-flight dynamically loads/registers/verifies the full handler. Rejected ensure is not permanently cached; bounded backoff applies. HMR/test reset must re-verify the live registry, never an old module flag.
+- **All execution entries** call the same boundary before lease/attempt: webhook accept, Settings `retry`/`resume` (before queue mutation + wake), scheduler ensure/wake, and **tick as the final defensive gate**. Pure status/config/verify GET must not wake the scheduler or imply readiness side effects.
+- When not ready: reason `handler_not_ready`, `blockedAtLayer=scheduler`, Session `none`, **no business lease**, **attempt does not increment**, safe event `github_automation_handler_not_ready` with allowlisted stage (`load`/`register`/`verify`) + retryability + fixed diagnostic — never module specifier, absolute path, stack, or secret.
+- `defaultJobHandler` is isolation/test-only. Production planning jobs must never return unchanged through the default handler; a defensive fallback is still `handler_not_ready`, not `runner_no_progress`.
+
+#### Session bootstrap observability
+
+Parent Session create classifies failures **before** generic sanitization (`lib/agent-session-bootstrap-errors.ts` + session/runner catch):
+
+- Stable main job reasons: `session_bootstrap_failed` (operator) or `session_bootstrap_transient` (automatic).
+- Allowlisted `bootstrapCode` / stage / retryability drive safe event meta (`unattended_session_bootstrap_failed`) with a fixed safe message — not a free-text regex over `Internal GitHub automation error`.
+- Codes include binding invalid, worktree missing, project space missing/archived/mismatch, runtime module missing (`MODULE_NOT_FOUND` mapped without specifier), runtime start failed, index update failed, unknown.
+- Explicit disposition: hard → `blocked` + `blockedAtLayer=session_bootstrap`; transient → `retry_due` + `nextRetryAt`. Scheduler post-processing must preserve the bootstrap reason.
+- Success writes runner `sessionId`/`contextId`/`sessionFile` (server-only sidecar), advances independent `agentRunCount` / `progressRevision` / `meaningfulProgressCount` with `lastMeaningfulProgressKind=session_created`, and appends path-free `unattended_session_created` (opaque short id / binding flags only).
+
 #### Counts and truthfulness
 
-- Legacy `attempt` is retained and defined as **scheduler lease-run count** (UI: 「调度尝试 N」).
+- Legacy `attempt` is retained and defined as **scheduler lease-run count** (UI: 「调度尝试 N」). Lease acquisition increments it; handler readiness failure before lease does not; retry/reconcile never resets historical attempt.
 - Additive counters: `agentRunCount` / `meaningfulProgressCount` / `noProgressRunCount` / `progressRevision` / `lastMeaningfulProgressAt`.
 - Meaningful progress = checkpoint advance, Session create, child/validation/policy/publisher terminal — **not** lease heartbeat or scheduler ticks.
-- Safe status projection exposes dual layers: `schedulerState`, `agentExecutionState`, `sessionAvailability`, `blockedAtLayer`, retryability, counts, safe `workspaceLabel`, and `runtimeProvenance` / optional `evaluatedProvenance`. Absolute paths, sessionFile, Issue/comment bodies, prompts, transcripts, and tool payloads stay off the wire.
+- Safe status projection exposes dual layers: `schedulerState`, `agentExecutionState`, `sessionAvailability`, `blockedAtLayer`, retryability, counts, safe `workspaceLabel`, and `runtimeProvenance` / optional `evaluatedProvenance`. Absolute paths, sessionFile, Issue/comment bodies, prompts, transcripts, and tool payloads stay off the wire. Jobs UI (`GithubAutomationConfig`) reuses these existing fields only — no new wire status structure for handler/bootstrap.
 
 #### Owner command consumption
 
@@ -534,9 +556,9 @@ Title hints cannot override a safe actual final diff. High-confidence UI/secret/
 
 #### WorkTree Session binding and env isolation
 
-- WorkTree ensure/reuse resolves and persists **`projectId + spaceId`**. Parent Session bootstrap requires both; failure is visible `retry_due` / `blocked_session_binding`, never silent “Agent active”.
+- WorkTree ensure/reuse resolves and persists **`projectId + spaceId`**. Parent Session bootstrap requires both; failure is a typed bootstrap outcome (`session_binding_invalid` / space mismatch / …) with explicit disposition — never silent “Agent active” and never only a generic internal error.
 - Parent/child JSONL headers and WorkTree `.ypi/sessions/index.v1.json` share the same project/space identity. WorkTree Sessions must not appear under main space.
-- Policy/Studio gates **before** implementing legitimately have `sessionAvailability=none` — UI must say 「尚未启动 Agent / Session 不存在」.
+- Policy/Studio gates **before** implementing legitimately have `sessionAvailability=none` — UI must say 「尚未启动 Agent / Session 不存在」. Handler-not-ready also projects Session none + scheduler layer.
 - Full-agent child env uses a **scrubbed env copy** (`buildGithubUnattendedScrubbedEnv` / `scrubGithubAutomationOwnedSecretsFromEnv`). Shared Next/server `process.env` must not be deleted/temporarily mutated (publisher/webhook credentials stay intact). This is product non-injection, not an OS sandbox.
 
 #### Lease heartbeat and fencing
@@ -550,14 +572,25 @@ Long full-agent runs use lease owner heartbeat + fencing token. Stale removal re
 #### #22-class recovery (same generation)
 
 1. Per-job pause (or global `paused` if needed) — stop attempt growth.
-2. Deploy fix + full restart; confirm provenance.
+2. Deploy fix + full restart; confirm provenance. Isolate any other `ypi` scheduler sharing the same `PI_CODING_AGENT_DIR` so results are attributable to one process.
 3. Idempotent `reconcileGithubAutomationLegacyJob`: consume already `remote_confirmed` commands, repair missing `spaceId`, normalize safe checkpoint (often `studio_task_ready`), preserve generation/legacy attempt; never rewrite history or create g2.
-4. Operator **single** retry/resume on the same job/WorkTree/branch/task.
-5. Allowed outcomes only: stable policy/manual block (no Session) **or** implementing with WorkTree Session + auditable child run. Forbidden: 2s queued/running jitter, attempt skyrocket, “实现中” without Session, skip gate, delete audit.
+4. Operator **single** retry/resume on the same job/WorkTree/branch/task. Retry/resume **must** ensure full handler readiness before wake; cold process without a new webhook still registers the full triage/unattended handler.
+5. Allowed outcomes only: stable policy/manual block (no Session) **or** implementing with WorkTree Session + auditable child run (`unattended_session_created` / runner `sessionId` + dual-layer projection). Forbidden: 2s queued/running jitter, attempt skyrocket, “实现中” without Session, silent default-handler no-progress, skip gate, delete audit, g2.
+
+**Regression-class completion gate:** focused offline suites are **necessary but not sufficient** for the historical “Settings retry empty-runs / Session never starts” class. Proving that regression fixed requires a release-candidate process on a **direct** port (operator convention: **http://localhost:30142**), same-generation real (or same-shape production) job, pause → **one** retry, and cross-checked Session evidence — not fixture green alone. Harness: `npm run verify:github-automation-30142` (default read-only; mutation only with explicit `--confirm-single-retry`). Ordinary day-to-day operator recovery remains the pause → single retry steps above; do not treat every planning block as needing 30142 theatre.
 
 Operator runbook detail: `docs/operations/troubleshooting.md` (Unattended planning spin / no Session).
 
-Focused tests: `npm run test:github-automation` (P0 + disposition/lease), `npm run test:github-unattended` (P1 adversarial/recovery/E2E with mocks), `npm run test:github-unattended-runner` (runner checkpoints / Session binding), `npm run test:github-publish-policy` (diff/PR/publisher).
+Focused tests (offline, temp `PI_CODING_AGENT_DIR`, mocks; never real operator #22 mutation):
+
+```bash
+npm run test:github-automation
+npm run test:github-unattended
+npm run test:github-unattended-runner
+npm run test:github-publish-policy
+npm run test:github-handler-runtime
+npm run test:github-session-bootstrap
+```
 
 ### Identity matrix
 
@@ -710,8 +743,13 @@ Focused tests (offline, temp `PI_CODING_AGENT_DIR`, mocked GitHub/credentials; n
 ```bash
 npm run test:github-automation
 npm run test:github-unattended
+npm run test:github-unattended-runner
 npm run test:github-publish-policy
+npm run test:github-handler-runtime
+npm run test:github-session-bootstrap
 ```
+
+These suites do **not** replace the 30142 same-generation Session proof when claiming the #22-class “manual retry empty-run / invisible bootstrap failure” regression is fixed (see P1 recovery section above).
 
 ## Session File Format
 

@@ -58,9 +58,32 @@ import {
 } from "./github-automation-store";
 import type { GithubAutomationJobHandlerResult } from "./github-automation-scheduler";
 import type {
+  GithubAutomationBlockedLayer,
   GithubAutomationConfigV1,
+  GithubAutomationJobDisposition,
   GithubAutomationRepositoryConfig,
+  GithubAutomationRetryability,
 } from "./github-automation-types";
+import {
+  buildGithubAutomationBlockFingerprint,
+  classifyGithubAutomationRetryability,
+} from "./github-automation-types";
+/** Opaque short session id for safe events — never paths / sessionFile. */
+function toSafeSessionIdShort(sessionId: string | null | undefined): string | null {
+  if (typeof sessionId !== "string") return null;
+  const trimmed = sessionId.trim();
+  if (!trimmed) return null;
+  if (
+    trimmed.includes("/") ||
+    trimmed.includes("\\") ||
+    trimmed.includes("..") ||
+    trimmed.startsWith("~")
+  ) {
+    return null;
+  }
+  if (trimmed.length <= 12) return trimmed;
+  return `${trimmed.slice(0, 8)}…${trimmed.slice(-4)}`;
+}
 import {
   GITHUB_FULL_AGENT_PROFILE,
   containsGithubAutomationSecretInjectionMarker,
@@ -337,6 +360,44 @@ function effectRemoteId(pathOrId: string | null | undefined): string | null {
   return parts[parts.length - 1] || pathOrId.slice(0, 80);
 }
 
+/** Explicit blocked disposition so scheduler cannot fold into runner_no_progress. */
+function blockedDisposition(input: {
+  reasonCode: string;
+  layer: GithubAutomationBlockedLayer;
+  checkpoint?: string | null;
+  retryability?: GithubAutomationRetryability;
+}): GithubAutomationJobDisposition {
+  const retryability =
+    input.retryability ?? classifyGithubAutomationRetryability(input.reasonCode);
+  return {
+    kind: "blocked",
+    reasonCode: input.reasonCode,
+    layer: input.layer,
+    fingerprint: buildGithubAutomationBlockFingerprint({
+      layer: input.layer,
+      reasonCode: input.reasonCode,
+      checkpoint: input.checkpoint ?? "blocked",
+    }),
+    retryability,
+  };
+}
+
+/** Explicit retry_due disposition preserving the real reasonCode. */
+function retryDueDisposition(input: {
+  reasonCode: string;
+  nextRetryAt: string;
+  retryClass?: "infra" | "runtime" | "network" | "session" | "unknown";
+}): GithubAutomationJobDisposition {
+  return {
+    kind: "retry_due",
+    reasonCode: input.reasonCode,
+    nextRetryAt: input.nextRetryAt,
+    retryClass: input.retryClass ?? "unknown",
+  };
+}
+
+const SESSION_BOOTSTRAP_TRANSIENT_DELAY_MS = 15_000;
+
 // ─── Public: seed owner adoption into runner ─────────────────────────────────
 
 export interface QueueGithubUnattendedImplementationInput {
@@ -394,10 +455,21 @@ export async function queueGithubUnattendedImplementation(
       status: "blocked",
       checkpoint: "blocked",
       reasonCode: "incomplete_claim",
+      blockedAtLayer: "start_gate",
+      retryability: "operator",
       leaseOwner: null,
       leaseExpiresAt: null,
     });
-    return { job, wakeAgain: false };
+    return {
+      job,
+      wakeAgain: false,
+      disposition: blockedDisposition({
+        reasonCode: "incomplete_claim",
+        layer: "start_gate",
+        checkpoint: "blocked",
+        retryability: "operator",
+      }),
+    };
   }
 
   if (!gates.ok && gates.reasonCode === "unattended_concurrency_limit") {
@@ -410,13 +482,15 @@ export async function queueGithubUnattendedImplementation(
       ownerCommentHash: input.owner.ownerCommentHash,
       reasonCode: "unattended_concurrency_limit",
     });
+    const nextRetryAt = new Date(Date.now() + 15_000).toISOString();
     const job = await persistJob({
       ...input.job,
       phase: "implementation_queued",
       status: "retry_due",
       checkpoint: "implementation_queued",
       reasonCode: "unattended_concurrency_limit",
-      nextRetryAt: new Date(Date.now() + 15_000).toISOString(),
+      nextRetryAt,
+      retryability: "automatic",
       leaseOwner: null,
       leaseExpiresAt: null,
     });
@@ -431,7 +505,15 @@ export async function queueGithubUnattendedImplementation(
       reasonCode: job.reasonCode,
       traceId: job.traceId,
     });
-    return { job, wakeAgain: true };
+    return {
+      job,
+      wakeAgain: true,
+      disposition: retryDueDisposition({
+        reasonCode: "unattended_concurrency_limit",
+        nextRetryAt,
+        retryClass: "runtime",
+      }),
+    };
   }
 
   if (!gates.ok) {
@@ -441,10 +523,20 @@ export async function queueGithubUnattendedImplementation(
       status: "blocked",
       checkpoint: "blocked",
       reasonCode: gates.reasonCode,
+      blockedAtLayer: "start_gate",
+      retryability: classifyGithubAutomationRetryability(gates.reasonCode),
       leaseOwner: null,
       leaseExpiresAt: null,
     });
-    return { job, wakeAgain: false };
+    return {
+      job,
+      wakeAgain: false,
+      disposition: blockedDisposition({
+        reasonCode: gates.reasonCode ?? "blocked",
+        layer: "start_gate",
+        checkpoint: "blocked",
+      }),
+    };
   }
 
   const priorState = readGithubAutomationRunnerState(input.job.jobId) ?? emptyRunnerState(input.job);
@@ -522,16 +614,26 @@ export async function runGithubUnattendedImplementation(
 
   if (!gates.ok) {
     if (gates.reasonCode === "automation_paused" || gates.reasonCode === "unattended_concurrency_limit") {
+      const nextRetryAt = new Date(Date.now() + 15_000).toISOString();
       job = await persistJob({
         ...job,
         phase: job.phase === "received" ? "implementation_queued" : job.phase,
         status: "retry_due",
         reasonCode: gates.reasonCode,
-        nextRetryAt: new Date(Date.now() + 15_000).toISOString(),
+        nextRetryAt,
+        retryability: "automatic",
         leaseOwner: null,
         leaseExpiresAt: null,
       });
-      return { job, wakeAgain: gates.reasonCode === "unattended_concurrency_limit" };
+      return {
+        job,
+        wakeAgain: gates.reasonCode === "unattended_concurrency_limit",
+        disposition: retryDueDisposition({
+          reasonCode: gates.reasonCode,
+          nextRetryAt,
+          retryClass: "runtime",
+        }),
+      };
     }
     job = await persistJob({
       ...job,
@@ -539,10 +641,20 @@ export async function runGithubUnattendedImplementation(
       status: "blocked",
       checkpoint: "blocked",
       reasonCode: gates.reasonCode,
+      blockedAtLayer: "start_gate",
+      retryability: classifyGithubAutomationRetryability(gates.reasonCode),
       leaseOwner: null,
       leaseExpiresAt: null,
     });
-    return { job, wakeAgain: false };
+    return {
+      job,
+      wakeAgain: false,
+      disposition: blockedDisposition({
+        reasonCode: gates.reasonCode ?? "blocked",
+        layer: "start_gate",
+        checkpoint: "blocked",
+      }),
+    };
   }
 
   const repository = gates.repository!;
@@ -710,10 +822,21 @@ export async function runGithubUnattendedImplementation(
           status: "blocked",
           checkpoint: "blocked",
           reasonCode: "missing_owner_authorization_seed",
+          blockedAtLayer: "start_gate",
+          retryability: "operator",
           leaseOwner: null,
           leaseExpiresAt: null,
         });
-        return { job, wakeAgain: false };
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode: "missing_owner_authorization_seed",
+            layer: "start_gate",
+            checkpoint: "blocked",
+            retryability: "operator",
+          }),
+        };
       }
 
       const ensured = ensureGithubUnattendedStudioTask({
@@ -733,12 +856,16 @@ export async function runGithubUnattendedImplementation(
       });
 
       if (!ensured.authorized) {
+        const reasonCode =
+          ensured.authorizationReasonCode ?? "policy_not_authorized";
         job = await persistJob({
           ...job,
           phase: "blocked",
           status: "blocked",
           checkpoint: "blocked",
-          reasonCode: ensured.authorizationReasonCode ?? "policy_not_authorized",
+          reasonCode,
+          blockedAtLayer: "policy_pre",
+          retryability: classifyGithubAutomationRetryability(reasonCode),
           leaseOwner: null,
           leaseExpiresAt: null,
         });
@@ -749,7 +876,15 @@ export async function runGithubUnattendedImplementation(
           scopeFingerprint: ensured.binding.scopeFingerprint,
           reasonCode: job.reasonCode,
         });
-        return { job, wakeAgain: false };
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode,
+            layer: "policy_pre",
+            checkpoint: "blocked",
+          }),
+        };
       }
 
       state = writeGithubAutomationRunnerState({
@@ -829,19 +964,22 @@ export async function runGithubUnattendedImplementation(
         });
         // deferred empty plan (outcome=defer) continues; only hard blocks stop.
         if (planGate.policy.decision === "block" || planGate.policy.outcome === "block") {
+          const reasonCode = planGate.policy.reasonCode;
           job = await persistJob({
             ...job,
             phase: "blocked",
             status: "blocked",
             checkpoint: "blocked",
-            reasonCode: planGate.policy.reasonCode,
+            reasonCode,
+            blockedAtLayer: "policy_plan",
+            retryability: classifyGithubAutomationRetryability(reasonCode),
             leaseOwner: null,
             leaseExpiresAt: null,
           });
           state = writeGithubAutomationRunnerState({
             ...state,
             checkpoint: "blocked",
-            reasonCode: planGate.policy.reasonCode,
+            reasonCode,
           });
           await appendGithubAutomationSafeEvent({
             at: new Date().toISOString(),
@@ -855,7 +993,15 @@ export async function runGithubUnattendedImplementation(
             traceId: job.traceId,
             meta: { classification: planGate.policy.classification },
           });
-          return { job, wakeAgain: false };
+          return {
+            job,
+            wakeAgain: false,
+            disposition: blockedDisposition({
+              reasonCode,
+              layer: "policy_plan",
+              checkpoint: "blocked",
+            }),
+          };
         }
       } catch (err) {
         // Diff collection failures at plan stage are non-fatal; final gate still runs.
@@ -920,14 +1066,17 @@ export async function runGithubUnattendedImplementation(
         const message = err instanceof Error ? err.message : String(err);
         const uiBlocked =
           /blocked_manual_ui_approval|uiGate|UI\/user-visible/i.test(message);
+        const reasonCode = uiBlocked
+          ? "blocked_manual_ui_approval"
+          : "policy_transition_failed";
         job = await persistJob({
           ...job,
           phase: "blocked",
           status: "blocked",
           checkpoint: "blocked",
-          reasonCode: uiBlocked
-            ? "blocked_manual_ui_approval"
-            : "policy_transition_failed",
+          reasonCode,
+          blockedAtLayer: uiBlocked ? "policy_plan" : "policy_pre",
+          retryability: classifyGithubAutomationRetryability(reasonCode),
           leaseOwner: null,
           leaseExpiresAt: null,
         });
@@ -946,9 +1095,19 @@ export async function runGithubUnattendedImplementation(
           phase: job.phase,
           reasonCode: job.reasonCode,
           traceId: job.traceId,
-          meta: { message: message.slice(0, 160) },
+          meta: {
+            message: safeGithubAutomationErrorMessage(err).slice(0, 160),
+          },
         });
-        return { job, wakeAgain: false };
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode,
+            layer: uiBlocked ? "policy_plan" : "policy_pre",
+            checkpoint: "blocked",
+          }),
+        };
       }
 
       if (input.singleStep) {
@@ -997,7 +1156,10 @@ export async function runGithubUnattendedImplementation(
         }
 
         if (!state.projectId || !state.spaceId) {
-          const reasonCode = "blocked_session_binding";
+          // Stable main reason for Jobs UI; typed code lives in safe event meta.
+          const reasonCode = "session_bootstrap_failed";
+          const bootstrapCode = "session_binding_invalid";
+          const safeMessage = "Session binding is invalid";
           state = writeGithubAutomationRunnerState({
             ...state,
             reasonCode,
@@ -1008,6 +1170,8 @@ export async function runGithubUnattendedImplementation(
             status: "blocked",
             checkpoint: "blocked",
             reasonCode,
+            blockedAtLayer: "session_bootstrap",
+            retryability: "operator",
             leaseOwner: null,
             leaseExpiresAt: null,
           });
@@ -1022,12 +1186,24 @@ export async function runGithubUnattendedImplementation(
             reasonCode,
             traceId: job.traceId,
             meta: {
-              message: "projectId and spaceId are required before Session bootstrap",
+              bootstrapCode,
+              stage: "binding",
+              retryable: false,
+              message: safeMessage,
               hasProjectId: Boolean(state.projectId),
               hasSpaceId: Boolean(state.spaceId),
             },
           });
-          return { job, wakeAgain: false };
+          return {
+            job,
+            wakeAgain: false,
+            disposition: blockedDisposition({
+              reasonCode,
+              layer: "session_bootstrap",
+              checkpoint: "blocked",
+              retryability: "operator",
+            }),
+          };
         }
 
         try {
@@ -1037,24 +1213,29 @@ export async function runGithubUnattendedImplementation(
             spaceId: state.spaceId,
           });
           // Dispose immediately — child runs use SDK sessions; we only need binding ids.
+          // Prefer destroy so the process-local wrapper is not left live as "Session none".
           try {
             const disposable = boot.session as {
               dispose?: () => void;
               destroy?: () => void;
             };
-            disposable.dispose?.();
-            disposable.destroy?.();
+            if (typeof disposable.destroy === "function") {
+              disposable.destroy();
+            } else {
+              disposable.dispose?.();
+            }
           } catch {
             // ignore
           }
+          const sessionFile =
+            (boot as { sessionFile?: string | null }).sessionFile ??
+            boot.session.sessionFile ??
+            null;
           state = writeGithubAutomationRunnerState({
             ...state,
             sessionId: boot.sessionId,
             contextId: boot.contextId,
-            sessionFile:
-              (boot as { sessionFile?: string | null }).sessionFile ??
-              boot.session.sessionFile ??
-              null,
+            sessionFile,
             reasonCode: null,
           });
           // Stamp agentRunCount only after successful parent Session bootstrap.
@@ -1062,42 +1243,86 @@ export async function runGithubUnattendedImplementation(
             typeof job.agentRunCount === "number" && Number.isFinite(job.agentRunCount)
               ? Math.max(0, Math.floor(job.agentRunCount))
               : 0;
+          const createdAt = new Date().toISOString();
+          const nextProgressRevision =
+            (typeof job.progressRevision === "number" ? job.progressRevision : 0) +
+            1;
           job = await persistJob({
             ...job,
             agentRunCount: priorRuns + 1,
-            lastMeaningfulProgressAt: new Date().toISOString(),
+            lastMeaningfulProgressAt: createdAt,
             lastMeaningfulProgressKind: "session_created",
             meaningfulProgressCount:
               (typeof job.meaningfulProgressCount === "number"
                 ? job.meaningfulProgressCount
                 : 0) + 1,
-            progressRevision:
-              (typeof job.progressRevision === "number" ? job.progressRevision : 0) +
-              1,
+            progressRevision: nextProgressRevision,
+            reasonCode: null,
+            blockedAtLayer: null,
+          });
+          const sessionIdShort = toSafeSessionIdShort(boot.sessionId);
+          await appendGithubAutomationSafeEvent({
+            at: createdAt,
+            kind: "unattended_session_created",
+            repositoryId: job.repositoryId,
+            issueNumber: job.issueNumber,
+            jobId: job.jobId,
+            deliveryId: job.deliveryId,
+            phase: job.phase,
+            reasonCode: null,
+            traceId: job.traceId,
+            meta: {
+              // Opaque short id only — never sessionFile / absolute path.
+              ...(sessionIdShort ? { sessionIdShort } : {}),
+              hasProjectId: true,
+              hasSpaceId: true,
+              hasContextId: Boolean(boot.contextId),
+              hasSessionFile: Boolean(sessionFile),
+            },
           });
         } catch (err) {
-          // Bootstrap failure is fatal for this tick: do not continue as Agent active.
-          const message = safeGithubAutomationErrorMessage(err).slice(0, 160);
-          const transient =
-            /ENOENT|EACCES|EPERM|EBUSY|EMFILE|ENFILE|EAGAIN|timeout|temporar|busy|locked/i.test(
-              message,
-            );
-          const reasonCode = transient
-            ? "session_bootstrap_transient"
-            : "session_bootstrap_failed";
+          // Classify from typed error / Node cause codes BEFORE generic sanitize.
+          // Never regex the sanitized "Internal GitHub automation error" text.
+          const {
+            classifyAgentSessionBootstrapFailure,
+            isAgentSessionBootstrapError,
+          } = await import("./agent-session-bootstrap-errors");
+          const classified = isAgentSessionBootstrapError(err)
+            ? {
+                bootstrapCode: err.bootstrapCode,
+                stage: err.stage,
+                retryability: err.retryability,
+                safeMessage: err.safeMessage,
+                reasonCode:
+                  err.retryability === "automatic"
+                    ? ("session_bootstrap_transient" as const)
+                    : ("session_bootstrap_failed" as const),
+              }
+            : classifyAgentSessionBootstrapFailure(err, "runtime_start");
+          const reasonCode = classified.reasonCode;
+          const transient = classified.retryability === "automatic";
+          const nextRetryAt = transient
+            ? new Date(Date.now() + SESSION_BOOTSTRAP_TRANSIENT_DELAY_MS).toISOString()
+            : null;
           state = writeGithubAutomationRunnerState({
             ...state,
+            // Retain g1 WorkTree/task/project/space; session stays null.
+            sessionId: null,
+            contextId: null,
+            sessionFile: null,
             reasonCode,
           });
           job = await persistJob({
             ...job,
-            // Transient → retryable queued; binding/hard errors → stable blocked.
+            // Transient → explicit retry_due; hard → stable blocked.
             phase: transient ? "implementing" : "blocked",
-            status: transient ? "queued" : "blocked",
+            status: transient ? "retry_due" : "blocked",
+            // Keep recoverable checkpoint at implementing so resume re-enters bootstrap.
             checkpoint: transient ? "implementing" : "blocked",
             reasonCode,
             blockedAtLayer: "session_bootstrap",
             retryability: transient ? "automatic" : "operator",
+            nextRetryAt,
             leaseOwner: null,
             leaseExpiresAt: null,
           });
@@ -1111,9 +1336,34 @@ export async function runGithubUnattendedImplementation(
             phase: job.phase,
             reasonCode,
             traceId: job.traceId,
-            meta: { message },
+            meta: {
+              bootstrapCode: classified.bootstrapCode,
+              stage: classified.stage,
+              retryable: transient,
+              message: classified.safeMessage,
+            },
           });
-          return { job, wakeAgain: transient };
+          if (transient && nextRetryAt) {
+            return {
+              job,
+              wakeAgain: false,
+              disposition: retryDueDisposition({
+                reasonCode,
+                nextRetryAt,
+                retryClass: "session",
+              }),
+            };
+          }
+          return {
+            job,
+            wakeAgain: false,
+            disposition: blockedDisposition({
+              reasonCode,
+              layer: "session_bootstrap",
+              checkpoint: "blocked",
+              retryability: "operator",
+            }),
+          };
         }
       }
 
@@ -1190,7 +1440,11 @@ export async function runGithubUnattendedImplementation(
             leaseOwner: null,
             leaseExpiresAt: null,
           });
-          return { job, wakeAgain: false };
+          return {
+            job,
+            wakeAgain: false,
+            disposition: { kind: "waiting", wakeOn: "external" },
+          };
         }
 
         if (result.status === "failed") {
@@ -1200,25 +1454,70 @@ export async function runGithubUnattendedImplementation(
             status: "blocked",
             checkpoint: "blocked",
             reasonCode: "implementer_failed",
+            blockedAtLayer: "agent",
+            retryability: "operator",
             leaseOwner: null,
             leaseExpiresAt: null,
           });
-          return { job, wakeAgain: false };
+          return {
+            job,
+            wakeAgain: false,
+            disposition: blockedDisposition({
+              reasonCode: "implementer_failed",
+              layer: "agent",
+              checkpoint: "blocked",
+              retryability: "operator",
+            }),
+          };
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = safeGithubAutomationErrorMessage(err);
+        const errDetails =
+          err &&
+          typeof err === "object" &&
+          "details" in err &&
+          err.details &&
+          typeof err.details === "object"
+            ? (err.details as Record<string, unknown>)
+            : null;
+        const implementerCode =
+          typeof errDetails?.implementerCode === "string" &&
+          /^[a-z][a-z0-9_]{0,63}$/i.test(errDetails.implementerCode)
+            ? errDetails.implementerCode
+            : null;
+        const implementerStage =
+          typeof errDetails?.stage === "string" &&
+          /^[a-z][a-z0-9_]{0,63}$/i.test(errDetails.stage)
+            ? errDetails.stage
+            : null;
         // runtime_lost / preflight: park for retry rather than hard block when recoverable
         const retryable =
-          /runtime_lost|preflight|ECONNRESET|timed out/i.test(message);
+          errDetails?.retryable === true ||
+          /runtime_lost|ECONNRESET|timed out/i.test(
+            err instanceof Error ? err.message : String(err),
+          );
+        // Prompt-sentinel / hard preflight refusals are operator-visible blocks, not auto-retry spin.
+        const hardPreflight =
+          implementerCode === "full_agent_prompt_sentinel" ||
+          implementerStage === "full_agent_preflight";
+        const reasonCode = hardPreflight
+          ? "implementer_error"
+          : retryable
+            ? "implementer_retry"
+            : "implementer_error";
+        const nextRetryAt =
+          !hardPreflight && retryable
+            ? new Date(Date.now() + 20_000).toISOString()
+            : null;
         job = await persistJob({
           ...job,
-          phase: retryable ? "implementing" : "blocked",
-          status: retryable ? "retry_due" : "blocked",
-          checkpoint: retryable ? "implementing" : "blocked",
-          reasonCode: retryable ? "implementer_retry" : "implementer_error",
-          nextRetryAt: retryable
-            ? new Date(Date.now() + 20_000).toISOString()
-            : null,
+          phase: !hardPreflight && retryable ? "implementing" : "blocked",
+          status: !hardPreflight && retryable ? "retry_due" : "blocked",
+          checkpoint: !hardPreflight && retryable ? "implementing" : "blocked",
+          reasonCode,
+          blockedAtLayer: "agent",
+          retryability: !hardPreflight && retryable ? "automatic" : "operator",
+          nextRetryAt,
           leaseOwner: null,
           leaseExpiresAt: null,
         });
@@ -1232,9 +1531,34 @@ export async function runGithubUnattendedImplementation(
           phase: job.phase,
           reasonCode: job.reasonCode,
           traceId: job.traceId,
-          meta: { message: message.slice(0, 160), retryable },
+          meta: {
+            message: message.slice(0, 160),
+            retryable: !hardPreflight && retryable,
+            ...(implementerCode ? { implementerCode } : {}),
+            ...(implementerStage ? { stage: implementerStage } : {}),
+          },
         });
-        return { job, wakeAgain: retryable };
+        if (!hardPreflight && retryable && nextRetryAt) {
+          return {
+            job,
+            wakeAgain: false,
+            disposition: retryDueDisposition({
+              reasonCode,
+              nextRetryAt,
+              retryClass: "runtime",
+            }),
+          };
+        }
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode,
+            layer: "agent",
+            checkpoint: "blocked",
+            retryability: "operator",
+          }),
+        };
       }
 
       if (input.singleStep) {
@@ -1251,12 +1575,15 @@ export async function runGithubUnattendedImplementation(
       });
 
       if (!validation.ok) {
+        const reasonCode = validation.reasonCode ?? "validation_failed";
         job = await persistJob({
           ...job,
           phase: "blocked",
           status: "blocked",
           checkpoint: "blocked",
-          reasonCode: validation.reasonCode ?? "validation_failed",
+          reasonCode,
+          blockedAtLayer: "validation",
+          retryability: classifyGithubAutomationRetryability(reasonCode),
           leaseOwner: null,
           leaseExpiresAt: null,
         });
@@ -1280,7 +1607,15 @@ export async function runGithubUnattendedImplementation(
             failedLabel: validation.results.find((r) => !r.ok)?.commandLabel ?? null,
           },
         });
-        return { job, wakeAgain: false };
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode,
+            layer: "validation",
+            checkpoint: "blocked",
+          }),
+        };
       }
 
       // Validation passed → enter final_policy / awaiting_publish; publish continues below.
@@ -1361,10 +1696,21 @@ export async function runGithubUnattendedImplementation(
           status: "blocked",
           checkpoint: "blocked",
           reasonCode: "repository_not_allowlisted",
+          blockedAtLayer: "start_gate",
+          retryability: "operator",
           leaseOwner: null,
           leaseExpiresAt: null,
         });
-        return { job, wakeAgain: false };
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode: "repository_not_allowlisted",
+            layer: "start_gate",
+            checkpoint: "blocked",
+            retryability: "operator",
+          }),
+        };
       }
 
       if (!state.worktreePath || !state.branchName || !state.baseRef) {
@@ -1374,10 +1720,21 @@ export async function runGithubUnattendedImplementation(
           status: "blocked",
           checkpoint: "blocked",
           reasonCode: "missing_worktree_for_publish",
+          blockedAtLayer: "worktree",
+          retryability: "operator",
           leaseOwner: null,
           leaseExpiresAt: null,
         });
-        return { job, wakeAgain: false };
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode: "missing_worktree_for_publish",
+            layer: "worktree",
+            checkpoint: "blocked",
+            retryability: "operator",
+          }),
+        };
       }
 
       if (
@@ -1391,10 +1748,21 @@ export async function runGithubUnattendedImplementation(
           status: "blocked",
           checkpoint: "blocked",
           reasonCode: "installation_missing",
+          blockedAtLayer: "publisher",
+          retryability: "operator",
           leaseOwner: null,
           leaseExpiresAt: null,
         });
-        return { job, wakeAgain: false };
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode: "installation_missing",
+            layer: "publisher",
+            checkpoint: "blocked",
+            retryability: "operator",
+          }),
+        };
       }
 
       assertDiffArgsNotFromIssue({});
@@ -1450,19 +1818,22 @@ export async function runGithubUnattendedImplementation(
           : preflight;
 
       if (!isGithubFinalDiffAllowed(finalEval)) {
+        const reasonCode = finalEval.policy.reasonCode;
         job = await persistJob({
           ...job,
           phase: "blocked",
           status: "blocked",
           checkpoint: "blocked",
-          reasonCode: finalEval.policy.reasonCode,
+          reasonCode,
+          blockedAtLayer: "policy_final",
+          retryability: classifyGithubAutomationRetryability(reasonCode),
           leaseOwner: null,
           leaseExpiresAt: null,
         });
         state = writeGithubAutomationRunnerState({
           ...state,
           checkpoint: "blocked",
-          reasonCode: finalEval.policy.reasonCode,
+          reasonCode,
         });
         await appendGithubAutomationSafeEvent({
           at: new Date().toISOString(),
@@ -1480,7 +1851,15 @@ export async function runGithubUnattendedImplementation(
             changedLines: finalEval.policy.changedLines,
           },
         });
-        return { job, wakeAgain: false };
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode,
+            layer: "policy_final",
+            checkpoint: "blocked",
+          }),
+        };
       }
 
       // Record Studio completion evidence (checker + validation + final diff).
@@ -1502,6 +1881,8 @@ export async function runGithubUnattendedImplementation(
             status: "blocked",
             checkpoint: "blocked",
             reasonCode: "completion_evidence_failed",
+            blockedAtLayer: "lifecycle",
+            retryability: "operator",
             leaseOwner: null,
             leaseExpiresAt: null,
           });
@@ -1517,7 +1898,16 @@ export async function runGithubUnattendedImplementation(
             traceId: job.traceId,
             meta: { message: message.slice(0, 160) },
           });
-          return { job, wakeAgain: false };
+          return {
+            job,
+            wakeAgain: false,
+            disposition: blockedDisposition({
+              reasonCode: "completion_evidence_failed",
+              layer: "lifecycle",
+              checkpoint: "blocked",
+              retryability: "operator",
+            }),
+          };
         }
       }
 
@@ -1637,7 +2027,14 @@ export async function runGithubUnattendedImplementation(
           },
         });
 
-        return { job, wakeAgain: false };
+        return {
+          job,
+          wakeAgain: false,
+          disposition: {
+            kind: "terminal",
+            status: "completed",
+          },
+        };
       } catch (err) {
         const reason = isGithubAutomationError(err)
           ? err.code
@@ -1648,16 +2045,20 @@ export async function runGithubUnattendedImplementation(
           reason === "github_timeout" ||
           reason === "github_network_error" ||
           /push_failed|ECONNRESET|timed out/i.test(message);
+        const reasonCode = retryable ? "publish_retry" : reason;
+        const nextRetryAt = retryable
+          ? new Date(Date.now() + 30_000).toISOString()
+          : null;
 
         job = await persistJob({
           ...job,
           phase: retryable ? "publishing" : "blocked",
           status: retryable ? "retry_due" : "blocked",
           checkpoint: retryable ? "awaiting_publish" : "blocked",
-          reasonCode: retryable ? "publish_retry" : reason,
-          nextRetryAt: retryable
-            ? new Date(Date.now() + 30_000).toISOString()
-            : null,
+          reasonCode,
+          blockedAtLayer: "publisher",
+          retryability: retryable ? "automatic" : "operator",
+          nextRetryAt,
           leaseOwner: null,
           leaseExpiresAt: null,
         });
@@ -1678,19 +2079,51 @@ export async function runGithubUnattendedImplementation(
           traceId: job.traceId,
           meta: { message: message.slice(0, 160), retryable },
         });
-        return { job, wakeAgain: retryable };
+        if (retryable && nextRetryAt) {
+          return {
+            job,
+            wakeAgain: false,
+            disposition: retryDueDisposition({
+              reasonCode,
+              nextRetryAt,
+              retryClass: "network",
+            }),
+          };
+        }
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode,
+            layer: "publisher",
+            checkpoint: "blocked",
+            retryability: "operator",
+          }),
+        };
       }
     }
 
     // Default: re-queue for next tick if unknown checkpoint mid-flight.
+    // Explicit retry_due keeps reason (never runner_no_progress) without inventing progress.
+    const nextRetryAt = new Date(Date.now() + 2_000).toISOString();
     job = await persistJob({
       ...job,
-      status: "queued",
+      status: "retry_due",
       reasonCode: "runner_continue",
+      nextRetryAt,
+      retryability: "automatic",
       leaseOwner: null,
       leaseExpiresAt: null,
     });
-    return { job, wakeAgain: true };
+    return {
+      job,
+      wakeAgain: true,
+      disposition: retryDueDisposition({
+        reasonCode: "runner_continue",
+        nextRetryAt,
+        retryClass: "runtime",
+      }),
+    };
   } catch (err) {
     const reason = isGithubAutomationError(err)
       ? err.code
@@ -1702,6 +2135,8 @@ export async function runGithubUnattendedImplementation(
       status: "blocked",
       checkpoint: "blocked",
       reasonCode: reason,
+      blockedAtLayer: "agent",
+      retryability: classifyGithubAutomationRetryability(reason),
       leaseOwner: null,
       leaseExpiresAt: null,
     });
@@ -1717,7 +2152,15 @@ export async function runGithubUnattendedImplementation(
       traceId: job.traceId,
       meta: { message: message.slice(0, 160) },
     });
-    return { job, wakeAgain: false };
+    return {
+      job,
+      wakeAgain: false,
+      disposition: blockedDisposition({
+        reasonCode: reason,
+        layer: "agent",
+        checkpoint: "blocked",
+      }),
+    };
   } finally {
     inflight.delete(job.jobId);
   }

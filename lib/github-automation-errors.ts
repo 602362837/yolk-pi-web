@@ -113,7 +113,18 @@ export function safeGithubAutomationErrorMessage(
   fallback = SAFE_DEFAULT_MESSAGES.internal_error,
 ): string {
   if (err instanceof GithubAutomationError) {
+    // Prefer fixed message; still surface short allowlisted operator text when present.
     return err.message;
+  }
+  // Typed Session bootstrap errors already carry fixed allowlisted safeMessage.
+  if (
+    err &&
+    typeof err === "object" &&
+    (err as { name?: unknown }).name === "AgentSessionBootstrapError" &&
+    typeof (err as { safeMessage?: unknown }).safeMessage === "string" &&
+    (err as { safeMessage: string }).safeMessage.trim()
+  ) {
+    return (err as { safeMessage: string }).safeMessage.trim();
   }
   if (err instanceof Error && typeof err.message === "string" && err.message.trim()) {
     const redacted = redactGithubAutomationSecrets(err.message).trim();

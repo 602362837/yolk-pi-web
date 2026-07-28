@@ -8662,6 +8662,71 @@ await test("GHA-CLOSE-04 active session projects Agent implementing + opaque ses
   projection.assertGithubAutomationProjectionSafe(safe);
 });
 
+await test("IMP-001 binding-only Session after implementer_error is not Agent implementing", async () => {
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 602362837,
+    repositoryFullName: "602362837/yolk-pi-web",
+    issueNumber: 2201,
+    installationId: 999001,
+    deliveryId: "del-imp001-binding-only",
+    issueTitlePreview: "binding only",
+    generation: 1,
+    phase: "blocked",
+  });
+  const blocked = await store.writeGithubAutomationJob({
+    ...job,
+    status: "blocked",
+    phase: "blocked",
+    checkpoint: "blocked",
+    reasonCode: "implementer_error",
+    blockedAtLayer: "agent",
+    attempt: 901,
+    progressRevision: 1,
+    agentRunCount: 1,
+    noProgressRunCount: 0,
+    meaningfulProgressCount: 1,
+    lastMeaningfulProgressAt: new Date().toISOString(),
+    lastMeaningfulProgressKind: "session_created",
+  });
+  const runner = jiti(join(root, "lib/github-automation-runner.ts"));
+  runner.writeGithubAutomationRunnerState({
+    schemaVersion: 1,
+    jobId: blocked.jobId,
+    repositoryId: blocked.repositoryId,
+    issueNumber: blocked.issueNumber,
+    generation: 1,
+    checkpoint: "implementing",
+    worktreePath: "/Users/secret/worktrees/ypi-gha-binding-only",
+    branchName: "ypi/gha/602362837/issue-2201/g1",
+    baseRef: "main",
+    projectId: "prj_binding",
+    spaceId: "wt_binding",
+    taskId: "task-binding",
+    sessionId: "019fa25b-1d0b-731e-88af-1b2e86911602",
+    contextId: "pi_019fa25b-1d0b-731e-88af-1b2e86911602",
+    sessionFile: "/Users/secret/sessions/binding.jsonl",
+    scopeFingerprint: null,
+    ownerActorId: 1,
+    ownerCommentId: 1,
+    ownerCommentHash: "h",
+    lastMember: null,
+    lastRunId: null,
+    pauseRequested: true,
+    updatedAt: new Date().toISOString(),
+    reasonCode: "implementer_error",
+  });
+  const safe = projection.toGithubAutomationJobSafeProjection(blocked, {
+    claimStatus: "complete",
+    projectDisplayName: "yolk-pi-web",
+  });
+  assert.equal(safe.sessionAvailability, "active");
+  assert.equal(safe.agentExecutionState, "failed");
+  assert.notEqual(safe.agentExecutionState, "implementing");
+  assert.equal(safe.counts.agentRuns, 1);
+  assert.ok(safe.sessionIdShort);
+  projection.assertGithubAutomationProjectionSafe(safe);
+});
+
 await test("GHA-CLOSE-04 legacy job without additive fields stays unknown_legacy / not active", async () => {
   const job = await store.createQueuedGithubAutomationJob({
     repositoryId: 602362837,
