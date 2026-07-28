@@ -78,6 +78,23 @@ type AdminRuntimeCacheEntry = {
 };
 
 const adminRuntimeCache = new Map<string, AdminRuntimeCacheEntry>();
+// Administrative routes often arrive concurrently on a cold server (for
+// example Models' provider summaries). Keep initialization and the safe,
+// offline catalog refresh separate so one caller cannot duplicate fixed
+// provider registration or make another caller wait on a network refresh.
+const adminRuntimePending = new Map<string, Promise<AdminRuntimeCacheEntry>>();
+const adminRuntimeRefreshPending = new Map<string, Promise<void>>();
+let adminRuntimeCacheGeneration = 0;
+
+type AdminRuntimeTestHooks = {
+  createEntry?: (
+    agentDir: string,
+    modelsPath: string | null | undefined,
+    allowModelNetwork: false,
+  ) => Promise<AdminRuntimeCacheEntry>;
+  refreshOffline?: (entry: AdminRuntimeCacheEntry) => Promise<void>;
+};
+let adminRuntimeTestHooks: AdminRuntimeTestHooks | undefined;
 
 async function resolveAgentDir(agentDir?: string): Promise<string> {
   if (agentDir && agentDir.length > 0) return resolve(agentDir);
@@ -159,34 +176,98 @@ export async function getWebModelRuntime(
   const modelsPath =
     options.modelsPath === undefined ? join(agentDir, "models.json") : options.modelsPath;
   const key = adminCacheKey(agentDir, modelsPath);
-  let entry = adminRuntimeCache.get(key);
+  const entry = await getOrCreateAdminRuntimeEntry(key, agentDir, modelsPath);
 
-  if (!entry) {
-    const authPath = join(agentDir, "auth.json");
-    const credentials = await getWebCredentialStore({ authPath, agentDir });
-    const runtime = await createWebModelRuntime({
-      agentDir,
-      credentials,
-      authPath,
-      modelsPath,
-      allowModelNetwork: options.allowModelNetwork,
-    });
-    // Load fixed providers into this runtime via a throwaway services build
-    // that skips project extension discovery (noExtensions) while still
-    // applying webExtensionFactories.
-    await registerFixedProvidersOnRuntime(runtime, agentDir);
-    entry = { runtime, credentials, authPath, modelsPath };
-    adminRuntimeCache.set(key, entry);
+  // The shared refresh is deliberately offline. It is safe for local catalog
+  // routes and cannot turn a cold concurrent summary request into auth/network
+  // work. An explicit network caller retains its old opt-in behavior but stays
+  // outside the offline flight, so network work is never mixed into it.
+  if (options.allowModelNetwork === true) {
+    await entry.runtime.refresh({ allowNetwork: true });
+  } else {
+    await refreshAdminRuntimeOffline(key, entry);
   }
-
-  await entry.runtime.refresh({ allowNetwork: options.allowModelNetwork === true });
   return entry.runtime;
+}
+
+async function getOrCreateAdminRuntimeEntry(
+  key: string,
+  agentDir: string,
+  modelsPath: string | null | undefined,
+): Promise<AdminRuntimeCacheEntry> {
+  const cached = adminRuntimeCache.get(key);
+  if (cached) return cached;
+
+  let pending = adminRuntimePending.get(key);
+  if (!pending) {
+    const generation = adminRuntimeCacheGeneration;
+    pending = (async () => {
+      const entry = adminRuntimeTestHooks?.createEntry
+        ? await adminRuntimeTestHooks.createEntry(agentDir, modelsPath, false)
+        : await createAdminRuntimeEntry(agentDir, modelsPath);
+      // A test reset must not let an old pending initialization repopulate the
+      // resolved cache after it has been cleared.
+      if (generation === adminRuntimeCacheGeneration) {
+        adminRuntimeCache.set(key, entry);
+      }
+      return entry;
+    })();
+    adminRuntimePending.set(key, pending);
+    void pending.finally(() => {
+      if (adminRuntimePending.get(key) === pending) {
+        adminRuntimePending.delete(key);
+      }
+    }).catch(() => undefined);
+  }
+  return pending;
+}
+
+async function refreshAdminRuntimeOffline(
+  key: string,
+  entry: AdminRuntimeCacheEntry,
+): Promise<void> {
+  let pending = adminRuntimeRefreshPending.get(key);
+  if (!pending) {
+    pending = adminRuntimeTestHooks?.refreshOffline
+      ? adminRuntimeTestHooks.refreshOffline(entry)
+      : entry.runtime.refresh({ allowNetwork: false }).then(() => undefined);
+    adminRuntimeRefreshPending.set(key, pending);
+    void pending.finally(() => {
+      if (adminRuntimeRefreshPending.get(key) === pending) {
+        adminRuntimeRefreshPending.delete(key);
+      }
+    }).catch(() => undefined);
+  }
+  await pending;
 }
 
 /**
  * Register fixed Web providers onto an existing ModelRuntime without loading
  * project-local extensions from cwd.
  */
+async function createAdminRuntimeEntry(
+  agentDir: string,
+  modelsPath: string | null | undefined,
+): Promise<AdminRuntimeCacheEntry> {
+  const authPath = join(agentDir, "auth.json");
+  const credentials = await getWebCredentialStore({ authPath, agentDir });
+  // Initialization is always offline. In particular, a first caller that
+  // asks for a network refresh must not alter the shared runtime's cold
+  // startup semantics.
+  const runtime = await createWebModelRuntime({
+    agentDir,
+    credentials,
+    authPath,
+    modelsPath,
+    allowModelNetwork: false,
+  });
+  // Load fixed providers into this runtime via a throwaway services build
+  // that skips project extension discovery (noExtensions) while still
+  // applying webExtensionFactories.
+  await registerFixedProvidersOnRuntime(runtime, agentDir);
+  return { runtime, credentials, authPath, modelsPath };
+}
+
 async function registerFixedProvidersOnRuntime(
   modelRuntime: ModelRuntime,
   agentDir: string,
@@ -302,7 +383,18 @@ export async function createTemporaryWebModelRuntimeServices(options: {
   });
 }
 
-/** Test helper: drop admin runtime cache between isolated agent dirs. */
+/** Test-only hooks for deterministic administrative runtime concurrency tests. */
+export function __setWebModelRuntimeTestHooksForTests(
+  hooks: AdminRuntimeTestHooks | undefined,
+): void {
+  adminRuntimeTestHooks = hooks;
+}
+
+/** Test helper: drop all administrative runtime state between isolated agent dirs. */
 export function __resetWebModelRuntimeCacheForTests(): void {
+  adminRuntimeCacheGeneration += 1;
   adminRuntimeCache.clear();
+  adminRuntimePending.clear();
+  adminRuntimeRefreshPending.clear();
+  adminRuntimeTestHooks = undefined;
 }

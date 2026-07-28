@@ -1,4 +1,5 @@
 import { activateOAuthAccount, OAuthAccountStoreError } from "@/lib/oauth-accounts";
+import { invalidateProviderVerification } from "@/lib/models-provider-auth-summary";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export async function POST(
     const result = await activateOAuthAccount(provider, body.accountId);
     // SDK-03 will make reload fully async; Promise.resolve covers both shapes.
     await Promise.resolve(reloadRpcAuthState());
+    invalidateProviderVerification(provider);
     return Response.json(result);
   } catch (error) {
     const status = error instanceof OAuthAccountStoreError ? error.status : 500;

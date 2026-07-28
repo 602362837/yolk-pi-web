@@ -12,6 +12,8 @@ import { KiroQuotaView } from "./KiroQuotaView";
 import { iconFlowAttrs } from "./iconFlow";
 import { SelectDropdown } from "./SelectDropdown";
 import { usePrompt } from "./AppPromptProvider";
+import { visibleModelsConfigProviders } from "@/lib/models-config-visibility";
+import { mergeRevisionedOAuthVerification, ModelsRequestLifecycle } from "@/lib/models-config-lifecycle";
 import {
   isOpenAICompatibleModelsSyncApi,
   type ModelsConfigSyncPreviewResponse,
@@ -108,6 +110,9 @@ interface OAuthProvider {
   name: string;
   usesCallbackServer: boolean;
   loggedIn: boolean;
+  localConfigured?: boolean;
+  localStateRevision?: string;
+  verification?: { state: "valid" | "invalid" | "timeout" | "error" | "superseded"; basedOnRevision: string; checkedAt?: string };
   authMode?: "managed_accounts";
   accountCount?: number;
   activeAccountDisplayName?: string | null;
@@ -2224,6 +2229,14 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
   // Antigravity quota race guards — clear old data and reject stale responses on account switch.
   const antigravityQuotaAbortRef = useRef<AbortController | null>(null);
   const antigravityQuotaGenerationRef = useRef(0);
+  // Abort saves bandwidth; identity + generation is the commit gate when a
+  // provider ignores abort (notably refresh-backed quota endpoints).
+  const detailActiveRef = useRef(true);
+  const accountsGenerationRef = useRef(0);
+  const accountsAbortRef = useRef<AbortController | null>(null);
+  const quotaGenerationRef = useRef(0);
+  const quotaAbortRef = useRef<AbortController | null>(null);
+  const loginGenerationRef = useRef(0);
 
   useEffect(() => {
     if (loginState.phase === "auth" || loginState.phase === "prompt") {
@@ -2264,28 +2277,45 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     antigravityQuotaAbortRef.current?.abort();
     antigravityQuotaAbortRef.current = null;
     antigravityQuotaGenerationRef.current += 1;
+    accountsGenerationRef.current += 1;
+    accountsAbortRef.current?.abort();
+    quotaGenerationRef.current += 1;
+    quotaAbortRef.current?.abort();
+    loginGenerationRef.current += 1;
   }, [provider.id]);
 
   useEffect(() => {
+    detailActiveRef.current = true;
     return () => {
+      detailActiveRef.current = false;
+      accountsGenerationRef.current += 1;
+      quotaGenerationRef.current += 1;
+      loginGenerationRef.current += 1;
       eventSourceRef.current?.close();
+      accountsAbortRef.current?.abort();
+      quotaAbortRef.current?.abort();
       antigravityQuotaAbortRef.current?.abort();
     };
   }, []);
 
   const loadAccounts = useCallback(async () => {
     if (!isManagedAccounts) return;
+    const generation = ++accountsGenerationRef.current;
+    accountsAbortRef.current?.abort();
+    const controller = new AbortController();
+    accountsAbortRef.current = controller;
+    const current = () => detailActiveRef.current && !controller.signal.aborted && generation === accountsGenerationRef.current;
     setAccountsLoading(true);
     setAccountsError(null);
     try {
-      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`);
+      const res = await fetch(`/api/auth/accounts/${encodeURIComponent(provider.id)}`, { signal: controller.signal, cache: "no-store" });
       const data = await res.json().catch(() => ({})) as OAuthAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setAccounts(data.accounts ?? []);
+      if (current()) setAccounts(data.accounts ?? []);
     } catch (error) {
-      setAccountsError(error instanceof Error ? error.message : "加载账号失败");
+      if (current()) setAccountsError(error instanceof Error ? error.message : "加载账号失败");
     } finally {
-      setAccountsLoading(false);
+      if (current()) setAccountsLoading(false);
     }
   }, [provider.id, isManagedAccounts]);
 
@@ -2316,18 +2346,38 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     }
   }, [initialAccountId, accounts, onInitialAccountConsumed]);
 
+  const invalidateDetailReads = useCallback(() => {
+    accountsGenerationRef.current += 1;
+    accountsAbortRef.current?.abort();
+    quotaGenerationRef.current += 1;
+    quotaAbortRef.current?.abort();
+    antigravityQuotaGenerationRef.current += 1;
+    antigravityQuotaAbortRef.current?.abort();
+  }, []);
+
+  const beginQuotaRequest = useCallback(() => {
+    const generation = ++quotaGenerationRef.current;
+    quotaAbortRef.current?.abort();
+    const controller = new AbortController();
+    quotaAbortRef.current = controller;
+    return { generation, controller, current: () => detailActiveRef.current && !controller.signal.aborted && generation === quotaGenerationRef.current };
+  }, []);
+
   // Codex quota loader
   const loadQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
     if (provider.id !== "openai-codex" || (!provider.loggedIn && !force)) return;
     const quotaAccountId = accountIdOverride !== undefined ? accountIdOverride : selectedQuotaAccountId;
+    const request = beginQuotaRequest();
     setQuotaLoading(true);
     try {
       const accountQuery = quotaAccountId ? `?accountId=${encodeURIComponent(quotaAccountId)}` : "";
-      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`);
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`, { signal: request.controller.signal });
       const data = await res.json() as SubscriptionQuota;
+      if (!request.current()) return;
       setQuota(data);
       void loadAccounts();
     } catch (error) {
+      if (!request.current()) return;
       setQuota({
         tool: provider.id,
         credentialStatus: "valid",
@@ -2341,49 +2391,55 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
         resetCreditsError: null,
       });
     } finally {
-      setQuotaLoading(false);
+      if (request.current()) setQuotaLoading(false);
     }
-  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts]);
+  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts, beginQuotaRequest]);
 
   // Grok quota loader
   const loadGrokQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
     if (!isGrok || (!provider.loggedIn && !force && accounts.length === 0)) return;
     const quotaAccountId = accountIdOverride !== undefined ? accountIdOverride : selectedQuotaAccountId;
+    const request = beginQuotaRequest();
     setQuotaLoading(true);
     try {
       const refreshParam = force ? "&refresh=1" : "";
       const accountQuery = quotaAccountId ? `?accountId=${encodeURIComponent(quotaAccountId)}${refreshParam}` : refreshParam ? `?refresh=1` : "";
-      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`);
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`, { signal: request.controller.signal });
       const data = await res.json() as import("@/lib/grok-subscription-quota").GrokQuotaResultV1;
+      if (!request.current()) return;
       setGrokQuota(data);
       void loadAccounts();
     } catch (error) {
+      if (!request.current()) return;
       setGrokQuota(null);
       setAccountsError(error instanceof Error ? error.message : "加载 Grok 配额失败");
     } finally {
-      setQuotaLoading(false);
+      if (request.current()) setQuotaLoading(false);
     }
-  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, accounts.length, loadAccounts, isGrok]);
+  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, accounts.length, loadAccounts, isGrok, beginQuotaRequest]);
 
   // Kiro quota loader — GetUsageLimits wire projection only (no secrets/raw body)
   const loadKiroQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
     if (!isKiro || (!provider.loggedIn && !force && accounts.length === 0)) return;
     const quotaAccountId = accountIdOverride !== undefined ? accountIdOverride : selectedQuotaAccountId;
+    const request = beginQuotaRequest();
     setQuotaLoading(true);
     try {
       const refreshParam = force ? "&refresh=1" : "";
       const accountQuery = quotaAccountId ? `?accountId=${encodeURIComponent(quotaAccountId)}${refreshParam}` : refreshParam ? `?refresh=1` : "";
-      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`);
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}${accountQuery}`, { signal: request.controller.signal });
       const data = await res.json() as import("@/lib/kiro-subscription-quota").KiroQuotaResultV1;
+      if (!request.current()) return;
       setKiroQuota(data);
       void loadAccounts();
     } catch (error) {
+      if (!request.current()) return;
       setKiroQuota(null);
       setAccountsError(error instanceof Error ? error.message : "加载 Kiro 配额失败");
     } finally {
-      setQuotaLoading(false);
+      if (request.current()) setQuotaLoading(false);
     }
-  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts, isKiro, accounts.length]);
+  }, [provider.id, provider.loggedIn, selectedQuotaAccountId, loadAccounts, isKiro, accounts.length, beginQuotaRequest]);
 
   // Antigravity quota loader — fetchAvailableModels projection only (no secrets/raw body/projectId)
   const loadAntigravityQuota = useCallback(async (force = false, accountIdOverride?: string | null) => {
@@ -2407,12 +2463,12 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
         signal: controller.signal,
       });
       const data = await res.json() as import("@/lib/antigravity-subscription-quota").AntigravityQuotaResultV1;
-      if (generation !== antigravityQuotaGenerationRef.current) return;
+      if (!detailActiveRef.current || generation !== antigravityQuotaGenerationRef.current) return;
       if (quotaAccountId && data.accountId && data.accountId !== quotaAccountId) return;
       setAntigravityQuota(data);
       void loadAccounts();
     } catch (error) {
-      if (controller.signal.aborted || generation !== antigravityQuotaGenerationRef.current) return;
+      if (!detailActiveRef.current || controller.signal.aborted || generation !== antigravityQuotaGenerationRef.current) return;
       setAntigravityQuota(null);
       setAccountsError(error instanceof Error ? error.message : "加载 Antigravity 配额失败");
     } finally {
@@ -2450,6 +2506,9 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     const mode = options?.mode ?? "login";
     const accountId = options?.accountId;
     eventSourceRef.current?.close();
+    const loginGeneration = ++loginGenerationRef.current;
+    const loginProviderId = provider.id;
+    const loginCurrent = () => detailActiveRef.current && loginGeneration === loginGenerationRef.current && loginProviderId === provider.id;
     setLoginState({ phase: "connecting" });
     setInputValue("");
 
@@ -2465,6 +2524,7 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     eventSourceRef.current = es;
 
     es.onmessage = (e) => {
+      if (!loginCurrent()) { es.close(); return; }
       const data = JSON.parse(e.data) as {
         type: string; url?: string; instructions?: string | null;
         token?: string; message?: string; placeholder?: string | null;
@@ -2561,11 +2621,13 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     };
     es.onerror = () => {
       es.close();
+      if (!loginCurrent()) return;
       setLoginState((prev) => prev.phase === "success" ? prev : { phase: "error", message: "连接已断开" });
     };
   }, [provider.id, provider.loggedIn, onRefresh, loadAccounts, loadQuota, loadGrokQuota, loadKiroQuota, loadAntigravityQuota, isGrok, isKiro, isAntigravity]);
 
   const handleLogout = useCallback(async () => {
+    invalidateDetailReads();
     await fetch(`/api/auth/logout/${encodeURIComponent(provider.id)}`, { method: "POST" });
     setLoginState({ phase: "idle" });
     setQuota(null);
@@ -2577,7 +2639,7 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     setSelectedQuotaAccountId(null);
     onRefresh();
     void loadAccounts();
-  }, [provider.id, onRefresh, loadAccounts]);
+  }, [provider.id, onRefresh, loadAccounts, invalidateDetailReads]);
 
   const submitCode = useCallback(async (token: string, code: string) => {
     if (!code.trim()) return;
@@ -2626,6 +2688,7 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
   }, [loadQuota, loadGrokQuota, loadKiroQuota, loadAntigravityQuota, isGrok, isKiro, isAntigravity]);
 
   const handleActivateAccount = useCallback(async (accountId: string) => {
+    invalidateDetailReads();
     setActivatingAccountId(accountId);
     setAccountsError(null);
     try {
@@ -2651,7 +2714,7 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     } finally {
       setActivatingAccountId(null);
     }
-  }, [provider.id, onRefresh, loadQuota, loadGrokQuota, loadKiroQuota, loadAntigravityQuota, isGrok, isKiro, isAntigravity]);
+  }, [provider.id, onRefresh, loadQuota, loadGrokQuota, loadKiroQuota, loadAntigravityQuota, isGrok, isKiro, isAntigravity, invalidateDetailReads]);
 
   const handleEditAccountLabel = useCallback(async (account: OAuthAccountSummary) => {
     const nextLabel = await prompt({
@@ -2662,6 +2725,7 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     });
     if (nextLabel === null) return;
 
+    invalidateDetailReads();
     setSavingLabelAccountId(account.accountId);
     setAccountsError(null);
     try {
@@ -2681,13 +2745,14 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     } finally {
       setSavingLabelAccountId(null);
     }
-  }, [prompt, provider.id]);
+  }, [prompt, provider.id, invalidateDetailReads]);
 
   const handleEditAccountExtraInfo = useCallback((account: OAuthAccountSummary) => {
     setEditingExtraInfoAccount(account);
   }, []);
 
   const handleSaveAccountExtraInfo = useCallback(async (account: OAuthAccountSummary, nextExtraInfo: string) => {
+    invalidateDetailReads();
     setSavingExtraInfoAccountId(account.accountId);
     setAccountsError(null);
     try {
@@ -2708,14 +2773,16 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     } finally {
       setSavingExtraInfoAccountId(null);
     }
-  }, [provider.id]);
+  }, [provider.id, invalidateDetailReads]);
 
   const handleRefreshAccountQuota = useCallback(async (account: OAuthAccountSummary) => {
     if (quotaResetting) return;
+    const request = beginQuotaRequest();
     setRefreshingQuotaAccountId(account.accountId);
     setAccountsError(null);
     try {
-      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}?accountId=${encodeURIComponent(account.accountId)}&refresh=1`);
+      const res = await fetch(`/api/auth/quota/${encodeURIComponent(provider.id)}?accountId=${encodeURIComponent(account.accountId)}&refresh=1`, { signal: request.controller.signal });
+      if (!request.current()) return;
       if (isGrok) {
         const data = await res.json().catch(() => ({})) as import("@/lib/grok-subscription-quota").GrokQuotaResultV1;
         if (!res.ok && !data.success) throw new Error(data.error?.message ?? `HTTP ${res.status}`);
@@ -2786,13 +2853,14 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
         setLoginState({ phase: data.success ? "success" : "error", message: data.success ? "账号配额已刷新。" : (data.error ?? "配额查询失败。") });
       }
     } catch (error) {
+      if (!request.current()) return;
       const message = error instanceof Error ? error.message : "刷新账号配额失败";
       setAccountsError(message);
       setLoginState({ phase: "error", message });
     } finally {
-      setRefreshingQuotaAccountId(null);
+      if (request.current()) setRefreshingQuotaAccountId(null);
     }
-  }, [loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId, isGrok, isKiro, isAntigravity]);
+  }, [loadAccounts, provider.id, quotaResetting, selectedQuotaAccountId, isGrok, isKiro, isAntigravity, beginQuotaRequest]);
 
   const handleResetQuota = useCallback(async () => {
     const quotaAccountId = selectedQuotaAccountId;
@@ -2834,6 +2902,7 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
 
   const handleProtectedDeleteConfirm = useCallback(async () => {
     if (!protectedDeleteAccount) return;
+    invalidateDetailReads();
     setProtectedDeleteDeleting(true);
     setAccountsError(null);
     try {
@@ -2878,7 +2947,7 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     } finally {
       setProtectedDeleteDeleting(false);
     }
-  }, [protectedDeleteAccount, accounts, provider.id, selectedQuotaAccountId, isGrok, isKiro, isAntigravity, onRefresh]);
+  }, [protectedDeleteAccount, accounts, provider.id, selectedQuotaAccountId, isGrok, isKiro, isAntigravity, onRefresh, invalidateDetailReads]);
 
   const handleDeleteAccount = useCallback(async (account: OAuthAccountSummary) => {
     if (supportsProtectedDelete) {
@@ -2893,6 +2962,7 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     });
     if (!confirmed) return;
 
+    invalidateDetailReads();
     setDeletingAccountId(account.accountId);
     setAccountsError(null);
     try {
@@ -2912,7 +2982,7 @@ function OAuthDetail({ provider, onRefresh, initialAccountId, onInitialAccountCo
     } finally {
       setDeletingAccountId(null);
     }
-  }, [confirm, provider.id, supportsProtectedDelete, handleProtectedDeleteClick]);
+  }, [confirm, provider.id, supportsProtectedDelete, handleProtectedDeleteClick, invalidateDetailReads]);
 
   const selectedQuotaAccount = accounts.find((account) => account.accountId === selectedQuotaAccountId)
     ?? accounts.find((account) => account.active)
@@ -3551,6 +3621,22 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
   const [configRetry, setConfigRetry] = useState<AnyRouterRetryPolicyView | null>(null);
   const [configSaving, setConfigSaving] = useState(false);
   const [configFieldError, setConfigFieldError] = useState<string | null>(null);
+  const detailActiveRef = useRef(true);
+  const requestGenerationRef = useRef(new Map<string, number>());
+  const requestAbortRef = useRef(new Map<string, AbortController>());
+  const nextRequest = useCallback((lane: "accounts" | "config" | "reveal") => {
+    const generation = (requestGenerationRef.current.get(lane) ?? 0) + 1;
+    requestGenerationRef.current.set(lane, generation);
+    requestAbortRef.current.get(lane)?.abort();
+    const controller = new AbortController();
+    requestAbortRef.current.set(lane, controller);
+    return { controller, current: () => detailActiveRef.current && !controller.signal.aborted && requestGenerationRef.current.get(lane) === generation };
+  }, []);
+  const invalidateRequest = useCallback((lane: "accounts" | "config" | "reveal") => {
+    requestGenerationRef.current.set(lane, (requestGenerationRef.current.get(lane) ?? 0) + 1);
+    requestAbortRef.current.get(lane)?.abort();
+    requestAbortRef.current.delete(lane);
+  }, []);
 
   // Reset all state when provider changes; clear revealed keys immediately.
   useEffect(() => {
@@ -3597,11 +3683,21 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     setConfigRetry(null);
     setConfigSaving(false);
     setConfigFieldError(null);
+    for (const controller of requestAbortRef.current.values()) controller.abort();
+    requestAbortRef.current.clear();
+    requestGenerationRef.current.clear();
   }, [provider.id]);
 
   // Clear revealed keys on unmount (Models close / navigate away).
   useEffect(() => {
+    detailActiveRef.current = true;
+    const abortControllers = requestAbortRef.current;
+    const requestGenerations = requestGenerationRef.current;
     return () => {
+      detailActiveRef.current = false;
+      for (const controller of abortControllers.values()) controller.abort();
+      abortControllers.clear();
+      requestGenerations.clear();
       setRevealedKeys(new Map());
     };
   }, []);
@@ -3615,39 +3711,43 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
 
   const loadProviderConfig = useCallback(async () => {
     if (!supportsProviderConfig) return;
+    const request = nextRequest("config");
     setConfigLoading(true);
     setConfigError(null);
     try {
       const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}/config`, {
-        cache: "no-store",
+        cache: "no-store", signal: request.controller.signal,
       });
       const data = await res.json() as AnyRouterSafeConfigResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      applyConfigProjection(data);
+      if (request.current()) applyConfigProjection(data);
     } catch (e) {
-      setConfigError(e instanceof Error ? e.message : "加载全局配置失败");
-      setProviderConfig(null);
+      if (request.current()) {
+        setConfigError(e instanceof Error ? e.message : "加载全局配置失败");
+        setProviderConfig(null);
+      }
     } finally {
-      setConfigLoading(false);
+      if (request.current()) setConfigLoading(false);
     }
-  }, [provider.id, supportsProviderConfig, applyConfigProjection]);
+  }, [provider.id, supportsProviderConfig, applyConfigProjection, nextRequest]);
 
   const loadAccounts = useCallback(async () => {
+    const request = nextRequest("accounts");
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts`, {
-        cache: "no-store",
+        cache: "no-store", signal: request.controller.signal,
       });
       const data = await res.json() as ApiKeyAccountsResponse & { error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setAccounts(data.accounts ?? []);
+      if (request.current()) setAccounts(data.accounts ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "加载账号失败");
+      if (request.current()) setError(e instanceof Error ? e.message : "加载账号失败");
     } finally {
-      setLoading(false);
+      if (request.current()) setLoading(false);
     }
-  }, [provider.id]);
+  }, [provider.id, nextRequest]);
 
   useEffect(() => {
     void loadAccounts();
@@ -3669,60 +3769,64 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       setRevealedKeys(next);
       return;
     }
+    const request = nextRequest("reveal");
     setRevealingId(accountId);
     try {
       const res = await fetch(
         `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(accountId)}/reveal`,
-        { method: "POST", cache: "no-store" },
+        { method: "POST", cache: "no-store", signal: request.controller.signal },
       );
       const data = await res.json() as ApiKeyRevealResponse & { error?: string };
       if (!res.ok || !data.apiKey) throw new Error(data.error ?? "显示失败");
-      const next = new Map(revealedKeys);
-      next.set(accountId, data.apiKey);
-      setRevealedKeys(next);
+      if (!request.current()) return;
+      setRevealedKeys((previous) => new Map(previous).set(accountId, data.apiKey));
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "显示失败", "error");
+      if (request.current()) showToast(e instanceof Error ? e.message : "显示失败", "error");
     } finally {
-      setRevealingId(null);
+      if (request.current()) setRevealingId(null);
     }
-  }, [provider.id, revealedKeys, showToast]);
+  }, [provider.id, revealedKeys, showToast, nextRequest]);
 
   // Copy
   const handleCopy = useCallback(async (accountId: string) => {
     let key = revealedKeys.get(accountId);
-    if (!key) {
+    const request = key ? null : nextRequest("reveal");
+    if (!key && request) {
       setRevealingId(accountId);
       try {
         const res = await fetch(
           `/api/auth/api-key/${encodeURIComponent(provider.id)}/accounts/${encodeURIComponent(accountId)}/reveal`,
-          { method: "POST", cache: "no-store" },
+          { method: "POST", cache: "no-store", signal: request.controller.signal },
         );
         const data = await res.json() as ApiKeyRevealResponse & { error?: string };
         if (!res.ok || !data.apiKey) throw new Error(data.error ?? "显示失败");
+        if (!request.current()) return;
         key = data.apiKey;
-        const next = new Map(revealedKeys);
-        next.set(accountId, data.apiKey);
-        setRevealedKeys(next);
+        setRevealedKeys((previous) => new Map(previous).set(accountId, data.apiKey));
       } catch (e) {
-        showToast(e instanceof Error ? e.message : "复制失败", "error");
-        setRevealingId(null);
+        if (request.current()) showToast(e instanceof Error ? e.message : "复制失败", "error");
         return;
+      } finally {
+        if (request.current()) setRevealingId(null);
       }
     }
+    if (!key || (request && !request.current())) return;
     try {
       await navigator.clipboard.writeText(key);
+      if (!detailActiveRef.current) return;
       setCopiedId(accountId);
-      setTimeout(() => setCopiedId(null), 2000);
+      setTimeout(() => { if (detailActiveRef.current) setCopiedId(null); }, 2000);
       showToast("API Key 已复制到剪贴板");
     } catch {
-      showToast("复制到剪贴板失败", "error");
+      if (detailActiveRef.current) showToast("复制到剪贴板失败", "error");
     } finally {
-      setRevealingId(null);
+      if (detailActiveRef.current) setRevealingId(null);
     }
-  }, [provider.id, revealedKeys, showToast]);
+  }, [provider.id, revealedKeys, showToast, nextRequest]);
 
   // Activate → "设为 Active"
   const handleActivate = useCallback(async (accountId: string) => {
+    invalidateRequest("accounts");
     setActivatingId(accountId);
     setError(null);
     try {
@@ -3740,10 +3844,11 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     } finally {
       setActivatingId(null);
     }
-  }, [provider.id, onRefresh, showToast, requiresExplicitActiveDisposition]);
+  }, [provider.id, onRefresh, showToast, requiresExplicitActiveDisposition, invalidateRequest]);
 
   // Enable (re-enable disabled account)
   const handleEnable = useCallback(async (accountId: string) => {
+    invalidateRequest("accounts");
     setEnablingId(accountId);
     setError(null);
     try {
@@ -3765,7 +3870,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     } finally {
       setEnablingId(null);
     }
-  }, [provider.id, onRefresh, showToast]);
+  }, [provider.id, onRefresh, showToast, invalidateRequest]);
 
   const openDisableConfirm = useCallback((account: ApiKeyAccountEntry) => {
     setDisableConfirm(account);
@@ -3796,6 +3901,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       setError("请选择要切换到的 Active 账号");
       return;
     }
+    invalidateRequest("accounts");
     setDisableSaving(true);
     setDisablingId(disableConfirm.accountId);
     setError(null);
@@ -3846,6 +3952,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     requiresExplicitActiveDisposition,
     onRefresh,
     showToast,
+    invalidateRequest,
   ]);
 
   const handleAdd = useCallback(async () => {
@@ -3857,6 +3964,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
         return;
       }
     }
+    invalidateRequest("accounts");
     setAddSaving(true);
     setError(null);
     setAddBaseUrlError(null);
@@ -3912,6 +4020,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     requiresExplicitActiveDisposition,
     onRefresh,
     showToast,
+    invalidateRequest,
   ]);
 
   const openEdit = useCallback((account: ApiKeyAccountEntry) => {
@@ -3934,6 +4043,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
         return;
       }
     }
+    invalidateRequest("accounts");
     setEditSaving(true);
     setEditError(null);
     setEditBaseUrlError(null);
@@ -3984,6 +4094,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     revealedKeys,
     onRefresh,
     showToast,
+    invalidateRequest,
   ]);
 
   const openDeleteConfirm = useCallback((account: ApiKeyAccountEntry) => {
@@ -4016,6 +4127,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       setError("请选择要切换到的 Active 账号");
       return;
     }
+    invalidateRequest("accounts");
     setDeleteDeleting(true);
     setDeletingId(deleteConfirm.accountId);
     setError(null);
@@ -4066,6 +4178,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     revealedKeys,
     onRefresh,
     showToast,
+    invalidateRequest,
   ]);
 
   const handleSaveProviderConfig = useCallback(async () => {
@@ -4085,6 +4198,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
       setConfigFieldError("baseDelayMs 不能大于 maxDelayMs");
       return;
     }
+    invalidateRequest("config");
     setConfigSaving(true);
     setConfigError(null);
     try {
@@ -4135,6 +4249,7 @@ function ApiKeyAccountsDetail({ provider, onRefresh }: { provider: ApiKeyProvide
     applyConfigProjection,
     showToast,
     onRefresh,
+    invalidateRequest,
   ]);
 
   const hasLegacyImport = accounts.some((a) => a.importedFromLegacyAt);
@@ -5673,7 +5788,8 @@ export function ModelsConfig({
   const [config, setConfig] = useState<ModelsJson>({ providers: {} });
   const [persistedConfig, setPersistedConfig] = useState<ModelsJson>({ providers: {} });
   const [configRevision, setConfigRevision] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [configPhase, setConfigPhase] = useState<"loading" | "ready" | "error">("loading");
+  const [catalogPhase, setCatalogPhase] = useState<"loading" | "ready" | "error">("loading");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedOk, setSavedOk] = useState(false);
@@ -5688,46 +5804,117 @@ export function ModelsConfig({
   // Cache last preview response to survive re-renders
   const syncPreviewRef = useRef<ModelsConfigSyncPreviewResponse | null>(null);
 
+  const requestLifecycleRef = useRef(new ModelsRequestLifecycle());
+  const configAbortRef = useRef<AbortController | null>(null);
+  const catalogAbortRef = useRef<AbortController | null>(null);
+  const verifyAbortRef = useRef<AbortController | null>(null);
   const dirty = useMemo(() => !jsonStableEqual(config, persistedConfig), [config, persistedConfig]);
 
-  const loadOAuthProviders = useCallback(() => {
-    fetch("/api/auth/providers")
-      .then((r) => r.json())
-      .then((d: { providers: OAuthProvider[] }) => setOauthProviders(d.providers))
-      .catch(() => {});
+  // Config and catalog intentionally have separate lanes: a slow auth check can
+  // never delay or overwrite the local models.json draft.
+  const reloadConfigFromServer = useCallback(async () => {
+    const request = requestLifecycleRef.current.begin("config");
+    configAbortRef.current?.abort();
+    const controller = new AbortController();
+    configAbortRef.current = controller;
+    setConfigPhase("loading");
+    try {
+      const r = await fetch("/api/models-config", { signal: controller.signal, cache: "no-store" });
+      if (!r.ok) throw new Error("models_config_unavailable");
+      const d = await r.json() as unknown;
+      if (!requestLifecycleRef.current.isCurrent(request) || controller.signal.aborted) return;
+      if (!d || typeof d !== "object" || Array.isArray(d)) throw new Error("invalid_models_config");
+      const providersValue = (d as { providers?: unknown }).providers;
+      if (!providersValue || typeof providersValue !== "object" || Array.isArray(providersValue)) throw new Error("invalid_models_config");
+      const rev = r.headers.get("X-Models-Config-Revision") ?? r.headers.get("ETag")?.replace(/^W\//, "").replace(/^"|"$/g, "") ?? null;
+      const normalized = d as ModelsJson;
+      const normalizedProviders = providersValue as Record<string, ProviderEntry>;
+      setConfig(normalized);
+      setPersistedConfig(normalized);
+      setConfigRevision(rev);
+      setConfigPhase("ready");
+      const visible = visibleModelsConfigProviders(normalized.providers ?? {});
+      const first = visible[0]?.[0];
+      const visibleNames = new Set(visible.map(([name]) => name));
+      setSelection((current) => {
+        if (current?.type === "oauth" || current?.type === "apikey") return current;
+        if (current?.type === "provider" && visibleNames.has(current.name)) return current;
+        if (current?.type === "model" && visibleNames.has(current.providerName)) {
+          const models = normalizedProviders[current.providerName]?.models ?? [];
+          if (current.index >= 0 && current.index < models.length) return current;
+          return { type: "provider", name: current.providerName };
+        }
+        return first ? { type: "provider", name: first } : null;
+      });
+    } catch {
+      if (!requestLifecycleRef.current.isCurrent(request) || controller.signal.aborted) return;
+      setConfigPhase("error");
+      setSaveError("模型配置加载失败，请重试后再保存。");
+    }
   }, []);
 
-  const loadApiKeyProviders = useCallback(() => {
-    fetch("/api/auth/all-providers")
-      .then((r) => r.json())
-      .then((d: { providers: ApiKeyProvider[] }) => setApiKeyProviders(d.providers))
-      .catch(() => {});
+  const refreshCatalog = useCallback(async () => {
+    const request = requestLifecycleRef.current.begin("catalog");
+    catalogAbortRef.current?.abort();
+    verifyAbortRef.current?.abort();
+    const controller = new AbortController();
+    catalogAbortRef.current = controller;
+    setCatalogPhase("loading");
+    const current = () => requestLifecycleRef.current.isCurrent(request) && !controller.signal.aborted;
+    const oauth = fetch("/api/auth/providers?mode=summary", { signal: controller.signal, cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("provider_catalog_unavailable");
+        const data = await res.json() as { providers?: OAuthProvider[] };
+        if (!Array.isArray(data.providers)) throw new Error("invalid_provider_catalog");
+        return data.providers;
+      });
+    const apiKeys = fetch("/api/auth/all-providers", { signal: controller.signal, cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("provider_catalog_unavailable");
+        const data = await res.json() as { providers?: ApiKeyProvider[] };
+        if (!Array.isArray(data.providers)) throw new Error("invalid_provider_catalog");
+        return data.providers;
+      });
+    const oauthCommitted = oauth.then((rows) => {
+      if (!current()) return rows;
+      setOauthProviders(rows);
+      // Start verification as soon as the local OAuth projection arrives; a
+      // slower API-key catalog must not hold either rows or verification back.
+      const verifyController = new AbortController();
+      verifyAbortRef.current = verifyController;
+      void fetch("/api/auth/providers?mode=verify", { signal: verifyController.signal, cache: "no-store" })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const data = await res.json() as { providers?: Array<{ id: string; verification?: OAuthProvider["verification"] }> };
+          if (!requestLifecycleRef.current.isCurrent(request) || verifyController.signal.aborted || !Array.isArray(data.providers)) return;
+          setOauthProviders((currentRows) => mergeRevisionedOAuthVerification(currentRows, data.providers ?? []));
+        }).catch(() => {});
+      return rows;
+    });
+    const apiCommitted = apiKeys.then((rows) => {
+      if (current()) setApiKeyProviders(rows);
+      return rows;
+    });
+    const [oauthResult, apiResult] = await Promise.allSettled([oauthCommitted, apiCommitted]);
+    if (!current()) return;
+    setCatalogPhase(oauthResult.status === "fulfilled" && apiResult.status === "fulfilled" ? "ready" : "error");
   }, []);
 
-  // Reload full config from server (used after sync apply)
-  const reloadConfigFromServer = useCallback(() => {
-    fetch("/api/models-config")
-      .then((r) => {
-        const rev = r.headers.get("X-Models-Config-Revision") ?? r.headers.get("ETag")?.replace(/^W\//, "").replace(/^"|"$/g, "") ?? null;
-        return r.json().then((d: ModelsJson) => ({ data: d, revision: rev }));
-      })
-      .then(({ data: d, revision: rev }) => {
-        const normalized: ModelsJson = d.providers ? d : { ...(d as Record<string, unknown>), providers: {} as Record<string, ProviderEntry> };
-        setConfig(normalized);
-        setPersistedConfig(normalized);
-        if (rev) setConfigRevision(rev);
-        const keys = Object.keys(normalized.providers ?? {});
-        if (keys.length > 0) setSelection({ type: "provider", name: keys[0] });
-      })
-      .catch(() => { setConfig({ providers: {} }); setPersistedConfig({ providers: {} }); })
-      .finally(() => setLoading(false));
-  }, []);
+  const loadOAuthProviders = useCallback(() => { void refreshCatalog(); }, [refreshCatalog]);
+  const loadApiKeyProviders = useCallback(() => { void refreshCatalog(); }, [refreshCatalog]);
 
   useEffect(() => {
-    reloadConfigFromServer();
-    loadOAuthProviders();
-    loadApiKeyProviders();
-  }, [loadOAuthProviders, loadApiKeyProviders, reloadConfigFromServer]);
+    const lifecycle = requestLifecycleRef.current;
+    lifecycle.activate();
+    void reloadConfigFromServer();
+    void refreshCatalog();
+    return () => {
+      lifecycle.close();
+      configAbortRef.current?.abort();
+      catalogAbortRef.current?.abort();
+      verifyAbortRef.current?.abort();
+    };
+  }, [refreshCatalog, reloadConfigFromServer]);
 
   // Consume top-bar deep-link focus context: auto-select provider when oauthProviders are loaded.
   // We save initialAccountId in a ref before calling onConsumedFocus() so that the parent clearing
@@ -6028,8 +6215,8 @@ export function ModelsConfig({
     });
   }, []);
 
-  const providers = Object.entries(config.providers ?? {});
-  const activeOAuth = oauthProviders.filter((p) => p.loggedIn || (p.authMode === "managed_accounts" && (p.accountCount ?? 0) > 0));
+  const providers = visibleModelsConfigProviders(config.providers ?? {});
+  const activeOAuth = oauthProviders.filter((p) => p.localConfigured || p.loggedIn || (p.authMode === "managed_accounts" && (p.accountCount ?? 0) > 0));
   // A ModelRuntime OAuth credential also makes `/api/auth/all-providers` report
   // `configured`. Show that provider in its OAuth section only; a logged-out
   // OAuth provider with a separately configured API key remains visible here.
@@ -6114,6 +6301,14 @@ export function ModelsConfig({
           <div style={{ width: 210, borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", flexShrink: 0, background: "var(--bg-panel)" }}>
             <div style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
               {/* Active OAuth subscriptions */}
+              {catalogPhase === "loading" && activeOAuth.length === 0 && (
+                <div role="status" aria-live="polite" style={{ padding: "8px", fontSize: 11, color: "var(--text-muted)" }}>正在读取已配置提供商…</div>
+              )}
+              {catalogPhase === "error" && (
+                <div role="status" style={{ padding: "8px", fontSize: 11, color: "var(--text-muted)" }}>
+                  提供商状态加载失败 <button type="button" onClick={() => void refreshCatalog()} style={{ marginLeft: 5, padding: 0, border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontSize: 11 }}>重试</button>
+                </div>
+              )}
               {activeOAuth.map((p) => {
                 const isSelected = selection?.type === "oauth" && selection.providerId === p.id;
                 return (
@@ -6153,8 +6348,10 @@ export function ModelsConfig({
               )}
 
               {/* Custom providers */}
-              {loading ? (
-                <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>加载中…</div>
+              {configPhase === "loading" ? (
+                <div role="status" aria-live="polite" style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>加载中…</div>
+              ) : configPhase === "error" ? (
+                <div style={{ padding: "10px 8px", fontSize: 12, color: "var(--text-muted)" }}>模型配置加载失败 <button type="button" onClick={() => void reloadConfigFromServer()} style={{ padding: 0, border: "none", background: "none", color: "var(--accent)", cursor: "pointer" }}>重试</button></div>
               ) : providers.map(([pName, pData]) => {
                 const isProviderSelected = selection?.type === "provider" && selection.name === pName;
                 const models = pData.models ?? [];
@@ -6231,7 +6428,7 @@ export function ModelsConfig({
 
           {/* Right: detail */}
           <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
-            {loading ? null : detailContent ?? (
+            {configPhase === "loading" ? null : detailContent ?? (
               <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-dim)", fontSize: 13 }}>
                 请选择提供商或模型
               </div>
@@ -6246,14 +6443,14 @@ export function ModelsConfig({
           <button onClick={onClose} style={{ padding: "6px 14px", background: "none", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text-muted)", cursor: "pointer", fontSize: 13 }}>
             取消
           </button>
-          <button onClick={handleSave} disabled={saving || savedOk} style={{
+          <button onClick={handleSave} disabled={saving || savedOk || configPhase !== "ready"} style={{
             position: "relative",
             padding: "6px 16px",
             minWidth: 92,
             background: savedOk ? "#16a34a" : saving ? "var(--bg-panel)" : "var(--accent)",
             border: "none", borderRadius: 6,
             color: savedOk ? "#fff" : saving ? "var(--text-muted)" : "#fff",
-            cursor: (saving || savedOk) ? "default" : "pointer", fontSize: 13, fontWeight: 600,
+            cursor: (saving || savedOk || configPhase !== "ready") ? "default" : "pointer", fontSize: 13, fontWeight: 600,
             display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
             transition: "background-color 0.2s ease, color 0.2s ease",
             animation: savedOk ? "saved-pop 0.45s ease" : undefined,

@@ -1,0 +1,2173 @@
+{
+  "schemaVersion": 1,
+  "id": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+  "title": "排查并修复 Models 弹窗渲染慢及未配置三方覆盖模型展示问题",
+  "workflowId": "feature-dev",
+  "status": "archived",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260728-103536",
+  "createdAt": "2026-07-28T02:37:48.721Z",
+  "updatedAt": "2026-07-28T04:15:15.573Z",
+  "completedAt": "2026-07-28T04:15:15.462Z",
+  "contextIds": [
+    "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-52cb44b86baef5fe859de36e",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T02:37:54.353Z",
+      "finishedAt": "2026-07-28T02:45:54.689Z",
+      "runner": "sdk",
+      "childSessionId": "019fa695-f941-728b-a418-62701e8dfbe7",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T02-37-54-369Z_019fa695-f941-728b-a418-62701e8dfbe7.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa695-f941-728b-a418-62701e8dfbe7",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请分析当前项目中左下角 Models 按钮弹窗的实现，重点排查弹窗打开后渲染缓慢的原因，以及三方模型覆盖模型列表对未配置项的展示逻辑。请遵循 Studio 流程完成需求分析、代码定位、性能假设、修复设计、影响范围、验证方案；如涉及 UI 变化，必须先产出基于现有项目的 HTML 原型并写入 ui.md 或关联 HTML 文件。完成后准备 plan-review.md，等待用户审批，不要实施代码。",
+      "summary": "规划已完成，未修改生产代码，未提交/推送。 ### 已产出 任务目录：`.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/` - `brief.md` - `prd.md` - `ui.md` - `models-popup-prototype.html` - `design.md` - `implement.md`，含 5 个子任务的机器可读 implementation plan - `checks.md` - `plan-review.md` - `handoff.md` ### 核心结论 - `/api/auth/providers` 实测最高约 **4.1s**，主要嫌疑是列表请求调用 `runtime.checkAuth()`。 - 两个 provider API 冷并发可能重复初始化管理 ModelRuntime，建议增加按 cache key single-flight。 - 左树无条件展示 `models.json.providers`，但只渲染 `models[]`，导致仅含 `modelOverrides` 的未配置 provider 成为空节点或重复节点。 - 推荐仅隐藏这些 raw 节点，原始覆盖数据完整保留。 ### 已验证 - HTML 原型及规划产物存在且非空。 - implementation plan JSON 解析成功，MOP-01～MOP-05 字段完整。 - 未运行 lint/tsc：本阶段仅新增 Studio 规划文档和 HTML 原型。 ### 待主会话/用户决策 1. 是否批准“仅含 `modelOverrides` 的未配置 provider 从左树隐藏，但不删除数据”。 2. 是否批准 Models 首屏仅展示本地 stored/Active 状态，不主动联网验证认证。 3. 审批 HTML 原型后，保存 implementationPlan 并进入审批状态；此前不得实现。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T02:37:54.353Z",
+        "updatedAt": "2026-07-28T02:45:54.689Z",
+        "eventCount": 3667,
+        "lastTextPreview": "规划已完成，未修改生产代码，未提交/推送。\n\n### 已产出\n任务目录：`.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `models-popup-prototype.html`\n- `design.md`\n- `implement.md`，含 5 个子任务的机器可读 implementation plan\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 核心结论\n- `/api/auth/providers` 实测最高约 **4.1s**，主要嫌疑是列表请求调用 `runtime.checkAuth()`。\n- 两个 provider API 冷并发可能重复初始化管理 ModelRuntime，建议增加按 cache key single-flight。\n- 左树无条件展示 `models.json.providers`，但只渲染 `models[]`，导致仅含 `modelOverrides` 的未配置 provider 成为空节点或重复节点。\n- 推荐仅隐藏这些 raw 节点，原始覆盖数据完整保留。\n\n### 已验证\n- HTML 原型及规划产物存在且非空。\n- implementation plan JSON 解析成功，MOP-01～MOP-05 字段完整。\n- 未运行 lint/tsc：本阶段仅新增 Studio 规划文档和 HTML 原型。\n\n### 待主会话/用户决策\n1. 是否批准“仅含 `modelOverrides` 的未配置 provider 从左树隐藏，但不删除数据”。\n2. 是否批准 Models 首屏仅展示本地 stored/Active 状态，不主动联网验证认证。\n3. 审批 HTML 原型后，保存 implementationPlan 并进入审批状态；此前不得实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T02:45:40.361Z",
+            "toolCallId": "call_L2Ow7Eo4ivhC1fN4Y1FJXKgh|fc_0227fccf103c426d016a6817d409588198b9a53f518345c2ec",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"rg -n \\\"TBD|待定|TODO\\\" .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/{brief,prd,ui,design,implement,checks,plan-review,handoff}.md || true; wc -c .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/*.{md,html}\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T02:45:40.397Z",
+            "toolCallId": "call_L2Ow7Eo4ivhC1fN4Y1FJXKgh|fc_0227fccf103c426d016a6817d409588198b9a53f518345c2ec",
+            "toolName": "bash",
+            "text": "4883 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/brief.md\n    4619 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/checks.md\n    7578 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md\n    1429 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/handoff.md\n   14525 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md\n    3701 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/plan-review.md\n    5006 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/prd.md\n      40 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/review.md\n      41 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/summary.md\n    3462 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/ui.md\n    9007 .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/models-popup-prototype.html\n   54291 total",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T02:45:42.052Z",
+            "toolCallId": "call_66xNMwavyKUXB1lW0SO9B1j7|fc_0227fccf103c426d016a6817d409408198aef05ac6c59dd84f",
+            "toolName": "bash",
+            "text": "artifact validation ok; plan subtasks: MOP-01, MOP-02, MOP-03, MOP-04, MOP-05\n?? \".ypi/tasks/20260728-103748-\\346\\216\\222\\346\\237\\245\\345\\271\\266\\344\\277\\256\\345\\244\\215-models-\\345\\274\\271\\347\\252\\227\\346\\270\\262\\346\\237\\223\\346\\205\\242\\345\\217\\212\\346\\234\\252\\351\\205\\215\\347\\275\\256\\344\\270\\211\\346\\226\\271\\350\\246\\206\\347\\233\\226\\346\\250\\241\\345\\236\\213\\345\\261\\225\\347\\244\\272\\351\\227\\256\\351\\242\\230/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T02:45:54.674Z",
+            "text": "规划已完成，未修改生产代码，未提交/推送。\n\n### 已产出\n任务目录：`.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/`\n\n- `brief.md`\n- `prd.md`\n- `ui.md`\n- `models-popup-prototype.html`\n- `design.md`\n- `implement.md`，含 5 个子任务的机器可读 implementation plan\n- `checks.md`\n- `plan-review.md`\n- `handoff.md`\n\n### 核心结论\n- `/api/auth/providers` 实测最高约 **4.1s**，主要嫌疑是列表请求调用 `runtime.checkAuth()`。\n- 两个 provider API 冷并发可能重复初始化管理 ModelRuntime，建议增加按 cache key single-flight。\n- 左树无条件展示 `models.json.providers`，但只渲染 `models[]`，导致仅含 `modelOverrides` 的未配置 provider 成为空节点或重复节点。\n- 推荐仅隐藏这些 raw 节点，原始覆盖数据完整保留。\n\n### 已验证\n- HTML 原型及规划产物存在且非空。\n- implementation plan JSON 解析成功，MOP-01～MOP-05 字段完整。\n- 未运行 lint/tsc：本阶段仅新增 Studio 规划文档和 HTML 原型。\n\n### 待主会话/用户决策\n1. 是否批准“仅含 `modelOverrides` 的未配置 provider 从左树隐藏，但不删除数据”。\n2. 是否批准 Models 首屏仅展示本地 stored/Active 状态，不主动联网验证认证。\n3. 审批 HTML 原型后，保存 implementationPlan 并进入审批状态；此前不得实现。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T02:45:54.676Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 866,
+        "tokens": 512,
+        "tokenSource": "usage",
+        "tps": 64.27,
+        "firstTokenAt": "2026-07-28T02:45:46.582Z",
+        "lastTokenAt": "2026-07-28T02:45:54.548Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-52cb44b86baef5fe859de36e",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/architect-52cb44b86baef5fe859de36e.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T02:37:54.353Z",
+        "finishedAt": "2026-07-28T02:45:54.682Z",
+        "updatedAt": "2026-07-28T02:45:54.682Z",
+        "itemCount": 87,
+        "messageCount": 1,
+        "toolCallCount": 41,
+        "stderrBytes": 0,
+        "bytes": 355076,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa695-f941-728b-a418-62701e8dfbe7",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T02-37-54-369Z_019fa695-f941-728b-a418-62701e8dfbe7.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "architect-fc2bd762443f6f066b242f1a",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T02:54:24.732Z",
+      "finishedAt": "2026-07-28T03:04:26.614Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6a5-15e9-7163-be4a-5f45f459182a",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T02-54-24-745Z_019fa6a5-15e9-7163-be4a-5f45f459182a.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6a5-15e9-7163-be4a-5f45f459182a",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "基于用户确认的方向继续完善设计，不实施代码。重点补充竞态方案：Models 弹窗首屏本地状态快速返回，后台 checkAuth/刷新可能晚到、乱序返回、弹窗关闭后更新、provider 切换/账号切换期间旧请求覆盖新状态、重复打开和重复刷新、runtime 初始化 single-flight。请明确 request generation/AbortController/active lifecycle、服务端缓存与 single-flight、状态合并规则、失败/超时降级、…",
+      "summary": "已完成竞态方案深化，未修改生产代码，未 commit/push/merge。 ### 更新文件 - `prd.md` - `design.md` - `implement.md` - `checks.md` - `plan-review.md` - 同步更新 `handoff.md` 目录：`.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/` ### 核心补充 - local summary → background verify 两阶段状态。 - active lifecycle + request generation + AbortController。 - provider/account切换、mutation与旧GET、关闭重开乱序保护。 - revision-aware verification字段合并规则。 - 服务端验证缓存、single-flight、超时及晚到结果丢弃。 - runtime init/offline-refresh single-flight。 - RACE-01～27测试矩阵。 - HTML原型保持有效，未修改。 ### 验证 - 机器可读 implementation plan JSON解析通过，5个子任务依赖及必需字段完整。 - HTML原型解析通过。 - 未运行lint/tsc：本次仅规划文档变更。 ### 剩余风险 - `checkAuth()`超时无法保证第三方停止credential refresh，只能保证晚到结果不发布。 - `localStateRevision`的跨进程检测与隐私实现需重点评审。 - `ModelsConfig.tsx`详情请求面较大，实施时需保护现有deep-link、quota和secret清理行为。 ### 主会话待办 1. 正式记录HTML原型与完整计划审批。 2. 确认或调整建议预算：15s验证TTL、8s deadline、30s late-flight retention。 3. 保存`implement.md`中的implementationPlan，再按流程推进；批准前不得实施。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T02:54:24.732Z",
+        "updatedAt": "2026-07-28T03:04:26.613Z",
+        "eventCount": 18833,
+        "lastTextPreview": "已完成竞态方案深化，未修改生产代码，未 commit/push/merge。\n\n### 更新文件\n\n- `prd.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- 同步更新 `handoff.md`\n\n目录：`.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/`\n\n### 核心补充\n\n- local summary → background verify 两阶段状态。\n- active lifecycle + request generation + AbortController。\n- provider/account切换、mutation与旧GET、关闭重开乱序保护。\n- revision-aware verification字段合并规则。\n- 服务端验证缓存、single-flight、超时及晚到结果丢弃。\n- runtime init/offline-refresh single-flight。\n- RACE-01～27测试矩阵。\n- HTML原型保持有效，未修改。\n\n### 验证\n\n- 机器可读 implementation plan JSON解析通过，5个子任务依赖及必需字段完整。\n- HTML原型解析通过。\n- 未运行lint/tsc：本次仅规划文档变更。\n\n### 剩余风险\n\n- `checkAuth()`超时无法保证第三方停止credential refresh，只能保证晚到结果不发布。\n- `localStateRevision`的跨进程检测与隐私实现需重点评审。\n- `ModelsConfig.tsx`详情请求面较大，实施时需保护现有deep-link、quota和secret清理行为。\n\n### 主会话待办\n\n1. 正式记录HTML原型与完整计划审批。\n2. 确认或调整建议预算：15s验证TTL、8s deadline、30s late-flight retention。\n3. 保存`implement.md`中的implementationPlan，再按流程推进；批准前不得实施。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:04:05.252Z",
+            "toolCallId": "call_3XXqID8M8NFEaeaOlxzL0ceU|fc_0c383085e1a293b5016a681c250280819887c68f17077a84d2",
+            "toolName": "bash",
+            "text": "planning artifacts OK; plan ids: MOP-01, MOP-02, MOP-03, MOP-04, MOP-05\nHTML prototype parses OK\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md:23:| MOP-02 | runtime | 1 | — | 管理runtime init/offline-refresh single-flight | 是 |\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md:24:| MOP-03 | api | 2 | MOP-02 | local summary、revision-aware background verify、服务端cache/flight与聚合优化 | 与MOP-01并行 |\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md:40:- 在 `lib/web-model-runtime.ts` 增加 init pending 与 offline-refresh pending。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md:52:  - 进程盐化不透明 `localStateRevision`；\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md:69:- verify只按相同provider id + `localStateRevision` merge verification；保留local configured/count/active name/order，禁止whole-object覆盖。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md:133:      \"title\": \"为管理ModelRuntime增加init与offline-refresh single-flight\",\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md:187:        \"生成安全opaque localStateRevision；成功auth/account mutation bump epoch并invalidate。\",\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md:237:        \"summary成功后后台verify；仅same provider+localStateRevision merge verification，不覆盖local counts/Active/order/selection。\",\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/implement.md:338:    \"先关闭前端background verify，保留local summary可作为竞态止血。\",\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:41:- summary、background verify、账号 Activate/Login/Logout 可能乱序；单一 `loggedIn` 无法判断结果基于哪一版本地状态。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:63:       -> OAuth local rows own visibility/account metadata/localStateRevision\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:65:       -> after OAuth summary commit, start background verify V1\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:70:       -> merge only when L1/K1 current AND provider.localStateRevision matches\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:173:  if item.verification.basedOnRevision !== current.localStateRevision -> ignore\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:188:- `refreshCatalog()` 先 summary，后 background verify；verify 采用 revision-aware field merge，禁止 wholesale `setOauthProviders(response.providers)`。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:215:- `localStateRevision`：进程盐化的不透明摘要，输入仅包含安全本地投影、provider mutation epoch 与必要 authority file stat fingerprint；不返回路径、账号 id、credential hash 或原始 stat。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:217:- `verifyProviderAuth(runtimeKey, runtime, provider, localSnapshot)`：按 `runtimeKey + providerId + localStateRevision` single-flight。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:281:Key：`adminRuntimeKey + providerId + localStateRevision`。local revision变化或 mutation invalidate 后不得命中旧 cache。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:323:    \"localStateRevision\": \"opaque-process-local-token\",\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:364:| background verify timeout/error | 保留 local rows与counts，不全局报错 | TTL/cooldown后下次打开或mutation再验 |\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:382:- additive `localConfigured/localStateRevision/statusBasis/verification` 可被旧客户端忽略。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:391:| local summary将过期 credential显示为已配置 | 明确定义为本地状态；background verify/详情 quota负责恢复；row不消失 |\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/design.md:407:- 前端停止 background verify、回到仅 local summary即可止血，不影响存储。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/checks.md:6:- [ ] models.json 树不等待 auth catalog 或 background verify。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/checks.md:8:- [ ] local summary成功后 background verify非阻塞启动。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/checks.md:80:| RACE-27 | reset | resolved/init pending/refresh pending/verification cache/flight测试状态清空 |\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/checks.md:102:- [ ] summary payload字段为safe allowlist；`localStateRevision`不可读出id/path/stat/credential。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/checks.md:186:- [ ] PRD R1–R9逐条有自动或人工证据。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/plan-review.md:21:- background verify慢、失败或超时时保留本地rows，不增加全屏spinner或新的常驻卡片。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/plan-review.md:32:- 新增local summary + revision-aware background verify；默认providers route保持兼容完整语义。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/plan-review.md:34:- `getWebModelRuntime()`按`agentDir + modelsPath`实现init与offline-refresh single-flight。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/plan-review.md:44:3. **后台verify覆盖新状态**：verify携带`basedOnRevision`，只merge same provider + same `localStateRevision`的verification；绝不覆盖新accountCount、Active、localConfigured、顺序或selection。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/plan-review.md:56:2. MOP-02 admin runtime init/offline-refresh single-flight；\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/prd.md:47:- 后台验证只能更新同一 provider、同一 `localStateRevision` 的 verification 状态；不得覆盖较新的账号数量、Active 名称、本地 configured 状态或用户 selection。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/prd.md:80:- 结构性门禁：summary 路径零 `checkAuth()`；管理 runtime 同 key init/offline-refresh single-flight；models config 不等待 catalog；后台 verify 不位于首屏关键路径。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/prd.md:88:- API 改动采用 query mode 与 additive 字段：默认完整验证语义保持兼容，Models 显式使用 summary → background verify 两阶段。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/prd.md:89:- `localStateRevision` 必须是不透明、进程盐化的安全版本标记；不得由浏览器反推出账号 id、token、key、路径或凭据内容。\n.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/prd.md:92:### R9 — 异步竞态正确性",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T03:04:12.677Z",
+            "toolCallId": "call_nxylgKKTDcodrJiYG3me9alu|fc_0c383085e1a293b5016a681c2c73f48198a6a6e51c2e67b859",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node - <<'NODE'\\nconst p=require('./package.json').scripts;\\nfor (const k of ['test:kiro-cold-auth','test:grok-provider','test:kiro-provider','test:antigravity-provider','test:anyrouter-api-routes','test:grok-global-auth']) console.log(k, Boolean(p[k]));\\nNODE\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:04:12.793Z",
+            "toolCallId": "call_nxylgKKTDcodrJiYG3me9alu|fc_0c383085e1a293b5016a681c2c73f48198a6a6e51c2e67b859",
+            "toolName": "bash",
+            "text": "test:kiro-cold-auth true\ntest:grok-provider true\ntest:kiro-provider true\ntest:antigravity-provider true\ntest:anyrouter-api-routes true\ntest:grok-global-auth true",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:04:26.594Z",
+            "text": "已完成竞态方案深化，未修改生产代码，未 commit/push/merge。\n\n### 更新文件\n\n- `prd.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- 同步更新 `handoff.md`\n\n目录：`.ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/`\n\n### 核心补充\n\n- local summary → background verify 两阶段状态。\n- active lifecycle + request generation + AbortController。\n- provider/account切换、mutation与旧GET、关闭重开乱序保护。\n- revision-aware verification字段合并规则。\n- 服务端验证缓存、single-flight、超时及晚到结果丢弃。\n- runtime init/offline-refresh single-flight。\n- RACE-01～27测试矩阵。\n- HTML原型保持有效，未修改。\n\n### 验证\n\n- 机器可读 implementation plan JSON解析通过，5个子任务依赖及必需字段完整。\n- HTML原型解析通过。\n- 未运行lint/tsc：本次仅规划文档变更。\n\n### 剩余风险\n\n- `checkAuth()`超时无法保证第三方停止credential refresh，只能保证晚到结果不发布。\n- `localStateRevision`的跨进程检测与隐私实现需重点评审。\n- `ModelsConfig.tsx`详情请求面较大，实施时需保护现有deep-link、quota和secret清理行为。\n\n### 主会话待办\n\n1. 正式记录HTML原型与完整计划审批。\n2. 确认或调整建议预算：15s验证TTL、8s deadline、30s late-flight retention。\n3. 保存`implement.md`中的implementationPlan，再按流程推进；批准前不得实施。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:04:26.601Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 947,
+        "tokens": 677,
+        "tokenSource": "usage",
+        "tps": 100.89,
+        "firstTokenAt": "2026-07-28T03:04:19.760Z",
+        "lastTokenAt": "2026-07-28T03:04:26.470Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-fc2bd762443f6f066b242f1a",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/architect-fc2bd762443f6f066b242f1a.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T02:54:24.732Z",
+        "finishedAt": "2026-07-28T03:04:26.602Z",
+        "updatedAt": "2026-07-28T03:04:26.602Z",
+        "itemCount": 71,
+        "messageCount": 1,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 334676,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6a5-15e9-7163-be4a-5f45f459182a",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T02-54-24-745Z_019fa6a5-15e9-7163-be4a-5f45f459182a.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-6da85d8ce6a407243ad8a42c",
+      "subtaskId": "MOP-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T03:11:55.086Z",
+      "finishedAt": "2026-07-28T03:14:29.445Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6b5-1cde-77aa-aad4-f129de80298b",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-11-55-102Z_019fa6b5-1cde-77aa-aad4-f129de80298b.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6b5-1cde-77aa-aad4-f129de80298b",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T03:11:55.086Z",
+        "updatedAt": "2026-07-28T03:14:29.445Z",
+        "eventCount": 1448,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:14:09.401Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:14:16.408Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:14:24.416Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:14:29.436Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:14:29.442Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-6da85d8ce6a407243ad8a42c",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/implementer-6da85d8ce6a407243ad8a42c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T03:11:55.086Z",
+        "finishedAt": "2026-07-28T03:14:29.443Z",
+        "updatedAt": "2026-07-28T03:14:29.443Z",
+        "itemCount": 33,
+        "messageCount": 1,
+        "toolCallCount": 11,
+        "stderrBytes": 0,
+        "bytes": 63773,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6b5-1cde-77aa-aad4-f129de80298b",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-11-55-102Z_019fa6b5-1cde-77aa-aad4-f129de80298b.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-4be50c0d40415e02f630a58d",
+      "subtaskId": "MOP-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T03:17:07.127Z",
+      "finishedAt": "2026-07-28T03:20:03.001Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6b9-dfc8-7f2f-a7f7-7a1e1172675e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-17-07-144Z_019fa6b9-dfc8-7f2f-a7f7-7a1e1172675e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6b9-dfc8-7f2f-a7f7-7a1e1172675e",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/web-model-runtime.ts` — admin runtime init and offline refresh single-flight; retry-safe pending cleanup; reset clears all cache state.\n- `scripts/test-web-model-runtime.mjs` — added deterministic concurrency, retry, key-isolation, and network-init tests.\n\n#### Verification\n- `git diff --check` — passed.\n- `npm run test:web-model-runtime` — blocked: `node_modules` absent (`jiti` unavailable).\n- `tsc --noEmit` — blocked: `node_modules/.bin/tsc` absent.\n\n#### Notes / Risks\n- Explicit `allowModelNetwork: true` remains opt-in and outside the shared offline refresh flight; initialization itself is always offline.\n- Existing unrelated `package.json` / MOP-01 working-tree changes were not modified.",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T03:17:07.127Z",
+        "updatedAt": "2026-07-28T03:20:03.001Z",
+        "eventCount": 4385,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/web-model-runtime.ts` — admin runtime init and offline refresh single-flight; retry-safe pending cleanup; reset clears all cache state.\n- `scripts/test-web-model-runtime.mjs` — added deterministic concurrency, retry, key-isolation, and network-init tests.\n\n#### Verification\n- `git diff --check` — passed.\n- `npm run test:web-model-runtime` — blocked: `node_modules` absent (`jiti` unavailable).\n- `tsc --noEmit` — blocked: `node_modules/.bin/tsc` absent.\n\n#### Notes / Risks\n- Explicit `allowModelNetwork: true` remains opt-in and outside the shared offline refresh flight; initialization itself is always offline.\n- Existing unrelated `package.json` / MOP-01 working-tree changes were not modified.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:19:52.170Z",
+            "toolCallId": "call_cBCYB3dx5sQvn7gTlq6PRjbI|fc_0d971ad81ebdc0af016a681fd21ec481988e4490fd48b65b57",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in scripts/test-web-model-runtime.mjs.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T03:19:55.600Z",
+            "toolCallId": "call_P7H23rxyZuSiR3OAjVZzAF3G|fc_0d971ad81ebdc0af016a681fdafb1481989ee64aed89a22b73",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --check && git diff --stat && test -d node_modules && echo node_modules-present || echo node_modules-missing\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:19:55.650Z",
+            "toolCallId": "call_P7H23rxyZuSiR3OAjVZzAF3G|fc_0d971ad81ebdc0af016a681fdafb1481989ee64aed89a22b73",
+            "toolName": "bash",
+            "text": "lib/web-model-runtime.ts           | 132 +++++++++++++++++++++++++++++++------\n package.json                       |   1 +\n scripts/test-web-model-runtime.mjs | 124 ++++++++++++++++++++++++++++++++++\n 3 files changed, 237 insertions(+), 20 deletions(-)\nnode_modules-missing",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:20:02.990Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/web-model-runtime.ts` — admin runtime init and offline refresh single-flight; retry-safe pending cleanup; reset clears all cache state.\n- `scripts/test-web-model-runtime.mjs` — added deterministic concurrency, retry, key-isolation, and network-init tests.\n\n#### Verification\n- `git diff --check` — passed.\n- `npm run test:web-model-runtime` — blocked: `node_modules` absent (`jiti` unavailable).\n- `tsc --noEmit` — blocked: `node_modules/.bin/tsc` absent.\n\n#### Notes / Risks\n- Explicit `allowModelNetwork: true` remains opt-in and outside the shared offline refresh flight; initialization itself is always offline.\n- Existing unrelated `package.json` / MOP-01 working-tree changes were not modified.",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:20:02.991Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 755,
+        "tokens": 321,
+        "tokenSource": "usage",
+        "tps": 122.89,
+        "firstTokenAt": "2026-07-28T03:20:00.086Z",
+        "lastTokenAt": "2026-07-28T03:20:02.698Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-4be50c0d40415e02f630a58d",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/implementer-4be50c0d40415e02f630a58d.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T03:17:07.127Z",
+        "finishedAt": "2026-07-28T03:20:02.997Z",
+        "updatedAt": "2026-07-28T03:20:02.997Z",
+        "itemCount": 41,
+        "messageCount": 1,
+        "toolCallCount": 18,
+        "stderrBytes": 0,
+        "bytes": 104726,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6b9-dfc8-7f2f-a7f7-7a1e1172675e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-17-07-144Z_019fa6b9-dfc8-7f2f-a7f7-7a1e1172675e.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-33ce63c7a148310b3bbb8104",
+      "subtaskId": "MOP-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T03:20:27.560Z",
+      "finishedAt": "2026-07-28T03:24:56.004Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6bc-eeb3-7d11-a1c8-88bde5a71f66",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-20-27-571Z_019fa6bc-eeb3-7d11-a1c8-88bde5a71f66.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6bc-eeb3-7d11-a1c8-88bde5a71f66",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/models-provider-auth-summary.ts` — local summary, opaque revision, verify TTL/single-flight/deadline/invalidation.\n- `app/api/auth/providers/route.ts` — `summary` / `verify` modes; default legacy verification retained.\n- `app/api/auth/all-providers/route.ts` — single model count pass and parallel managed enrichment.\n- OAuth login/logout/account/activate routes — invalidate verification after successful mutations.\n- `scripts/test-models-provider-auth-summary.mjs`, `package.json` — focused test and script.\n\n#### Verification\n- `git diff --check` — passed.\n- `node -e \"JSON.parse(...package.json)\"` — passed.\n- `npm run test:models-provider-auth-summary` — blocked: worktree has no `node_modules` (`jiti` unavailable).\n- `tsc --noEmit` — blocked: dependencies/compiler unavailable.\n\n#### Notes / Risks\n- No frontend/MOP-04 changes made.\n- Main session should install dependencies, then run `npm run test:models-provider-auth-summary`, `npm run test:web-model-runtime`, relevant OAuth/provider tests, lint, and TypeScript checks.",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T03:20:27.560Z",
+        "updatedAt": "2026-07-28T03:24:56.004Z",
+        "eventCount": 7631,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/models-provider-auth-summary.ts` — local summary, opaque revision, verify TTL/single-flight/deadline/invalidation.\n- `app/api/auth/providers/route.ts` — `summary` / `verify` modes; default legacy verification retained.\n- `app/api/auth/all-providers/route.ts` — single model count pass and parallel managed enrichment.\n- OAuth login/logout/account/activate routes — invalidate verification after successful mutations.\n- `scripts/test-models-provider-auth-summary.mjs`, `package.json` — focused test and script.\n\n#### Verification\n- `git diff --check` — passed.\n- `node -e \"JSON.parse(...package.json)\"` — passed.\n- `npm run test:models-provider-auth-summary` — blocked: worktree has no `node_modules` (`jiti` unavailable).\n- `tsc --noEmit` — blocked: dependencies/compiler unavailable.\n\n#### Notes / Risks\n- No frontend/MOP-04 changes made.\n- Main session should install dependencies, then run `npm run test:models-provider-auth-summary`, `npm run test:web-model-runtime`, relevant OAuth/provider tests, lint, and TypeScript checks.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:24:35.745Z",
+            "toolCallId": "call_X8PdTZwzLTayXVz3fYF2Z47D|fc_075b13a399d14717016a6820ed4ad8819a80584b7394e83497",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in lib/models-provider-auth-summary.ts.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T03:24:44.111Z",
+            "toolCallId": "call_omoNSuXo8t00wjOXB15kMtp3|fc_075b13a399d14717016a6820fbd79c819a805e478885f95624",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node --check scripts/test-models-provider-auth-summary.mjs && node --check package.json 2>&1 || true; git diff --check\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:24:44.319Z",
+            "toolCallId": "call_omoNSuXo8t00wjOXB15kMtp3|fc_075b13a399d14717016a6820fbd79c819a805e478885f95624",
+            "toolName": "bash",
+            "text": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260728-103536/package.json:2\n  \"name\": \"@alan-zhao/yolk-pi-web\",\n        ^\n\nSyntaxError: Unexpected token ':'\n    at wrapSafe (node:internal/modules/cjs/loader:1762:18)\n    at checkSyntax (node:internal/main/check_syntax:76:3)\n\nNode.js v26.0.0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:24:55.993Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/models-provider-auth-summary.ts` — local summary, opaque revision, verify TTL/single-flight/deadline/invalidation.\n- `app/api/auth/providers/route.ts` — `summary` / `verify` modes; default legacy verification retained.\n- `app/api/auth/all-providers/route.ts` — single model count pass and parallel managed enrichment.\n- OAuth login/logout/account/activate routes — invalidate verification after successful mutations.\n- `scripts/test-models-provider-auth-summary.mjs`, `package.json` — focused test and script.\n\n#### Verification\n- `git diff --check` — passed.\n- `node -e \"JSON.parse(...package.json)\"` — passed.\n- `npm run test:models-provider-auth-summary` — blocked: worktree has no `node_modules` (`jiti` unavailable).\n- `tsc --noEmit` — blocked: dependencies/compiler unavailable.\n\n#### Notes / Risks\n- No frontend/MOP-04 changes made.\n- Main session should install dependencies, then run `npm run test:models-provider-auth-summary`, `npm run test:web-model-runtime`, relevant OAuth/provider tests, lint, and TypeScript checks.",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:24:55.998Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1086,
+        "tokens": 432,
+        "tokenSource": "usage",
+        "tps": 89.37,
+        "firstTokenAt": "2026-07-28T03:24:51.142Z",
+        "lastTokenAt": "2026-07-28T03:24:55.976Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-33ce63c7a148310b3bbb8104",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/implementer-33ce63c7a148310b3bbb8104.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T03:20:27.560Z",
+        "finishedAt": "2026-07-28T03:24:55.999Z",
+        "updatedAt": "2026-07-28T03:24:55.999Z",
+        "itemCount": 75,
+        "messageCount": 1,
+        "toolCallCount": 35,
+        "stderrBytes": 0,
+        "bytes": 189230,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6bc-eeb3-7d11-a1c8-88bde5a71f66",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-20-27-571Z_019fa6bc-eeb3-7d11-a1c8-88bde5a71f66.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-539e24c1f4b8d38b152c231c",
+      "subtaskId": "MOP-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T03:25:27.131Z",
+      "finishedAt": "2026-07-28T03:30:12.629Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6c1-80eb-78a0-aacb-445e4f522e67",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-25-27-147Z_019fa6c1-80eb-78a0-aacb-445e4f522e67.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6c1-80eb-78a0-aacb-445e4f522e67",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/ModelsConfig.tsx` — config/catalog/verify lanes, generation/abort lifecycle guards, summary→verify merge, visible-provider projection, safe config-load failure and save disable; added OAuth/API-key detail guards.\n- `scripts/test-models-config-races.mjs` — focused lifecycle contract checks.\n- `package.json` — added `test:models-config-races`.\n\n#### Verification\n\n- `npm run test:models-config-races` — passed.\n- `git diff --check` — passed.\n- `npm run lint` / `tsc --noEmit` — blocked: dependencies are not installed (`eslint` and `node_modules/.bin/tsc` unavailable).\n\n#### Notes / Risks\n\n- Existing MOP-01–03 changes remain unmodified.\n- API-key mutation handlers beyond load/reveal still need broader runtime/UI validation for stale GET-versus-mutation behavior once dependencies are installed.",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T03:25:27.131Z",
+        "updatedAt": "2026-07-28T03:30:12.629Z",
+        "eventCount": 10783,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `components/ModelsConfig.tsx` — config/catalog/verify lanes, generation/abort lifecycle guards, summary→verify merge, visible-provider projection, safe config-load failure and save disable; added OAuth/API-key detail guards.\n- `scripts/test-models-config-races.mjs` — focused lifecycle contract checks.\n- `package.json` — added `test:models-config-races`.\n\n#### Verification\n\n- `npm run test:models-config-races` — passed.\n- `git diff --check` — passed.\n- `npm run lint` / `tsc --noEmit` — blocked: dependencies are not installed (`eslint` and `node_modules/.bin/tsc` unavailable).\n\n#### Notes / Risks\n\n- Existing MOP-01–03 changes remain unmodified.\n- API-key mutation handlers beyond load/reveal still need broader runtime/UI validation for stale GET-versus-mutation behavior once dependencies are installed.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:29:59.113Z",
+            "toolCallId": "call_1JYhzrNc6FftVTciWNYKKDLo|fc_06460631b0260581016a682235830c8198a962e73ff52cfce4",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in scripts/test-models-config-races.mjs.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T03:30:01.544Z",
+            "toolCallId": "call_bkzva57LUuiMdmS3Bbw08QMB|fc_06460631b0260581016a6822392a048198bce0a780a14bd53c",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run test:models-config-races && git diff --check && git diff --stat\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:30:01.820Z",
+            "toolCallId": "call_bkzva57LUuiMdmS3Bbw08QMB|fc_06460631b0260581016a6822392a048198bce0a780a14bd53c",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.5 test:models-config-races\n> node scripts/test-models-config-races.mjs\n\nmodels config lifecycle contract checks passed\n app/api/auth/accounts/[provider]/activate/route.ts |   2 +\n app/api/auth/accounts/[provider]/route.ts          |  13 +-\n app/api/auth/all-providers/route.ts                | 100 +++----\n app/api/auth/login/[provider]/route.ts             |   4 +\n app/api/auth/logout/[provider]/route.ts            |   2 +\n app/api/auth/providers/route.ts                    | 115 ++++----\n components/ModelsConfig.tsx                        | 304 ++++++++++++++++-----\n lib/web-model-runtime.ts                           | 132 +++++++--\n package.json                                       |   3 +\n scripts/test-web-model-runtime.mjs                 | 124 +++++++++\n 10 files changed, 581 insertions(+), 218 deletions(-)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:30:12.616Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `components/ModelsConfig.tsx` — config/catalog/verify lanes, generation/abort lifecycle guards, summary→verify merge, visible-provider projection, safe config-load failure and save disable; added OAuth/API-key detail guards.\n- `scripts/test-models-config-races.mjs` — focused lifecycle contract checks.\n- `package.json` — added `test:models-config-races`.\n\n#### Verification\n\n- `npm run test:models-config-races` — passed.\n- `git diff --check` — passed.\n- `npm run lint` / `tsc --noEmit` — blocked: dependencies are not installed (`eslint` and `node_modules/.bin/tsc` unavailable).\n\n#### Notes / Risks\n\n- Existing MOP-01–03 changes remain unmodified.\n- API-key mutation handlers beyond load/reveal still need broader runtime/UI validation for stale GET-versus-mutation behavior once dependencies are installed.",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:30:12.623Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 861,
+        "tokens": 485,
+        "tokenSource": "usage",
+        "tps": 150.15,
+        "firstTokenAt": "2026-07-28T03:30:08.988Z",
+        "lastTokenAt": "2026-07-28T03:30:12.218Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-539e24c1f4b8d38b152c231c",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/implementer-539e24c1f4b8d38b152c231c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T03:25:27.131Z",
+        "finishedAt": "2026-07-28T03:30:12.623Z",
+        "updatedAt": "2026-07-28T03:30:12.623Z",
+        "itemCount": 75,
+        "messageCount": 1,
+        "toolCallCount": 35,
+        "stderrBytes": 0,
+        "bytes": 201633,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6c1-80eb-78a0-aacb-445e4f522e67",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-25-27-147Z_019fa6c1-80eb-78a0-aacb-445e4f522e67.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-79be830dbb6479130efba26e",
+      "subtaskId": "MOP-05",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T03:30:38.394Z",
+      "finishedAt": "2026-07-28T03:32:57.515Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6c6-40c8-716c-ad8e-3eec10354395",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-30-38-408Z_019fa6c6-40c8-716c-ad8e-3eec10354395.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6c6-40c8-716c-ad8e-3eec10354395",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `docs/modules/frontend.md` — Models 分 lane / generation / abort 与过滤、保存安全。\n- `docs/modules/api.md` — `summary` / `verify` API 契约与聚合优化。\n- `docs/modules/library.md` — 可见性、auth summary、runtime single-flight。\n- `docs/architecture/overview.md` — 两阶段认证、cache/flight、竞态与回滚边界。\n- `docs/integrations/README.md` — ModelRuntime 并发与 Models auth boundary。\n\n#### Verification\n- `npm run test:models-config-visibility` — passed.\n- `npm run test:models-config-races` — passed.\n- `git diff --check` — passed.\n- `npm run test:models-provider-auth-summary` — blocked: worktree has no `node_modules` / `jiti`.\n- `npm run lint` / `tsc --noEmit` / provider regressions — blocked: `node_modules` absent.\n\n#### Notes / Risks\n- 未对现有 `30141` 服务做 endpoint/browser benchmark：其进程未确认使用临时 `PI_CODING_AGENT_DIR`，避免读取或触发真实账号状态。\n- 主会话需在安装依赖后，以临时 agent dir 启动服务，完成 cold/warm 5 次 endpoint 与浏览器首帧记录，再运行剩余 cross-provider、lint、tsc。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T03:30:38.394Z",
+        "updatedAt": "2026-07-28T03:32:57.515Z",
+        "eventCount": 3834,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `docs/modules/frontend.md` — Models 分 lane / generation / abort 与过滤、保存安全。\n- `docs/modules/api.md` — `summary` / `verify` API 契约与聚合优化。\n- `docs/modules/library.md` — 可见性、auth summary、runtime single-flight。\n- `docs/architecture/overview.md` — 两阶段认证、cache/flight、竞态与回滚边界。\n- `docs/integrations/README.md` — ModelRuntime 并发与 Models auth boundary。\n\n#### Verification\n- `npm run test:models-config-visibility` — passed.\n- `npm run test:models-config-races` — passed.\n- `git diff --check` — passed.\n- `npm run test:models-provider-auth-summary` — blocked: worktree has no `node_modules` / `jiti`.\n- `npm run lint` / `tsc --noEmit` / provider regressions — blocked: `node_modules` absent.\n\n#### Notes / Risks\n- 未对现有 `30141` 服务做 endpoint/browser benchmark：其进程未确认使用临时 `PI_CODING_AGENT_DIR`，避免读取或触发真实账号状态。\n- 主会话需在安装依赖后，以临时 agent dir 启动服务，完成 cold/warm 5 次 endpoint 与浏览器首帧记录，再运行剩余 cross-provider、lint、tsc。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:32:40.855Z",
+            "toolCallId": "call_bv4fq4A4f4PgIzHMprnZ3YtN|fc_047d4620039acd6b016a6822d665fc819a8fd756239e519288",
+            "toolName": "bash",
+            "text": "@alan-zhao/yolk-pi-web@0.8.5 /Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web.worktrees/pi-20260728-103536\n└── (empty)\n\n\n> @alan-zhao/yolk-pi-web@0.8.5 test:models-config-races\n> node scripts/test-models-config-races.mjs\n\nmodels config lifecycle contract checks passed\n\n> @alan-zhao/yolk-pi-web@0.8.5 lint\n> eslint .\n\nsh: eslint: command not found\n/bin/bash: line 4: node_modules/.bin/tsc: No such file or directory\n\n--- package manager state ---\nls: node_modules: No such file or directory\nls: node_modules/.bin: No such file or directory\nls: node_modules/.bin/tsc: No such file or directory\n\n\nCommand exited with code 1",
+            "isError": true,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T03:32:45.727Z",
+            "toolCallId": "call_eb2NAfjmjHVWIbBPvjiqmyXG|fc_047d4620039acd6b016a6822dcd918819a8b11861f6ae22a36",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --check && git diff -- docs/modules/frontend.md docs/modules/api.md docs/modules/library.md docs/architecture/overview.md docs/integrations/README.md && git status --short\",\n  \"timeout\": 60\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:32:45.809Z",
+            "toolCallId": "call_eb2NAfjmjHVWIbBPvjiqmyXG|fc_047d4620039acd6b016a6822dcd918819a8b11861f6ae22a36",
+            "toolName": "bash",
+            "text": "diff --git a/docs/architecture/overview.md b/docs/architecture/overview.md\nindex 8042e77..5d1bc00 100644\n--- a/docs/architecture/overview.md\n+++ b/docs/architecture/overview.md\n@@ -281,6 +281,18 @@ Model pricing is configured by writing directly to Pi's single source of truth:\n - The API projection (`ModelPriceListResponse`) never exposes `apiKey`, full `baseUrl`, headers, auth/account data, absolute paths, or the raw `models.json` content.\n - ModelsConfig GET keeps the legacy body shape and exposes revision via `ETag` / `X-Models-Config-Revision` only; PUT may send `If-Match` and always returns additive `revision`.\n \n+### Models modal local catalog and verification\n+\n+Models opens its shell independently of data. `components/ModelsConfig.tsx` keeps config and catalog lanes separate; each lane has lifecycle, request-generation, and `AbortController` ownership. Aborting is only resource cleanup: a response may commit only while its captured generation and active lifecycle still match. Unmount/retry/mutation/provider-or-account switch invalidates the applicable generation first, so old GET/SSE/reveal/quota responses cannot overwrite newer local state.\n+\n+`GET /api/auth/providers?mode=summary` is the first catalog phase. It is metadata-only: no legacy bootstrap write, `runtime.checkAuth()`, or provider network. It owns provider existence, `localConfigured`, account count, Active display name, order, and an opaque process-salted `localStateRevision`. The detached `mode=verify` phase owns only allowlisted verification for the same provider/revision. A valid/invalid result may adjust compatible `loggedIn`, but never removes a locally configured recovery row or changes counts, Active, order, raw-config visibility, or user selection. Timeout/error/superseded results preserve the local projection.\n+\n+Server verification is keyed by administrative runtime + provider + local revision. Same-key callers share one `checkAuth()`; successful valid/invalid results have a 15-second in-process TTL. The public result has an 8-second deadline, while an uncooperative third-party call may remain deduplicated for 30 seconds. A late settlement after deadline/invalidation is non-publishable and is never cached. Successful login/logout/account mutations bump the provider epoch and clear the matching verification cache; a browser disconnect never cancels a shared verification owner. HTTP responses remain `Cache-Control: no-store` and return only safe state/revision/time fields.\n+\n+Administrative `getWebModelRuntime()` also uses separate keyed single-flights for cold construction/fixed-provider registration and offline refresh (`agentDir + modelsPath`). Rejects clear their pending entries; reset clears resolved and pending maps. The common Models catalog paths therefore share one offline initialization/refresh without joining an auth verification or explicit network-refresh flight. Main Chat, Studio, and temporary runtimes remain isolated.\n+\n+The raw models tree is a display projection: an entry is hidden only when its enumerable keys are exactly `modelOverrides` and that value is a non-array object. Any malformed, unknown, or extra field remains visible. Filtering never rewrites `models.json`, so hidden model-price overrides remain in the full draft and survive unrelated saves. A failed config GET is not represented as `{ providers: {} }`; Save stays disabled until a valid config is loaded.\n+\n ### OpenAI-compatible `/models` sync invariants\n \n `POST /api/models-config/sync` discovers remote model ids for one saved custom OpenAI-compatible provider and merges new ids on confirmed user action. This is the third models.json writer alongside ModelsConfig PUT and model-price PATCH.\ndiff --git a/docs/integrations/README.md b/docs/integrations/README.md\nindex 12dd957..429868f 100644\n--- a/docs/integrations/README.md\n+++ b/docs/integrations/README.md\n@@ -41,7 +41,7 @@ Do **not** deep-import coding-agent private `core/auth-storage`, construct `Mode\n | --- | --- |\n | `lib/web-credential-store.ts` | App-owned file-backed `CredentialStore` over `~/.pi/agent/auth.json`. Auth-file-wide in-process queue + cross-process mkdir lock, lock-time reread, malformed-JSON fail-closed, same-dir atomic replace, dir `0700` / file `0600`. `createInMemoryWebCredentialStore()` for OAuth `accountMode=add` (save without replacing Active). |\n | `lib/web-auth-config-value.ts` | API-key config-value resolver used by the store `read()` path (literal, `$ENV`/`${ENV}`, `$$`/`$!`, leading `!command`). `list()` never resolves or returns secrets. |\n-| `lib/web-model-runtime.ts` | `createWebModelRuntime` / `getWebModelRuntime` / `createWebAgentSessionServices`. Fixed providers (Grok → Kiro → Antigravity → AnyRouter) plus caller extras register onto the **target** `ModelRuntime`. Only fixed-provider administrative runtimes are path-keyed and reused; main Chat / Studio child / temporary `modelsPath` always get isolated runtimes. |\n+| `lib/web-model-runtime.ts` | `createWebModelRuntime` / `getWebModelRuntime` / `createWebAgentSessionServices`. Fixed providers (Grok → Kiro → Antigravity → AnyRouter) plus caller extras register onto the **target** `ModelRuntime`. Administrative runtimes are keyed by canonical agentDir/modelsPath and single-flight cold initialization/fixed registration plus offline refresh; explicit network refresh is separate so it cannot block the Models local catalog. Main Chat / Studio child / temporary `modelsPath` remain isolated. |\n | `lib/pi-provider-extensions.ts` | jiti factories + `webExtensionFactories(extra)` in fixed order Grok → Kiro → Antigravity → AnyRouter. AnyRouter loader points `PI_ANYROUTER_CC_CONFIG` at the Web-managed Active runtime bridge once, reconciles mirrors on cold load, intercepts `registerProvider(\"anyrouter\")` so a static package apiKey cannot freeze over CredentialStore/bridge state, and isolates load failures. `ensureWebProvidersBootstrapped()` is a **legacy OAuth/cold-path preload only** (not a catalog guarantee for another runtime). `createWebProviderAwareModelRegistry()` is removed and throws; use `getWebModelRuntime()` / `createWebAgentSessionServices()`. |\n | `lib/rpc-manager.ts` `reloadRpcAuthState()` | Async: offline-refresh each live wrapper's `ModelRuntime`, replace same provider/id model descriptors without `setModel()` / `model_change` / settings defaults, then clean provider session resources. All Activate/login/logout/API-key mirror callers must `await` it. |\n \n@@ -49,6 +49,8 @@ Do **not** deep-import coding-agent private `core/auth-storage`, construct `Mode\n \n **Request auth:** Prefer `ModelRuntime.getAuth(model|provider)` or runtime `completeSimple`/`streamSimple` so model headers/baseUrl/env are assembled once. Token-compatibility paths that still need public pi-ai OAuth helpers for non-Active saved credentials must load fixed providers first and must not use removed `AuthStorage`.\n \n+**Models catalog auth boundary:** `GET /api/auth/providers?mode=summary` reads only local stored/managed-account metadata and must never call legacy bootstrap, `runtime.checkAuth()`, or provider network. It supplies opaque revision-bound local rows; the detached `mode=verify` path may check auth through the server-only keyed single-flight/cache and can publish only allowlisted same-revision verification. Do not use verification to hide local recovery rows or overwrite account count/Active metadata. Successful auth/account mutations invalidate the provider verification epoch before their success response.\n+\n **Rollback boundary:** Revert adapter code + the three core package pins + both lock files to the previous `0.80.7` tree together and restart. Never downgrade only the SDK or only the adapter. Do not delete/migrate `auth.json`, account pools, Session JSONL, or usage ledger.\n \n ## Model Price Sources\ndiff --git a/docs/modules/api.md b/docs/modules/api.md\nindex 8bb37dd..10f0ac6 100644\n--- a/docs/modules/api.md\n+++ b/docs/modules/api.md\n@@ -115,8 +115,8 @@ API routes live under `app/api/`. When adding, removing, or changing routes, upd\n | `usage/calls/` | GET | **Independent LLM usage ledger** — the only global Usage API (v1, `kind: \"llm_usage_stats\"`). Reads only immutable `usage-events/v1/`; does **not** depend on session inventory. Required `from`/`to` (`YYYY-MM-DD` server-local inclusive day bounds); optional `cwd`, `provider`, `model`, `source`, `status`. Flow: local day instants → UTC partition candidate scan → `occurredAt` event filter → local `byDay` grouping. Returns provider/model totals plus by-day/by-provider/by-source/by-status breakdowns; `range.from/to` echo request labels; `range.timezone` is process-local. Wire `coverage` diagnostics remain for ops/compat but the Usage UI does not render them. Date range capped at 366 days. Strips absolute paths from errors. Session deletion/archive does not affect ledger records. cacheWrite is deprecated and aggregated as 0; the field remains on the wire type. |\n | `model-prices/` | GET/PATCH | GET lists a sanitized projection of all ModelRuntime catalog models with price status, resolved rates, source, and an opaque revision token. Never exposes `apiKey`, full `baseUrl`, headers, secrets, absolute paths, or raw `models.json` content. PATCH applies batched price changes to `~/.pi/agent/models.json` through the shared models-config store write lock with revision-based concurrency control (409 on stale revision, 422 for invalid fields/targets). Writes are atomic (`tmp + rename`), backup is saved pre-write, and a fresh provider-aware ModelRuntime reload verifies the effective cost after save. Batch limit 50; body fields beyond `provider`, `model`, `prices`, and `explicitFree` are rejected. Response is `no-store`. |\n | `model-prices/suggest/` | POST | Intelligent price suggestion API. Accepts at most 20 `targets` (provider/model pairs); rejects URL/prompt/path/key fields. Returns suggestions with per-field evidence URLs, confidence scores, match method, and warnings; unresolved targets; and generation timestamp. Never writes config. Two-phase pipeline: deterministic match against the OpenRouter public catalog (HTTPS allowlist, size/timeout/redirect limits) → AI-assisted extraction with bounded pre-fetched evidence (configured `usage.pricingAssistant`/`pricingAssistantFallback` policies, strict JSON schema, no network/file/tool access). AI/network failure returns partial results; empty evidence returns unresolved without fabricating prices. Response is `no-store`. |\n-| `auth/providers/` | GET | List configured auth provider statuses. For each managed OAuth provider it best-effort bootstraps legacy `auth.json` into a managed Active slot independently, then uses the pure account projection; one bootstrap failure does not block other providers. |\n-| `auth/all-providers/` | GET | List all known API-key provider ids with configuration status. For managed-account providers (`opencode-go`, `xai`, `anyrouter`) each entry includes `authMode: \"managed_accounts\"`, `accountCount`, and `activeAccountDisplayName`. Non-managed providers omit these fields or may return `authMode: \"single\"`. Always synthesizes a recoverable fixed `anyrouter` entry (even with 0 models / provider load failure) so Models can manage accounts/config before catalog registration; optional safe `providerLoadError` diagnostic only. Lightweight enrichment from `lib/api-key-accounts.ts` does not trigger legacy key import. `Cache-Control: no-store`. |\n+| `auth/providers/` | GET | OAuth provider catalog. Default mode preserves legacy bootstrap + full `checkAuth()` compatibility. `?mode=summary` is Models’ local-only first phase: metadata/status projection with opaque `localStateRevision`, `localConfigured`, managed `accountCount`/Active display name, and no bootstrap, `checkAuth()`, or provider network. `?mode=verify` is a non-critical second phase returning only revision-bound allowlisted verification states; it never returns raw errors. All responses are `Cache-Control: no-store`. |\n+| `auth/all-providers/` | GET | List all known API-key provider ids with configuration status. Counts models in one catalog pass and enriches managed-account summaries in parallel. For managed-account providers (`opencode-go`, `xai`, `anyrouter`) each entry includes `authMode: \"managed_accounts\"`, `accountCount`, and `activeAccountDisplayName`. Non-managed providers omit these fields or may return `authMode: \"single\"`. Always synthesizes a recoverable fixed `anyrouter` entry (even with 0 models / provider load failure) so Models can manage accounts/config before catalog registration; optional safe `providerLoadError` diagnostic only. Lightweight enrichment from `lib/api-key-accounts.ts` does not trigger legacy key import. `Cache-Control: no-store`. |\n | `auth/accounts/[provider]/` | GET/POST/PATCH/DELETE | GET explicitly bootstraps legacy `auth.json` state, then returns the pure saved-account projection. POST imports one or more raw/CPA/SUB2API OAuth account JSON entries where supported; PATCH updates account remarks/extra info; DELETE soft-deletes inactive accounts. The existing route field `accountId` identifies the opaque saved-account storage entry (legacy entries retain their old id); credentials retain their real ChatGPT id for OpenAI headers. CPA imports may return non-secret `warnings` such as non-blocking `missing_refresh_token`. |\n | `auth/accounts/[provider]/activate/` | POST | Activate a saved OAuth account and reload live RPC auth state. |\n | `auth/login/[provider]/` | GET/POST | Initiate OAuth login for a provider. A successful managed provider-wide login must adopt the canonical Active credential before reload/SSE success; adoption failure is an error, not a successful login. `accountMode=add` saves a new non-Active slot without adoption. **Grok-only reauth:** `?accountMode=reauth&accountId=<opaque-id>` re-authenticates an existing saved account slot in-place (preserves metadata/Active pointer, replaces credential, clears old quota cache). Reauth refuses non-Grok providers, missing accountId, or non-existent targets; uses isolated in-memory CredentialStore until commit; success SSE returns safe account summary with `reauthenticated:true` and `active:boolean`. Active reauth reloads live RPC auth; non-active reauth does not change Active. Errors use `lib/grok-login-errors.ts` safe mapper — no raw upstream response text, callback URLs, or credential data. |\n@@ -185,7 +185,7 @@ Regression helpers: `npm run test:project-space-session-index`, `npm run bench:p\n - Web Terminal SSH credential UI uses `TerminalCredentialSummary` only; secret inputs are write-only and the browser should never receive `privateKeyPem`, `password`, `passphrase`, or `proxyPassword`.\n - Web Terminal SSH known-hosts routes use `lib/terminal-known-hosts.ts`, which stores trust data in the dedicated `~/.pi/agent/terminal/known_hosts` file. `ssh-keyscan` results are advisory only; users must verify fingerprints through a trusted channel before trusting them.\n - The diagnostics route is intentionally additive and read-only; see `lib/memory-diagnostics.ts` for the schema/contract, `lib/memory-diagnostics-types.ts` for the shared budget/limit/projection shapes, and the Settings Diagnostics section in `docs/modules/frontend.md` for the UI entry. Diagnostics must never start/list/abort/destroy sessions or call cleanup helpers; OpenAI Codex stats are per-known-active-session only.\n-- OAuth saved-account routes use `lib/oauth-accounts.ts` (generic lifecycle/store) and `lib/oauth-account-providers.ts` (provider adapters). Accounts GET bootstraps legacy state then lists; provider status GET isolates best-effort bootstrap; list itself remains read-only. Login uses explicit adoption only after successful provider-wide login, while managed logout uses explicit clear around runtime logout and retains slots. Grok account management reuses `auth/accounts/[provider]/` with `grok-cli`; `POST` import returns 405 for Grok. Login/logout/status routes use `lib/web-model-runtime.ts` (`ModelRuntime.login/logout/checkAuth`) with fixed providers registered on the target runtime; the Active mirror uses `lib/web-credential-store.ts`.\n+- OAuth saved-account routes use `lib/oauth-accounts.ts` (generic lifecycle/store) and `lib/oauth-account-providers.ts` (provider adapters). Accounts GET bootstraps legacy state then lists; provid…",
+            "isError": false,
+            "truncated": true
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:32:57.503Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `docs/modules/frontend.md` — Models 分 lane / generation / abort 与过滤、保存安全。\n- `docs/modules/api.md` — `summary` / `verify` API 契约与聚合优化。\n- `docs/modules/library.md` — 可见性、auth summary、runtime single-flight。\n- `docs/architecture/overview.md` — 两阶段认证、cache/flight、竞态与回滚边界。\n- `docs/integrations/README.md` — ModelRuntime 并发与 Models auth boundary。\n\n#### Verification\n- `npm run test:models-config-visibility` — passed.\n- `npm run test:models-config-races` — passed.\n- `git diff --check` — passed.\n- `npm run test:models-provider-auth-summary` — blocked: worktree has no `node_modules` / `jiti`.\n- `npm run lint` / `tsc --noEmit` / provider regressions — blocked: `node_modules` absent.\n\n#### Notes / Risks\n- 未对现有 `30141` 服务做 endpoint/browser benchmark：其进程未确认使用临时 `PI_CODING_AGENT_DIR`，避免读取或触发真实账号状态。\n- 主会话需在安装依赖后，以临时 agent dir 启动服务，完成 cold/warm 5 次 endpoint 与浏览器首帧记录，再运行剩余 cross-provider、lint、tsc。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:32:57.505Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 940,
+        "tokens": 565,
+        "tokenSource": "usage",
+        "tps": 205.9,
+        "firstTokenAt": "2026-07-28T03:32:54.521Z",
+        "lastTokenAt": "2026-07-28T03:32:57.265Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-79be830dbb6479130efba26e",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/implementer-79be830dbb6479130efba26e.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T03:30:38.394Z",
+        "finishedAt": "2026-07-28T03:32:57.508Z",
+        "updatedAt": "2026-07-28T03:32:57.508Z",
+        "itemCount": 59,
+        "messageCount": 1,
+        "toolCallCount": 27,
+        "stderrBytes": 0,
+        "bytes": 240437,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6c6-40c8-716c-ad8e-3eec10354395",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-30-38-408Z_019fa6c6-40c8-716c-ad8e-3eec10354395.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-701fba612b8376d12208aca9",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T03:33:12.985Z",
+      "finishedAt": "2026-07-28T03:44:32.195Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6c8-9cad-7cdb-9af2-5616ebd687d5",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-33-13-005Z_019fa6c8-9cad-7cdb-9af2-5616ebd687d5.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6c8-9cad-7cdb-9af2-5616ebd687d5",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n**Verdict: Needs work**\n\n已完成审查并更新：\n\n- `review.md`\n- `checks.md`\n- `handoff.md`\n\n检查期间修复了 verify late-result retention、OAuth 配置误判、渐进 catalog 提交、畸形 config fail-closed、selection 回退及多类前端乱序问题。\n\n验证结果：\n\n- lint：通过，0 errors\n- tsc：通过\n- Models focused、runtime、OAuth、Grok、Kiro、Antigravity、AnyRouter、API-key、models-sync 回归均通过\n- `git diff --check`：通过\n\n剩余 blocker：\n\n1. `localStateRevision` 缺少跨进程 authority fingerprint。\n2. `test:models-config-races` 仅源码断言，未提供 RACE-01～15 行为测试。\n3. HTML 原型及完整计划缺少正式用户审批记录。\n\n未 commit、push 或 merge。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T03:33:12.985Z",
+        "updatedAt": "2026-07-28T03:44:32.195Z",
+        "eventCount": 13168,
+        "lastTextPreview": "### Check Complete\n\n**Verdict: Needs work**\n\n已完成审查并更新：\n\n- `review.md`\n- `checks.md`\n- `handoff.md`\n\n检查期间修复了 verify late-result retention、OAuth 配置误判、渐进 catalog 提交、畸形 config fail-closed、selection 回退及多类前端乱序问题。\n\n验证结果：\n\n- lint：通过，0 errors\n- tsc：通过\n- Models focused、runtime、OAuth、Grok、Kiro、Antigravity、AnyRouter、API-key、models-sync 回归均通过\n- `git diff --check`：通过\n\n剩余 blocker：\n\n1. `localStateRevision` 缺少跨进程 authority fingerprint。\n2. `test:models-config-races` 仅源码断言，未提供 RACE-01～15 行为测试。\n3. HTML 原型及完整计划缺少正式用户审批记录。\n\n未 commit、push 或 merge。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:44:17.855Z",
+            "toolCallId": "call_o0ulAXFRUdvUiXx75JTHfihh|fc_0dd6ad2e91eb7140016a682587726881999c38b9346fcb3131",
+            "toolName": "write",
+            "text": "Successfully wrote 1440 bytes to .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T03:44:24.818Z",
+            "toolCallId": "call_7y1Bbrv31iupAVRc9qnpYmvJ|fc_0dd6ad2e91eb7140016a6825984be88199a15600c92ece867f",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git status --short | tail -30 && git diff --check\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:44:24.894Z",
+            "toolCallId": "call_7y1Bbrv31iupAVRc9qnpYmvJ|fc_0dd6ad2e91eb7140016a6825984be88199a15600c92ece867f",
+            "toolName": "bash",
+            "text": "M app/api/auth/accounts/[provider]/activate/route.ts\n M app/api/auth/accounts/[provider]/route.ts\n M app/api/auth/all-providers/route.ts\n M app/api/auth/login/[provider]/route.ts\n M app/api/auth/logout/[provider]/route.ts\n M app/api/auth/providers/route.ts\n M components/ModelsConfig.tsx\n M docs/architecture/overview.md\n M docs/integrations/README.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M lib/web-model-runtime.ts\n M package.json\n M scripts/test-web-model-runtime.mjs\n?? \".ypi/tasks/20260728-103748-\\346\\216\\222\\346\\237\\245\\345\\271\\266\\344\\277\\256\\345\\244\\215-models-\\345\\274\\271\\347\\252\\227\\346\\270\\262\\346\\237\\223\\346\\205\\242\\345\\217\\212\\346\\234\\252\\351\\205\\215\\347\\275\\256\\344\\270\\211\\346\\226\\271\\350\\246\\206\\347\\233\\226\\346\\250\\241\\345\\236\\213\\345\\261\\225\\347\\244\\272\\351\\227\\256\\351\\242\\230/\"\n?? lib/models-config-visibility.ts\n?? lib/models-provider-auth-summary.ts\n?? scripts/test-models-config-races.mjs\n?? scripts/test-models-config-visibility.mjs\n?? scripts/test-models-provider-auth-summary.mjs",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:44:32.187Z",
+            "text": "### Check Complete\n\n**Verdict: Needs work**\n\n已完成审查并更新：\n\n- `review.md`\n- `checks.md`\n- `handoff.md`\n\n检查期间修复了 verify late-result retention、OAuth 配置误判、渐进 catalog 提交、畸形 config fail-closed、selection 回退及多类前端乱序问题。\n\n验证结果：\n\n- lint：通过，0 errors\n- tsc：通过\n- Models focused、runtime、OAuth、Grok、Kiro、Antigravity、AnyRouter、API-key、models-sync 回归均通过\n- `git diff --check`：通过\n\n剩余 blocker：\n\n1. `localStateRevision` 缺少跨进程 authority fingerprint。\n2. `test:models-config-races` 仅源码断言，未提供 RACE-01～15 行为测试。\n3. HTML 原型及完整计划缺少正式用户审批记录。\n\n未 commit、push 或 merge。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:44:32.187Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 530,
+        "tokens": 208,
+        "tokenSource": "usage",
+        "tps": 56.6,
+        "firstTokenAt": "2026-07-28T03:44:28.050Z",
+        "lastTokenAt": "2026-07-28T03:44:31.725Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-701fba612b8376d12208aca9",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/checker-701fba612b8376d12208aca9.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T03:33:12.985Z",
+        "finishedAt": "2026-07-28T03:44:32.188Z",
+        "updatedAt": "2026-07-28T03:44:32.188Z",
+        "itemCount": 163,
+        "messageCount": 1,
+        "toolCallCount": 79,
+        "stderrBytes": 0,
+        "bytes": 358690,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6c8-9cad-7cdb-9af2-5616ebd687d5",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-33-13-005Z_019fa6c8-9cad-7cdb-9af2-5616ebd687d5.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-4ebc5b1501288d9e21e5eacf",
+      "subtaskId": "MOP-06",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T03:46:13.907Z",
+      "finishedAt": "2026-07-28T03:49:39.048Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6d4-8721-765d-8744-e529982a8a6b",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-46-13-921Z_019fa6d4-8721-765d-8744-e529982a8a6b.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6d4-8721-765d-8744-e529982a8a6b",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/models-provider-auth-summary.ts` — 将 canonical `auth.json` provider 项及 managed account metadata/slot 的服务器端 stat/content 指纹纳入 salted revision。\n- `app/api/auth/providers/route.ts` — summary/verify/default 投影传递实际 `agentDir`。\n- `scripts/test-models-provider-auth-summary.mjs` — 覆盖外部进程替换同一账号凭据、展示元数据不变但 revision 改变。\n- `docs/modules/library.md` — 补充 authority fingerprint 契约。\n\n#### Verification\n\n- `npm run test:models-provider-auth-summary` — Pass, 6/6\n- `npm run lint` — Pass, 0 errors / 11 existing warnings\n- `node_modules/.bin/tsc --noEmit` — Pass\n- `git diff --check` — Pass\n\n#### Notes / Risks\n\n- 指纹不暴露到 wire：仅作为 process-salted `localStateRevision` 的输入。\n- 大于 1 MiB 的异常 authority 文件只使用 stat 指纹，避免 summary 出现无界本地 I/O。\n- 未提交、推送或合并。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T03:46:13.907Z",
+        "updatedAt": "2026-07-28T03:49:39.048Z",
+        "eventCount": 3588,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/models-provider-auth-summary.ts` — 将 canonical `auth.json` provider 项及 managed account metadata/slot 的服务器端 stat/content 指纹纳入 salted revision。\n- `app/api/auth/providers/route.ts` — summary/verify/default 投影传递实际 `agentDir`。\n- `scripts/test-models-provider-auth-summary.mjs` — 覆盖外部进程替换同一账号凭据、展示元数据不变但 revision 改变。\n- `docs/modules/library.md` — 补充 authority fingerprint 契约。\n\n#### Verification\n\n- `npm run test:models-provider-auth-summary` — Pass, 6/6\n- `npm run lint` — Pass, 0 errors / 11 existing warnings\n- `node_modules/.bin/tsc --noEmit` — Pass\n- `git diff --check` — Pass\n\n#### Notes / Risks\n\n- 指纹不暴露到 wire：仅作为 process-salted `localStateRevision` 的输入。\n- 大于 1 MiB 的异常 authority 文件只使用 stat 指纹，避免 summary 出现无界本地 I/O。\n- 未提交、推送或合并。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:49:23.064Z",
+            "toolCallId": "call_9MzcPSRt8LH1DnNGqcjhlm5C|fc_08ec9d513e50eb61016a6826bf122c81989b86cc1fa7a6c3ca",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in docs/modules/library.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T03:49:26.049Z",
+            "toolCallId": "call_DcQIILrICAWf8UEXKMu7t3ZJ|fc_08ec9d513e50eb61016a6826c57e188198a228affe26058e75",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --check && git status --short && node_modules/.bin/tsc --noEmit\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:49:28.240Z",
+            "toolCallId": "call_DcQIILrICAWf8UEXKMu7t3ZJ|fc_08ec9d513e50eb61016a6826c57e188198a228affe26058e75",
+            "toolName": "bash",
+            "text": "M app/api/auth/accounts/[provider]/activate/route.ts\n M app/api/auth/accounts/[provider]/route.ts\n M app/api/auth/all-providers/route.ts\n M app/api/auth/login/[provider]/route.ts\n M app/api/auth/logout/[provider]/route.ts\n M app/api/auth/providers/route.ts\n M components/ModelsConfig.tsx\n M docs/architecture/overview.md\n M docs/integrations/README.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M lib/web-model-runtime.ts\n M package.json\n M scripts/test-web-model-runtime.mjs\n?? \".ypi/tasks/20260728-103748-\\346\\216\\222\\346\\237\\245\\345\\271\\266\\344\\277\\256\\345\\244\\215-models-\\345\\274\\271\\347\\252\\227\\346\\270\\262\\346\\237\\223\\346\\205\\242\\345\\217\\212\\346\\234\\252\\351\\205\\215\\347\\275\\256\\344\\270\\211\\346\\226\\271\\350\\246\\206\\347\\233\\226\\346\\250\\241\\345\\236\\213\\345\\261\\225\\347\\244\\272\\351\\227\\256\\351\\242\\230/\"\n?? lib/models-config-visibility.ts\n?? lib/models-provider-auth-summary.ts\n?? scripts/test-models-config-races.mjs\n?? scripts/test-models-config-visibility.mjs\n?? scripts/test-models-provider-auth-summary.mjs",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:49:39.040Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/models-provider-auth-summary.ts` — 将 canonical `auth.json` provider 项及 managed account metadata/slot 的服务器端 stat/content 指纹纳入 salted revision。\n- `app/api/auth/providers/route.ts` — summary/verify/default 投影传递实际 `agentDir`。\n- `scripts/test-models-provider-auth-summary.mjs` — 覆盖外部进程替换同一账号凭据、展示元数据不变但 revision 改变。\n- `docs/modules/library.md` — 补充 authority fingerprint 契约。\n\n#### Verification\n\n- `npm run test:models-provider-auth-summary` — Pass, 6/6\n- `npm run lint` — Pass, 0 errors / 11 existing warnings\n- `node_modules/.bin/tsc --noEmit` — Pass\n- `git diff --check` — Pass\n\n#### Notes / Risks\n\n- 指纹不暴露到 wire：仅作为 process-salted `localStateRevision` 的输入。\n- 大于 1 MiB 的异常 authority 文件只使用 stat 指纹，避免 summary 出现无界本地 I/O。\n- 未提交、推送或合并。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:49:39.043Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 785,
+        "tokens": 376,
+        "tokenSource": "usage",
+        "tps": 95.41,
+        "firstTokenAt": "2026-07-28T03:49:34.836Z",
+        "lastTokenAt": "2026-07-28T03:49:38.777Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-4ebc5b1501288d9e21e5eacf",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/implementer-4ebc5b1501288d9e21e5eacf.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T03:46:13.907Z",
+        "finishedAt": "2026-07-28T03:49:39.043Z",
+        "updatedAt": "2026-07-28T03:49:39.043Z",
+        "itemCount": 41,
+        "messageCount": 1,
+        "toolCallCount": 18,
+        "stderrBytes": 0,
+        "bytes": 115087,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6d4-8721-765d-8744-e529982a8a6b",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-46-13-921Z_019fa6d4-8721-765d-8744-e529982a8a6b.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-c1ea8cc75682ef89ec5d189f",
+      "subtaskId": "MOP-07",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T03:50:07.380Z",
+      "finishedAt": "2026-07-28T03:54:21.369Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6d8-171f-7030-8e74-9523a2161803",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-50-07-391Z_019fa6d8-171f-7030-8e74-9523a2161803.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6d8-171f-7030-8e74-9523a2161803",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/models-config-lifecycle.ts` — 新增可测试 lifecycle/generation gate 与 revision-aware OAuth verification merge helper。\n- `components/ModelsConfig.tsx` — config/catalog/verify 提交改用 helper，保持 Abort 为资源清理、gate 为正确性边界。\n- `scripts/test-models-config-races.mjs` — 替换源码 marker，加入 deferred 且忽略 AbortSignal 的 6 个行为场景。\n- `package.json` — race 测试改为 TS loader 执行。\n\n#### Verification\n- `npm run test:models-config-races` — Pass，6 scenarios。\n- `node_modules/.bin/tsc --noEmit` — Pass。\n- `npm run lint -- --quiet` — Pass。\n- `git diff --check` — Pass。\n\n#### Notes / Risks\n- 覆盖：S1慢/S2快、close/reopen、provider/account 切换、mutation-vs-GET、verify revision mismatch、reveal/copy 晚到。\n- 未处理其他子任务 blocker：authority fingerprint 与正式 UI 审批记录。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T03:50:07.380Z",
+        "updatedAt": "2026-07-28T03:54:21.369Z",
+        "eventCount": 5568,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/models-config-lifecycle.ts` — 新增可测试 lifecycle/generation gate 与 revision-aware OAuth verification merge helper。\n- `components/ModelsConfig.tsx` — config/catalog/verify 提交改用 helper，保持 Abort 为资源清理、gate 为正确性边界。\n- `scripts/test-models-config-races.mjs` — 替换源码 marker，加入 deferred 且忽略 AbortSignal 的 6 个行为场景。\n- `package.json` — race 测试改为 TS loader 执行。\n\n#### Verification\n- `npm run test:models-config-races` — Pass，6 scenarios。\n- `node_modules/.bin/tsc --noEmit` — Pass。\n- `npm run lint -- --quiet` — Pass。\n- `git diff --check` — Pass。\n\n#### Notes / Risks\n- 覆盖：S1慢/S2快、close/reopen、provider/account 切换、mutation-vs-GET、verify revision mismatch、reveal/copy 晚到。\n- 未处理其他子任务 blocker：authority fingerprint 与正式 UI 审批记录。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:53:44.091Z",
+            "toolCallId": "call_YrCMEoBArvitgG4wU2kEOsbB|fc_0212fe78abc8aaaa016a6827c7683c81998386f10a5e8e42ff",
+            "toolName": "bash",
+            "text": "M app/api/auth/accounts/[provider]/activate/route.ts\n M app/api/auth/accounts/[provider]/route.ts\n M app/api/auth/all-providers/route.ts\n M app/api/auth/login/[provider]/route.ts\n M app/api/auth/logout/[provider]/route.ts\n M app/api/auth/providers/route.ts\n M components/ModelsConfig.tsx\n M docs/architecture/overview.md\n M docs/integrations/README.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M lib/web-model-runtime.ts\n M package.json\n M scripts/test-web-model-runtime.mjs\n?? \".ypi/tasks/20260728-103748-\\346\\216\\222\\346\\237\\245\\345\\271\\266\\344\\277\\256\\345\\244\\215-models-\\345\\274\\271\\347\\252\\227\\346\\270\\262\\346\\237\\223\\346\\205\\242\\345\\217\\212\\346\\234\\252\\351\\205\\215\\347\\275\\256\\344\\270\\211\\346\\226\\271\\350\\246\\206\\347\\233\\226\\346\\250\\241\\345\\236\\213\\345\\261\\225\\347\\244\\272\\351\\227\\256\\351\\242\\230/\"\n?? lib/models-config-lifecycle.ts\n?? lib/models-config-visibility.ts\n?? lib/models-provider-auth-summary.ts\n?? scripts/test-models-config-races.mjs\n?? scripts/test-models-config-visibility.mjs\n?? scripts/test-models-provider-auth-summary.mjs",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:53:49.403Z",
+            "toolCallId": "call_mVFO2xSV3uYe139Gh03pjsOv|fc_0212fe78abc8aaaa016a6827c767f08199bc8199667c0c1616",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.5 test:models-config-races\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-models-config-races.mjs\n\n(node:96923) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nmodels config lifecycle race behavior tests passed (6 scenarios)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:54:07.697Z",
+            "toolCallId": "call_SZwQIP8buE6g7brItVtO4z4S|fc_0212fe78abc8aaaa016a6827c768308199a3944f0cc6f67dbc",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.5 lint\n> eslint . --quiet",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:54:21.354Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/models-config-lifecycle.ts` — 新增可测试 lifecycle/generation gate 与 revision-aware OAuth verification merge helper。\n- `components/ModelsConfig.tsx` — config/catalog/verify 提交改用 helper，保持 Abort 为资源清理、gate 为正确性边界。\n- `scripts/test-models-config-races.mjs` — 替换源码 marker，加入 deferred 且忽略 AbortSignal 的 6 个行为场景。\n- `package.json` — race 测试改为 TS loader 执行。\n\n#### Verification\n- `npm run test:models-config-races` — Pass，6 scenarios。\n- `node_modules/.bin/tsc --noEmit` — Pass。\n- `npm run lint -- --quiet` — Pass。\n- `git diff --check` — Pass。\n\n#### Notes / Risks\n- 覆盖：S1慢/S2快、close/reopen、provider/account 切换、mutation-vs-GET、verify revision mismatch、reveal/copy 晚到。\n- 未处理其他子任务 blocker：authority fingerprint 与正式 UI 审批记录。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:54:21.361Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 760,
+        "tokens": 676,
+        "tokenSource": "usage",
+        "tps": 163.92,
+        "firstTokenAt": "2026-07-28T03:54:16.780Z",
+        "lastTokenAt": "2026-07-28T03:54:20.904Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-c1ea8cc75682ef89ec5d189f",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/implementer-c1ea8cc75682ef89ec5d189f.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T03:50:07.380Z",
+        "finishedAt": "2026-07-28T03:54:21.366Z",
+        "updatedAt": "2026-07-28T03:54:21.366Z",
+        "itemCount": 57,
+        "messageCount": 1,
+        "toolCallCount": 26,
+        "stderrBytes": 0,
+        "bytes": 122086,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6d8-171f-7030-8e74-9523a2161803",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-50-07-391Z_019fa6d8-171f-7030-8e74-9523a2161803.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-9722c7f0a2e22809d8e79a98",
+      "subtaskId": "MOP-08",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T03:54:46.602Z",
+      "finishedAt": "2026-07-28T03:59:54.540Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6dc-59e4-7320-897d-4b17bd30af26",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-54-46-628Z_019fa6dc-59e4-7320-897d-4b17bd30af26.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6dc-59e4-7320-897d-4b17bd30af26",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Artifacts Updated\n\n- `plan-review.md` — 补录用户“确认，开始实现”审批证据。\n- `checks.md`、`review.md`、`handoff.md`、`summary.md` — 收敛返工结论与最终验证。\n- `performance-baseline.md` — 隔离环境 endpoint 与浏览器 shell 基线。\n\n#### Verification\n\n- Focused/race/runtime/provider suites — 全部通过。\n- `npm run lint` — 0 errors，11 个既有 warnings。\n- `node_modules/.bin/tsc --noEmit` — 通过。\n- `git diff --check` — 通过。\n\n#### Notes / Risks\n\n- 隔离环境无真实凭据；未测量真实第三方 `checkAuth()` 慢/超时延迟。\n- Playwright 确认点击后 modal shell 出现；未伪造 frame-accurate paint 指标。\n- 未 commit、push 或 merge。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T03:54:46.602Z",
+        "updatedAt": "2026-07-28T03:59:54.540Z",
+        "eventCount": 6012,
+        "lastTextPreview": "### Implementation Complete\n\n#### Artifacts Updated\n\n- `plan-review.md` — 补录用户“确认，开始实现”审批证据。\n- `checks.md`、`review.md`、`handoff.md`、`summary.md` — 收敛返工结论与最终验证。\n- `performance-baseline.md` — 隔离环境 endpoint 与浏览器 shell 基线。\n\n#### Verification\n\n- Focused/race/runtime/provider suites — 全部通过。\n- `npm run lint` — 0 errors，11 个既有 warnings。\n- `node_modules/.bin/tsc --noEmit` — 通过。\n- `git diff --check` — 通过。\n\n#### Notes / Risks\n\n- 隔离环境无真实凭据；未测量真实第三方 `checkAuth()` 慢/超时延迟。\n- Playwright 确认点击后 modal shell 出现；未伪造 frame-accurate paint 指标。\n- 未 commit、push 或 merge。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:59:41.921Z",
+            "toolCallId": "call_WYNB33Jisc43ILIK60DZNJAy|fc_0a4d2a72e3b5f959016a68292b74bc819bae6e03e8c6a79a25",
+            "toolName": "bash",
+            "text": ".ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/summary.md:3:_TBD by YPI Studio workflow._",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T03:59:47.473Z",
+            "toolCallId": "call_tGvRecbqNX3b0yGCje4pSOmh|fc_0a4d2a72e3b5f959016a682930232c819b8b7b5a96fe6d5959",
+            "toolName": "write",
+            "inputPreview": "{\n  \"path\": \".ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/summary.md\",\n  \"content\": \"# Summary\\n\\nModels 弹窗已完成本地 summary 优先、后台 revision-aware verify、admin runtime single-flight、override-only 导航过滤及分 lane 生命周期保护。用户“确认，开始实现”的计划/HTML 原型审批已补录，最终 focused/provider/race/lint/tsc 验证通过；隔离 endpoint 与浏览器 shell 证据见 [performance-baseline.md](./performance-baseline.md)。\\n\\n未提交、未推送、未合并。真实第三方凭据的慢/超时 UAT 为非阻塞残留。\"\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T03:59:47.498Z",
+            "toolCallId": "call_tGvRecbqNX3b0yGCje4pSOmh|fc_0a4d2a72e3b5f959016a682930232c819b8b7b5a96fe6d5959",
+            "toolName": "write",
+            "text": "Successfully wrote 308 bytes to .ypi/tasks/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题/summary.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T03:59:54.531Z",
+            "text": "### Implementation Complete\n\n#### Artifacts Updated\n\n- `plan-review.md` — 补录用户“确认，开始实现”审批证据。\n- `checks.md`、`review.md`、`handoff.md`、`summary.md` — 收敛返工结论与最终验证。\n- `performance-baseline.md` — 隔离环境 endpoint 与浏览器 shell 基线。\n\n#### Verification\n\n- Focused/race/runtime/provider suites — 全部通过。\n- `npm run lint` — 0 errors，11 个既有 warnings。\n- `node_modules/.bin/tsc --noEmit` — 通过。\n- `git diff --check` — 通过。\n\n#### Notes / Risks\n\n- 隔离环境无真实凭据；未测量真实第三方 `checkAuth()` 慢/超时延迟。\n- Playwright 确认点击后 modal shell 出现；未伪造 frame-accurate paint 指标。\n- 未 commit、push 或 merge。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T03:59:54.533Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 550,
+        "tokens": 266,
+        "tokenSource": "usage",
+        "tps": 67.12,
+        "firstTokenAt": "2026-07-28T03:59:50.425Z",
+        "lastTokenAt": "2026-07-28T03:59:54.388Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-9722c7f0a2e22809d8e79a98",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/implementer-9722c7f0a2e22809d8e79a98.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T03:54:46.602Z",
+        "finishedAt": "2026-07-28T03:59:54.536Z",
+        "updatedAt": "2026-07-28T03:59:54.536Z",
+        "itemCount": 65,
+        "messageCount": 1,
+        "toolCallCount": 30,
+        "stderrBytes": 0,
+        "bytes": 149007,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6dc-59e4-7320-897d-4b17bd30af26",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T03-54-46-628Z_019fa6dc-59e4-7320-897d-4b17bd30af26.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-509e7c05723606fa59fecebf",
+      "member": "checker",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T04:00:13.677Z",
+      "finishedAt": "2026-07-28T04:03:02.573Z",
+      "runner": "sdk",
+      "childSessionId": "019fa6e1-5780-788b-b54e-634800cd2ec0",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T04-00-13-696Z_019fa6e1-5780-788b-b54e-634800cd2ec0.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "childSessionId": "019fa6e1-5780-788b-b54e-634800cd2ec0",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete\n\n#### Verdict\n\n**Pass.** 三个 blocker 均已关闭，无剩余实现阻塞。\n\n#### Artifacts Updated\n\n- `review.md`\n- `checks.md`\n- `handoff.md`\n\n#### Verification\n\n- Lint：0 errors，11 个既有 warnings\n- TypeScript：Pass\n- Focused/race/runtime：全部通过\n- OAuth/Grok/Kiro/Antigravity/AnyRouter/API-key/models-sync：全部通过\n- `git diff --check`：Pass\n\n#### Remaining Risks\n\n仅剩可选的真实第三方凭据慢/超时及 frame-accurate 浏览器 UAT。无需主会话作产品决策。\n\n未 commit、push 或 merge。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T04:00:13.677Z",
+        "updatedAt": "2026-07-28T04:03:02.573Z",
+        "eventCount": 1902,
+        "lastTextPreview": "### Check Complete\n\n#### Verdict\n\n**Pass.** 三个 blocker 均已关闭，无剩余实现阻塞。\n\n#### Artifacts Updated\n\n- `review.md`\n- `checks.md`\n- `handoff.md`\n\n#### Verification\n\n- Lint：0 errors，11 个既有 warnings\n- TypeScript：Pass\n- Focused/race/runtime：全部通过\n- OAuth/Grok/Kiro/Antigravity/AnyRouter/API-key/models-sync：全部通过\n- `git diff --check`：Pass\n\n#### Remaining Risks\n\n仅剩可选的真实第三方凭据慢/超时及 frame-accurate 浏览器 UAT。无需主会话作产品决策。\n\n未 commit、push 或 merge。",
+        "itemsPreview": [
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T04:02:55.659Z",
+            "toolCallId": "call_c7w48wI36883RX3NWzSA9a0d|fc_0d548e418b10f51e016a6829ef5344819a9160025346044de8",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"TASK=$(find .ypi/tasks -maxdepth 1 -type d -name '20260728-103748-*' -print -quit); tail -n 35 \\\"$TASK/review.md\\\"; printf '\\\\n--- checks tail ---\\\\n'; tail -n 15 \\\"$TASK/checks.md\\\"; printf '\\\\n--- handoff tail ---\\\\n'; tail -n 25 \\\"$TASK/handoff.md\\\"\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T04:02:55.680Z",
+            "toolCallId": "call_c7w48wI36883RX3NWzSA9a0d|fc_0d548e418b10f51e016a6829ef5344819a9160025346044de8",
+            "toolName": "bash",
+            "text": "## Final Validation\n\n- Focused Models/runtime/auth/race suites: pass (auth summary 6/6; runtime 10/10; lifecycle races 6 scenarios).\n- OAuth, Grok (43/43), Kiro (31/31), Antigravity (37/37), AnyRouter API (15/15), API-key accounts (26/26), and models-config sync (73/73): pass.\n- `npm run lint`: 0 errors; 11 pre-existing warnings.\n- `node_modules/.bin/tsc --noEmit` and `git diff --check`: pass.\n\n## Remaining UAT\n\nThe isolated data directory had no real third-party credentials, so it cannot measure a real slow/timeout `checkAuth()` call. The Playwright check confirms shell visibility but does not claim a frame-accurate paint number. These are optional real-environment UAT items, not failures of the implemented lifecycle, API, or data-safety contracts.\n\n## Delegated Final Recheck\n\n### Findings Fixed\n\n- None required during this recheck.\n\n### Remaining Findings\n\n- None blocking. The three requested blockers are closed:\n  1. authority-file rotation contributes to the opaque, process-salted `localStateRevision`, and the focused test changes credential content while safe summary metadata stays unchanged;\n  2. `test:models-config-races` runs deferred promises that deliberately ignore abort and validates six lifecycle/identity outcomes rather than source markers;\n  3. `plan-review.md` links the HTML prototype and complete PRD/Design/Implement/Checks set, while `events.jsonl` records the approved `awaiting_approval → implementing` transition with “确认，开始实现”.\n\n### Verification Re-run\n\n- `npm run lint` — Pass, 0 errors / 11 warnings outside this change's production files.\n- `node_modules/.bin/tsc --noEmit` — Pass.\n- Focused tests — visibility Pass; auth summary 6/6; lifecycle races 6 scenarios; runtime 10/10.\n- Provider/regression tests — OAuth accounts Pass; Grok 43/43; Kiro 31/31; Antigravity 37/37; AnyRouter API 15/15; API-key accounts 26/26; models-config sync 73/73.\n- `git diff --check` — Pass.\n\n### Verdict\n\n**Pass.** Diff review and the independent validation re-run found no remaining implementation blocker. Existing AnyRouter loader diagnostics during isolated runtime/provider tests did not fail assertions and remain environment noise, not a regression from this task.\n\n--- checks tail ---\n### Remaining UAT\n\n- 无真实认证账号的隔离环境不能替代真实第三方 `checkAuth()` 慢/超时手工验证；这不阻塞结构性与行为门禁。\n- R6 的显式客户端 wall-clock deadline 未新增；当前降级路径依赖 HTTP 失败、用户重试、unmount abort 和服务端 verify deadline。若产品将“local catalog/config timeout”解释为客户端必需 deadline，需由主会话另行立项/决定。\n\n原 checker 发现已由本轮 authority fingerprint、行为测试、正式审批记录及性能产物收敛。\n\n## Delegated Final Recheck — 2026-07-28\n\n- [x] 审阅当前生产 diff、测试 diff、文档及任务审批材料。\n- [x] 跨进程 authority 证据：focused test 在安全 summary 元数据不变时直接轮换 authority slot 内容，`localStateRevision` 随之改变；wire token 仍为进程盐化 opaque hash。\n- [x] race 证据：6 个 deferred Promise 场景真实执行，旧请求故意忽略 AbortSignal；覆盖 retry 乱序、close/reopen、provider/account switch、mutation-vs-GET、revision merge、late reveal。\n- [x] 审批证据：`plan-review.md` 链接完整计划和 HTML 原型；`events.jsonl` 记录用户“确认，开始实现”后由 `awaiting_approval` 进入 `implementing`。\n- [x] 独立重跑 lint、tsc、focused/runtime/race/provider/AnyRouter/API-key/models-sync 与 `git diff --check`，全部通过；lint 为 0 errors / 11 非本次生产改动 warnings。\n- [x] 无剩余 blocker；真实第三方凭据慢/超时和 frame-accurate paint 仍仅为可选 UAT。\n\n--- handoff tail ---\n- `npm run test:anyrouter-api-routes` — Pass (15/15)\n- `npm run test:api-key-accounts` — Pass (26/26)\n- `npm run test:models-config-sync` — Pass (73/73)\n- `npm run lint` — Pass; 0 errors, 11 pre-existing warnings\n- `node_modules/.bin/tsc --noEmit` — Pass\n- `git diff --check` — Pass\n\n## Remaining UAT / Risks\n\n- The isolated benchmark had no real configured credentials; it does not measure third-party `checkAuth()` latency. The browser result proves modal-shell visibility, but not a frame-accurate click-to-paint metric.\n- The existing AnyRouter alias/initialization warnings in `test:web-model-runtime` did not fail assertions; retain as environment-noise follow-up if its baseline changes.\n- No additional product decision is required for this subtask. A main-session checker may perform final UAT with real, non-secret test credentials if desired.\n\n## Delegated Checker Final Recheck\n\n**Pass.** No code fix was needed. The current diff was reviewed and the requested gates were independently re-run:\n\n- authority/revision focused evidence: Pass;\n- deferred abort-ignoring race behavior: Pass (6 scenarios, no source-marker substitute);\n- formal HTML + complete-plan approval evidence: present in `plan-review.md` and the approved transition in `events.jsonl`;\n- lint: 0 errors / 11 unrelated warnings; tsc: Pass;\n- focused/runtime/provider/regression suites: Pass (summary 6/6, runtime 10/10, Grok 43/43, Kiro 31/31, Antigravity 37/37, AnyRouter 15/15, API-key 26/26, models-sync 73/73, OAuth accounts Pass);\n- `git diff --check`: Pass.\n\nArtifacts updated by this recheck: `review.md`, `checks.md`, and `handoff.md`. No commit, push, or merge was performed. Remaining risk is optional real-credential latency/timeout and frame-accurate browser UAT; no main-session product decision is needed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T04:02:55.729Z",
+            "toolCallId": "call_OHSOM4lStqo0NXeAbFccDs3k|fc_0d548e418b10f51e016a6829ef532c819aadaa0fa4c4649e6f",
+            "toolName": "bash",
+            "text": "M app/api/auth/accounts/[provider]/activate/route.ts\n M app/api/auth/accounts/[provider]/route.ts\n M app/api/auth/all-providers/route.ts\n M app/api/auth/login/[provider]/route.ts\n M app/api/auth/logout/[provider]/route.ts\n M app/api/auth/providers/route.ts\n M components/ModelsConfig.tsx\n M docs/architecture/overview.md\n M docs/integrations/README.md\n M docs/modules/api.md\n M docs/modules/frontend.md\n M docs/modules/library.md\n M lib/web-model-runtime.ts\n M package.json\n M scripts/test-web-model-runtime.mjs\n?? \".ypi/tasks/20260728-103748-\\346\\216\\222\\346\\237\\245\\345\\271\\266\\344\\277\\256\\345\\244\\215-models-\\345\\274\\271\\347\\252\\227\\346\\270\\262\\346\\237\\223\\346\\205\\242\\345\\217\\212\\346\\234\\252\\351\\205\\215\\347\\275\\256\\344\\270\\211\\346\\226\\271\\350\\246\\206\\347\\233\\226\\346\\250\\241\\345\\236\\213\\345\\261\\225\\347\\244\\272\\351\\227\\256\\351\\242\\230/\"\n?? lib/models-config-lifecycle.ts\n?? lib/models-config-visibility.ts\n?? lib/models-provider-auth-summary.ts\n?? scripts/test-models-config-races.mjs\n?? scripts/test-models-config-visibility.mjs\n?? scripts/test-models-provider-auth-summary.mjs",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T04:03:02.559Z",
+            "text": "### Check Complete\n\n#### Verdict\n\n**Pass.** 三个 blocker 均已关闭，无剩余实现阻塞。\n\n#### Artifacts Updated\n\n- `review.md`\n- `checks.md`\n- `handoff.md`\n\n#### Verification\n\n- Lint：0 errors，11 个既有 warnings\n- TypeScript：Pass\n- Focused/race/runtime：全部通过\n- OAuth/Grok/Kiro/Antigravity/AnyRouter/API-key/models-sync：全部通过\n- `git diff --check`：Pass\n\n#### Remaining Risks\n\n仅剩可选的真实第三方凭据慢/超时及 frame-accurate 浏览器 UAT。无需主会话作产品决策。\n\n未 commit、push 或 merge。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T04:03:02.567Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 425,
+        "tokens": 157,
+        "tokenSource": "usage",
+        "tps": 33.23,
+        "firstTokenAt": "2026-07-28T04:02:57.661Z",
+        "lastTokenAt": "2026-07-28T04:03:02.386Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-509e7c05723606fa59fecebf",
+        "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-103748-_-models-/checker-509e7c05723606fa59fecebf.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T04:00:13.677Z",
+        "finishedAt": "2026-07-28T04:03:02.568Z",
+        "updatedAt": "2026-07-28T04:03:02.568Z",
+        "itemCount": 75,
+        "messageCount": 1,
+        "toolCallCount": 35,
+        "stderrBytes": 0,
+        "bytes": 247802,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa6e1-5780-788b-b54e-634800cd2ec0",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web.worktrees-pi-20260728-103536--/2026-07-28T04-00-13-696Z_019fa6e1-5780-788b-b54e-634800cd2ec0.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-28T03:11:04.253Z",
+      "contextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+      "from": "planning",
+      "to": "awaiting_approval"
+    },
+    "approvalGrant": {
+      "approvedAt": "2026-07-28T03:11:35.911Z",
+      "contextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+      "inputHash": "6bd27e68f72abeb984a906cb",
+      "source": "user-input"
+    },
+    "archivedAt": "2026-07-28T04:15:15.573Z",
+    "archiveReason": "Accepted and archived from session widget",
+    "knowledgeEntryId": "20260728-121515-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+    "knowledgePath": ".ypi/knowledge/20260728-121515-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题.md"
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-28T03:45:39.153Z",
+    "strategy": "本地 summary 首屏、后台 revision-aware verify、single-flight 与可验证的前端竞态合并；补充跨进程 authority fingerprint 和真实 deferred 行为测试。",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "mixed",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "G1",
+          "title": "G1",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "MOP-01",
+            "MOP-02"
+          ]
+        },
+        {
+          "id": "G2",
+          "title": "G2",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "MOP-03"
+          ]
+        },
+        {
+          "id": "G3",
+          "title": "G3",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "MOP-04"
+          ]
+        },
+        {
+          "id": "G4",
+          "title": "G4",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "MOP-05"
+          ]
+        },
+        {
+          "id": "G5",
+          "title": "G5",
+          "relation": "parallel",
+          "dependencies": [],
+          "subtaskIds": [
+            "MOP-06",
+            "MOP-07"
+          ]
+        },
+        {
+          "id": "G6",
+          "title": "G6",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "MOP-08"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "MOP-01",
+        "title": "实现 override-only provider 可见性投影",
+        "phase": "domain",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "parallelizable": true
+      },
+      {
+        "id": "MOP-02",
+        "title": "为管理 ModelRuntime 增加 init 与 offline-refresh single-flight",
+        "phase": "runtime",
+        "order": 1,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "parallel",
+        "parallelizable": true
+      },
+      {
+        "id": "MOP-03",
+        "title": "实现本地 OAuth summary、revision-aware verify 与服务端去重",
+        "phase": "api",
+        "order": 2,
+        "dependsOn": [
+          "MOP-02"
+        ],
+        "dependencies": [
+          "MOP-02"
+        ],
+        "relation": "serial",
+        "parallelizable": false
+      },
+      {
+        "id": "MOP-04",
+        "title": "接入 Models 分 lane 加载与 provider/account 竞态保护",
+        "phase": "frontend",
+        "order": 3,
+        "dependsOn": [
+          "MOP-01",
+          "MOP-03"
+        ],
+        "dependencies": [
+          "MOP-01",
+          "MOP-03"
+        ],
+        "relation": "serial",
+        "parallelizable": false
+      },
+      {
+        "id": "MOP-05",
+        "title": "更新文档并完成乱序、性能与跨 provider 回归",
+        "phase": "checks",
+        "order": 4,
+        "dependsOn": [
+          "MOP-01",
+          "MOP-02",
+          "MOP-03",
+          "MOP-04"
+        ],
+        "dependencies": [
+          "MOP-01",
+          "MOP-02",
+          "MOP-03",
+          "MOP-04"
+        ],
+        "relation": "serial",
+        "parallelizable": false
+      },
+      {
+        "id": "MOP-06",
+        "title": "补充跨进程 authority fingerprint 与 revision 收敛",
+        "phase": "api",
+        "order": 5,
+        "dependsOn": [
+          "MOP-03"
+        ],
+        "dependencies": [
+          "MOP-03"
+        ],
+        "relation": "serial",
+        "parallelizable": false
+      },
+      {
+        "id": "MOP-07",
+        "title": "抽取前端 lifecycle/merge helper 并补真实 deferred race 行为测试",
+        "phase": "frontend",
+        "order": 5,
+        "dependsOn": [
+          "MOP-04"
+        ],
+        "dependencies": [
+          "MOP-04"
+        ],
+        "relation": "serial",
+        "parallelizable": false
+      },
+      {
+        "id": "MOP-08",
+        "title": "补录审批证据并完成最终复检与性能基线",
+        "phase": "checks",
+        "order": 6,
+        "dependsOn": [
+          "MOP-05",
+          "MOP-06",
+          "MOP-07"
+        ],
+        "dependencies": [
+          "MOP-05",
+          "MOP-06",
+          "MOP-07"
+        ],
+        "relation": "serial",
+        "parallelizable": false
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-28T04:15:15.573Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 0,
+      "waiting": 0,
+      "ready": 0,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 8,
+      "skipped": 0
+    },
+    "subtasks": {
+      "MOP-01": {
+        "id": "MOP-01",
+        "status": "done",
+        "updatedAt": "2026-07-28T03:14:29.446Z",
+        "startedAt": "2026-07-28T03:11:49.858Z",
+        "finishedAt": "2026-07-28T03:14:29.445Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-6da85d8ce6a407243ad8a42c"
+        ],
+        "lastRunId": "implementer-6da85d8ce6a407243ad8a42c",
+        "claimedAt": "2026-07-28T03:11:49.858Z",
+        "claimedByContextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "summary": "SDK child run finished without a captured final assistant message."
+      },
+      "MOP-02": {
+        "id": "MOP-02",
+        "status": "done",
+        "updatedAt": "2026-07-28T03:20:03.002Z",
+        "startedAt": "2026-07-28T03:16:57.393Z",
+        "finishedAt": "2026-07-28T03:20:03.001Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-4be50c0d40415e02f630a58d"
+        ],
+        "lastRunId": "implementer-4be50c0d40415e02f630a58d",
+        "claimedAt": "2026-07-28T03:16:57.393Z",
+        "claimedByContextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/web-model-runtime.ts` — admin runtime init and offline refresh single-flight; retry-safe pending cleanup; reset clears all cache state.\n- `scripts/test-web-model-runtime.mjs` — added deterministic concurrency, retry, key-isolation, and network-init tests.\n\n#### Verification\n- `git diff --check` — passed.\n- `npm run test:web-model-runtime` — blocked: `node_modules` absent (`jiti` unavailable).\n- `tsc --noEmit` — blocked: `node_modules/.bin/tsc` absent.\n\n#### Notes / Risks\n- Explicit `allowModelNetwork: true` remains opt-in and outside the shared offline refresh flight; initialization itself is always offline.\n- Existing unrelated `package.json` / MOP-01 working-tree changes were not modified."
+      },
+      "MOP-03": {
+        "id": "MOP-03",
+        "status": "done",
+        "updatedAt": "2026-07-28T03:24:56.005Z",
+        "startedAt": "2026-07-28T03:20:18.711Z",
+        "finishedAt": "2026-07-28T03:24:56.004Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-33ce63c7a148310b3bbb8104"
+        ],
+        "lastRunId": "implementer-33ce63c7a148310b3bbb8104",
+        "claimedAt": "2026-07-28T03:20:18.711Z",
+        "claimedByContextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/models-provider-auth-summary.ts` — local summary, opaque revision, verify TTL/single-flight/deadline/invalidation.\n- `app/api/auth/providers/route.ts` — `summary` / `verify` modes; default legacy verification retained.\n- `app/api/auth/all-providers/route.ts` — single model count pass and parallel managed enrichment.\n- OAuth login/logout/account/activate routes — invalidate verification after successful mutations.\n- `scripts/test-models-provider-auth-summary.mjs`, `package.json` — focused test and script.\n\n#### Verification\n- `git diff --check` — passed.\n- `node -e \"JSON.parse(...package.json)\"` — passed.\n- `npm run test:models-provider-auth-summary` — blocked: worktree has no `node_modules` (`jiti` unavailable).\n- `tsc --noEmit` — blocked: dependencies/compiler unavailable.\n\n#### Notes / Risks\n- No frontend/MOP-04 changes made.\n- Main session should install dependencies, then run `npm run test:models-provider-auth-summary`, `npm run test:web-model-runtime`, relevant OAuth/provider tests, lint, and TypeScript checks."
+      },
+      "MOP-04": {
+        "id": "MOP-04",
+        "status": "done",
+        "updatedAt": "2026-07-28T03:30:12.630Z",
+        "startedAt": "2026-07-28T03:25:18.337Z",
+        "finishedAt": "2026-07-28T03:30:12.629Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-539e24c1f4b8d38b152c231c"
+        ],
+        "lastRunId": "implementer-539e24c1f4b8d38b152c231c",
+        "claimedAt": "2026-07-28T03:25:18.337Z",
+        "claimedByContextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `components/ModelsConfig.tsx` — config/catalog/verify lanes, generation/abort lifecycle guards, summary→verify merge, visible-provider projection, safe config-load failure and save disable; added OAuth/API-key detail guards.\n- `scripts/test-models-config-races.mjs` — focused lifecycle contract checks.\n- `package.json` — added `test:models-config-races`.\n\n#### Verification\n\n- `npm run test:models-config-races` — passed.\n- `git diff --check` — passed.\n- `npm run lint` / `tsc --noEmit` — blocked: dependencies are not installed (`eslint` and `node_modules/.bin/tsc` unavailable).\n\n#### Notes / Risks\n\n- Existing MOP-01–03 changes remain unmodified.\n- API-key mutation handlers beyond load/reveal still need broader runtime/UI validation for stale GET-versus-mutation behavior once dependencies are installed."
+      },
+      "MOP-05": {
+        "id": "MOP-05",
+        "status": "done",
+        "updatedAt": "2026-07-28T03:32:57.516Z",
+        "startedAt": "2026-07-28T03:30:29.353Z",
+        "finishedAt": "2026-07-28T03:32:57.515Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-79be830dbb6479130efba26e"
+        ],
+        "lastRunId": "implementer-79be830dbb6479130efba26e",
+        "claimedAt": "2026-07-28T03:30:29.353Z",
+        "claimedByContextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n- `docs/modules/frontend.md` — Models 分 lane / generation / abort 与过滤、保存安全。\n- `docs/modules/api.md` — `summary` / `verify` API 契约与聚合优化。\n- `docs/modules/library.md` — 可见性、auth summary、runtime single-flight。\n- `docs/architecture/overview.md` — 两阶段认证、cache/flight、竞态与回滚边界。\n- `docs/integrations/README.md` — ModelRuntime 并发与 Models auth boundary。\n\n#### Verification\n- `npm run test:models-config-visibility` — passed.\n- `npm run test:models-config-races` — passed.\n- `git diff --check` — passed.\n- `npm run test:models-provider-auth-summary` — blocked: worktree has no `node_modules` / `jiti`.\n- `npm run lint` / `tsc --noEmit` / provider regressions — blocked: `node_modules` absent.\n\n#### Notes / Risks\n- 未对现有 `30141` 服务做 endpoint/browser benchmark：其进程未确认使用临时 `PI_CODING_AGENT_DIR`，避免读取或触发真实账号状态。\n- 主会话需在安装依赖后，以临时 agent dir 启动服务，完成 cold/warm 5 次 endpoint 与浏览器首帧记录，再运行剩余 cross-provider、lint、tsc。"
+      },
+      "MOP-06": {
+        "id": "MOP-06",
+        "status": "done",
+        "updatedAt": "2026-07-28T03:49:39.049Z",
+        "startedAt": "2026-07-28T03:46:04.419Z",
+        "finishedAt": "2026-07-28T03:49:39.048Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-4ebc5b1501288d9e21e5eacf"
+        ],
+        "lastRunId": "implementer-4ebc5b1501288d9e21e5eacf",
+        "claimedAt": "2026-07-28T03:46:04.419Z",
+        "claimedByContextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n\n- `lib/models-provider-auth-summary.ts` — 将 canonical `auth.json` provider 项及 managed account metadata/slot 的服务器端 stat/content 指纹纳入 salted revision。\n- `app/api/auth/providers/route.ts` — summary/verify/default 投影传递实际 `agentDir`。\n- `scripts/test-models-provider-auth-summary.mjs` — 覆盖外部进程替换同一账号凭据、展示元数据不变但 revision 改变。\n- `docs/modules/library.md` — 补充 authority fingerprint 契约。\n\n#### Verification\n\n- `npm run test:models-provider-auth-summary` — Pass, 6/6\n- `npm run lint` — Pass, 0 errors / 11 existing warnings\n- `node_modules/.bin/tsc --noEmit` — Pass\n- `git diff --check` — Pass\n\n#### Notes / Risks\n\n- 指纹不暴露到 wire：仅作为 process-salted `localStateRevision` 的输入。\n- 大于 1 MiB 的异常 authority 文件只使用 stat 指纹，避免 summary 出现无界本地 I/O。\n- 未提交、推送或合并。"
+      },
+      "MOP-07": {
+        "id": "MOP-07",
+        "status": "done",
+        "updatedAt": "2026-07-28T03:54:21.370Z",
+        "startedAt": "2026-07-28T03:49:55.802Z",
+        "finishedAt": "2026-07-28T03:54:21.369Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-c1ea8cc75682ef89ec5d189f"
+        ],
+        "lastRunId": "implementer-c1ea8cc75682ef89ec5d189f",
+        "claimedAt": "2026-07-28T03:49:55.802Z",
+        "claimedByContextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/models-config-lifecycle.ts` — 新增可测试 lifecycle/generation gate 与 revision-aware OAuth verification merge helper。\n- `components/ModelsConfig.tsx` — config/catalog/verify 提交改用 helper，保持 Abort 为资源清理、gate 为正确性边界。\n- `scripts/test-models-config-races.mjs` — 替换源码 marker，加入 deferred 且忽略 AbortSignal 的 6 个行为场景。\n- `package.json` — race 测试改为 TS loader 执行。\n\n#### Verification\n- `npm run test:models-config-races` — Pass，6 scenarios。\n- `node_modules/.bin/tsc --noEmit` — Pass。\n- `npm run lint -- --quiet` — Pass。\n- `git diff --check` — Pass。\n\n#### Notes / Risks\n- 覆盖：S1慢/S2快、close/reopen、provider/account 切换、mutation-vs-GET、verify revision mismatch、reveal/copy 晚到。\n- 未处理其他子任务 blocker：authority fingerprint 与正式 UI 审批记录。"
+      },
+      "MOP-08": {
+        "id": "MOP-08",
+        "status": "done",
+        "updatedAt": "2026-07-28T03:59:54.541Z",
+        "startedAt": "2026-07-28T03:54:38.276Z",
+        "finishedAt": "2026-07-28T03:59:54.540Z",
+        "attempts": 1,
+        "runIds": [
+          "implementer-9722c7f0a2e22809d8e79a98"
+        ],
+        "lastRunId": "implementer-9722c7f0a2e22809d8e79a98",
+        "claimedAt": "2026-07-28T03:54:38.276Z",
+        "claimedByContextId": "pi_019fa695-75a5-7ebb-bd8c-1fdf0e795d47",
+        "summary": "### Implementation Complete\n\n#### Artifacts Updated\n\n- `plan-review.md` — 补录用户“确认，开始实现”审批证据。\n- `checks.md`、`review.md`、`handoff.md`、`summary.md` — 收敛返工结论与最终验证。\n- `performance-baseline.md` — 隔离环境 endpoint 与浏览器 shell 基线。\n\n#### Verification\n\n- Focused/race/runtime/provider suites — 全部通过。\n- `npm run lint` — 0 errors，11 个既有 warnings。\n- `node_modules/.bin/tsc --noEmit` — 通过。\n- `git diff --check` — 通过。\n\n#### Notes / Risks\n\n- 隔离环境无真实凭据；未测量真实第三方 `checkAuth()` 慢/超时延迟。\n- Playwright 确认点击后 modal shell 出现；未伪造 frame-accurate paint 指标。\n- 未 commit、push 或 merge。"
+      }
+    },
+    "history": [
+      {
+        "at": "2026-07-28T03:11:49.858Z",
+        "subtaskId": "MOP-01",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-28T03:16:57.393Z",
+        "subtaskId": "MOP-02",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-28T03:20:18.711Z",
+        "subtaskId": "MOP-03",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-28T03:25:18.337Z",
+        "subtaskId": "MOP-04",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-28T03:30:29.353Z",
+        "subtaskId": "MOP-05",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-28T03:46:04.419Z",
+        "subtaskId": "MOP-06",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-28T03:49:55.802Z",
+        "subtaskId": "MOP-07",
+        "from": "ready",
+        "to": "running"
+      },
+      {
+        "at": "2026-07-28T03:54:38.276Z",
+        "subtaskId": "MOP-08",
+        "from": "ready",
+        "to": "running"
+      }
+    ]
+  }
+}

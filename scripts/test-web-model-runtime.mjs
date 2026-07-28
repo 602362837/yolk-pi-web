@@ -40,6 +40,7 @@ async function main() {
     createWebAgentSessionServices,
     createTemporaryWebModelRuntimeServices,
     __resetWebModelRuntimeCacheForTests,
+    __setWebModelRuntimeTestHooksForTests,
   } = runtimeMod;
   const { createWebProviderAwareModelRegistry } = providerMod;
 
@@ -48,6 +49,129 @@ async function main() {
   __resetWebModelRuntimeCacheForTests();
 
   try {
+    await test("admin runtime cold init and offline refresh are single-flight per key", async () => {
+      __resetWebModelRuntimeCacheForTests();
+      let createCalls = 0;
+      let refreshCalls = 0;
+      let releaseCreate;
+      const createGate = new Promise((resolve) => {
+        releaseCreate = resolve;
+      });
+      const fakeRuntime = { refresh: async () => undefined };
+      __setWebModelRuntimeTestHooksForTests({
+        createEntry: async (_dir, modelsPath) => {
+          createCalls += 1;
+          await createGate;
+          return {
+            runtime: fakeRuntime,
+            credentials: {},
+            authPath: join(agentDir, "auth.json"),
+            modelsPath,
+          };
+        },
+        refreshOffline: async () => {
+          refreshCalls += 1;
+        },
+      });
+      const callers = Array.from({ length: 20 }, () => getWebModelRuntime({ agentDir }));
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(createCalls, 1);
+      releaseCreate();
+      const runtimes = await Promise.all(callers);
+      assert.ok(runtimes.every((runtime) => runtime === fakeRuntime));
+      assert.equal(refreshCalls, 1);
+      __resetWebModelRuntimeCacheForTests();
+    });
+
+    await test("admin runtime pending failures clear so init and refresh can retry", async () => {
+      __resetWebModelRuntimeCacheForTests();
+      let createCalls = 0;
+      let refreshCalls = 0;
+      const fakeRuntime = { refresh: async () => undefined };
+      __setWebModelRuntimeTestHooksForTests({
+        createEntry: async (_dir, modelsPath) => {
+          createCalls += 1;
+          if (createCalls === 1) throw new Error("init failed");
+          return {
+            runtime: fakeRuntime,
+            credentials: {},
+            authPath: join(agentDir, "auth.json"),
+            modelsPath,
+          };
+        },
+        refreshOffline: async () => {
+          refreshCalls += 1;
+          if (refreshCalls === 1) throw new Error("refresh failed");
+        },
+      });
+      await assert.rejects(() => getWebModelRuntime({ agentDir }), /init failed/);
+      await assert.rejects(() => getWebModelRuntime({ agentDir }), /refresh failed/);
+      const runtime = await getWebModelRuntime({ agentDir });
+      assert.equal(runtime, fakeRuntime);
+      assert.equal(createCalls, 2);
+      assert.equal(refreshCalls, 2);
+      __resetWebModelRuntimeCacheForTests();
+    });
+
+    await test("network opt-in does not alter shared offline initialization", async () => {
+      __resetWebModelRuntimeCacheForTests();
+      let initAllowNetwork;
+      let offlineRefreshes = 0;
+      let networkRefreshes = 0;
+      const fakeRuntime = {
+        refresh: async ({ allowNetwork }) => {
+          if (allowNetwork) networkRefreshes += 1;
+        },
+      };
+      __setWebModelRuntimeTestHooksForTests({
+        createEntry: async (_dir, modelsPath, allowModelNetwork) => {
+          initAllowNetwork = allowModelNetwork;
+          return {
+            runtime: fakeRuntime,
+            credentials: {},
+            authPath: join(agentDir, "auth.json"),
+            modelsPath,
+          };
+        },
+        refreshOffline: async () => {
+          offlineRefreshes += 1;
+        },
+      });
+      await getWebModelRuntime({ agentDir, allowModelNetwork: true });
+      assert.equal(initAllowNetwork, false);
+      assert.equal(offlineRefreshes, 0);
+      assert.equal(networkRefreshes, 1);
+      __resetWebModelRuntimeCacheForTests();
+    });
+
+    await test("admin runtime keys remain isolated", async () => {
+      __resetWebModelRuntimeCacheForTests();
+      let createCalls = 0;
+      let refreshCalls = 0;
+      __setWebModelRuntimeTestHooksForTests({
+        createEntry: async (_dir, modelsPath) => {
+          createCalls += 1;
+          return {
+            runtime: { refresh: async () => undefined },
+            credentials: {},
+            authPath: join(agentDir, "auth.json"),
+            modelsPath,
+          };
+        },
+        refreshOffline: async () => {
+          refreshCalls += 1;
+        },
+      });
+      const [a, b] = await Promise.all([
+        getWebModelRuntime({ agentDir, modelsPath: join(agentDir, "a.json") }),
+        getWebModelRuntime({ agentDir, modelsPath: join(agentDir, "b.json") }),
+      ]);
+      assert.notEqual(a, b);
+      assert.equal(createCalls, 2);
+      assert.equal(refreshCalls, 2);
+      __resetWebModelRuntimeCacheForTests();
+    });
+
     await test("createWebProviderAwareModelRegistry hard-fails (no AuthStorage path)", async () => {
       await assert.rejects(
         () => createWebProviderAwareModelRegistry(),

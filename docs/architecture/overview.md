@@ -281,6 +281,18 @@ Model pricing is configured by writing directly to Pi's single source of truth: 
 - The API projection (`ModelPriceListResponse`) never exposes `apiKey`, full `baseUrl`, headers, auth/account data, absolute paths, or the raw `models.json` content.
 - ModelsConfig GET keeps the legacy body shape and exposes revision via `ETag` / `X-Models-Config-Revision` only; PUT may send `If-Match` and always returns additive `revision`.
 
+### Models modal local catalog and verification
+
+Models opens its shell independently of data. `components/ModelsConfig.tsx` keeps config and catalog lanes separate; each lane has lifecycle, request-generation, and `AbortController` ownership. Aborting is only resource cleanup: a response may commit only while its captured generation and active lifecycle still match. Unmount/retry/mutation/provider-or-account switch invalidates the applicable generation first, so old GET/SSE/reveal/quota responses cannot overwrite newer local state.
+
+`GET /api/auth/providers?mode=summary` is the first catalog phase. It is metadata-only: no legacy bootstrap write, `runtime.checkAuth()`, or provider network. It owns provider existence, `localConfigured`, account count, Active display name, order, and an opaque process-salted `localStateRevision`. The detached `mode=verify` phase owns only allowlisted verification for the same provider/revision. A valid/invalid result may adjust compatible `loggedIn`, but never removes a locally configured recovery row or changes counts, Active, order, raw-config visibility, or user selection. Timeout/error/superseded results preserve the local projection.
+
+Server verification is keyed by administrative runtime + provider + local revision. Same-key callers share one `checkAuth()`; successful valid/invalid results have a 15-second in-process TTL. The public result has an 8-second deadline, while an uncooperative third-party call may remain deduplicated for 30 seconds. A late settlement after deadline/invalidation is non-publishable and is never cached. Successful login/logout/account mutations bump the provider epoch and clear the matching verification cache; a browser disconnect never cancels a shared verification owner. HTTP responses remain `Cache-Control: no-store` and return only safe state/revision/time fields.
+
+Administrative `getWebModelRuntime()` also uses separate keyed single-flights for cold construction/fixed-provider registration and offline refresh (`agentDir + modelsPath`). Rejects clear their pending entries; reset clears resolved and pending maps. The common Models catalog paths therefore share one offline initialization/refresh without joining an auth verification or explicit network-refresh flight. Main Chat, Studio, and temporary runtimes remain isolated.
+
+The raw models tree is a display projection: an entry is hidden only when its enumerable keys are exactly `modelOverrides` and that value is a non-array object. Any malformed, unknown, or extra field remains visible. Filtering never rewrites `models.json`, so hidden model-price overrides remain in the full draft and survive unrelated saves. A failed config GET is not represented as `{ providers: {} }`; Save stays disabled until a valid config is loaded.
+
 ### OpenAI-compatible `/models` sync invariants
 
 `POST /api/models-config/sync` discovers remote model ids for one saved custom OpenAI-compatible provider and merges new ids on confirmed user action. This is the third models.json writer alongside ModelsConfig PUT and model-price PATCH.

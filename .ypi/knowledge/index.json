@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-27T04:28:48.815Z",
+  "updatedAt": "2026-07-28T04:15:15.573Z",
   "entries": [
+    {
+      "id": "20260728-121515-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+      "title": "排查并修复 Models 弹窗渲染慢及未配置三方覆盖模型展示问题",
+      "taskId": "20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+      "taskKey": "archived:2026-07:20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+      "workflowId": "feature-dev",
+      "summary": "Models 弹窗已完成本地 summary 优先、后台 revision-aware verify、admin runtime single-flight、override-only 导航过滤及分 lane 生命周期保护。用户“确认，开始实现”的计划/HTML 原型审批已补录，最终 focused/provider/race/lint/tsc 验证通过；隔离 endpoint 与浏览器 shell 证据见 [performance-baseline.md](./performance-baseline.md)。 未提交、未推送、未合并。真实第三方凭据的慢/超时 UAT 为非阻塞残留。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260728-103748-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
+      "knowledgePath": ".ypi/knowledge/20260728-121515-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题.md",
+      "createdAt": "2026-07-28T04:15:15.573Z",
+      "archivedAt": "2026-07-28T04:15:15.573Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260727-122848-github-无人值守实现卡在-planning-空转-无-session-plan-polic",
       "title": "GitHub 无人值守实现卡在 planning 空转：无 session、plan policy 误拦、调度自旋与可观测性闭环",
