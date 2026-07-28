@@ -743,6 +743,10 @@ await test("E2E docs path: owner+claim → worktree → validation → one unmer
   state = runner.writeGithubAutomationRunnerState({
     ...state,
     checkpoint: "checking",
+    // This fixture intentionally starts after a previously reconciled checker
+    // so it can exercise the existing operator-validation/publish mock path.
+    checkStage: "operator_validation",
+    checkerReportHash: "fixture_checker_report",
     reasonCode: null,
   });
   let job = await store.writeGithubAutomationJob({
@@ -1481,6 +1485,103 @@ await test("TEST-04 owner comment free text never enters prompt/task/runner/vali
   assert.ok(!JSON.stringify(paused).includes("evil.example"));
   assert.ok(!JSON.stringify(woken).includes("evil.example"));
   assertNoSentinel(woken, "wake after free-text comment");
+});
+
+// ─── WDP-04 checker → operator-validation durable gate ─────────────────────
+
+await test("durable checker stage precedes operator validation and resume keeps its report", async () => {
+  const repoPath = await registerFixtureRepo("checker-stage");
+  const cfg = unattendedConfig(repoPath);
+  const job = await createJob(861, "docs: checker stage");
+  await markClaimComplete(job);
+  const wt = await worktree.ensureGithubAutomationWorktree({
+    repository: cfg.repositories[0], issueNumber: job.issueNumber, generation: job.generation,
+  });
+  runner.writeGithubAutomationRunnerState({
+    schemaVersion: 1, jobId: job.jobId, repositoryId: job.repositoryId, issueNumber: job.issueNumber,
+    generation: job.generation, checkpoint: "checking", worktreePath: wt.worktreePath,
+    branchName: wt.branchName, baseRef: wt.baseRef, projectId: wt.projectId, spaceId: wt.spaceId,
+    taskId: "task_checker_fixture", sessionId: null, contextId: null, sessionFile: null,
+    scopeFingerprint: "scope", ownerActorId: 99, ownerCommentId: 1, ownerCommentHash: "h",
+    lastMember: "implementer", lastRunId: "impl", pauseRequested: false,
+    updatedAt: new Date().toISOString(), reasonCode: null,
+  });
+  let checkerCalls = 0;
+  session._testSetGithubFullAgentMemberOverride(async (input) => {
+    checkerCalls += 1;
+    assert.equal(input.member, "checker");
+    assert.equal(input.checkExecution, true);
+    return {
+      output: "report", status: "succeeded", warnings: [],
+      checkResult: {
+        status: "passed", reasonCode: null, stage: "complete", probeCount: 1,
+        prepareAttempts: 0, checkCount: 1, durationMs: 1, timedOut: false,
+        commandStarted: true, retryability: "none", reportHash: "report_hash",
+        safeMessage: "Project checks passed.",
+      },
+    };
+  });
+  try {
+    const afterChecker = await runner.runGithubUnattendedImplementation({
+      job: { ...job, phase: "checking", status: "running", checkpoint: "checking" },
+      config: cfg, claimComplete: true, singleStep: true,
+    });
+    assert.equal(afterChecker.job.phase, "checking");
+    let state = runner.readGithubAutomationRunnerState(job.jobId);
+    assert.equal(state.checkStage, "operator_validation");
+    assert.equal(state.checkerReportHash, "report_hash");
+    assert.equal(checkerCalls, 1);
+
+    const afterValidation = await runner.runGithubUnattendedImplementation({
+      job: afterChecker.job, config: cfg, claimComplete: true, singleStep: true,
+    });
+    assert.equal(afterValidation.job.checkpoint, "awaiting_publish");
+    state = runner.readGithubAutomationRunnerState(job.jobId);
+    assert.equal(state.checkerReportHash, "report_hash");
+    assert.equal(checkerCalls, 1, "resume must skip a completed checker");
+  } finally {
+    session._testSetGithubFullAgentMemberOverride(null);
+  }
+});
+
+await test("checker evidence failure blocks before operator validation", async () => {
+  const repoPath = await registerFixtureRepo("checker-block");
+  const cfg = unattendedConfig(repoPath);
+  const job = await createJob(862, "docs: checker block");
+  await markClaimComplete(job);
+  const wt = await worktree.ensureGithubAutomationWorktree({
+    repository: cfg.repositories[0], issueNumber: job.issueNumber, generation: job.generation,
+  });
+  runner.writeGithubAutomationRunnerState({
+    schemaVersion: 1, jobId: job.jobId, repositoryId: job.repositoryId, issueNumber: job.issueNumber,
+    generation: job.generation, checkpoint: "checking", worktreePath: wt.worktreePath,
+    branchName: wt.branchName, baseRef: wt.baseRef, projectId: wt.projectId, spaceId: wt.spaceId,
+    taskId: "task_checker_block", sessionId: null, contextId: null, sessionFile: null,
+    scopeFingerprint: "scope", ownerActorId: 99, ownerCommentId: 1, ownerCommentHash: "h",
+    lastMember: "implementer", lastRunId: "impl", pauseRequested: false,
+    updatedAt: new Date().toISOString(), reasonCode: null,
+  });
+  session._testSetGithubFullAgentMemberOverride(async () => ({
+    output: "fake pass", status: "succeeded", warnings: [],
+    checkResult: {
+      status: "blocked", reasonCode: "check_dependency_prepare_failed", stage: "prepare",
+      probeCount: 1, prepareAttempts: 1, checkCount: 0, durationMs: 1, timedOut: false,
+      commandStarted: true, retryability: "operator", reportHash: null,
+      safeMessage: "Project dependency preparation failed.",
+    },
+  }));
+  try {
+    const result = await runner.runGithubUnattendedImplementation({
+      job: { ...job, phase: "checking", status: "running", checkpoint: "checking" },
+      config: cfg, claimComplete: true,
+    });
+    assert.equal(result.job.status, "blocked");
+    assert.equal(result.job.reasonCode, "check_dependency_prepare_failed");
+    assert.equal(result.job.blockedAtLayer, "validation");
+    assert.equal(runner.readGithubAutomationRunnerState(job.jobId).checkStage, undefined);
+  } finally {
+    session._testSetGithubFullAgentMemberOverride(null);
+  }
 });
 
 // ─── Store / process surface sentinel scan ───────────────────────────────────

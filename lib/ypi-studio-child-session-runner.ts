@@ -8,6 +8,8 @@ import {
 } from "./project-space-session-lifecycle";
 import { createYpiStudioChildGuardExtension } from "./ypi-studio-child-guard";
 import { createWebAgentSessionServices } from "./web-model-runtime";
+import { WorktreeCheckExecutionController } from "./worktree-check-execution";
+import { createWorktreeCheckFileTools, createWorktreeCheckPolicyExtension, createWorktreeCheckTools } from "./worktree-check-extension";
 import {
   appendYpiStudioSubagentTranscriptItem,
   finalizeYpiStudioSubagentTranscript,
@@ -96,6 +98,15 @@ export interface StudioSdkChildRunOptions {
    * launch gate for GitHub unattended (GHA-06 product decision).
    */
   fullAgent?: boolean;
+  /**
+   * Server-owned tool additions for a restricted child profile. Callers must
+   * pair these with excludeTools; task content never supplies either value.
+   */
+  customTools?: unknown[];
+  /** Additional builtin tools removed by a server-owned profile. */
+  excludeTools?: readonly string[];
+  /** Present only for a server-created checker execution profile. */
+  worktreeCheckController?: WorktreeCheckExecutionController;
 }
 
 const CHILD_RECENT_PROGRESS_LIMIT = 5;
@@ -274,7 +285,7 @@ function modelFromPolicyArg(
 }
 
 export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOptions): Promise<StudioSdkChildRunResult> {
-  const { root, prompt, policy, meta, writer, signal, onUpdate, persistence, beforeStart, toolEnv } = options;
+  const { root, prompt, policy, meta, writer, signal, onUpdate, persistence, beforeStart, toolEnv, worktreeCheckController } = options;
   // fullAgent is accepted for call-site clarity; standard exclude list already keeps file/bash/network.
   void options.fullAgent;
   const warnings: string[] = [];
@@ -528,26 +539,35 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
       const ev = isObj(event) ? event : {};
       const toolCallId = str(ev.toolCallId) ?? `tool-${eventCount}`;
       const toolName = str(ev.toolName) ?? "tool";
-      const preview = previewYpiStudioTranscriptText(ev.args ?? ev.input).text;
+      const checkInput = ev.args ?? ev.input;
+      const checkPurpose = worktreeCheckController && isObj(checkInput) ? str(checkInput.purpose) : undefined;
+      const preview = worktreeCheckController
+        ? "Server-owned restricted WorkTree Check tool."
+        : previewYpiStudioTranscriptText(ev.args ?? ev.input).text;
       phase = "running_tool";
       currentTool = { toolCallId, toolName, startedAt: at };
-      lastTextPreview = `Running tool ${toolName}`;
+      lastTextPreview = checkPurpose === "prepare" ? "正在准备 WorkTree 项目依赖…"
+        : checkPurpose === "check" ? "正在执行项目检查…"
+          : toolName === "submit_check_report" ? "正在核对检查证据…"
+            : "正在识别项目工具链与检查方式…";
       appendItem({ kind: "tool_call", at, toolCallId, toolName, inputPreview: preview });
     } else if (eventType === "tool_execution_update") {
       phase = "running_tool";
-      const text = resultText(isObj(event) ? event.partialResult : undefined).trim();
-      if (text) lastTextPreview = boundedText(text);
+      if (!worktreeCheckController) {
+        const text = resultText(isObj(event) ? event.partialResult : undefined).trim();
+        if (text) lastTextPreview = boundedText(text);
+      }
     } else if (eventType === "tool_execution_end" || eventType === "tool_result_end") {
       const ev = isObj(event) ? event : {};
       const toolCallId = str(ev.toolCallId) ?? `tool-${eventCount}`;
       const toolName = str(ev.toolName);
       const rawText = resultText(ev.result).trim() || resultText(ev.message).trim() || "(no output)";
-      const text = boundedText(rawText, MAX_CHILD_FINAL_OUTPUT_BYTES);
+      const text = worktreeCheckController ? "Restricted WorkTree Check command completed." : boundedText(rawText, MAX_CHILD_FINAL_OUTPUT_BYTES);
       const isError = ev.isError === true;
       phase = "waiting_model";
       currentTool = undefined;
-      lastTextPreview = `${toolName ?? "Tool"} ${isError ? "failed" : "completed"}`;
-      appendItem({ kind: "tool_result", at, toolCallId, toolName, text, isError, truncated: text.length < rawText.length });
+      lastTextPreview = worktreeCheckController ? "正在识别项目工具链与检查方式…" : `${toolName ?? "Tool"} ${isError ? "failed" : "completed"}`;
+      appendItem({ kind: "tool_result", at, toolCallId, toolName, text, isError, truncated: !worktreeCheckController && text.length < rawText.length });
     } else if (eventType === "extension_error") {
       const message = isObj(event) && typeof event.error === "string" ? event.error : safeJson(event);
       lastTextPreview = boundedText(message);
@@ -560,6 +580,15 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
 
   const finish = (nextStatus: YpiStudioTaskSubagentRun["status"], outputText?: string): StudioSdkChildRunResult => {
     if (settled) nextStatus = status;
+    if (worktreeCheckController) {
+      const check = worktreeCheckController.finalize();
+      if (check.status !== "passed") {
+        nextStatus = check.status === "cancelled" ? "cancelled" : "failed";
+        terminationReason = check.reasonCode ?? "check_report_missing";
+        outputText = `${outputText ?? finalAssistantOutput}\n\nWorkTree Check: ${check.safeMessage}`.trim();
+      }
+      void worktreeCheckController.releaseLease();
+    }
     settled = true;
     status = nextStatus;
     phase = status === "waiting_for_user" ? "waiting_for_user" : "finished";
@@ -669,6 +698,7 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
           workspaceRoot: root,
           blockTaskJsonWrites: true,
         }),
+        ...(worktreeCheckController ? [createWorktreeCheckPolicyExtension()] : []),
       ],
     });
     for (const diagnostic of services.diagnostics ?? []) {
@@ -678,11 +708,14 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
     // When toolEnv is provided, override the builtin bash tool so child shell
     // spawns use the scrubbed env copy instead of shared process.env.
     // customTools override builtins by name in AgentSession tool registry.
-    let customTools: unknown[] | undefined;
-    if (toolEnv) {
+    let customTools: unknown[] | undefined = worktreeCheckController
+      ? [...createWorktreeCheckFileTools(worktreeCheckController), ...createWorktreeCheckTools(worktreeCheckController)]
+      : options.customTools;
+    if (toolEnv && !worktreeCheckController) {
       const { createBashToolDefinition } = await import("@earendil-works/pi-coding-agent");
       const scrubbed = { ...toolEnv };
       customTools = [
+        ...(customTools ?? []),
         createBashToolDefinition(root, {
           spawnHook: (ctx) => ({
             ...ctx,
@@ -696,7 +729,11 @@ export async function runYpiStudioSdkChildSession(options: StudioSdkChildRunOpti
       sessionManager,
       model: model as never,
       thinkingLevel: policy.thinkingArg as never,
-      excludeTools: EXCLUDED_CHILD_TOOLS,
+      excludeTools: [...new Set([
+        ...EXCLUDED_CHILD_TOOLS,
+        ...(worktreeCheckController ? ["bash", "read", "grep", "find", "ls", "edit", "write"] : []),
+        ...(options.excludeTools ?? []),
+      ])],
       ...(customTools ? { customTools: customTools as never } : {}),
     });
     session = result.session as typeof session;

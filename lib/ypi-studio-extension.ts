@@ -48,6 +48,9 @@ import {
 } from "./ypi-studio-transcripts";
 import { abortYpiStudioChildRun, getYpiStudioChildRun, registerYpiStudioChildRun, scheduleYpiStudioChildRunContinuation, unregisterYpiStudioChildRun, updateYpiStudioChildRun } from "./ypi-studio-subagent-runtime";
 import { runYpiStudioSdkChildSession } from "./ypi-studio-child-session-runner";
+import { WorktreeCheckExecutionController, buildWorktreeCheckEnv } from "./worktree-check-execution";
+import { parseWorktreeCheckExecutionResult } from "./worktree-check-policy";
+import { worktreeCheckPolicyHandshake } from "./worktree-check-extension";
 import type { YpiStudioImplementationLocalReviewStatus, YpiStudioImplementationSubtaskStatus, YpiStudioImprovementDisposition, YpiStudioImprovementStatus, YpiStudioSubagentCurrentTool, YpiStudioSubagentRunPhase, YpiStudioSubagentRunProgress, YpiStudioSubagentToolAction, YpiStudioSubagentToolMode, YpiStudioSubagentTranscriptItem, YpiStudioSubagentTranscriptRef, YpiStudioTaskDetail, YpiStudioTaskEvent, YpiStudioTaskScope, YpiStudioTaskSubagentRun } from "./ypi-studio-types";
 
 type JsonObject = Record<string, unknown>;
@@ -878,8 +881,54 @@ function resolvePiCli(): { command: string; args: string[] } {
   return { command: "pi", args: [] };
 }
 
-function buildPiArgs(policy: ResolvedYpiStudioMemberPolicy): string[] {
+interface StudioWorktreeCheckProfile {
+  controller?: WorktreeCheckExecutionController;
+  cliExtensionPath: string;
+  /** Unpredictable parent/extension fence; repository commands never receive it. */
+  invocationFence: string;
+  cliResultChunks: Buffer[];
+  cliResultBytes: number;
+  cliResultEnded: boolean;
+}
+
+async function createStudioWorktreeCheckProfile(
+  root: string,
+  runner: YpiStudioTaskSubagentRun["runner"],
+  signal?: AbortSignal,
+): Promise<StudioWorktreeCheckProfile> {
+  // Resolve from this installed application module, never from the checker WorkTree cwd.
+  const cliExtensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "worktree-check-cli-extension.ts");
+  if (!existsSync(cliExtensionPath)) throw new Error("check_runner_policy_unavailable");
+  const controller = runner === "sdk" ? new WorktreeCheckExecutionController({ worktreePath: root, signal, allowMainWorktree: true }) : undefined;
+  if (controller && !await controller.acquireLease()) throw new Error("check_execution_lease_timeout");
+  return { controller, cliExtensionPath, invocationFence: randomBytes(24).toString("hex"), cliResultChunks: [], cliResultBytes: 0, cliResultEnded: false };
+}
+
+function reconcileCliWorktreeCheck(result: ChildPiResult, profile: StudioWorktreeCheckProfile): ChildPiResult {
+  const unavailable = (): ChildPiResult => ({ ...result, status: "failed", terminationReason: "check_runner_policy_unavailable", output: `${result.output}\n\nWorkTree Check: restricted runner evidence is unavailable.`.trim(), progress: { ...result.progress, terminationReason: "check_runner_policy_unavailable" } });
+  try {
+    const raw = Buffer.concat(profile.cliResultChunks).toString("utf8");
+    if (!profile.cliResultEnded || profile.cliResultBytes === 0 || profile.cliResultBytes > 64 * 1024 || raw.includes("\n")) return unavailable();
+    const frame = JSON.parse(raw) as { protocol?: unknown; policy?: unknown; fence?: unknown; result?: unknown };
+    const frameKeys = ["protocol", "policy", "fence", "result"];
+    if (Object.keys(frame).length !== frameKeys.length || frameKeys.some((key) => !(key in frame)) || frame.protocol !== "ypi-worktree-check-result-v1" || frame.policy !== worktreeCheckPolicyHandshake() || frame.fence !== profile.invocationFence || !isObj(frame.result)) return unavailable();
+    const value = parseWorktreeCheckExecutionResult(frame.result);
+    if (!value) return unavailable();
+    if (value.status === "passed") return result;
+    const reason = value.reasonCode ?? "check_report_inconsistent";
+    return { ...result, status: value.status === "cancelled" ? "cancelled" : "failed", terminationReason: reason, output: `${result.output}\n\nWorkTree Check: ${value.safeMessage}`.trim(), progress: { ...result.progress, terminationReason: reason } };
+  } catch { return unavailable(); }
+}
+
+function buildPiArgs(policy: ResolvedYpiStudioMemberPolicy, checkProfile?: StudioWorktreeCheckProfile): string[] {
   const args = ["--mode", "json", "-p", "--no-session"];
+  if (checkProfile) {
+    args.push(
+      "--no-builtin-tools", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files",
+      "-e", checkProfile.cliExtensionPath,
+      "--tools", "read,grep,find,ls,edit,write,worktree_check_exec,submit_check_report",
+    );
+  }
   if (policy.modelArg) args.push("--model", policy.modelArg);
   if (policy.thinkingArg) args.push("--thinking", policy.thinkingArg);
   return args;
@@ -1006,16 +1055,37 @@ function runChildPi(
   signal?: AbortSignal,
   onUpdate?: ToolUpdateCallback,
   persistence?: ChildPiPersistenceCallbacks,
+  checkProfile?: StudioWorktreeCheckProfile,
 ): Promise<ChildPiResult> {
   const childPromise = new Promise<ChildPiResult>((resolveResult) => {
     const inv = resolvePiCli();
-    const child = spawn(inv.command, [...inv.args, ...buildPiArgs(policy)], {
+    const child = spawn(inv.command, [...inv.args, ...buildPiArgs(policy, checkProfile)], {
       cwd: root,
-      env: { ...process.env, YPI_STUDIO_SUBAGENT_CHILD: "1", TRELLIS_SUBAGENT_CHILD: "1" },
-      stdio: ["pipe", "pipe", "pipe"],
+      env: checkProfile ? {
+        ...buildWorktreeCheckEnv(process.env),
+        // These control variables are visible only to the trusted CLI extension;
+        // its executor rebuilds the stripped environment before repository spawn.
+        YPI_WORKTREE_CHECK_ROOT: root,
+        YPI_WORKTREE_CHECK_RESULT_FD: "3",
+        YPI_WORKTREE_CHECK_RESULT_FENCE: checkProfile.invocationFence,
+        YPI_WORKTREE_CHECK_POLICY: worktreeCheckPolicyHandshake(),
+        YPI_WORKTREE_CHECK_ALLOW_MAIN: "1",
+      } : {
+        ...process.env,
+        YPI_STUDIO_SUBAGENT_CHILD: "1",
+        TRELLIS_SUBAGENT_CHILD: "1",
+      },
+      stdio: checkProfile ? ["pipe", "pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
       windowsHide: true,
       detached: process.platform !== "win32",
     });
+    if (checkProfile && child.stdio[3]) {
+      child.stdio[3].on("data", (chunk: Buffer) => {
+        checkProfile.cliResultBytes += chunk.length;
+        if (checkProfile.cliResultBytes <= 64 * 1024) checkProfile.cliResultChunks.push(Buffer.from(chunk));
+      });
+      child.stdio[3].once("end", () => { checkProfile.cliResultEnded = true; });
+    }
     const decoder = new StringDecoder("utf8");
     const recentItems: YpiStudioSubagentTranscriptItem[] = [];
     const warnings: string[] = [];
@@ -1316,26 +1386,32 @@ function runChildPi(
         const ev = isObj(event) ? event : {};
         const toolCallId = str(ev.toolCallId) ?? `tool-${eventCount}`;
         const toolName = str(ev.toolName) ?? "tool";
-        const preview = previewYpiStudioTranscriptText(ev.args).text;
+        const checkPurpose = checkProfile && isObj(ev.args) ? ev.args.purpose : undefined;
+        const preview = checkProfile ? "Server-owned restricted WorkTree Check tool." : previewYpiStudioTranscriptText(ev.args).text;
         phase = "running_tool";
         currentTool = { toolCallId, toolName, startedAt: at };
-        lastTextPreview = `Running tool ${toolName}`;
+        lastTextPreview = checkPurpose === "prepare" ? "正在准备 WorkTree 项目依赖…"
+          : checkPurpose === "check" ? "正在执行项目检查…"
+            : toolName === "submit_check_report" ? "正在核对检查证据…"
+              : "正在识别项目工具链与检查方式…";
         appendItem({ kind: "tool_call", at, toolCallId, toolName, inputPreview: preview });
       } else if (eventType === "tool_execution_update") {
         phase = "running_tool";
-        const text = resultText(isObj(event) ? event.partialResult : undefined).trim();
-        if (text) lastTextPreview = boundedText(text);
+        if (!checkProfile) {
+          const text = resultText(isObj(event) ? event.partialResult : undefined).trim();
+          if (text) lastTextPreview = boundedText(text);
+        }
       } else if (eventType === "tool_execution_end" || eventType === "tool_result_end") {
         const ev = isObj(event) ? event : {};
         const toolCallId = str(ev.toolCallId) ?? `tool-${eventCount}`;
         const toolName = str(ev.toolName) ?? undefined;
         const rawText = resultText(ev.result).trim() || resultText(ev.message).trim() || "(no output)";
-        const text = boundedText(rawText, MAX_CHILD_FINAL_OUTPUT_BYTES);
+        const text = checkProfile ? "Restricted WorkTree Check command completed." : boundedText(rawText, MAX_CHILD_FINAL_OUTPUT_BYTES);
         const isError = ev.isError === true;
         phase = "waiting_model";
         currentTool = undefined;
-        lastTextPreview = `${toolName ?? "Tool"} ${isError ? "failed" : "completed"}`;
-        appendItem({ kind: "tool_result", at, toolCallId, toolName, text, isError, truncated: text.length < rawText.length });
+        lastTextPreview = checkProfile ? "正在识别项目工具链与检查方式…" : `${toolName ?? "Tool"} ${isError ? "failed" : "completed"}`;
+        appendItem({ kind: "tool_result", at, toolCallId, toolName, text, isError, truncated: !checkProfile && text.length < rawText.length });
       } else if (eventType === "extension_ui_request" && isBlockingExtensionUiRequest(event)) {
         const text = extensionUiRequestText(event);
         status = "waiting_for_user";
@@ -2583,6 +2659,7 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
           recordYpiStudioSubagentRun(root, taskId, failedRun);
           updateYpiStudioChildRun(runId, { status: "failed", progress: failedRun.progress, result: { output: message, status: "failed", transcript, warnings: Array.from(persistentRunWarnings), progress: failedRun.progress!, terminationReason, runner: "sdk" } });
           unregisterYpiStudioChildRun(runId);
+          void checkProfile?.controller?.releaseLease();
         };
         const persistTerminalRun = (run: YpiStudioTaskSubagentRun): void => {
           if (mode === "async") recordYpiStudioSubagentRun(root, taskId, run);
@@ -2597,6 +2674,9 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
             : { run: compactSubagentRunProjection(projectSubagentRun(root, taskId, runningRun)) },
         });
         const childMeta: ChildRunMeta = { runId, taskId, member, startedAt, parentSessionId: getParentSessionContinuationId(inputValue, ctx), parentSessionFile: getParentSessionFile(inputValue, ctx), subtaskId, improvementId, continuationOnFinal: false, runner: runnerSelection.runner };
+        const checkProfile = member === "checker"
+          ? await createStudioWorktreeCheckProfile(root, runnerSelection.runner, signal)
+          : undefined;
         const childOnUpdate = mode === "async" ? undefined : onUpdate;
         const childPromise = runnerSelection.runner === "sdk"
           ? runYpiStudioSdkChildSession({
@@ -2606,12 +2686,13 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
             meta: childMeta,
             writer,
             signal,
+            worktreeCheckController: checkProfile?.controller,
             onUpdate: childOnUpdate,
             persistence: {
               onProgress: persistRunStartMetadata,
               onFinal: persistTerminalRun,
             },
-          }).catch((error) => {
+          }).catch(async (error) => {
             const isPreflight = error && typeof error === "object" && (error as { preflight?: boolean }).preflight === true;
             if (runnerSelection.configured !== "auto" || !isPreflight) {
               persistSdkRunnerFailure(error);
@@ -2626,6 +2707,10 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
             }
             const fallbackRun: YpiStudioTaskSubagentRun = { ...runningRun, runner: "cli", summary: `SDK child runner preflight failed; falling back to CLI child process. ${oneLine(fallbackWarning, 500)}`, progress: runningRun.progress ? { ...runningRun.progress, warnings: Array.from(persistentRunWarnings).slice(-12), lastTextPreview: "SDK preflight failed; CLI fallback starting." } : undefined };
             persistRunStartMetadata(fallbackRun);
+            await checkProfile?.controller?.releaseLease();
+            const cliCheckProfile = member === "checker"
+              ? await createStudioWorktreeCheckProfile(root, "cli", signal)
+              : undefined;
             return runChildPi(
               root,
               childPrompt,
@@ -2638,7 +2723,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
                 onProgress: persistRunStartMetadata,
                 onFinal: persistTerminalRun,
               },
-            );
+              cliCheckProfile,
+            ).then((result) => cliCheckProfile ? reconcileCliWorktreeCheck(result, cliCheckProfile) : result);
           })
           : runChildPi(
             root,
@@ -2652,7 +2738,8 @@ export function createYpiStudioExtension(workspaceRoot: string, sessionContext?:
               onProgress: persistRunStartMetadata,
               onFinal: persistTerminalRun,
             },
-          );
+            checkProfile,
+          ).then((result) => checkProfile ? reconcileCliWorktreeCheck(result, checkProfile) : result);
         if (runnerSelection.runner === "sdk" && !getYpiStudioChildRun(runId)) {
           registerYpiStudioChildRun({
             runId,

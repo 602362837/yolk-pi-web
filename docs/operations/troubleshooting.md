@@ -672,6 +672,27 @@ Non-owner, incomplete claims, and high-risk final diffs must never open a PR. Fr
 
 P1 uses the **standard full agent** (file/bash/network). Owner gate, WorkTree, and final diff gate are publish/business controls only. The agent may still run arbitrary commands, access the network, or read same-OS-user files outside the WorkTree before any publish gate runs. Product code scrubs App/machine automation secrets from child env and refuses secret markers in runner state/prompts; **sentinel tests do not prove host isolation**. Prefer a dedicated low-privilege OS account/container.
 
+### WorkTree Check blocked before GitHub validation
+
+GitHub unattended and Studio `member=checker` use the same restricted, evidence-backed Check profile. The checker first reads repository docs/CI/config/wrappers as data, uses bounded probes, may prepare dependencies only in a linked WorkTree when project evidence supports it, then submits a structured report. The platform does not select a package manager or invent an install command. A checker failure means the GitHub operator validation broker ran **zero** commands.
+
+| Safe reason | Operator action |
+| --- | --- |
+| `check_dependency_discovery_inconclusive` | Add/repair repository documentation, CI, wrapper, or toolchain evidence; do not guess an install command in Issue/task text. |
+| `check_dependency_tool_missing` | Provide the required host tool through the managed image/environment or repository-supported local wrapper. Do not use sudo/system/global installation. |
+| `check_command_rejected` | Use a project-local argv command compatible with the policy; remove shell/eval, privilege, global/system/service/remote/download, Git-mutation, path-escape, or secret-like arguments. |
+| `check_dependency_prepare_failed` / `check_dependency_prepare_timeout` | Inspect the project environment securely, fix the underlying dependency/tool/config issue, then use an explicit operator retry. A started prepare is not automatically repeated. |
+| `check_dependency_prepare_attempt_limit` | Start a new operator-directed checker run only after new evidence or an environment change; restart/resume in the same GitHub generation preserves prepare usage. |
+| `check_dependency_prepare_mutated_sources` | Review and intentionally resolve the tracked source/config/lock/toolchain change. The controller never resets it automatically. |
+| `check_validation_failed` / `check_validation_timeout` | Repair the work or test environment, then retry; do not classify it as missing dependencies without evidence. |
+| `check_report_missing` / `check_report_inconsistent` | Treat the checker result as untrusted/incomplete. Fix runner/profile/report behavior; assistant prose cannot replace controller evidence. |
+| `check_runner_policy_unavailable` | Repair released server-owned CLI extension/asset or SDK profile packaging. Do not fall back to normal `pi`/bash. |
+| `check_runtime_unavailable` / `check_execution_lease_timeout` | Check linked WorkTree existence and competing checker process; only command-not-started runtime/lease cases may be bounded automatic retries. |
+
+Safe status/progress intentionally contains phase, counts, durations, flags, report hash, and stable reason only. It must not expose command argv, cwd, output, env, URLs, paths, or credentials. The argv/path guard is **not an OS sandbox**: repository wrappers/lifecycle scripts can still run code and use network or same-user resources. Run unattended jobs in a dedicated low-privilege account/container; do not claim a WorkTree or final-diff gate contains host side effects.
+
+Rollback is code/config only: disable unattended or the checker profile as appropriate and retain WorkTrees, tasks, sessions, dependency/build outputs, and external tool caches. Never remove user files, reset a WorkTree, or copy/link main-tree dependencies as a recovery shortcut.
+
 ### Pause / resume / retry (per-job vs global)
 
 | Control | Scope | Clears global `paused`? |

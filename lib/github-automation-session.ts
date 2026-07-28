@@ -43,6 +43,8 @@ export function buildGithubUnattendedScrubbedEnv(
 }
 import type { GithubAutomationRepositoryConfig } from "./github-automation-types";
 import { createYpiStudioChildGuardExtension } from "./ypi-studio-child-guard";
+import { WorktreeCheckExecutionController } from "./worktree-check-execution";
+import type { WorktreeCheckExecutionResult } from "./worktree-check-policy";
 import {
   createYpiStudioGithubUnattendedTask,
   evaluateYpiStudioUnattendedImplementationAuthorization,
@@ -149,6 +151,7 @@ export type GithubFullAgentMemberOverride = (
   warnings: string[];
   childSessionId?: string;
   childSessionFile?: string;
+  checkResult?: WorktreeCheckExecutionResult;
 }>;
 
 declare global {
@@ -188,6 +191,14 @@ export interface RunGithubFullAgentMemberInput {
   parentSessionFile?: string;
   subtaskId?: string;
   signal?: AbortSignal;
+  /** Server-owned restricted profile for the durable GitHub checker stage. */
+  checkExecution?: boolean;
+  /** Generation-scoped started prepare attempts restored from durable state. */
+  checkPrepareAttemptsUsed?: number;
+  /** Persist a generation-scoped reservation before a prepare process is spawned. */
+  reservePrepareAttempt?: (input: { executable: string; args: string[]; cwd?: string }) => Promise<boolean>;
+  /** Started prepare hashes consumed by this generation before a crash. */
+  checkConsumedPrepareCommandHashes?: readonly string[];
   /**
    * Extra untrusted Issue material may be embedded by the caller inside `prompt`
    * under clear UNTRUSTED markers. This module never puts secrets in the prompt.
@@ -640,6 +651,8 @@ export function buildGithubFullAgentPromptEnvelope(input: {
   instructions: string;
   /** Optional untrusted Issue material (title/body excerpt) — treated as data. */
   untrustedIssueExcerpt?: string;
+  /** Server-owned policy appended after untrusted data; never supplied by Issue/task. */
+  trustedPolicyGuidance?: string;
 }): string {
   if (containsGithubAutomationSecretInjectionMarker(input.instructions)) {
     throw new Error("Refusing to build agent prompt: instructions contain secret injection markers");
@@ -680,6 +693,9 @@ export function buildGithubFullAgentPromptEnvelope(input: {
     "Instructions:",
     input.instructions,
     untrusted,
+    input.trustedPolicyGuidance
+      ? ["", "----- BEGIN SERVER_OWNED_CHECK_POLICY -----", input.trustedPolicyGuidance, "----- END SERVER_OWNED_CHECK_POLICY -----"].join("\n")
+      : "",
   ].join("\n");
 }
 
@@ -696,6 +712,7 @@ export async function runGithubFullAgentMember(
   warnings: string[];
   childSessionId?: string;
   childSessionFile?: string;
+  checkResult?: WorktreeCheckExecutionResult;
 }> {
   if (containsGithubAutomationSecretInjectionMarker(input.prompt)) {
     // Typed preflight failure so operator events keep an allowlisted code/stage
@@ -721,6 +738,24 @@ export async function runGithubFullAgentMember(
   // Per-run scrubbed env *copy* — never mutate shared Next process.env.
   // Bash tool spawnHook receives this copy; App/machine credentials remain on server.
   const scrubbedEnv = buildGithubUnattendedScrubbedEnv(process.env);
+  const controller = input.checkExecution
+    ? new WorktreeCheckExecutionController({
+        worktreePath: input.worktreePath,
+        env: scrubbedEnv,
+        signal: input.signal,
+        initialPrepareAttempts: input.checkPrepareAttemptsUsed,
+        consumedPrepareCommandHashes: input.checkConsumedPrepareCommandHashes,
+        reservePrepareAttempt: input.reservePrepareAttempt ? async (command) => input.reservePrepareAttempt!({ executable: command.executable, args: command.args, cwd: command.cwd }) : undefined,
+      })
+    : null;
+  if (controller && !(await controller.acquireLease())) {
+    return {
+      output: "Restricted WorkTree checker could not acquire its execution lease.",
+      status: "failed",
+      warnings: [],
+      checkResult: controller.finalize(),
+    };
+  }
 
   const { readPiWebConfigForApi } = await import("./pi-web-config");
   const { resolveYpiStudioMemberPolicy } = await import("./ypi-studio-policy");
@@ -740,7 +775,8 @@ export async function runGithubFullAgentMember(
     startedAt: new Date().toISOString(),
   });
 
-  return runYpiStudioSdkChildSession({
+  try {
+    const child = await runYpiStudioSdkChildSession({
     root: input.worktreePath,
     prompt: input.prompt,
     policy,
@@ -756,10 +792,15 @@ export async function runGithubFullAgentMember(
     },
     writer,
     signal: input.signal,
-    fullAgent: true,
+    fullAgent: !controller,
     // Isolated scrubbed env for child bash/tool spawns (not a host sandbox).
     toolEnv: scrubbedEnv,
+    ...(controller ? { worktreeCheckController: controller } : {}),
   });
+    return controller ? { ...child, checkResult: controller.finalize() } : child;
+  } finally {
+    await controller?.releaseLease();
+  }
 }
 
 /**

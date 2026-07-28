@@ -33,6 +33,14 @@ When changing pi SDK usage, read the installed package documentation first:
 
 YPI Studio subagents support an in-process SDK runner selected by `studio.subagents.runner` (`auto`/`sdk`/`cli`). SDK child sessions use the same installed `@earendil-works/pi-coding-agent` dependency and the same Web `createWebAgentSessionServices` / `ModelRuntime` path as main Chat sessions, but they receive their own isolated runtime + persistent child session id for provider request affinity. The legacy CLI runner remains as rollback and resolves the bundled package CLI before consulting `PATH`.
 
+### Restricted WorkTree Check runner profile
+
+`member=checker` is not an ordinary Studio child. It uses the server-owned `worktree-check@1` policy and shared controller (`lib/worktree-check-policy.ts`, `lib/worktree-check-execution.ts`, `lib/worktree-check-extension.ts`) to read repository evidence, optionally prepare a linked WorkTree, run checks, and submit a reconciled report. The platform deliberately has no language/package-manager detector or installer argv table.
+
+SDK excludes builtin shell/filesystem tools and injects only contained file tools plus `worktree_check_exec` and `submit_check_report`. CLI must launch with `--no-builtin-tools --no-extensions --no-skills --no-prompt-templates --no-context-files`, load only `lib/worktree-check-cli-extension.ts` through `-e`, and use the explicit tool allowlist. The extension checks the server policy handshake and writes only a safe controller result for parent reconciliation. `auto` can fall back only to this equivalent restricted CLI profile; failure to load/preflight it is `check_runner_policy_unavailable`, never an unrestricted CLI fallback.
+
+These are application-level controls, not sandboxing: repository wrappers or lifecycle scripts can still have network and same-user side effects. Production unattended use therefore needs OS/container isolation and a low-privilege account. CLI extension source/assets are release artifacts: packaging validation must ensure the server-owned extension resolves in the published application; do not resolve it from the checked WorkTree or task data.
+
 ## Web Auth / ModelRuntime Adapter (0.80.10)
 
 Do **not** deep-import coding-agent private `core/auth-storage`, construct `ModelRegistry.create()`, or read `services.authStorage` / `services.modelRegistry` / `inner.modelRegistry` from application code.
