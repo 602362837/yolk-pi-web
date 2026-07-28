@@ -51,6 +51,7 @@ import {
   appendGithubAutomationSafeEvent,
   getGithubAutomationJobsDir,
   readGithubAutomationIssueState,
+  readGithubAutomationJobTerminalDisposition,
   upsertEffectMarker,
   upsertGithubAutomationIssueState,
   writeGithubAutomationJob,
@@ -63,13 +64,16 @@ import type {
   GithubAutomationJobDisposition,
   GithubAutomationRepositoryConfig,
   GithubAutomationRetryability,
+  GithubAutomationTerminalDisposition,
 } from "./github-automation-types";
+import type { GithubImplementerDisposition } from "./github-automation-session";
 import type { CheckReasonCode } from "./worktree-check-policy";
 import { worktreeCheckSystemGuidance } from "./worktree-check-policy";
 import {
   buildGithubAutomationBlockFingerprint,
   classifyGithubAutomationRetryability,
 } from "./github-automation-types";
+import { drainGithubTerminalDispositionNotification } from "./github-automation-notification";
 /** Opaque short session id for safe events — never paths / sessionFile. */
 function toSafeSessionIdShort(sessionId: string | null | undefined): string | null {
   if (typeof sessionId !== "string") return null;
@@ -201,6 +205,18 @@ export interface GithubAutomationRunnerStateV1 {
     worktreeDiffHash: string;
     launchState: "reserved" | "terminal";
   } | null;
+  /**
+   * Durable, fence-bound implementer terminal gate. Non-success values are
+   * terminal for this run and must never be reinterpreted from child status.
+   */
+  implementerDisposition?: {
+    generation: number;
+    runFence: string;
+    kind: GithubImplementerDisposition["kind"];
+    reasonCode: string;
+    retryability: GithubAutomationRetryability;
+    recordedAt: string;
+  } | null;
 }
 
 function runnerStatePath(jobId: string): string {
@@ -231,6 +247,17 @@ export function readGithubAutomationRunnerState(
         ["provider_transport_failure", "succeeded", "failed", "cancelled", "unknown"].includes(retry.outcomeKind) &&
         ["reserved", "terminal"].includes(retry.launchState) &&
         typeof retry.worktreeDiffHash === "string" && /^[a-f0-9]{64}$/.test(retry.worktreeDiffHash);
+      if (!valid) return null;
+    }
+    const disposition = raw.implementerDisposition;
+    if (disposition !== undefined && disposition !== null) {
+      const valid =
+        disposition.generation === raw.generation &&
+        typeof disposition.runFence === "string" && /^[a-z0-9-]{1,80}$/i.test(disposition.runFence) &&
+        ["succeeded", "needs_user_decision", "policy_blocked", "provider_transport_failure", "cancelled", "runtime_failed"].includes(disposition.kind) &&
+        typeof disposition.reasonCode === "string" && /^[a-z][a-z0-9_]{0,63}$/i.test(disposition.reasonCode) &&
+        ["automatic", "operator_after_change", "operator", "none"].includes(disposition.retryability) &&
+        typeof disposition.recordedAt === "string" && Number.isFinite(Date.parse(disposition.recordedAt));
       if (!valid) return null;
     }
     return raw;
@@ -272,6 +299,61 @@ function hashImplementerChildSessionId(value: string | null | undefined): string
   return createHash("sha256").update(`gha-implementer-child:v1:${value.trim()}`).digest("hex").slice(0, 24);
 }
 
+function getImplementerDisposition(value: unknown): GithubImplementerDisposition {
+  const candidate = value && typeof value === "object"
+    ? (value as { implementerDisposition?: unknown }).implementerDisposition
+    : null;
+  if (candidate && typeof candidate === "object") {
+    const raw = candidate as Partial<GithubImplementerDisposition>;
+    if (
+      ["succeeded", "needs_user_decision", "policy_blocked", "provider_transport_failure", "cancelled", "runtime_failed"].includes(raw.kind ?? "") &&
+      (raw.reasonCode === undefined || ["blocked_manual_ui_approval", "implementer_policy_blocked", "implementer_runtime_failed"].includes(raw.reasonCode))
+    ) {
+      return { kind: raw.kind!, ...(raw.reasonCode ? { reasonCode: raw.reasonCode } : {}) };
+    }
+  }
+  const outcome = getImplementerOutcome(value);
+  if (outcome.kind === "succeeded") return { kind: "succeeded" };
+  if (outcome.kind === "cancelled") return { kind: "cancelled" };
+  if (outcome.kind === "provider_transport_failure") return { kind: "provider_transport_failure" };
+  return { kind: "runtime_failed", reasonCode: "implementer_runtime_failed" };
+}
+
+function implementerDispositionReason(
+  disposition: GithubImplementerDisposition,
+): GithubAutomationTerminalDisposition["reasonCode"] {
+  if (disposition.kind === "needs_user_decision") return "blocked_manual_ui_approval";
+  if (disposition.kind === "policy_blocked") return "policy_blocked";
+  if (disposition.kind === "runtime_failed") return "runtime_failed";
+  if (disposition.kind === "provider_transport_failure") return "provider_transport_failure";
+  if (disposition.kind === "cancelled") return "cancelled";
+  return null;
+}
+
+function buildImplementerTerminalDisposition(input: {
+  generation: number;
+  runFence: string;
+  runOrdinal: number;
+  kind: GithubImplementerDisposition["kind"];
+  reasonCode: GithubAutomationTerminalDisposition["reasonCode"];
+  retryability: GithubAutomationRetryability;
+}): GithubAutomationTerminalDisposition {
+  const recordedAt = new Date().toISOString();
+  return {
+    generation: input.generation,
+    runFence: input.runFence,
+    runOrdinal: input.runOrdinal,
+    kind: input.kind,
+    reasonCode: input.reasonCode,
+    blockedAtLayer: input.kind === "succeeded" ? null : "agent",
+    retryability: input.retryability,
+    recordedAt,
+    provenanceHash: createHash("sha256").update(JSON.stringify(["implementer-disposition:v1", input.generation, input.runFence, input.runOrdinal, input.kind, input.reasonCode])).digest("hex"),
+    notificationRevision: `impl-${input.generation}-${input.runOrdinal}`,
+    notification: { labels: "pending", comment: "pending" },
+  };
+}
+
 function getImplementerOutcome(value: unknown): GithubImplementerOutcome {
   const candidate = value && typeof value === "object" && "outcome" in value
     ? (value as { outcome?: unknown }).outcome
@@ -282,7 +364,15 @@ function getImplementerOutcome(value: unknown): GithubImplementerOutcome {
     return { kind: "unknown", stage: "unknown", retryable: false };
   }
   const raw = candidate as Record<string, unknown>;
-  const kind = raw.kind === "provider_transport_failure" ? "provider_transport_failure" : "unknown";
+  const kind = raw.kind === "provider_transport_failure"
+    ? "provider_transport_failure"
+    : raw.kind === "succeeded"
+      ? "succeeded"
+      : raw.kind === "cancelled"
+        ? "cancelled"
+        : raw.kind === "failed"
+          ? "failed"
+          : "unknown";
   const stage = raw.stage === "before_first_provider_request"
     ? "before_first_provider_request"
     : raw.stage === "provider_request_started"
@@ -801,6 +891,70 @@ export async function runGithubUnattendedImplementation(
     // env copies (GHA-CLOSE-03). Server publisher credentials stay intact.
 
     let state = readGithubAutomationRunnerState(job.jobId) ?? emptyRunnerState(job);
+
+    // Notification recovery is an outbox drain, never a pipeline retry. A valid
+    // exceptional terminal disposition is authoritative even if a scheduler or
+    // operator wakes this job again.
+    const durableTerminal = readGithubAutomationJobTerminalDisposition(job);
+    if (
+      durableTerminal.state === "valid" &&
+      durableTerminal.disposition &&
+      durableTerminal.disposition.kind !== "succeeded" &&
+      (durableTerminal.disposition.notification.labels !== "confirmed" ||
+        durableTerminal.disposition.notification.comment !== "confirmed")
+    ) {
+      const [owner, repo] = repository.fullName.split("/", 2);
+      const notification =
+        typeof owner === "string" && owner.length > 0 &&
+        typeof repo === "string" && repo.length > 0 &&
+        typeof repository.installationId === "number" && repository.installationId > 0
+          ? await drainGithubTerminalDispositionNotification({
+              target: {
+                installationId: repository.installationId,
+                repositoryId: job.repositoryId,
+                owner,
+                repo,
+                issueNumber: job.issueNumber,
+              },
+              disposition: durableTerminal.disposition,
+            })
+          : { labels: "failed" as const, comment: "failed" as const, lastFailureOperation: "reconcile" as const };
+      const notificationFailed =
+        notification.labels === "failed" || notification.comment === "failed";
+      const terminalDisposition = {
+        ...durableTerminal.disposition,
+        blockedAtLayer: notificationFailed ? "operator_notification" as const : "agent" as const,
+        notification: {
+          labels: notification.labels,
+          comment: notification.comment,
+          ...(notification.lastFailureOperation
+            ? { lastFailureOperation: notification.lastFailureOperation }
+            : {}),
+        },
+      };
+      job = await persistJob({
+        ...job,
+        terminalDisposition,
+        phase: "blocked",
+        status: "blocked",
+        checkpoint: "blocked",
+        reasonCode: terminalDisposition.reasonCode,
+        blockedAtLayer: notificationFailed ? "operator_notification" : "agent",
+        retryability: terminalDisposition.retryability,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      });
+      return {
+        job,
+        wakeAgain: false,
+        disposition: blockedDisposition({
+          reasonCode: terminalDisposition.reasonCode ?? "automation_state_inconsistent",
+          layer: notificationFailed ? "operator_notification" : "agent",
+          checkpoint: "blocked",
+          retryability: terminalDisposition.retryability,
+        }),
+      };
+    }
 
     // State and job are separate durable writes. If one records a downstream
     // checkpoint before a crash, converge on it before considering implementer
@@ -1626,41 +1780,126 @@ export async function runGithubUnattendedImplementation(
           parentSessionFile: state.sessionFile ?? undefined,
         });
 
-        if (result.status !== "succeeded" && result.status !== "cancelled") {
-          const failure = new GithubAutomationError("internal_error", "Implementer child did not succeed", {
-            status: 500,
-          });
+        const disposition = getImplementerDisposition(result);
+        // Keep the separately proven IMP-001 transport lane: only its strict
+        // before-first-request evidence may schedule a bounded automatic retry.
+        if (disposition.kind === "provider_transport_failure") {
+          const failure = new GithubAutomationError("internal_error", "Implementer transport failure", { status: 500 });
           Object.assign(failure, { childOutcome: getImplementerOutcome(result) });
           throw failure;
         }
+        const reservation = state.implementerRetry;
+        const current = readGithubAutomationRunnerState(job.jobId);
+        // The child ran outside this call stack. Its terminal write is valid only
+        // for its own generation/fence and only while its reservation remains.
+        if (
+          !reservation ||
+          !current ||
+          current.generation !== state.generation ||
+          current.implementerRetry?.generation !== reservation.generation ||
+          current.implementerRetry.runFence !== reservation.runFence ||
+          current.implementerRetry.runId !== runId ||
+          current.implementerRetry.launchState !== "reserved"
+        ) {
+          await appendGithubAutomationSafeEvent({
+            at: new Date().toISOString(), kind: "unattended_implementer_stale_result",
+            repositoryId: job.repositoryId, issueNumber: job.issueNumber, jobId: job.jobId,
+            deliveryId: job.deliveryId, phase: job.phase, reasonCode: "implementer_stale_result", traceId: job.traceId,
+          });
+          return { job, wakeAgain: false, disposition: { kind: "waiting", wakeOn: "external" } };
+        }
 
+        const reasonCode = implementerDispositionReason(disposition);
+        const retryability = disposition.kind === "needs_user_decision" || disposition.kind === "policy_blocked"
+          ? "operator_after_change"
+          : disposition.kind === "cancelled" ? "operator" : "operator";
+        const succeeded = disposition.kind === "succeeded";
+        const paused = disposition.kind === "cancelled";
+        const terminalDisposition = buildImplementerTerminalDisposition({
+          generation: current.generation,
+          runFence: reservation.runFence,
+          runOrdinal: reservation.attemptOrdinal,
+          kind: disposition.kind,
+          reasonCode,
+          retryability,
+        });
         state = writeGithubAutomationRunnerState({
-          ...state,
-          checkpoint: "checking",
+          ...current,
+          checkpoint: succeeded ? "checking" : paused ? "paused" : "blocked",
           lastMember: "implementer",
           lastRunId: runId,
-          reasonCode:
-            result.status === "succeeded" ? null : `implementer_${result.status}`,
-          implementerRetry: state.implementerRetry
-            ? {
-                ...state.implementerRetry,
-                childSessionIdHash: hashImplementerChildSessionId(
-                  (result as { childSessionId?: string }).childSessionId,
-                ),
-                providerRequestStarted: result.status === "succeeded" ? true : null,
-                outcomeKind: result.status === "succeeded" ? "succeeded" : "cancelled",
-                launchState: "terminal",
-              }
-            : null,
+          reasonCode: succeeded ? null : paused ? "implementer_cancelled" : reasonCode,
+          implementerDisposition: {
+            generation: current.generation,
+            runFence: reservation.runFence,
+            kind: disposition.kind,
+            reasonCode: reasonCode ?? "implementer_succeeded",
+            retryability,
+            recordedAt: new Date().toISOString(),
+          },
+          // A checker result from an earlier fence must not explain this run.
+          checkerReasonCode: null,
+          checkerReportHash: null,
+          checkerRunId: null,
+          checkStage: undefined,
+          implementerRetry: {
+            ...reservation,
+            childSessionIdHash: hashImplementerChildSessionId(result.childSessionId),
+            providerRequestStarted: disposition.kind === "succeeded" ? true : null,
+            outcomeKind: disposition.kind === "succeeded" ? "succeeded" : disposition.kind === "cancelled" ? "cancelled" : "failed",
+            launchState: "terminal",
+          },
         });
 
         job = await persistJob({
           ...job,
-          phase: "checking",
-          status: "running",
-          checkpoint: "checking",
+          phase: succeeded ? "checking" : paused ? "paused" : "blocked",
+          status: succeeded ? "running" : paused ? "paused" : "blocked",
+          checkpoint: succeeded ? "checking" : paused ? "paused" : "blocked",
           reasonCode: state.reasonCode,
+          blockedAtLayer: succeeded ? null : "agent",
+          retryability,
+          nextRetryAt: null,
+          terminalDisposition,
+          ...(succeeded ? {} : { leaseOwner: null, leaseExpiresAt: null }),
         });
+
+        if (!succeeded) {
+          const [owner, repo] = repository.fullName.split("/", 2);
+          const notification =
+            typeof owner === "string" && owner.length > 0 &&
+            typeof repo === "string" && repo.length > 0 &&
+            typeof repository.installationId === "number" && repository.installationId > 0
+              ? await drainGithubTerminalDispositionNotification({
+                  target: {
+                    installationId: repository.installationId,
+                    repositoryId: job.repositoryId,
+                    owner,
+                    repo,
+                    issueNumber: job.issueNumber,
+                  },
+                  disposition: terminalDisposition,
+                })
+              : { labels: "failed" as const, comment: "failed" as const, lastFailureOperation: "reconcile" as const };
+          const notificationFailed =
+            notification.labels === "failed" || notification.comment === "failed";
+          const notifiedDisposition = {
+            ...terminalDisposition,
+            blockedAtLayer: notificationFailed ? "operator_notification" as const : terminalDisposition.blockedAtLayer,
+            notification: {
+              labels: notification.labels,
+              comment: notification.comment,
+              ...(notification.lastFailureOperation
+                ? { lastFailureOperation: notification.lastFailureOperation }
+                : {}),
+            },
+          };
+          job = await persistJob({
+            ...job,
+            terminalDisposition: notifiedDisposition,
+            blockedAtLayer: notificationFailed ? "operator_notification" : job.blockedAtLayer,
+          });
+        }
 
         await appendGithubAutomationSafeEvent({
           at: new Date().toISOString(),
@@ -1672,38 +1911,37 @@ export async function runGithubUnattendedImplementation(
           phase: job.phase,
           reasonCode: state.reasonCode,
           traceId: job.traceId,
-          meta: {
-            runId,
-            childStatus: result.status,
-            // Never store full transcript/output — only length.
-            outputChars: result.output?.length ?? 0,
-          },
+          meta: { runId, childStatus: result.status, disposition: disposition.kind },
         });
 
-        if (result.status === "cancelled") {
-          state = writeGithubAutomationRunnerState({
-            ...state,
-            checkpoint: "paused",
-            reasonCode: "implementer_cancelled",
-          });
-          job = await persistJob({
-            ...job,
-            phase: "paused",
-            status: "paused",
-            checkpoint: "paused",
-            reasonCode: "implementer_cancelled",
-            leaseOwner: null,
-            leaseExpiresAt: null,
-          });
+        if (!succeeded) {
+          if (paused) return { job, wakeAgain: false, disposition: { kind: "waiting", wakeOn: "external" } };
           return {
             job,
             wakeAgain: false,
-            disposition: { kind: "waiting", wakeOn: "external" },
+            disposition: blockedDisposition({ reasonCode: reasonCode ?? "runtime_failed", layer: "agent", checkpoint: "blocked", retryability }),
           };
         }
 
       } catch (err) {
         const message = safeGithubAutomationErrorMessage(err);
+        const reservation = state.implementerRetry;
+        const current = readGithubAutomationRunnerState(job.jobId);
+        if (
+          !reservation || !current || current.generation !== state.generation ||
+          current.implementerRetry?.generation !== reservation.generation ||
+          current.implementerRetry.runFence !== reservation.runFence ||
+          current.implementerRetry.runId !== runId ||
+          current.implementerRetry.launchState !== "reserved"
+        ) {
+          await appendGithubAutomationSafeEvent({
+            at: new Date().toISOString(), kind: "unattended_implementer_stale_result",
+            repositoryId: job.repositoryId, issueNumber: job.issueNumber, jobId: job.jobId,
+            deliveryId: job.deliveryId, phase: job.phase, reasonCode: "implementer_stale_result", traceId: job.traceId,
+          });
+          return { job, wakeAgain: false, disposition: { kind: "waiting", wakeOn: "external" } };
+        }
+        state = current;
         const errDetails =
           err &&
           typeof err === "object" &&
@@ -1815,6 +2053,75 @@ export async function runGithubUnattendedImplementation(
 
     // ── 5. Restricted checker, then operator validation (both durable) ──────
     if (state.checkpoint === "checking" || job.phase === "checking") {
+      // Defense in depth: no checker/validation/publisher path may infer
+      // implementer success from status or an old checking checkpoint. Legacy
+      // sidecars without a fence-bound disposition require operator review.
+      const implementerGate = state.implementerDisposition;
+      const terminalGate = readGithubAutomationJobTerminalDisposition(job);
+      const retry = state.implementerRetry;
+      if (
+        terminalGate.state === "valid" &&
+        terminalGate.disposition &&
+        terminalGate.disposition.generation === state.generation &&
+        terminalGate.disposition.kind !== "succeeded"
+      ) {
+        const terminal = terminalGate.disposition;
+        const reasonCode = terminal.reasonCode ?? "automation_state_inconsistent";
+        const blockedAtLayer = terminal.blockedAtLayer ?? "agent";
+        state = writeGithubAutomationRunnerState({
+          ...state,
+          checkpoint: "blocked",
+          reasonCode,
+        });
+        job = await persistJob({
+          ...job,
+          terminalDisposition: terminal,
+          phase: "blocked",
+          status: "blocked",
+          checkpoint: "blocked",
+          reasonCode,
+          blockedAtLayer,
+          retryability: terminal.retryability,
+          leaseOwner: null,
+          leaseExpiresAt: null,
+        });
+        return {
+          job,
+          wakeAgain: false,
+          disposition: blockedDisposition({
+            reasonCode,
+            layer: blockedAtLayer,
+            checkpoint: "blocked",
+            retryability: terminal.retryability,
+          }),
+        };
+      }
+      if (
+        terminalGate.state !== "valid" ||
+        terminalGate.disposition?.generation !== state.generation ||
+        terminalGate.disposition?.kind !== "succeeded" ||
+        !implementerGate ||
+        implementerGate.generation !== state.generation ||
+        !retry ||
+        retry.generation !== state.generation ||
+        retry.runFence !== implementerGate.runFence ||
+        retry.launchState !== "terminal" ||
+        retry.outcomeKind !== "succeeded" ||
+        implementerGate.kind !== "succeeded"
+      ) {
+        const reasonCode = "automation_state_inconsistent";
+        state = writeGithubAutomationRunnerState({ ...state, checkpoint: "blocked", reasonCode });
+        job = await persistJob({
+          ...job, phase: "blocked", status: "blocked", checkpoint: "blocked", reasonCode,
+          blockedAtLayer: "agent", retryability: "operator", leaseOwner: null, leaseExpiresAt: null,
+        });
+        await appendGithubAutomationSafeEvent({
+          at: new Date().toISOString(), kind: "unattended_checker_gate_blocked",
+          repositoryId: job.repositoryId, issueNumber: job.issueNumber, jobId: job.jobId,
+          deliveryId: job.deliveryId, phase: job.phase, reasonCode, traceId: job.traceId,
+        });
+        return { job, wakeAgain: false, disposition: blockedDisposition({ reasonCode, layer: "agent", checkpoint: "blocked", retryability: "operator" }) };
+      }
       // Old sidecars had a single checking checkpoint. They always resume at the
       // restricted checker, never directly at operator validation.
       const checkStage = state.checkStage ?? "checker";
@@ -2071,6 +2378,25 @@ export async function runGithubUnattendedImplementation(
       job.phase === "final_policy" ||
       job.phase === "publishing"
     ) {
+      const implementerGate = state.implementerDisposition;
+      const terminalGate = readGithubAutomationJobTerminalDisposition(job);
+      const retry = state.implementerRetry;
+      if (
+        terminalGate.state !== "valid" || terminalGate.disposition?.generation !== state.generation ||
+        terminalGate.disposition?.kind !== "succeeded" ||
+        !implementerGate || implementerGate.generation !== state.generation ||
+        implementerGate.kind !== "succeeded" || !retry ||
+        retry.generation !== state.generation || retry.runFence !== implementerGate.runFence ||
+        retry.launchState !== "terminal" || retry.outcomeKind !== "succeeded"
+      ) {
+        const reasonCode = "automation_state_inconsistent";
+        state = writeGithubAutomationRunnerState({ ...state, checkpoint: "blocked", reasonCode });
+        job = await persistJob({
+          ...job, phase: "blocked", status: "blocked", checkpoint: "blocked", reasonCode,
+          blockedAtLayer: "agent", retryability: "operator", leaseOwner: null, leaseExpiresAt: null,
+        });
+        return { job, wakeAgain: false, disposition: blockedDisposition({ reasonCode, layer: "agent", checkpoint: "blocked", retryability: "operator" }) };
+      }
       if (state.pauseRequested || input.config.paused) {
         job = await persistJob({
           ...job,

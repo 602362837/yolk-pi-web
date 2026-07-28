@@ -668,6 +668,14 @@ If still no implement / no receipt:
 
 Non-owner, incomplete claims, and high-risk final diffs must never open a PR. Free-text comments never set validation/branch/remote/publisher.
 
+### `blocked_manual_ui_approval` / Issue status notification
+
+A child may technically finish with `status=succeeded` while its server-validated disposition says `blocked_manual_ui_approval` or another needs-user/policy result. That disposition is authoritative: the job must remain blocked and checker, operator validation, final policy, and publisher must have made **zero** calls. Do not retry it automatically. Complete the required UI/HTML design and approval, then have an operator explicitly retry the job.
+
+The App maintains only approved `ypi:*` labels and one canonical Chinese `automation_status` marker comment. The comment is a status explanation, **not** approval. If labels or comment delivery fails/has an unknown result, the business reason remains durable but the job surfaces `blockedAtLayer=operator_notification`. Fix App Issues permissions/connectivity and use the notification retry/drain action; it reconciles remote labels/comment first and must not rerun implementer, checker, validation, or publisher. Do not delete unrelated user labels or manually duplicate the marker comment.
+
+If a job unexpectedly reaches `checking` after a visible manual/UI block, preserve the job sidecar and report it as `automation_state_inconsistent`; stale child/checker status must not be used to force it forward.
+
 ### Full agent residual risk (not a sandbox)
 
 P1 uses the **standard full agent** (file/bash/network). Owner gate, WorkTree, and final diff gate are publish/business controls only. The agent may still run arbitrary commands, access the network, or read same-OS-user files outside the WorkTree before any publish gate runs. Product code scrubs App/machine automation secrets from child env and refuses secret markers in runner state/prompts; **sentinel tests do not prove host isolation**. Prefer a dedicated low-privilege OS account/container.

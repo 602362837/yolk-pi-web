@@ -1213,6 +1213,83 @@ await test("IMP-04 terminal publish checkpoint outranks persisted retry metadata
   );
 });
 
+// ─── IMP2-04: disposition-first runner fault boundaries ─────────────────────
+
+await test("IMP2-04 manual-UI disposition beats succeeded child status and survives durable reload", async () => {
+  await store.ensureGithubAutomationStoreLayout();
+  const { job: initialJob, config } = await seedImplementerRetryFixture(9044);
+  let implementerCalls = 0;
+  let checkerCalls = 0;
+  session._testSetGithubFullAgentMemberOverride(async (input) => {
+    if (input.member === "checker") checkerCalls += 1;
+    else implementerCalls += 1;
+    return {
+      // The regression is specifically a child that reports succeeded while the
+      // server-owned structured disposition says manual UI approval is needed.
+      output: "",
+      status: "succeeded",
+      warnings: [],
+      implementerDisposition: {
+        kind: "needs_user_decision",
+        reasonCode: "blocked_manual_ui_approval",
+      },
+    };
+  });
+  try {
+    const first = await runner.runGithubUnattendedImplementation({
+      job: initialJob,
+      config,
+      claimComplete: true,
+    });
+    assert.equal(first.job.status, "blocked");
+    assert.equal(first.job.reasonCode, "blocked_manual_ui_approval");
+    assert.equal(first.job.checkpoint, "blocked");
+    assert.equal(implementerCalls, 1);
+    assert.equal(checkerCalls, 0, "non-success disposition must never spawn checker");
+
+    const state = runner.readGithubAutomationRunnerState(initialJob.jobId);
+    assert.equal(state?.implementerDisposition?.kind, "needs_user_decision");
+    assert.equal(state?.implementerDisposition?.reasonCode, "blocked_manual_ui_approval");
+    assert.equal(state?.checkerReasonCode, null);
+    assert.equal(state?.checkStage, undefined);
+    assert.ok(state?.implementerRetry?.runFence, "terminal outcome keeps its run fence");
+    assertNoSentinel(state, "manual UI durable runner state");
+
+    // Simulate a stale late checker/status writer and a restart. The durable
+    // terminal disposition remains authority, so the gate must block before
+    // checker/operator-validation/publisher work can begin.
+    runner.writeGithubAutomationRunnerState({
+      ...state,
+      checkpoint: "checking",
+      checkerReasonCode: "check_failure",
+      checkStage: "checker",
+    });
+    const staleJob = await store.writeGithubAutomationJob({
+      ...first.job,
+      phase: "checking",
+      status: "running",
+      checkpoint: "checking",
+      reasonCode: "check_failure",
+    });
+    runner._testResetGithubUnattendedInFlight?.();
+    const resumed = await runner.runGithubUnattendedImplementation({
+      job: staleJob,
+      config,
+      claimComplete: true,
+    });
+    assert.equal(resumed.job.status, "blocked");
+    assert.equal(
+      resumed.job.reasonCode,
+      "blocked_manual_ui_approval",
+      "late checker reason must not overwrite the newer terminal disposition",
+    );
+    assert.equal(checkerCalls, 0, "stale checker checkpoint cannot override terminal block");
+    assert.equal(implementerCalls, 1, "resume must not replay implementer");
+  } finally {
+    session._testSetGithubFullAgentMemberOverride(null);
+  }
+});
+
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
 
 runner._testResetGithubUnattendedInFlight?.();

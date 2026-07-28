@@ -247,6 +247,33 @@ export async function ensureGithubRepoLabel(options: {
 
 // ─── Issue label mutations ───────────────────────────────────────────────────
 
+export async function listGithubIssueLabelNames(options: {
+  installationId: number;
+  owner: string;
+  repo: string;
+  issueNumber: number;
+  signal?: AbortSignal;
+}): Promise<string[]> {
+  const result = await githubAppInstallationRequest(
+    options.installationId,
+    `/repos/${encodePathSegment(options.owner)}/${encodePathSegment(options.repo)}/issues/${options.issueNumber}/labels`,
+    { method: "GET", signal: options.signal },
+  );
+  if (result.status === 403 || result.status === 401) {
+    throw new GithubAutomationError("permission_missing", undefined, {
+      status: 403,
+      details: { reason: "issue_labels_read" },
+    });
+  }
+  if (result.status < 200 || result.status >= 300) {
+    throw new GithubAutomationError("github_bad_response", undefined, {
+      status: 502,
+      details: { httpStatus: result.status, reason: "list_issue_labels" },
+    });
+  }
+  return extractLabelNames(result.body);
+}
+
 export async function addGithubIssueLabels(options: {
   installationId: number;
   owner: string;

@@ -6,7 +6,7 @@
   "status": "waiting_for_improvements",
   "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
   "createdAt": "2026-07-28T01:12:16.085Z",
-  "updatedAt": "2026-07-28T06:28:58.591Z",
+  "updatedAt": "2026-07-28T08:29:31.606Z",
   "completedAt": null,
   "contextIds": [
     "pi_019fa644-b890-7540-a361-d5cf147ba045"
@@ -4866,6 +4866,7 @@
       "member": "checker",
       "status": "failed",
       "startedAt": "2026-07-28T06:25:11.262Z",
+      "finishedAt": "2026-07-28T06:28:58.589Z",
       "runner": "sdk",
       "childSessionId": "019fa766-0f70-73e6-a7af-654501c8193f",
       "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-25-11-536Z_019fa766-0f70-73e6-a7af-654501c8193f.jsonl",
@@ -4974,7 +4975,8 @@
           "previewTruncated": false,
           "finalOutputTruncated": false,
           "transcriptItemTruncated": false,
-          "transcriptCaptureLimited": false
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
         },
         "terminationReason": "check_command_rejected"
       },
@@ -4989,6 +4991,7 @@
         "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/checker-0e0546a03dc2cbf6a55bcea3.jsonl",
         "status": "failed",
         "startedAt": "2026-07-28T06:25:11.262Z",
+        "finishedAt": "2026-07-28T06:28:58.584Z",
         "updatedAt": "2026-07-28T06:28:58.584Z",
         "itemCount": 71,
         "messageCount": 1,
@@ -4996,16 +4999,1045 @@
         "stderrBytes": 0,
         "bytes": 20760,
         "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019fa766-0f70-73e6-a7af-654501c8193f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-25-11-536Z_019fa766-0f70-73e6-a7af-654501c8193f.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "improver-2237f336471d6d0d182dd1fe",
+      "member": "improver",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T07:45:06.929Z",
+      "finishedAt": "2026-07-28T07:48:25.794Z",
+      "runner": "sdk",
+      "childSessionId": "019fa7af-3b91-7a20-a2bb-e9cce3292cdb",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-45-06-961Z_019fa7af-3b91-7a20-a2bb-e9cce3292cdb.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa7af-3b91-7a20-a2bb-e9cce3292cdb",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成 IMP-002 规划产物：\n\n`improvements/imp_wrva1yzo/`\n- `brief.md`, `prd.md`, `design.md`, `implement.md`\n- `checks.md`, `plan-review.md`, `ui.md`, `summary.md`\n\n核心：非成功 implementer disposition 禁止进入 checker；持久化 fenced safe provenance；复用 allowlisted 标签与幂等中文状态评论；通知失败进入独立可观察 operator 状态，重试仅补通知。\n\n验证：\n- 产物完整性与 implementation plan JSON/DAG：通过\n- `git diff --check`：通过\n\n未实现代码、未改普通 Chat/UI、未提交/推送/合并。\n\n待主会话审批 `plan-review.md` 中 D1–D5。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "improver",
+        "member": "improver",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T07:45:06.929Z",
+        "updatedAt": "2026-07-28T07:48:25.794Z",
+        "eventCount": 4568,
+        "lastTextPreview": "已完成 IMP-002 规划产物：\n\n`improvements/imp_wrva1yzo/`\n- `brief.md`, `prd.md`, `design.md`, `implement.md`\n- `checks.md`, `plan-review.md`, `ui.md`, `summary.md`\n\n核心：非成功 implementer disposition 禁止进入 checker；持久化 fenced safe provenance；复用 allowlisted 标签与幂等中文状态评论；通知失败进入独立可观察 operator 状态，重试仅补通知。\n\n验证：\n- 产物完整性与 implementation plan JSON/DAG：通过\n- `git diff --check`：通过\n\n未实现代码、未改普通 Chat/UI、未提交/推送/合并。\n\n待主会话审批 `plan-review.md` 中 D1–D5。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T07:48:08.661Z",
+            "toolCallId": "call_cCP4Alw2nRgJlAU0LwmsjyLv|fc_0748905ec31525eb016a685eb89c28819b9dea24725ce83f5e",
+            "toolName": "write",
+            "text": "Successfully wrote 1507 bytes to .ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_wrva1yzo/plan-review.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T07:48:19.068Z",
+            "toolCallId": "call_qGcH8FcwdlPgGbr0otce8XRS|fc_0748905ec31525eb016a685ebe5a98819b85a067b0ba9ed3e5",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"set -e\\nD='.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_wrva1yzo'\\nfor f in brief prd design implement checks plan-review ui summary; do test -s \\\"$D/$f.md\\\"; done\\npython3 - <<'PY'\\nimport json, re\\np='.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_wrva1yzo/implement.md'\\ns=open(p).read()\\nm=re.search(r'```json ypi-implementation-plan\\\\n(.*?)\\\\n```',s,re.S)\\nassert m, 'missing plan'\\nplan=json.loads(m.group(1))\\nassert [x['id'] for x in plan['subtasks']] == ['IMP2-01','IMP2-02','IMP2-03','IMP2-04']\\nassert plan['subtasks'][3]['dependsOn'] == ['IMP2-02','IMP2-03']\\nprint('IMP-002 artifact and implementation-plan validation: pass')\\nPY\\ngit diff --check -- \\\"$D\\\"\\ngit status --short -- \\\"$D\\\"\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T07:48:19.197Z",
+            "toolCallId": "call_qGcH8FcwdlPgGbr0otce8XRS|fc_0748905ec31525eb016a685ebe5a98819b85a067b0ba9ed3e5",
+            "toolName": "bash",
+            "text": "IMP-002 artifact and implementation-plan validation: pass\n?? \".ypi/tasks/20260728-091216-\\347\\273\\237\\344\\270\\200\\344\\277\\256\\345\\244\\215-worktree-check-\\351\\230\\266\\346\\256\\265\\344\\276\\235\\350\\265\\226\\345\\256\\211\\350\\243\\205\\344\\270\\216\\351\\252\\214\\350\\257\\201\\346\\265\\201\\347\\250\\213/improvements/imp_wrva1yzo/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T07:48:25.784Z",
+            "text": "已完成 IMP-002 规划产物：\n\n`improvements/imp_wrva1yzo/`\n- `brief.md`, `prd.md`, `design.md`, `implement.md`\n- `checks.md`, `plan-review.md`, `ui.md`, `summary.md`\n\n核心：非成功 implementer disposition 禁止进入 checker；持久化 fenced safe provenance；复用 allowlisted 标签与幂等中文状态评论；通知失败进入独立可观察 operator 状态，重试仅补通知。\n\n验证：\n- 产物完整性与 implementation plan JSON/DAG：通过\n- `git diff --check`：通过\n\n未实现代码、未改普通 Chat/UI、未提交/推送/合并。\n\n待主会话审批 `plan-review.md` 中 D1–D5。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T07:48:25.787Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 420,
+        "tokens": 173,
+        "tokenSource": "usage",
+        "tps": 55.41,
+        "firstTokenAt": "2026-07-28T07:48:22.444Z",
+        "lastTokenAt": "2026-07-28T07:48:25.566Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "improver-2237f336471d6d0d182dd1fe",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "improver",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/improver-2237f336471d6d0d182dd1fe.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T07:45:06.929Z",
+        "finishedAt": "2026-07-28T07:48:25.788Z",
+        "updatedAt": "2026-07-28T07:48:25.788Z",
+        "itemCount": 71,
+        "messageCount": 1,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 252138,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa7af-3b91-7a20-a2bb-e9cce3292cdb",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-45-06-961Z_019fa7af-3b91-7a20-a2bb-e9cce3292cdb.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-a769dea4d206807700a7812c",
+      "subtaskId": "IMP2-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T07:52:26.117Z",
+      "finishedAt": "2026-07-28T07:56:11.255Z",
+      "runner": "sdk",
+      "childSessionId": "019fa7b5-ef3d-78a6-b112-51ce4bc6c7c1",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-52-26-173Z_019fa7b5-ef3d-78a6-b112-51ce4bc6c7c1.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa7b5-ef3d-78a6-b112-51ce4bc6c7c1",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-types.ts` — 新增严格 terminal disposition、run-fence/provenance、notification outbox 状态校验及 `operator_notification` 层。\n- `lib/github-automation-store.ts` — Job durable record 增加 `terminalDisposition`；写入时拒绝无效 schema。\n- `lib/github-automation-projection.ts` — Jobs 安全投影增加 disposition 与 legacy/invalid 状态，不暴露 fence、hash 或原始错误。\n\n#### Verification\n- `npm run lint` — 通过（既有 11 条 warning，无 error）。\n- `git diff --check` — 通过。\n- `node_modules/.bin/tsc --noEmit` — 被并行中的 `lib/github-automation-runner.ts:1740` TS2367 阻塞；非本子任务文件。\n\n#### Notes / Risks\n- IMP2-02 当前 runner 的本地 `implementerDisposition` 格式尚未对接本任务的 `terminalDisposition`（缺 runOrdinal、provenanceHash、notification 状态）；后续需统一后再持久化。\n- legacy/malformed disposition 会在安全投影中明确标为 `legacy_missing` / `invalid`，供 runner fail-closed 处理。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T07:52:26.117Z",
+        "updatedAt": "2026-07-28T07:56:11.255Z",
+        "eventCount": 4248,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-types.ts` — 新增严格 terminal disposition、run-fence/provenance、notification outbox 状态校验及 `operator_notification` 层。\n- `lib/github-automation-store.ts` — Job durable record 增加 `terminalDisposition`；写入时拒绝无效 schema。\n- `lib/github-automation-projection.ts` — Jobs 安全投影增加 disposition 与 legacy/invalid 状态，不暴露 fence、hash 或原始错误。\n\n#### Verification\n- `npm run lint` — 通过（既有 11 条 warning，无 error）。\n- `git diff --check` — 通过。\n- `node_modules/.bin/tsc --noEmit` — 被并行中的 `lib/github-automation-runner.ts:1740` TS2367 阻塞；非本子任务文件。\n\n#### Notes / Risks\n- IMP2-02 当前 runner 的本地 `implementerDisposition` 格式尚未对接本任务的 `terminalDisposition`（缺 runOrdinal、provenanceHash、notification 状态）；后续需统一后再持久化。\n- legacy/malformed disposition 会在安全投影中明确标为 `legacy_missing` / `invalid`，供 runner fail-closed 处理。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T07:55:54.101Z",
+            "toolCallId": "call_N0Zd3lJLgi75mSzkrDmccPy8|fc_0ba9c60d5afffae9016a6860840a8c819baf32744ca1f135f4",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in lib/github-automation-types.ts.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T07:55:58.897Z",
+            "toolCallId": "call_sKoE8rJUgAzLX0vRbnHWTja0|fc_0ba9c60d5afffae9016a68608eec3c819b9486ff13f1c3babe",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff --check && git status --short\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T07:55:58.954Z",
+            "toolCallId": "call_sKoE8rJUgAzLX0vRbnHWTja0|fc_0ba9c60d5afffae9016a68608eec3c819b9486ff13f1c3babe",
+            "toolName": "bash",
+            "text": "M \".ypi/tasks/20260728-091216-\\347\\273\\237\\344\\270\\200\\344\\277\\256\\345\\244\\215-worktree-check-\\351\\230\\266\\346\\256\\265\\344\\276\\235\\350\\265\\226\\345\\256\\211\\350\\243\\205\\344\\270\\216\\351\\252\\214\\350\\257\\201\\346\\265\\201\\347\\250\\213/task.json\"\n M lib/github-automation-projection.ts\n M lib/github-automation-runner.ts\n M lib/github-automation-session.ts\n M lib/github-automation-store.ts\n M lib/github-automation-types.ts\n?? \".ypi/tasks/20260728-091216-\\347\\273\\237\\344\\270\\200\\344\\277\\256\\345\\244\\215-worktree-check-\\351\\230\\266\\346\\256\\265\\344\\276\\235\\350\\265\\226\\345\\256\\211\\350\\243\\205\\344\\270\\216\\351\\252\\214\\350\\257\\201\\346\\265\\201\\347\\250\\213/improvements/imp_wrva1yzo/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T07:56:11.243Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-types.ts` — 新增严格 terminal disposition、run-fence/provenance、notification outbox 状态校验及 `operator_notification` 层。\n- `lib/github-automation-store.ts` — Job durable record 增加 `terminalDisposition`；写入时拒绝无效 schema。\n- `lib/github-automation-projection.ts` — Jobs 安全投影增加 disposition 与 legacy/invalid 状态，不暴露 fence、hash 或原始错误。\n\n#### Verification\n- `npm run lint` — 通过（既有 11 条 warning，无 error）。\n- `git diff --check` — 通过。\n- `node_modules/.bin/tsc --noEmit` — 被并行中的 `lib/github-automation-runner.ts:1740` TS2367 阻塞；非本子任务文件。\n\n#### Notes / Risks\n- IMP2-02 当前 runner 的本地 `implementerDisposition` 格式尚未对接本任务的 `terminalDisposition`（缺 runOrdinal、provenanceHash、notification 状态）；后续需统一后再持久化。\n- legacy/malformed disposition 会在安全投影中明确标为 `legacy_missing` / `invalid`，供 runner fail-closed 处理。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T07:56:11.244Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 840,
+        "tokens": 476,
+        "tokenSource": "usage",
+        "tps": 66.42,
+        "firstTokenAt": "2026-07-28T07:56:03.985Z",
+        "lastTokenAt": "2026-07-28T07:56:11.151Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-a769dea4d206807700a7812c",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/implementer-a769dea4d206807700a7812c.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T07:52:26.117Z",
+        "finishedAt": "2026-07-28T07:56:11.251Z",
+        "updatedAt": "2026-07-28T07:56:11.251Z",
+        "itemCount": 45,
+        "messageCount": 1,
+        "toolCallCount": 20,
+        "stderrBytes": 0,
+        "bytes": 186274,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa7b5-ef3d-78a6-b112-51ce4bc6c7c1",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-52-26-173Z_019fa7b5-ef3d-78a6-b112-51ce4bc6c7c1.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-86483e87c8d8f85fe0099273",
+      "subtaskId": "IMP2-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T07:52:26.151Z",
+      "finishedAt": "2026-07-28T07:59:17.508Z",
+      "runner": "sdk",
+      "childSessionId": "019fa7b5-ef4c-7343-bea6-c68da5c96a4d",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-52-26-188Z_019fa7b5-ef4c-7343-bea6-c68da5c96a4d.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa7b5-ef4c-7343-bea6-c68da5c96a4d",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-runner.ts` — persisted fence-bound implementer terminal dispositions, CAS/stale-result protection, and disposition-first gates before checker/final publish.\n- `lib/github-automation-session.ts` — added structured, allowlisted implementer disposition contract.\n\n#### Verification\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:github-unattended-runner` — passed (25/25)\n- `npm run lint` — passed with 11 pre-existing warnings\n- `git diff --check` — passed\n\n#### Notes / Risks\n- `needs_user_decision` / UI-manual blocks require the server-owned member adapter to populate `implementerDisposition`; no model-output text is interpreted as policy.\n- Notification delivery remains IMP2-03 scope; terminal records initialize notification operations as pending.",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T07:52:26.151Z",
+        "updatedAt": "2026-07-28T07:59:17.508Z",
+        "eventCount": 7779,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-runner.ts` — persisted fence-bound implementer terminal dispositions, CAS/stale-result protection, and disposition-first gates before checker/final publish.\n- `lib/github-automation-session.ts` — added structured, allowlisted implementer disposition contract.\n\n#### Verification\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:github-unattended-runner` — passed (25/25)\n- `npm run lint` — passed with 11 pre-existing warnings\n- `git diff --check` — passed\n\n#### Notes / Risks\n- `needs_user_decision` / UI-manual blocks require the server-owned member adapter to populate `implementerDisposition`; no model-output text is interpreted as policy.\n- Notification delivery remains IMP2-03 scope; terminal records initialize notification operations as pending.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T07:58:41.852Z",
+            "toolCallId": "call_5wDTlJ4bpQPUjXyW8lVWXt7y|fc_09127a84934e15c3016a6861315094819a90f34334eb90b2e2",
+            "toolName": "bash",
+            "text": "M \".ypi/tasks/20260728-091216-\\347\\273\\237\\344\\270\\200\\344\\277\\256\\345\\244\\215-worktree-check-\\351\\230\\266\\346\\256\\265\\344\\276\\235\\350\\265\\226\\345\\256\\211\\350\\243\\205\\344\\270\\216\\351\\252\\214\\350\\257\\201\\346\\265\\201\\347\\250\\213/task.json\"\n M lib/github-automation-projection.ts\n M lib/github-automation-runner.ts\n M lib/github-automation-session.ts\n M lib/github-automation-store.ts\n M lib/github-automation-types.ts\n?? \".ypi/tasks/20260728-091216-\\347\\273\\237\\344\\270\\200\\344\\277\\256\\345\\244\\215-worktree-check-\\351\\230\\266\\346\\256\\265\\344\\276\\235\\350\\265\\226\\345\\256\\211\\350\\243\\205\\344\\270\\216\\351\\252\\214\\350\\257\\201\\346\\265\\201\\347\\250\\213/improvements/imp_wrva1yzo/\"\n232\t45\tlib/github-automation-runner.ts\n22\t0\tlib/github-automation-session.ts",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T07:58:51.823Z",
+            "toolCallId": "call_nzmXSFiMBv8tinfY5zJeOBQH|fc_09127a84934e15c3016a68613b6ee4819aa16ca517582d9f77",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run lint\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T07:59:12.268Z",
+            "toolCallId": "call_nzmXSFiMBv8tinfY5zJeOBQH|fc_09127a84934e15c3016a68613b6ee4819aa16ca517582d9f77",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.8 lint\n> eslint .\n\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/archive/2026-07/20260714-100411-完善计费模块与模型价格配置/pre01-verification.mjs\n  14:33  warning  'readFileSync' is defined but never used  @typescript-eslint/no-unused-vars\n  87:12  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/components/ChatMinimap.tsx\n  158:9  warning  The 'scrollToMinimapRatio' function makes the dependencies of useCallback Hook (at line 191) change on every render. Move it inside the useCallback callback. Alternatively, wrap the definition of 'scrollToMinimapRatio' in its own useCallback() Hook  react-hooks/exhaustive-deps\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/antigravity-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  127:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/grok-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  128:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/scripts/test-model-prices.mjs\n  17:22  warning  'mkdirSync' is defined but never used                         @typescript-eslint/no-unused-vars\n  35:3   warning  'MODEL_PRICE_MAX_VALUE' is assigned a value but never used    @typescript-eslint/no-unused-vars\n  46:3   warning  'getModelsJsonBackupPath' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  78:10  warning  'assertStringNotContains' is defined but never used           @typescript-eslint/no-unused-vars\n\n✖ 11 problems (0 errors, 11 warnings)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T07:59:17.483Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-runner.ts` — persisted fence-bound implementer terminal dispositions, CAS/stale-result protection, and disposition-first gates before checker/final publish.\n- `lib/github-automation-session.ts` — added structured, allowlisted implementer disposition contract.\n\n#### Verification\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run test:github-unattended-runner` — passed (25/25)\n- `npm run lint` — passed with 11 pre-existing warnings\n- `git diff --check` — passed\n\n#### Notes / Risks\n- `needs_user_decision` / UI-manual blocks require the server-owned member adapter to populate `implementerDisposition`; no model-output text is interpreted as policy.\n- Notification delivery remains IMP2-03 scope; terminal records initialize notification operations as pending.",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T07:59:17.492Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 839,
+        "tokens": 188,
+        "tokenSource": "usage",
+        "tps": 53.23,
+        "firstTokenAt": "2026-07-28T07:59:13.939Z",
+        "lastTokenAt": "2026-07-28T07:59:17.471Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-86483e87c8d8f85fe0099273",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/implementer-86483e87c8d8f85fe0099273.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T07:52:26.151Z",
+        "finishedAt": "2026-07-28T07:59:17.498Z",
+        "updatedAt": "2026-07-28T07:59:17.498Z",
+        "itemCount": 89,
+        "messageCount": 1,
+        "toolCallCount": 42,
+        "stderrBytes": 0,
+        "bytes": 230954,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa7b5-ef4c-7343-bea6-c68da5c96a4d",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-52-26-188Z_019fa7b5-ef4c-7343-bea6-c68da5c96a4d.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-393366ed8b71d386ba14d610",
+      "subtaskId": "IMP2-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T07:59:47.454Z",
+      "finishedAt": "2026-07-28T08:04:04.613Z",
+      "runner": "sdk",
+      "childSessionId": "019fa7bc-ab32-770c-905b-6b2c0ca21303",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-59-47-506Z_019fa7bc-ab32-770c-905b-6b2c0ca21303.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa7bc-ab32-770c-905b-6b2c0ca21303",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-notification.ts` — 新增 server-owned 通知 outbox：固定标签映射、中文状态评论、未知标签写入 GET reconciliation。\n- `lib/github-automation-comments.ts` — 新增固定、安全的 implementer disposition 中文评论模板。\n- `lib/github-automation-labels.ts` — 新增 Issue labels 查询，用于未知写入 reconciliation。\n- `lib/github-automation-runner.ts` — 非成功终态后 drain 通知；通知失败标记 `operator_notification`。后续唤醒仅重放通知，不重跑 pipeline。\n\n#### Verification\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed（11 个既有 warnings，无 errors）\n- `npm run test:github-automation` — passed\n- `git diff --check` — passed\n- `npm run test:github-unattended` — failed（当前共享未提交 IMP2 runner 改动导致成功 disposition 写入时 `retryability` 非 `none`，触发 `automation_state_inconsistent`；4 failures）\n\n#### Notes / Risks\n- `test:github-unattended` 的失败看起来属于现有 IMP2-02 成功 disposition 合约不一致，不是通知 outbox 的调用路径；主会话需修复后重跑。\n- 未新增 IMP2-04 测试，留给其指定子任务。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T07:59:47.454Z",
+        "updatedAt": "2026-07-28T08:04:04.613Z",
+        "eventCount": 4553,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-notification.ts` — 新增 server-owned 通知 outbox：固定标签映射、中文状态评论、未知标签写入 GET reconciliation。\n- `lib/github-automation-comments.ts` — 新增固定、安全的 implementer disposition 中文评论模板。\n- `lib/github-automation-labels.ts` — 新增 Issue labels 查询，用于未知写入 reconciliation。\n- `lib/github-automation-runner.ts` — 非成功终态后 drain 通知；通知失败标记 `operator_notification`。后续唤醒仅重放通知，不重跑 pipeline。\n\n#### Verification\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed（11 个既有 warnings，无 errors）\n- `npm run test:github-automation` — passed\n- `git diff --check` — passed\n- `npm run test:github-unattended` — failed（当前共享未提交 IMP2 runner 改动导致成功 disposition 写入时 `retryability` 非 `none`，触发 `automation_state_inconsistent`；4 failures）\n\n#### Notes / Risks\n- `test:github-unattended` 的失败看起来属于现有 IMP2-02 成功 disposition 合约不一致，不是通知 outbox 的调用路径；主会话需修复后重跑。\n- 未新增 IMP2-04 测试，留给其指定子任务。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:03:26.086Z",
+            "toolCallId": "call_Vi324ftW8dCYvnGtGXJlgwr5|fc_0216c0596aa8cb9e016a68624aee008198a3761c8f39663e2d",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T08:03:29.962Z",
+            "toolCallId": "call_ylUdFycYLxot7WtmjXozVgxQ|fc_0216c0596aa8cb9e016a686251ebf08198856b30ea65b4ef66",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run lint\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:03:50.182Z",
+            "toolCallId": "call_ylUdFycYLxot7WtmjXozVgxQ|fc_0216c0596aa8cb9e016a686251ebf08198856b30ea65b4ef66",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.8 lint\n> eslint .\n\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/archive/2026-07/20260714-100411-完善计费模块与模型价格配置/pre01-verification.mjs\n  14:33  warning  'readFileSync' is defined but never used  @typescript-eslint/no-unused-vars\n  87:12  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/components/ChatMinimap.tsx\n  158:9  warning  The 'scrollToMinimapRatio' function makes the dependencies of useCallback Hook (at line 191) change on every render. Move it inside the useCallback callback. Alternatively, wrap the definition of 'scrollToMinimapRatio' in its own useCallback() Hook  react-hooks/exhaustive-deps\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/antigravity-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  127:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/grok-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  128:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/scripts/test-model-prices.mjs\n  17:22  warning  'mkdirSync' is defined but never used                         @typescript-eslint/no-unused-vars\n  35:3   warning  'MODEL_PRICE_MAX_VALUE' is assigned a value but never used    @typescript-eslint/no-unused-vars\n  46:3   warning  'getModelsJsonBackupPath' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  78:10  warning  'assertStringNotContains' is defined but never used           @typescript-eslint/no-unused-vars\n\n✖ 11 problems (0 errors, 11 warnings)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T08:04:04.603Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-notification.ts` — 新增 server-owned 通知 outbox：固定标签映射、中文状态评论、未知标签写入 GET reconciliation。\n- `lib/github-automation-comments.ts` — 新增固定、安全的 implementer disposition 中文评论模板。\n- `lib/github-automation-labels.ts` — 新增 Issue labels 查询，用于未知写入 reconciliation。\n- `lib/github-automation-runner.ts` — 非成功终态后 drain 通知；通知失败标记 `operator_notification`。后续唤醒仅重放通知，不重跑 pipeline。\n\n#### Verification\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed（11 个既有 warnings，无 errors）\n- `npm run test:github-automation` — passed\n- `git diff --check` — passed\n- `npm run test:github-unattended` — failed（当前共享未提交 IMP2 runner 改动导致成功 disposition 写入时 `retryability` 非 `none`，触发 `automation_state_inconsistent`；4 failures）\n\n#### Notes / Risks\n- `test:github-unattended` 的失败看起来属于现有 IMP2-02 成功 disposition 合约不一致，不是通知 outbox 的调用路径；主会话需修复后重跑。\n- 未新增 IMP2-04 测试，留给其指定子任务。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T08:04:04.604Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 918,
+        "tokens": 436,
+        "tokenSource": "usage",
+        "tps": 85.64,
+        "firstTokenAt": "2026-07-28T08:03:59.375Z",
+        "lastTokenAt": "2026-07-28T08:04:04.466Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-393366ed8b71d386ba14d610",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/implementer-393366ed8b71d386ba14d610.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T07:59:47.454Z",
+        "finishedAt": "2026-07-28T08:04:04.608Z",
+        "updatedAt": "2026-07-28T08:04:04.608Z",
+        "itemCount": 61,
+        "messageCount": 1,
+        "toolCallCount": 28,
+        "stderrBytes": 0,
+        "bytes": 204070,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa7bc-ab32-770c-905b-6b2c0ca21303",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-59-47-506Z_019fa7bc-ab32-770c-905b-6b2c0ca21303.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-f6ff390c117c47597c40fdb0",
+      "subtaskId": "IMP2-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T07:59:47.487Z",
+      "finishedAt": "2026-07-28T08:05:52.352Z",
+      "runner": "sdk",
+      "childSessionId": "019fa7bc-ab3f-7f04-8c7e-4f90bcdc747c",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-59-47-519Z_019fa7bc-ab3f-7f04-8c7e-4f90bcdc747c.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa7bc-ab3f-7f04-8c7e-4f90bcdc747c",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-github-unattended-runner.mjs` — 增加真实 runner/member override + durable reload 的 manual-UI disposition 回归。\n- `scripts/test-github-unattended.mjs` — 既有 checker/publish fixtures 改为显式提供成功 disposition/fence 证据。\n- `docs/architecture/overview.md`\n- `docs/modules/library.md`\n- `docs/operations/troubleshooting.md` — 补 disposition-first、通知 outbox 与 operator notification 运维说明。\n\n#### Verification\n- `npm run test:github-unattended` — pass（21）\n- `npm run test:github-automation` — pass（114）\n- `npm run test:github-handler-runtime` — pass（9）\n- `npm run lint` / `tsc --noEmit` / `git diff --check` — pass（lint 有既存 warnings）\n\n#### Blocker\n新增 `IMP2-04` 断言当前失败：迟到 checker 写入将 `reasonCode` 从 `blocked_manual_ui_approval` 覆盖为 `check_failure`。  \n该测试确认零 checker spawn，但不满足 C4“最新 implementer terminal reason 保留”。需要主会话修复 runner 的 stale checker CAS/原因保留后重跑：\n\n```bash\nnpm run test:github-unattended-runner\n```",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T07:59:47.487Z",
+        "updatedAt": "2026-07-28T08:05:52.352Z",
+        "eventCount": 7180,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-github-unattended-runner.mjs` — 增加真实 runner/member override + durable reload 的 manual-UI disposition 回归。\n- `scripts/test-github-unattended.mjs` — 既有 checker/publish fixtures 改为显式提供成功 disposition/fence 证据。\n- `docs/architecture/overview.md`\n- `docs/modules/library.md`\n- `docs/operations/troubleshooting.md` — 补 disposition-first、通知 outbox 与 operator notification 运维说明。\n\n#### Verification\n- `npm run test:github-unattended` — pass（21）\n- `npm run test:github-automation` — pass（114）\n- `npm run test:github-handler-runtime` — pass（9）\n- `npm run lint` / `tsc --noEmit` / `git diff --check` — pass（lint 有既存 warnings）\n\n#### Blocker\n新增 `IMP2-04` 断言当前失败：迟到 checker 写入将 `reasonCode` 从 `blocked_manual_ui_approval` 覆盖为 `check_failure`。  \n该测试确认零 checker spawn，但不满足 C4“最新 implementer terminal reason 保留”。需要主会话修复 runner 的 stale checker CAS/原因保留后重跑：\n\n```bash\nnpm run test:github-unattended-runner\n```",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:05:36.073Z",
+            "toolCallId": "call_2QhdVnN5ktzUApNPttmYLiVk|fc_00c93caa7eee292f016a6862cdff4c8199ba5a163665951a27",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in scripts/test-github-unattended-runner.mjs.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T08:05:40.231Z",
+            "toolCallId": "call_GJzG68UA0BLNHkh0WDwMsLsj|fc_00c93caa7eee292f016a6862d3d84081999e1630721ee3aba6",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run test:github-unattended-runner; exit 0\",\n  \"timeout\": 900\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:05:42.294Z",
+            "toolCallId": "call_GJzG68UA0BLNHkh0WDwMsLsj|fc_00c93caa7eee292f016a6862d3d84081999e1630721ee3aba6",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.8 test:github-unattended-runner\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended-runner.mjs\n\n(node:25026) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - full-agent profile is not sandboxed and keeps residual risk codes\nok - scrubGithubAutomationOwnedSecretsFromEnv removes App/machine env keys\nok - validation commands come from config only; Issue cannot set them\nok - branch name is deterministic and not derived from Issue title\nok - resolve project root requires Project Registry membership\nok - ensureGithubAutomationWorktree creates and reuses one path per generation\nok - ensure unattended Studio task records owner+policy without interactive grant\nok - UI fail-closed policyGrant cannot authorize implementing\nok - start gates require unattended mode, complete claim, allowlist root\nok - queue without unattended parks at accepted_waiting_automation (P0 path)\nok - pause request and retry wake keep injectsCommentText=false\nok - TEST-04 structured pause/retry never accept free-text comment injection\nok - runner state refuses secret markers\nok - source modules document residual risk and do not claim host isolation\nok - resolveGithubAutomationWorktreeSpaceId read-back works after ensure\nok - bootstrapGithubAutomationAgentSession requires projectId+spaceId pair\nok - GHR-02 classifyAgentSessionBootstrapFailure is typed before sanitize\nok - GHR-02 runner bootstrap catch returns explicit disposition (not no-progress)\nok - buildGithubUnattendedScrubbedEnv is a copy and preserves process.env\nok - session/runner sources no longer delete shared process.env\nok - IMP-03 converges torn post-implementer writes without replaying implementer\nok - IMP-01 implementer adapter keeps transport retry evidence structured and fail-closed\nok - IMP-04 retries confirmed pre-request transport only twice with durable 20s/60s budget\nok - IMP-04 cancellation pauses without transport retry or checker/publisher progression\nok - IMP-04 terminal publish checkpoint outranks persisted retry metadata\nnot ok - IMP2-04 manual-UI disposition beats succeeded child status and survives durable reload\nAssertionError [ERR_ASSERTION]: late checker reason must not overwrite the newer terminal disposition\n+ actual - expected\n\n+ 'check_failure'\n- 'blocked_manual_ui_approval'\n\n    at file:///Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/scripts/test-github-unattended-runner.mjs:1281:12\n    at async file:///Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/scripts/test-github-unattended-runner.mjs:1218:1 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 'check_failure',\n  expected: 'blocked_manual_ui_approval',\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\npassed=25 failed=1",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T08:05:52.342Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `scripts/test-github-unattended-runner.mjs` — 增加真实 runner/member override + durable reload 的 manual-UI disposition 回归。\n- `scripts/test-github-unattended.mjs` — 既有 checker/publish fixtures 改为显式提供成功 disposition/fence 证据。\n- `docs/architecture/overview.md`\n- `docs/modules/library.md`\n- `docs/operations/troubleshooting.md` — 补 disposition-first、通知 outbox 与 operator notification 运维说明。\n\n#### Verification\n- `npm run test:github-unattended` — pass（21）\n- `npm run test:github-automation` — pass（114）\n- `npm run test:github-handler-runtime` — pass（9）\n- `npm run lint` / `tsc --noEmit` / `git diff --check` — pass（lint 有既存 warnings）\n\n#### Blocker\n新增 `IMP2-04` 断言当前失败：迟到 checker 写入将 `reasonCode` 从 `blocked_manual_ui_approval` 覆盖为 `check_failure`。  \n该测试确认零 checker spawn，但不满足 C4“最新 implementer terminal reason 保留”。需要主会话修复 runner 的 stale checker CAS/原因保留后重跑：\n\n```bash\nnpm run test:github-unattended-runner\n```",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T08:05:52.344Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 949,
+        "tokens": 403,
+        "tokenSource": "usage",
+        "tps": 61.51,
+        "firstTokenAt": "2026-07-28T08:05:45.790Z",
+        "lastTokenAt": "2026-07-28T08:05:52.342Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-f6ff390c117c47597c40fdb0",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/implementer-f6ff390c117c47597c40fdb0.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T07:59:47.487Z",
+        "finishedAt": "2026-07-28T08:05:52.345Z",
+        "updatedAt": "2026-07-28T08:05:52.345Z",
+        "itemCount": 95,
+        "messageCount": 1,
+        "toolCallCount": 45,
+        "stderrBytes": 0,
+        "bytes": 359329,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa7bc-ab3f-7f04-8c7e-4f90bcdc747c",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T07-59-47-519Z_019fa7bc-ab3f-7f04-8c7e-4f90bcdc747c.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-3d025980b0225af34f640939",
+      "member": "checker",
+      "status": "failed",
+      "startedAt": "2026-07-28T08:06:24.117Z",
+      "finishedAt": "2026-07-28T08:13:20.941Z",
+      "runner": "sdk",
+      "childSessionId": "019fa7c2-b9ce-7197-9af7-5f7cf2f4970e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T08-06-24-462Z_019fa7c2-b9ce-7197-9af7-5f7cf2f4970e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa7c2-b9ce-7197-9af7-5f7cf2f4970e",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete — IMP-002\n\n#### Remaining Findings\n\n- **阻塞：旧状态仍可覆盖新 disposition。**  \n  `scripts/test-github-unattended-runner.mjs:1281` 新增回归用例实际失败：期望 `blocked_manual_ui_approval`，实际被旧 `check_failure` 覆盖。\n- **阻塞：通知标签重试不满足幂等约定。**  \n  `lib/github-automation-notification.ts` 在恢复时先重复 POST 标签，之后才 GET reconcile；崩溃恢复可能重复 POST，违反 C7/C9。\n- **阻塞：通知失败层级返回不一致。**  \n  `lib/github-automation-runner.ts` 持久化 `operator_notification` 后，非成功返回仍固定使用 `layer: \"agent\"`，可能被调度层再次覆盖。\n- **阻塞：回归覆盖不足。**  \n  缺少标签/中文评论幂等、通知未知写入、notification-only retry、注入隔离等 C6–C12 真实 App boundary 测试。\n\n#### Verification\n\n- `npm run test:github-unattended-runner` — **fail**，25 passed / 1 failed\n- `npm run test:github-automation` — pass，114\n- `npm run test:github-unattended` — pass，21\n- `npm run test:github-handler-runtime` — pass，9\n- `npm run lint` — pass，0 errors / 11 warnings\n- `node_modules/.bin/tsc --noEmit` — pass\n- `git diff --check` — pass\n\n#### Artifacts / Files\n\n- 未修改生产代码。\n- 未能更新 IMP-002 `checks.md` / `review.md`：当前受限工具未暴露 scoped edit/write，无法安全写入。\n\n#### Verdict\n\n**Needs work。** 主会话应保持 IMP-002 implementing，修复上述三项行为问题并补齐通知故障回归后重新检查。\n\nWorkTree Check: A requested check command was rejected by policy.",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T08:06:24.117Z",
+        "updatedAt": "2026-07-28T08:13:20.941Z",
+        "eventCount": 3305,
+        "lastTextPreview": "### Check Complete — IMP-002\n\n#### Remaining Findings\n\n- **阻塞：旧状态仍可覆盖新 disposition。**  \n  `scripts/test-github-unattended-runner.mjs:1281` 新增回归用例实际失败：期望 `blocked_manual_ui_approval`，实际被旧 `check_failure` 覆盖。\n- **阻塞：通知标签重试不满足幂等约定。**  \n  `lib/github-automation-notification.ts` 在恢复时先重复 POST 标签，之后才 GET reconcile；崩溃恢复可能重复 POST，违反 C7/C9。\n- **阻塞：通知失败层级返回不一致。**  \n  `lib/github-automation-runner.ts` 持久化 `operator_notification` 后，非成功返回仍固定使用 `layer: \"agent\"`，可能被调度层再次覆盖。\n- **阻塞：回归覆盖不足。**  \n  缺少标签/中文评论幂等、通知未知写入、notification-only retry、注入隔离等 C6–C12 真实 App boundary 测试。\n\n#### Verification\n\n- `npm run test:github-unattended-runner` — **fail**，25 passed / 1 failed\n- `npm run test:github-automation` — pass，114\n- `npm run test:github-unattended` — pass，21\n- `npm run test:github-handler-runtime` — pass，9\n- `npm run lint` — pass，0 errors / 11 warnings\n- `node_modules/.bin/tsc --noEmit` — pass\n- `git diff --check` — pass\n\n#### Artifacts / Files\n\n- 未修改生产代码。\n- 未能更新 IMP-002 `checks.md` / `review.md`：当前受限工具未暴露 scoped edit/write，无法安全写入。\n\n#### Verdict\n\n**Needs work。** 主会话应保持 IMP-002 implementing，修复上述三项行为问题并补齐通知故障回归后重新检查。\n\nWorkTree Check: A requested check command was rejected by policy.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:12:25.707Z",
+            "toolCallId": "call_OUR26lYRNO3j2zoeSoV7BIW1|fc_03d109ff1788994b016a6864523e08819b854927ef1775a952",
+            "toolName": "submit_check_report",
+            "text": "Restricted WorkTree Check command completed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T08:12:51.317Z",
+            "toolCallId": "call_SJbEX8CLUykPAr4eXTEvrHY5|fc_03d109ff1788994b016a686473d684819b8f3aca4797a4d712",
+            "toolName": "submit_check_report",
+            "inputPreview": "Server-owned restricted WorkTree Check tool.",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:12:51.321Z",
+            "toolCallId": "call_SJbEX8CLUykPAr4eXTEvrHY5|fc_03d109ff1788994b016a686473d684819b8f3aca4797a4d712",
+            "toolName": "submit_check_report",
+            "text": "Restricted WorkTree Check command completed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T08:13:20.932Z",
+            "text": "### Check Complete — IMP-002\n\n#### Remaining Findings\n\n- **阻塞：旧状态仍可覆盖新 disposition。**  \n  `scripts/test-github-unattended-runner.mjs:1281` 新增回归用例实际失败：期望 `blocked_manual_ui_approval`，实际被旧 `check_failure` 覆盖。\n- **阻塞：通知标签重试不满足幂等约定。**  \n  `lib/github-automation-notification.ts` 在恢复时先重复 POST 标签，之后才 GET reconcile；崩溃恢复可能重复 POST，违反 C7/C9。\n- **阻塞：通知失败层级返回不一致。**  \n  `lib/github-automation-runner.ts` 持久化 `operator_notification` 后，非成功返回仍固定使用 `layer: \"agent\"`，可能被调度层再次覆盖。\n- **阻塞：回归覆盖不足。**  \n  缺少标签/中文评论幂等、通知未知写入、notification-only retry、注入隔离等 C6–C12 真实 App boundary 测试。\n\n#### Verification\n\n- `npm run test:github-unattended-runner` — **fail**，25 passed / 1 failed\n- `npm run test:github-automation` — pass，114\n- `npm run test:github-unattended` — pass，21\n- `npm run test:github-handler-runtime` — pass，9\n- `npm run lint` — pass，0 errors / 11 warnings\n- `node_modules/.bin/tsc --noEmit` — pass\n- `git diff --check` — pass\n\n#### Artifacts / Files\n\n- 未修改生产代码。\n- 未能更新 IMP-002 `checks.md` / `review.md`：当前受限工具未暴露 scoped edit/write，无法安全写入。\n\n#### Verdict\n\n**Needs work。** 主会话应保持 IMP-002 implementing，修复上述三项行为问题并补齐通知故障回归后重新检查。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T08:13:20.934Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1108,
+        "tokens": 527,
+        "tokenSource": "usage",
+        "tps": 40.87,
+        "firstTokenAt": "2026-07-28T08:13:07.703Z",
+        "lastTokenAt": "2026-07-28T08:13:20.598Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        },
+        "terminationReason": "check_command_rejected"
+      },
+      "terminationReason": "check_command_rejected",
+      "error": "### Check Complete — IMP-002 #### Remaining Findings - **阻塞：旧状态仍可覆盖新 disposition。** `scripts/test-github-unattended-runner.mjs:1281` 新增回归用例实际失败：期望 `blocked_manual_ui_approval`，实际被旧 `check_failure` 覆盖。 - **阻塞：通知标签重试不满足幂等约定。** `lib/github-automation-notification.ts` 在恢复时先重复 POST 标签，之后才 GET reconcile；崩溃恢复可能重复 POST，违反 C7/C9。 - **阻塞：通知失败层级返回不一致。** `lib/github-automation-runner.ts` 持久化 `operator_notification` 后，非成功返回仍固定使用 `layer: \"agent\"`，可能被调度层再次覆盖。 - **阻塞：回归覆盖不足。** 缺少标签/中文评论幂等、通知未知写入、notification-only retry、注入隔离等 C6–C12 真实 App boundary 测试。 #### Verification - `npm run test:github-unattended-runner` — **fail**，25 passed / 1 failed - `npm run test:github-automation` — pass，114 - `npm run test:github-unattended` — pass，21 - `npm run test:github-handler-runtime` — pass，9 - `npm run lint` — pass，0 errors / 11 warnings - `node_modules/.bin/tsc --noEmit` — pass - `git diff --check` — pass #### Artifacts / Files - 未修改生产代码。 - 未能更新 IMP-002 `checks.md` / `review.md`：当前受限工具未暴露 scoped edit/write，无法安全写…",
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-3d025980b0225af34f640939",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/checker-3d025980b0225af34f640939.jsonl",
+        "status": "failed",
+        "startedAt": "2026-07-28T08:06:24.117Z",
+        "finishedAt": "2026-07-28T08:13:20.938Z",
+        "updatedAt": "2026-07-28T08:13:20.938Z",
+        "itemCount": 83,
+        "messageCount": 1,
+        "toolCallCount": 37,
+        "stderrBytes": 0,
+        "bytes": 23018,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019fa7c2-b9ce-7197-9af7-5f7cf2f4970e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T08-06-24-462Z_019fa7c2-b9ce-7197-9af7-5f7cf2f4970e.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-c4e443a4b495184805401071",
+      "member": "checker",
+      "status": "failed",
+      "startedAt": "2026-07-28T08:26:13.555Z",
+      "runner": "sdk",
+      "childSessionId": "019fa7d4-df36-7b7c-9322-68089100e59f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T08-26-13-686Z_019fa7d4-df36-7b7c-9322-68089100e59f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa7d4-df36-7b7c-9322-68089100e59f",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete — IMP-002\n\n#### Files / Artifacts\n\n- 未修改生产代码。\n- 未能更新 IMP-002 `checks.md` / `review.md`：当前工具未提供 scoped edit/write。\n\n#### Verification\n\n- `npm run test:github-unattended-runner` — pass，26/26\n- `npm run test:github-unattended` — pass，21/21\n- `npm run test:github-automation` — pass，114/114\n- `node_modules/.bin/tsc --noEmit` — pass\n- `git diff --check` — pass\n\n新回归确认：`blocked_manual_ui_approval` 在 durable reload 后不再被 stale `check_failure` 覆盖，且 checker 调用为零。\n\n#### Remaining Risks\n\n- 通知失败后的 runner disposition 仍可能返回 `agent` 层，而持久化状态为 `operator_notification`。\n- C6–C12 的标签/评论幂等、unknown-write reconciliation、notification-only retry 与注入隔离覆盖仍不足。\n\n#### Verdict\n\n**Needs work。** 主会话需决定是继续补齐上述通知边界，还是接受其为后续风险；当前不建议将 IMP-002 判定为 Pass。\n\nWorkTree Check: A requested check command was rejected by policy.",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T08:26:13.555Z",
+        "updatedAt": "2026-07-28T08:29:31.603Z",
+        "eventCount": 2251,
+        "lastTextPreview": "### Check Complete — IMP-002\n\n#### Files / Artifacts\n\n- 未修改生产代码。\n- 未能更新 IMP-002 `checks.md` / `review.md`：当前工具未提供 scoped edit/write。\n\n#### Verification\n\n- `npm run test:github-unattended-runner` — pass，26/26\n- `npm run test:github-unattended` — pass，21/21\n- `npm run test:github-automation` — pass，114/114\n- `node_modules/.bin/tsc --noEmit` — pass\n- `git diff --check` — pass\n\n新回归确认：`blocked_manual_ui_approval` 在 durable reload 后不再被 stale `check_failure` 覆盖，且 checker 调用为零。\n\n#### Remaining Risks\n\n- 通知失败后的 runner disposition 仍可能返回 `agent` 层，而持久化状态为 `operator_notification`。\n- C6–C12 的标签/评论幂等、unknown-write reconciliation、notification-only retry 与注入隔离覆盖仍不足。\n\n#### Verdict\n\n**Needs work。** 主会话需决定是继续补齐上述通知边界，还是接受其为后续风险；当前不建议将 IMP-002 判定为 Pass。\n\nWorkTree Check: A requested check command was rejected by policy.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:28:51.325Z",
+            "toolCallId": "call_cMc3fNsJkkn0HcwL67s1L34Q|fc_0ee6f8a303d715f3016a68683bef24819ab3f753a02994ed4e",
+            "toolName": "submit_check_report",
+            "text": "Restricted WorkTree Check command completed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T08:29:12.340Z",
+            "toolCallId": "call_spiT4taNBuBD3KQdJuvd350a|fc_0ee6f8a303d715f3016a68684b0c7c819ab4319d6c74482dbb",
+            "toolName": "submit_check_report",
+            "inputPreview": "Server-owned restricted WorkTree Check tool.",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:29:12.349Z",
+            "toolCallId": "call_spiT4taNBuBD3KQdJuvd350a|fc_0ee6f8a303d715f3016a68684b0c7c819ab4319d6c74482dbb",
+            "toolName": "submit_check_report",
+            "text": "Restricted WorkTree Check command completed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T08:29:31.590Z",
+            "text": "### Check Complete — IMP-002\n\n#### Files / Artifacts\n\n- 未修改生产代码。\n- 未能更新 IMP-002 `checks.md` / `review.md`：当前工具未提供 scoped edit/write。\n\n#### Verification\n\n- `npm run test:github-unattended-runner` — pass，26/26\n- `npm run test:github-unattended` — pass，21/21\n- `npm run test:github-automation` — pass，114/114\n- `node_modules/.bin/tsc --noEmit` — pass\n- `git diff --check` — pass\n\n新回归确认：`blocked_manual_ui_approval` 在 durable reload 后不再被 stale `check_failure` 覆盖，且 checker 调用为零。\n\n#### Remaining Risks\n\n- 通知失败后的 runner disposition 仍可能返回 `agent` 层，而持久化状态为 `operator_notification`。\n- C6–C12 的标签/评论幂等、unknown-write reconciliation、notification-only retry 与注入隔离覆盖仍不足。\n\n#### Verdict\n\n**Needs work。** 主会话需决定是继续补齐上述通知边界，还是接受其为后续风险；当前不建议将 IMP-002 判定为 Pass。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T08:29:31.597Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 742,
+        "tokens": 512,
+        "tokenSource": "usage",
+        "tps": 111.4,
+        "firstTokenAt": "2026-07-28T08:29:26.909Z",
+        "lastTokenAt": "2026-07-28T08:29:31.505Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false
+        },
+        "terminationReason": "check_command_rejected"
+      },
+      "terminationReason": "check_command_rejected",
+      "error": "### Check Complete — IMP-002 #### Files / Artifacts - 未修改生产代码。 - 未能更新 IMP-002 `checks.md` / `review.md`：当前工具未提供 scoped edit/write。 #### Verification - `npm run test:github-unattended-runner` — pass，26/26 - `npm run test:github-unattended` — pass，21/21 - `npm run test:github-automation` — pass，114/114 - `node_modules/.bin/tsc --noEmit` — pass - `git diff --check` — pass 新回归确认：`blocked_manual_ui_approval` 在 durable reload 后不再被 stale `check_failure` 覆盖，且 checker 调用为零。 #### Remaining Risks - 通知失败后的 runner disposition 仍可能返回 `agent` 层，而持久化状态为 `operator_notification`。 - C6–C12 的标签/评论幂等、unknown-write reconciliation、notification-only retry 与注入隔离覆盖仍不足。 #### Verdict **Needs work。** 主会话需决定是继续补齐上述通知边界，还是接受其为后续风险；当前不建议将 IMP-002 判定为 Pass。 WorkTree Check: A requested check command was rejected by policy.",
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-c4e443a4b495184805401071",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/checker-c4e443a4b495184805401071.jsonl",
+        "status": "failed",
+        "startedAt": "2026-07-28T08:26:13.555Z",
+        "updatedAt": "2026-07-28T08:29:31.598Z",
+        "itemCount": 71,
+        "messageCount": 1,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 19879,
+        "truncated": false,
         "truncation": {
           "bytesLimit": 5242880,
           "itemBytesLimit": 16384
         },
         "runner": "sdk",
-        "childSessionId": "019fa766-0f70-73e6-a7af-654501c8193f",
-        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-25-11-536Z_019fa766-0f70-73e6-a7af-654501c8193f.jsonl",
-        "finishedAt": "2026-07-28T06:28:58.584Z"
+        "childSessionId": "019fa7d4-df36-7b7c-9322-68089100e59f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T08-26-13-686Z_019fa7d4-df36-7b7c-9322-68089100e59f.jsonl",
+        "finishedAt": "2026-07-28T08:29:31.598Z"
       },
-      "finishedAt": "2026-07-28T06:28:58.589Z"
+      "finishedAt": "2026-07-28T08:29:31.603Z"
     }
   ],
   "meta": {
@@ -5485,7 +6517,7 @@
   },
   "implementationProgress": {
     "schemaVersion": 2,
-    "updatedAt": "2026-07-28T06:28:58.591Z",
+    "updatedAt": "2026-07-28T08:29:31.606Z",
     "activeSubtaskIds": [],
     "queuedSubtaskIds": [],
     "counts": {
@@ -5881,7 +6913,7 @@
         },
         "implementationProgress": {
           "schemaVersion": 1,
-          "updatedAt": "2026-07-28T06:28:58.591Z",
+          "updatedAt": "2026-07-28T08:29:31.606Z",
           "activeSubtaskIds": [],
           "queuedSubtaskIds": [],
           "counts": {
@@ -6037,6 +7069,286 @@
           "implementer-f3efff2b51a2963f4a4766a4",
           "implementer-c6713f1c7aed2ce6381c1849",
           "implementer-da16b87a2504d58439191226"
+        ],
+        "attempts": 0
+      },
+      {
+        "id": "imp_wrva1yzo",
+        "displayId": "IMP-002",
+        "title": "完善 GitHub 自动化异常分流、议题标签与用户沟通",
+        "feedback": "Issue #22 attempt 907 暴露自动化流程吞掉真实结果的问题：implementer 已明确输出 blocked_manual_ui_approval，但 runner 仍把 status=succeeded 当作成功推进到 checking，随后旧的 check_runtime_unavailable 覆盖真实原因；Issue 没有得到清晰的异常标签和评论，开发者无法知道需要用户沟通。请改进异常处理闭环：建立明确的结果分类/优先级（需要用户决策、UI/高风险范围、Provider transport、WorkTree Check、验证失败、取消/暂停、成功等）；任何非成功 disposition 禁止推进下游阶段；为不同异常映射 allowlisted GitHub labels，安全、幂等地追加中文说明评论（包含原因、当前阻塞阶段、需要用户采取的动作、是否可重试，禁止泄露 prompt/output/token/path）；持久化原始安全 reason/provenance，防止旧 checker 状态覆盖新结果；评论与标签失败也要可观察并进入明确 operator 状态；补充真实 runner fault-injection 回归测试和文档。禁止直接吞掉结果、自动重试需要用户确认的异常、重复评论/重复打标签或触发发布。",
+        "status": "checking",
+        "owner": "main",
+        "createdAt": "2026-07-28T07:44:48.921Z",
+        "updatedAt": "2026-07-28T08:06:14.567Z",
+        "completedAt": null,
+        "approval": {
+          "revision": 2,
+          "approvedAt": "2026-07-28T07:51:55.793Z",
+          "contextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+          "inputHash": "9f5ffcd6238a8dae66a257dd",
+          "source": "user-input"
+        },
+        "artifacts": {
+          "plan-review": "plan-review.md",
+          "brief": "brief.md",
+          "prd": "prd.md",
+          "ui": "ui.md",
+          "design": "design.md",
+          "implement": "implement.md",
+          "checks": "checks.md",
+          "review": "review.md",
+          "summary": "summary.md"
+        },
+        "implementationPlan": {
+          "schemaVersion": 1,
+          "updatedAt": "2026-07-28T07:51:21.074Z",
+          "summary": "完善 GitHub unattended 非成功结果分流、allowlisted 标签、幂等中文评论和 operator notification，不改变 Chat UI。",
+          "strategy": "Disposition-first durable CAS；通知 outbox 与业务 pipeline 分离，旧 checker/late writer 不得覆盖真实结果。",
+          "maxConcurrency": 2,
+          "execution": {
+            "mode": "mixed",
+            "maxParallel": 2,
+            "groups": [
+              {
+                "id": "IMP2-01",
+                "title": "定义安全 disposition/provenance/notification contract",
+                "relation": "serial",
+                "dependencies": [],
+                "subtaskIds": [
+                  "IMP2-01"
+                ]
+              },
+              {
+                "id": "IMP2-02",
+                "title": "以 durable disposition 门控下游阶段",
+                "relation": "serial",
+                "dependencies": [],
+                "subtaskIds": [
+                  "IMP2-02"
+                ]
+              },
+              {
+                "id": "IMP2-03",
+                "title": "实现幂等标签与中文状态评论通知",
+                "relation": "serial",
+                "dependencies": [],
+                "subtaskIds": [
+                  "IMP2-03"
+                ]
+              },
+              {
+                "id": "IMP2-04",
+                "title": "补 runner/App fault-injection 回归与文档",
+                "relation": "serial",
+                "dependencies": [],
+                "subtaskIds": [
+                  "IMP2-04"
+                ]
+              }
+            ]
+          },
+          "subtasks": [
+            {
+              "id": "IMP2-01",
+              "title": "定义安全 disposition/provenance/notification contract",
+              "description": "增加严格 allowlisted schema、generation/run-fence provenance、notification operation 状态和 fail-closed legacy handling。",
+              "order": 10,
+              "dependsOn": [],
+              "dependencies": [],
+              "relation": "serial",
+              "parallelizable": false
+            },
+            {
+              "id": "IMP2-02",
+              "title": "以 durable disposition 门控下游阶段",
+              "description": "implementer 非成功结果先 CAS 落盘，禁止进入 checker/validation/publisher；防止 stale writer 覆盖。",
+              "order": 20,
+              "dependsOn": [],
+              "dependencies": [],
+              "relation": "serial",
+              "parallelizable": false
+            },
+            {
+              "id": "IMP2-03",
+              "title": "实现幂等标签与中文状态评论通知",
+              "description": "复用批准标签目录与 automation_status marker；逐项持久化结果，通知失败进入 operator_notification，重试只补通知。",
+              "order": 30,
+              "dependsOn": [],
+              "dependencies": [],
+              "relation": "serial",
+              "parallelizable": false
+            },
+            {
+              "id": "IMP2-04",
+              "title": "补 runner/App fault-injection 回归与文档",
+              "description": "覆盖真实 runner/member adapter、标签评论 stub、durable reload、通知失败和防重复 pipeline，并运行完整验证。",
+              "order": 40,
+              "dependsOn": [],
+              "dependencies": [],
+              "relation": "serial",
+              "parallelizable": false
+            }
+          ]
+        },
+        "implementationProgress": {
+          "schemaVersion": 1,
+          "updatedAt": "2026-07-28T08:29:31.606Z",
+          "activeSubtaskIds": [],
+          "queuedSubtaskIds": [],
+          "counts": {
+            "pending": 0,
+            "waiting": 0,
+            "ready": 0,
+            "queued": 0,
+            "running": 0,
+            "blocked": 0,
+            "failed": 0,
+            "done": 4,
+            "skipped": 0
+          },
+          "subtasks": {
+            "IMP2-01": {
+              "id": "IMP2-01",
+              "status": "done",
+              "updatedAt": "2026-07-28T07:59:25.629Z",
+              "startedAt": "2026-07-28T07:52:17.153Z",
+              "finishedAt": "2026-07-28T07:59:25.629Z",
+              "attempts": 1,
+              "runIds": [
+                "implementer-a769dea4d206807700a7812c"
+              ],
+              "lastRunId": "implementer-a769dea4d206807700a7812c",
+              "currentRunId": "implementer-a769dea4d206807700a7812c",
+              "claimedAt": "2026-07-28T07:52:17.153Z",
+              "claimedByContextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+              "summary": "Implementer run succeeded; disposition/provenance/notification contract completed.",
+              "validation": [
+                "Studio implementer run succeeded"
+              ]
+            },
+            "IMP2-02": {
+              "id": "IMP2-02",
+              "status": "done",
+              "updatedAt": "2026-07-28T07:59:25.647Z",
+              "startedAt": "2026-07-28T07:52:17.175Z",
+              "finishedAt": "2026-07-28T07:59:25.647Z",
+              "attempts": 1,
+              "runIds": [
+                "implementer-86483e87c8d8f85fe0099273"
+              ],
+              "lastRunId": "implementer-86483e87c8d8f85fe0099273",
+              "currentRunId": "implementer-86483e87c8d8f85fe0099273",
+              "claimedAt": "2026-07-28T07:52:17.175Z",
+              "claimedByContextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+              "summary": "Implementer run succeeded; durable disposition downstream gate completed.",
+              "validation": [
+                "Studio implementer run succeeded"
+              ]
+            },
+            "IMP2-03": {
+              "id": "IMP2-03",
+              "status": "done",
+              "updatedAt": "2026-07-28T08:06:05.131Z",
+              "startedAt": "2026-07-28T07:59:38.625Z",
+              "finishedAt": "2026-07-28T08:06:05.131Z",
+              "attempts": 1,
+              "runIds": [
+                "implementer-393366ed8b71d386ba14d610"
+              ],
+              "lastRunId": "implementer-393366ed8b71d386ba14d610",
+              "currentRunId": "implementer-393366ed8b71d386ba14d610",
+              "claimedAt": "2026-07-28T07:59:38.625Z",
+              "claimedByContextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+              "summary": "Implementer run succeeded; idempotent labels and Chinese status notification work completed.",
+              "validation": [
+                "Studio implementer run succeeded"
+              ]
+            },
+            "IMP2-04": {
+              "id": "IMP2-04",
+              "status": "done",
+              "updatedAt": "2026-07-28T08:06:05.149Z",
+              "startedAt": "2026-07-28T07:59:38.646Z",
+              "finishedAt": "2026-07-28T08:06:05.149Z",
+              "attempts": 1,
+              "runIds": [
+                "implementer-f6ff390c117c47597c40fdb0"
+              ],
+              "lastRunId": "implementer-f6ff390c117c47597c40fdb0",
+              "currentRunId": "implementer-f6ff390c117c47597c40fdb0",
+              "claimedAt": "2026-07-28T07:59:38.646Z",
+              "claimedByContextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+              "summary": "Implementer run succeeded; runner/App fault-injection regression and docs work completed.",
+              "validation": [
+                "Studio implementer run succeeded"
+              ]
+            }
+          },
+          "history": [
+            {
+              "at": "2026-07-28T07:52:17.153Z",
+              "subtaskId": "IMP2-01",
+              "from": "ready",
+              "to": "running"
+            },
+            {
+              "at": "2026-07-28T07:52:17.175Z",
+              "subtaskId": "IMP2-02",
+              "from": "ready",
+              "to": "running"
+            },
+            {
+              "at": "2026-07-28T07:59:25.629Z",
+              "subtaskId": "IMP2-01",
+              "from": "running",
+              "to": "done",
+              "runId": "implementer-a769dea4d206807700a7812c",
+              "message": "Implementer run succeeded; disposition/provenance/notification contract completed."
+            },
+            {
+              "at": "2026-07-28T07:59:25.647Z",
+              "subtaskId": "IMP2-02",
+              "from": "running",
+              "to": "done",
+              "runId": "implementer-86483e87c8d8f85fe0099273",
+              "message": "Implementer run succeeded; durable disposition downstream gate completed."
+            },
+            {
+              "at": "2026-07-28T07:59:38.625Z",
+              "subtaskId": "IMP2-03",
+              "from": "ready",
+              "to": "running"
+            },
+            {
+              "at": "2026-07-28T07:59:38.646Z",
+              "subtaskId": "IMP2-04",
+              "from": "ready",
+              "to": "running"
+            },
+            {
+              "at": "2026-07-28T08:06:05.131Z",
+              "subtaskId": "IMP2-03",
+              "from": "running",
+              "to": "done",
+              "runId": "implementer-393366ed8b71d386ba14d610",
+              "message": "Implementer run succeeded; idempotent labels and Chinese status notification work completed."
+            },
+            {
+              "at": "2026-07-28T08:06:05.149Z",
+              "subtaskId": "IMP2-04",
+              "from": "running",
+              "to": "done",
+              "runId": "implementer-f6ff390c117c47597c40fdb0",
+              "message": "Implementer run succeeded; runner/App fault-injection regression and docs work completed."
+            }
+          ]
+        },
+        "runIds": [
+          "implementer-a769dea4d206807700a7812c",
+          "implementer-86483e87c8d8f85fe0099273",
+          "implementer-393366ed8b71d386ba14d610",
+          "implementer-f6ff390c117c47597c40fdb0"
         ],
         "attempts": 0
       }

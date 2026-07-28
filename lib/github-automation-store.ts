@@ -34,6 +34,11 @@ import { dirname, join } from "node:path";
 
 import { getGithubAutomationRootDir } from "./github-automation-config";
 import { GithubAutomationError } from "./github-automation-errors";
+import {
+  readGithubAutomationTerminalDisposition,
+  type GithubAutomationTerminalDisposition,
+  type GithubAutomationTerminalDispositionReadResult,
+} from "./github-automation-types";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -261,6 +266,12 @@ export interface GithubAutomationJobRecord {
   leaseFencingToken?: string | null;
   /** Last lease heartbeat ISO time (scheduler/lease only — not meaningful progress). */
   leaseHeartbeatAt?: string | null;
+  /**
+   * IMP2-01 terminal implementer outcome. Optional only for records written before
+   * disposition-first routing; readers must treat missing/invalid values as an
+   * operator-review gate rather than infer success from job.status.
+   */
+  terminalDisposition?: GithubAutomationTerminalDisposition | null;
   /**
    * Pending owner command work item (GHA-CLOSE-02).
    * Separates delivery audit identity (`deliveryId`) from one-shot command consumption.
@@ -819,9 +830,23 @@ export async function readGithubAutomationDelivery(
 
 // ─── Jobs ────────────────────────────────────────────────────────────────────
 
+export function readGithubAutomationJobTerminalDisposition(
+  job: Pick<GithubAutomationJobRecord, "terminalDisposition">,
+): GithubAutomationTerminalDispositionReadResult {
+  return readGithubAutomationTerminalDisposition(job.terminalDisposition);
+}
+
 export async function writeGithubAutomationJob(
   job: GithubAutomationJobRecord,
 ): Promise<GithubAutomationJobRecord> {
+  const terminal = readGithubAutomationJobTerminalDisposition(job);
+  if (terminal.state === "invalid") {
+    throw new GithubAutomationError(
+      "invalid_config",
+      "Invalid terminal disposition contract",
+      { status: 409, details: { reason: "automation_state_inconsistent" } },
+    );
+  }
   const next: GithubAutomationJobRecord = {
     ...job,
     schemaVersion: GITHUB_AUTOMATION_STORE_SCHEMA_VERSION,

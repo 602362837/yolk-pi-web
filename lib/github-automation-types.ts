@@ -382,6 +382,8 @@ export type GithubAutomationBlockedLayer =
   | "publisher"
   | "lifecycle"
   | "scheduler"
+  /** A durable terminal outcome is awaiting only label/comment delivery. */
+  | "operator_notification"
   | "unknown";
 
 /**
@@ -432,6 +434,160 @@ export type GithubAutomationRetryability =
   | "operator_after_change"
   | "operator"
   | "none";
+
+// ─── IMP2-01 implementer terminal disposition / notification contract ───────
+
+/** Server-normalized implementer result. Child status/output is never authority. */
+export type GithubImplementerDispositionKind =
+  | "succeeded"
+  | "needs_user_decision"
+  | "policy_blocked"
+  | "provider_transport_failure"
+  | "check_failure"
+  | "cancelled"
+  | "paused"
+  | "runtime_failed";
+
+/** Closed reason vocabulary persisted for implementer terminal outcomes. */
+export type GithubImplementerDispositionReasonCode =
+  | "automation_state_inconsistent"
+  | "blocked_manual_ui_approval"
+  | "needs_user_decision"
+  | "policy_blocked"
+  | "provider_transport_failure"
+  | "check_failure"
+  | "cancelled"
+  | "paused"
+  | "runtime_failed";
+
+export type GithubAutomationNotificationOperationStatus =
+  | "pending"
+  | "confirmed"
+  | "failed";
+
+export interface GithubAutomationNotificationState {
+  labels: GithubAutomationNotificationOperationStatus;
+  comment: GithubAutomationNotificationOperationStatus;
+  /** Operation name only; raw remote errors and response bodies are forbidden. */
+  lastFailureOperation?: "labels" | "comment" | "reconcile";
+}
+
+/**
+ * Durable, generation/run-fence-bound terminal outcome. All fields are safe
+ * scalars: never persist child output, Issue/comment text, paths, or provider errors.
+ */
+export interface GithubAutomationTerminalDisposition {
+  generation: number;
+  runFence: string;
+  runOrdinal: number;
+  kind: GithubImplementerDispositionKind;
+  reasonCode: GithubImplementerDispositionReasonCode | null;
+  blockedAtLayer: GithubAutomationBlockedLayer | null;
+  retryability: GithubAutomationRetryability;
+  recordedAt: string;
+  provenanceHash: string;
+  notificationRevision: string;
+  notification: GithubAutomationNotificationState;
+}
+
+export type GithubAutomationTerminalDispositionReadResult =
+  | { state: "valid"; disposition: GithubAutomationTerminalDisposition }
+  | { state: "legacy_missing" | "invalid"; disposition: null };
+
+const IMPLEMENTER_DISPOSITION_KINDS = new Set<GithubImplementerDispositionKind>([
+  "succeeded", "needs_user_decision", "policy_blocked",
+  "provider_transport_failure", "check_failure", "cancelled", "paused", "runtime_failed",
+]);
+const IMPLEMENTER_DISPOSITION_REASONS = new Set<GithubImplementerDispositionReasonCode>([
+  "automation_state_inconsistent", "blocked_manual_ui_approval", "needs_user_decision",
+  "policy_blocked", "provider_transport_failure", "check_failure", "cancelled", "paused", "runtime_failed",
+]);
+const NOTIFICATION_OPERATION_STATUSES = new Set<GithubAutomationNotificationOperationStatus>([
+  "pending", "confirmed", "failed",
+]);
+
+/** Strict parser for persisted terminal data; missing/invalid records fail closed. */
+export function readGithubAutomationTerminalDisposition(
+  value: unknown,
+): GithubAutomationTerminalDispositionReadResult {
+  if (value === undefined || value === null) {
+    return { state: "legacy_missing", disposition: null };
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    return { state: "invalid", disposition: null };
+  }
+  const raw = value as Record<string, unknown>;
+  const notification = raw.notification;
+  if (typeof notification !== "object" || notification === null || Array.isArray(notification)) {
+    return { state: "invalid", disposition: null };
+  }
+  const note = notification as Record<string, unknown>;
+  const generation = raw.generation;
+  const runOrdinal = raw.runOrdinal;
+  const kind = raw.kind;
+  const reasonCode = raw.reasonCode;
+  const layer = raw.blockedAtLayer;
+  const retryability = raw.retryability;
+  const valid =
+    Number.isInteger(generation) && (generation as number) > 0 &&
+    Number.isInteger(runOrdinal) && (runOrdinal as number) > 0 &&
+    typeof raw.runFence === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(raw.runFence) &&
+    typeof kind === "string" && IMPLEMENTER_DISPOSITION_KINDS.has(kind as GithubImplementerDispositionKind) &&
+    (reasonCode === null || (typeof reasonCode === "string" && IMPLEMENTER_DISPOSITION_REASONS.has(reasonCode as GithubImplementerDispositionReasonCode))) &&
+    (layer === null || (typeof layer === "string" && ["agent", "operator_notification"].includes(layer))) &&
+    (retryability === "automatic" || retryability === "operator_after_change" || retryability === "operator" || retryability === "none") &&
+    typeof raw.recordedAt === "string" && !Number.isNaN(Date.parse(raw.recordedAt)) &&
+    typeof raw.provenanceHash === "string" && /^[a-f0-9]{64}$/.test(raw.provenanceHash) &&
+    typeof raw.notificationRevision === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(raw.notificationRevision) &&
+    typeof note.labels === "string" && NOTIFICATION_OPERATION_STATUSES.has(note.labels as GithubAutomationNotificationOperationStatus) &&
+    typeof note.comment === "string" && NOTIFICATION_OPERATION_STATUSES.has(note.comment as GithubAutomationNotificationOperationStatus) &&
+    (note.lastFailureOperation === undefined || ["labels", "comment", "reconcile"].includes(note.lastFailureOperation as string));
+  if (!valid) return { state: "invalid", disposition: null };
+
+  // A terminal success has no block/retry/notification-failure semantics.
+  if (kind === "succeeded" && (reasonCode !== null || layer !== null || retryability !== "none")) {
+    return { state: "invalid", disposition: null };
+  }
+  if (kind !== "succeeded" && reasonCode === null) {
+    return { state: "invalid", disposition: null };
+  }
+  const reasonMatchesKind =
+    (kind === "succeeded" && reasonCode === null) ||
+    (kind === "needs_user_decision" &&
+      (reasonCode === "blocked_manual_ui_approval" || reasonCode === "needs_user_decision") &&
+      retryability === "operator_after_change") ||
+    (kind === "policy_blocked" && reasonCode === "policy_blocked" && retryability === "operator_after_change") ||
+    (kind === "provider_transport_failure" && reasonCode === "provider_transport_failure" && retryability === "automatic") ||
+    (kind === "check_failure" && reasonCode === "check_failure" && retryability === "operator") ||
+    (kind === "cancelled" && reasonCode === "cancelled" && retryability === "operator") ||
+    (kind === "paused" && reasonCode === "paused" && retryability === "operator") ||
+    (kind === "runtime_failed" &&
+      (reasonCode === "runtime_failed" || reasonCode === "automation_state_inconsistent") &&
+      retryability === "operator");
+  if (!reasonMatchesKind) return { state: "invalid", disposition: null };
+  return {
+    state: "valid",
+    disposition: {
+      generation: generation as number,
+      runFence: raw.runFence as string,
+      runOrdinal: runOrdinal as number,
+      kind: kind as GithubImplementerDispositionKind,
+      reasonCode: reasonCode as GithubImplementerDispositionReasonCode | null,
+      blockedAtLayer: layer as GithubAutomationBlockedLayer | null,
+      retryability: retryability as GithubAutomationRetryability,
+      recordedAt: raw.recordedAt as string,
+      provenanceHash: raw.provenanceHash as string,
+      notificationRevision: raw.notificationRevision as string,
+      notification: {
+        labels: note.labels as GithubAutomationNotificationOperationStatus,
+        comment: note.comment as GithubAutomationNotificationOperationStatus,
+        ...(note.lastFailureOperation === undefined
+          ? {}
+          : { lastFailureOperation: note.lastFailureOperation as "labels" | "comment" | "reconcile" }),
+      },
+    },
+  };
+}
 
 /** Scheduler view of a job (not Agent execution). */
 export type GithubAutomationSchedulerState =

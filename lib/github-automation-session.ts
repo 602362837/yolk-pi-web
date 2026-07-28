@@ -166,6 +166,23 @@ export interface GithubImplementerRunOutcome {
   childSessionId?: string;
 }
 
+export type GithubImplementerDispositionKind =
+  | "succeeded"
+  | "needs_user_decision"
+  | "policy_blocked"
+  | "provider_transport_failure"
+  | "cancelled"
+  | "runtime_failed";
+
+/**
+ * Server/test-adapter supplied structured implementer terminal result. This is
+ * deliberately not inferred from child output or error text.
+ */
+export interface GithubImplementerDisposition {
+  kind: GithubImplementerDispositionKind;
+  reasonCode?: "blocked_manual_ui_approval" | "implementer_policy_blocked" | "implementer_runtime_failed";
+}
+
 export interface GithubFullAgentMemberResult {
   output: string;
   status: string;
@@ -177,6 +194,11 @@ export interface GithubFullAgentMemberResult {
   outcome?: GithubImplementerRunOutcome;
   /** Compatibility alias while runner callers migrate to `outcome`. */
   implementerOutcome?: GithubImplementerRunOutcome;
+  /**
+   * Optional structured terminal disposition from a server-owned adapter.
+   * Never derive this from model output, warnings, or child transcript text.
+   */
+  implementerDisposition?: GithubImplementerDisposition;
 }
 
 export type GithubFullAgentMemberOverride = (

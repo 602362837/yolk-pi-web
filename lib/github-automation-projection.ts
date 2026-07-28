@@ -37,6 +37,7 @@ import {
   listGithubAutomationJobs,
   readGithubAutomationIssueState,
   readGithubAutomationJob,
+  readGithubAutomationJobTerminalDisposition,
   writeGithubAutomationJob,
   type GithubAutomationJobPhase,
   type GithubAutomationJobRecord,
@@ -64,6 +65,7 @@ import type {
   GithubAutomationSafeProgressSummary,
   GithubAutomationSchedulerState,
   GithubAutomationSessionAvailability,
+  GithubAutomationTerminalDisposition,
   GithubMachineAssigneeSafeProjection,
 } from "./github-automation-types";
 import {
@@ -250,6 +252,15 @@ export interface GithubAutomationJobActionAvailability {
   reasonCode: string | null;
 }
 
+export interface GithubAutomationTerminalDispositionSafeProjection {
+  kind: GithubAutomationTerminalDisposition["kind"];
+  reasonCode: GithubAutomationTerminalDisposition["reasonCode"];
+  blockedAtLayer: GithubAutomationTerminalDisposition["blockedAtLayer"];
+  retryability: GithubAutomationTerminalDisposition["retryability"];
+  recordedAt: string;
+  notification: GithubAutomationTerminalDisposition["notification"];
+}
+
 export interface GithubAutomationJobSafeProjection {
   jobId: string;
   repositoryId: number;
@@ -289,6 +300,10 @@ export interface GithubAutomationJobSafeProjection {
   sessionIdShort: string | null;
   /** Provenance captured when the current block/decision was evaluated. */
   evaluatedProvenance: GithubAutomationEvaluatedProvenance | null;
+  /** IMP2-01 safe terminal outcome; no child output, fence, hash, or raw errors. */
+  terminalDisposition: GithubAutomationTerminalDispositionSafeProjection | null;
+  /** Missing/invalid historical disposition must be handled by an operator, never inferred. */
+  terminalDispositionState: "valid" | "legacy_missing" | "invalid";
 }
 
 export interface GithubAutomationStatusProjection {
@@ -556,7 +571,20 @@ export function deriveGithubAutomationJobObservabilityFromRecord(
   workspaceLabel: string | null;
   sessionIdShort: string | null;
   evaluatedProvenance: GithubAutomationEvaluatedProvenance | null;
+  terminalDisposition: GithubAutomationTerminalDispositionSafeProjection | null;
+  terminalDispositionState: "valid" | "legacy_missing" | "invalid";
 } {
+  const terminalRead = readGithubAutomationJobTerminalDisposition(job);
+  const terminalDisposition = terminalRead.disposition
+    ? {
+        kind: terminalRead.disposition.kind,
+        reasonCode: terminalRead.disposition.reasonCode,
+        blockedAtLayer: terminalRead.disposition.blockedAtLayer,
+        retryability: terminalRead.disposition.retryability,
+        recordedAt: terminalRead.disposition.recordedAt,
+        notification: terminalRead.disposition.notification,
+      }
+    : null;
   const legacy = createLegacyGithubAutomationJobObservability(job.attempt);
   const runner = options.runner ?? null;
   const hasProgressFields =
@@ -838,6 +866,8 @@ export function deriveGithubAutomationJobObservabilityFromRecord(
     workspaceLabel,
     sessionIdShort,
     evaluatedProvenance,
+    terminalDisposition,
+    terminalDispositionState: terminalRead.state,
   };
 }
 
@@ -907,6 +937,8 @@ export function toGithubAutomationJobSafeProjection(
     workspaceLabel: observability.workspaceLabel,
     sessionIdShort: observability.sessionIdShort,
     evaluatedProvenance: observability.evaluatedProvenance,
+    terminalDisposition: observability.terminalDisposition,
+    terminalDispositionState: observability.terminalDispositionState,
   };
 }
 

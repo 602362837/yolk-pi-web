@@ -551,6 +551,12 @@ The GitHub unattended **implementer** has a separate, generation-scoped retry la
 
 `implementer_provider_transport_failure` and `implementer_provider_transport_failure_after_start` are implementer-only reasons. `check_runtime_unavailable` remains exclusively a restricted checker reservation/runtime reason. A successful implementer may advance once to `checking`; cancellation pauses and no transport retry may replay checking, validation, or publisher effects.
 
+#### Implementer disposition and Issue notification
+
+Child `status` is not pipeline success evidence. The runner persists a strict, generation/run-fence-bound implementer terminal disposition before considering downstream work. Only the matching `succeeded` disposition permits `checking`; `needs_user_decision` / `blocked_manual_ui_approval`, policy blocks, cancellations, runtime failures, legacy-missing, and conflicting stale checker state fail closed with **zero** checker, operator-validation, final-policy, or publisher calls. Late child/checker writes cannot replace a newer terminal fence.
+
+Non-success dispositions use the existing allowlisted `ypi:blocked`, decision, and risk labels plus one canonical `automation_status` Bot comment with fixed Chinese safe copy. The notification revision is idempotent: unchanged data is a no-op; changed copy updates the marker comment; unknown write results re-list before any further write. Label/comment failure does not erase the business disposition or restart the pipeline. It is recorded as `operator_notification`; an operator retry drains only the missing notification operation, never reruns implementer/checker/publisher. Comments are status communication, not UI/design approval.
+
 #### Counts and truthfulness
 
 - Legacy `attempt` is retained and defined as **scheduler lease-run count** (UI: 「调度尝试 N」). Lease acquisition increments it; handler readiness failure before lease does not; retry/reconcile never resets historical attempt.

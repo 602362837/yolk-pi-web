@@ -246,6 +246,48 @@ async function markClaimComplete(job) {
   });
 }
 
+// Synthetic post-implementer evidence for fixtures that deliberately begin at
+// checker/validation. New runner gates must never infer this from job status.
+function succeededImplementerEvidence(job, runFence = "impl-fixture") {
+  return {
+    terminalDisposition: {
+      generation: job.generation,
+      runFence,
+      runOrdinal: 1,
+      kind: "succeeded",
+      reasonCode: null,
+      blockedAtLayer: null,
+      retryability: "none",
+      recordedAt: new Date().toISOString(),
+      provenanceHash: "a".repeat(64),
+      notificationRevision: `impl-${job.generation}-1`,
+      notification: { labels: "confirmed", comment: "confirmed" },
+    },
+    runner: {
+      implementerDisposition: {
+        generation: job.generation,
+        runFence,
+        kind: "succeeded",
+        reasonCode: "implementer_succeeded",
+        retryability: "none",
+        recordedAt: new Date().toISOString(),
+      },
+      implementerRetry: {
+        generation: job.generation,
+        attemptOrdinal: 1,
+        retryCount: 0,
+        runId: "gha-impl-fixture",
+        runFence,
+        providerRequestStarted: true,
+        outcomeKind: "succeeded",
+        nextRetryAt: null,
+        worktreeDiffHash: "b".repeat(64),
+        launchState: "terminal",
+      },
+    },
+  };
+}
+
 // ─── Residual risk contract ──────────────────────────────────────────────────
 
 await test("full-agent residual risk is explicit and not a sandbox claim", () => {
@@ -740,8 +782,12 @@ await test("E2E docs path: owner+claim → worktree → validation → one unmer
   }
 
   // Jump to checking so validation broker runs, then publish with hooks.
+  // Explicitly seed the matching durable implementer evidence; status/checkpoint
+  // alone must not bypass the disposition-first checker gate.
+  const succeededEvidence = succeededImplementerEvidence(job0);
   state = runner.writeGithubAutomationRunnerState({
     ...state,
+    ...succeededEvidence.runner,
     checkpoint: "checking",
     // This fixture intentionally starts after a previously reconciled checker
     // so it can exercise the existing operator-validation/publish mock path.
@@ -755,6 +801,7 @@ await test("E2E docs path: owner+claim → worktree → validation → one unmer
     status: "running",
     checkpoint: "checking",
     reasonCode: null,
+    terminalDisposition: succeededEvidence.terminalDisposition,
   });
 
   // Patch publisher at the module used by runner via dynamic hooks is not
@@ -1132,6 +1179,7 @@ await test("permission_missing and installation_missing block without fallback i
     uiGate: "pass",
   });
 
+  const succeededEvidence = succeededImplementerEvidence(job0);
   runner.writeGithubAutomationRunnerState({
     schemaVersion: 1,
     jobId: job0.jobId,
@@ -1159,6 +1207,7 @@ await test("permission_missing and installation_missing block without fallback i
     pauseRequested: false,
     updatedAt: new Date().toISOString(),
     reasonCode: "validation_passed",
+    ...succeededEvidence.runner,
   });
 
   const result = await runner.runGithubUnattendedImplementation({
@@ -1167,6 +1216,7 @@ await test("permission_missing and installation_missing block without fallback i
       phase: "final_policy",
       status: "running",
       checkpoint: "awaiting_publish",
+      terminalDisposition: succeededEvidence.terminalDisposition,
     },
     config: uninstalledCfg,
     claimComplete: true,
@@ -1497,6 +1547,7 @@ await test("durable checker stage precedes operator validation and resume keeps 
   const wt = await worktree.ensureGithubAutomationWorktree({
     repository: cfg.repositories[0], issueNumber: job.issueNumber, generation: job.generation,
   });
+  const succeededEvidence = succeededImplementerEvidence(job);
   runner.writeGithubAutomationRunnerState({
     schemaVersion: 1, jobId: job.jobId, repositoryId: job.repositoryId, issueNumber: job.issueNumber,
     generation: job.generation, checkpoint: "checking", worktreePath: wt.worktreePath,
@@ -1505,6 +1556,7 @@ await test("durable checker stage precedes operator validation and resume keeps 
     scopeFingerprint: "scope", ownerActorId: 99, ownerCommentId: 1, ownerCommentHash: "h",
     lastMember: "implementer", lastRunId: "impl", pauseRequested: false,
     updatedAt: new Date().toISOString(), reasonCode: null,
+    ...succeededEvidence.runner,
   });
   let checkerCalls = 0;
   session._testSetGithubFullAgentMemberOverride(async (input) => {
@@ -1523,7 +1575,7 @@ await test("durable checker stage precedes operator validation and resume keeps 
   });
   try {
     const afterChecker = await runner.runGithubUnattendedImplementation({
-      job: { ...job, phase: "checking", status: "running", checkpoint: "checking" },
+      job: { ...job, phase: "checking", status: "running", checkpoint: "checking", terminalDisposition: succeededEvidence.terminalDisposition },
       config: cfg, claimComplete: true, singleStep: true,
     });
     assert.equal(afterChecker.job.phase, "checking");
@@ -1552,6 +1604,7 @@ await test("checker evidence failure blocks before operator validation", async (
   const wt = await worktree.ensureGithubAutomationWorktree({
     repository: cfg.repositories[0], issueNumber: job.issueNumber, generation: job.generation,
   });
+  const succeededEvidence = succeededImplementerEvidence(job);
   runner.writeGithubAutomationRunnerState({
     schemaVersion: 1, jobId: job.jobId, repositoryId: job.repositoryId, issueNumber: job.issueNumber,
     generation: job.generation, checkpoint: "checking", worktreePath: wt.worktreePath,
@@ -1560,6 +1613,7 @@ await test("checker evidence failure blocks before operator validation", async (
     scopeFingerprint: "scope", ownerActorId: 99, ownerCommentId: 1, ownerCommentHash: "h",
     lastMember: "implementer", lastRunId: "impl", pauseRequested: false,
     updatedAt: new Date().toISOString(), reasonCode: null,
+    ...succeededEvidence.runner,
   });
   session._testSetGithubFullAgentMemberOverride(async () => ({
     output: "fake pass", status: "succeeded", warnings: [],
@@ -1572,7 +1626,7 @@ await test("checker evidence failure blocks before operator validation", async (
   }));
   try {
     const result = await runner.runGithubUnattendedImplementation({
-      job: { ...job, phase: "checking", status: "running", checkpoint: "checking" },
+      job: { ...job, phase: "checking", status: "running", checkpoint: "checking", terminalDisposition: succeededEvidence.terminalDisposition },
       config: cfg, claimComplete: true,
     });
     assert.equal(result.job.status, "blocked");

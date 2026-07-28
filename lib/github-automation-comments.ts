@@ -547,6 +547,52 @@ export function buildAutomationStatusCommentBody(input: {
 `;
 }
 
+/**
+ * Fixed, disposition-owned status copy. Callers cannot inject Issue or child text
+ * into the canonical automation_status comment.
+ */
+export function buildImplementerDispositionStatusCommentBody(input: {
+  marker: string;
+  kind: "needs_user_decision" | "policy_blocked" | "provider_transport_failure" | "check_failure" | "cancelled" | "paused" | "runtime_failed";
+  reasonCode: string;
+  blockedAtLayer: "agent" | "operator_notification";
+  retryability: "automatic" | "operator_after_change" | "operator" | "none";
+}): string {
+  const manualUi = input.reasonCode === "blocked_manual_ui_approval";
+  const reason = manualUi
+    ? "该改动涉及需要人工确认的 UI/交互范围。"
+    : input.kind === "needs_user_decision"
+      ? "该改动需要人工决定后才能继续。"
+      : input.kind === "policy_blocked"
+        ? "该改动未通过自动化策略门禁。"
+        : input.kind === "provider_transport_failure"
+          ? "自动化服务暂时不可用，尚未进入后续检查。"
+          : input.kind === "cancelled" || input.kind === "paused"
+            ? "自动化已由操作者暂停或取消。"
+            : "自动化实现未能安全完成。";
+  const next = manualUi
+    ? "请先完成 UI/HTML 设计与审批；随后由仓库操作者重试。"
+    : input.retryability === "automatic"
+      ? "系统仅会在既有安全重试条件满足时重试。"
+      : input.retryability === "operator_after_change"
+        ? "请完成必要变更或人工确认后，由仓库操作者重试。"
+        : "请由仓库操作者检查后决定是否重试。";
+  const retry = input.retryability === "automatic"
+    ? "满足既有安全条件时可自动重试。"
+    : input.retryability === "operator_after_change"
+      ? "需变更或人工确认后重试，不会自动重试。"
+      : "仅限操作者处理，不会自动重试。";
+  const stage = input.blockedAtLayer === "operator_notification" ? "通知" : "实现阶段";
+
+  return `${input.marker}
+自动化已暂停处理此议题。
+- 原因：${reason}
+- 阻塞阶段：${stage}。
+- 需要操作：${next}
+- 可重试性：${retry}
+`;
+}
+
 /** Command help block appended to triage conclusions (approved UI copy). */
 export function buildOwnerCommandHelpSection(appBotLogin: string | null): string {
   const bot = appBotLogin ? `@${sanitizeLogin(appBotLogin)}` : "@AppBot";
