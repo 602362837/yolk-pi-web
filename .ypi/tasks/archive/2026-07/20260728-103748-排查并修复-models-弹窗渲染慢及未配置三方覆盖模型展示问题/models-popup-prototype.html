@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Models 弹窗性能与覆盖项可见性原型</title>
+<style>
+:root{color-scheme:dark;--bg:#17181c;--panel:#202228;--panel2:#292c33;--line:#393d46;--text:#f4f5f7;--muted:#a7adb7;--dim:#737b88;--accent:#766df4;--ok:#42c779;--warn:#d6a64a;--bad:#ef6b73}*{box-sizing:border-box}body{margin:0;background:#101115;color:var(--text);font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"PingFang SC",sans-serif}.page{max-width:1120px;margin:0 auto;padding:28px}.intro{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;margin-bottom:18px}.intro h1{font-size:20px;margin:0 0 7px}.intro p{margin:0;color:var(--muted);max-width:700px}.controls{display:flex;gap:8px;flex-wrap:wrap}.controls button,.btn{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:7px;padding:7px 11px;cursor:pointer}.controls button[aria-pressed="true"],.btn.primary{background:var(--accent);border-color:var(--accent);color:white}.stage{min-height:720px;border:1px solid #2a2d34;border-radius:14px;background:radial-gradient(circle at 50% 20%,#252730,#141519 60%);display:flex;align-items:center;justify-content:center;padding:24px}.modal{width:860px;height:min(650px,78vh);min-height:560px;background:var(--bg);border:1px solid var(--line);border-radius:10px;box-shadow:0 22px 70px #0009;display:flex;flex-direction:column;overflow:hidden}.header,.footer{height:51px;flex:none;display:flex;align-items:center;padding:0 18px;border-bottom:1px solid var(--line)}.header{justify-content:space-between}.header strong{font-size:15px}.header code{margin-left:10px;color:var(--muted);font-size:11px}.close{font-size:22px;color:var(--muted)}.body{display:flex;min-height:0;flex:1}.tree{width:230px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column}.scroll{padding:8px 7px;overflow:auto;flex:1}.section-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:7px 9px 4px}.row{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:6px;color:var(--muted);min-width:0}.row.selected{background:#35344c;color:var(--text)}.row .icon{width:17px;height:17px;border:1px solid var(--line);border-radius:5px;display:grid;place-items:center;font-size:9px;flex:none}.row .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}.row .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}.model{padding-left:34px;font:11px ui-monospace,SFMono-Regular,monospace;color:var(--dim)}.divider{border-top:1px solid var(--line);margin:5px 9px}.status{margin:5px 8px 8px;padding:8px 9px;border:1px solid var(--line);background:#1c1e23;border-radius:7px;color:var(--dim);font-size:11px}.status.loading:before{content:"";display:inline-block;width:9px;height:9px;margin-right:7px;border:2px solid #555;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}.status.error{color:#ff9da3;border-color:#713d43}.add{margin:8px;border:1px dashed var(--line);border-radius:6px;text-align:center;padding:7px;color:var(--muted)}.detail{flex:1;padding:22px;overflow:auto}.detail h2{font-size:12px;text-transform:uppercase;color:var(--dim);letter-spacing:.06em;margin:0 0 16px}.card{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:14px;margin-bottom:12px}.card h3{font-size:13px;margin:0 0 6px}.card p{color:var(--muted);margin:0}.field{margin-top:15px}.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px}.input{height:32px;border:1px solid var(--line);background:#181a1e;border-radius:6px;color:var(--dim);padding:7px 9px}.notice{display:flex;gap:10px;border:1px solid #4c4932;background:#29271e;border-radius:8px;padding:12px;color:#d5c98c}.notice strong{color:#f0dea0}.footer{border-top:1px solid var(--line);border-bottom:0;justify-content:flex-end;gap:9px}.legend{margin-top:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.legend article{border:1px solid #2c3038;background:#17191e;border-radius:9px;padding:12px}.legend b{display:block;margin-bottom:5px}.legend span{color:var(--muted);font-size:12px}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:720px){.page{padding:12px}.intro{display:block}.controls{margin-top:12px}.stage{padding:0;min-height:700px}.modal{width:100%;height:700px;border-radius:0}.tree{width:44%}.header code{display:none}.legend{grid-template-columns:1fr}.detail{padding:15px}}
+</style>
+</head>
+<body>
+<main class="page">
+  <div class="intro">
+    <div><h1>Models 弹窗：渐进加载 + 覆盖项过滤</h1><p>保持现有双栏信息架构。弹窗壳体和 models.json 配置先显示；认证提供商目录独立加载。仅含 <code>modelOverrides</code> 且尚未配置的三方提供商不再占据左栏，但原始配置不会被删除。</p></div>
+    <div class="controls" aria-label="原型状态">
+      <button data-state="loading" aria-pressed="true">首屏加载</button>
+      <button data-state="ready" aria-pressed="false">加载完成</button>
+      <button data-state="error" aria-pressed="false">目录失败</button>
+    </div>
+  </div>
+  <section class="stage">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="title">
+      <header class="header"><div><strong id="title">模型</strong><code>~/.pi/agent/models.json</code></div><span class="close" aria-label="关闭">×</span></header>
+      <div class="body">
+        <aside class="tree" aria-label="提供商和模型">
+          <div class="scroll">
+            <div class="section-label">已配置</div>
+            <div id="authRows"></div>
+            <div id="catalogStatus" class="status loading">正在读取已配置提供商…</div>
+            <div class="divider"></div>
+            <div class="section-label">自定义模型配置</div>
+            <div class="row selected"><span class="icon">CP</span><span class="name">cpa</span></div>
+            <div class="row model">claude-sonnet-4-6</div>
+            <div class="row model">gemini-3.1-pro-low</div>
+            <div class="row"><span class="icon">AI</span><span class="name">AITOB-OAI</span></div>
+            <div class="row model">gpt-5.6-sol</div>
+            <div class="row"><span class="icon">Q</span><span class="name">qiniu</span></div>
+            <div class="row model">openai/gpt-5.4</div>
+          </div>
+          <div class="add">+ 添加提供商</div>
+        </aside>
+        <section class="detail">
+          <h2>提供商</h2>
+          <div class="card"><h3>cpa</h3><p>自定义 OpenAI-compatible 提供商；配置已从本地快速加载。</p><div class="field"><label>Base URL</label><div class="input">https://api.example.com/v1</div></div><div class="field"><label>API</label><div class="input">openai-responses</div></div></div>
+          <div class="notice"><span>ⓘ</span><div><strong>覆盖项不会丢失</strong><br/>google、nvidia、openrouter、google-antigravity 等“仅 modelOverrides、未配置认证”的条目只从导航隐藏；保存 Models 时仍原样保留。</div></div>
+        </section>
+      </div>
+      <footer class="footer"><button class="btn">取消</button><button class="btn primary">保存</button></footer>
+    </div>
+  </section>
+  <div class="legend">
+    <article><b>首屏</b><span>弹窗立即出现；本地模型配置不等待认证检查。</span></article>
+    <article><b>可见性</b><span>仅覆盖、未配置项隐藏；有模型/端点配置或已认证的提供商继续显示。</span></article>
+    <article><b>降级</b><span>目录失败不清空 models.json 树，提供明确重试入口。</span></article>
+  </div>
+</main>
+<script>
+const authRows=document.querySelector('#authRows');const status=document.querySelector('#catalogStatus');
+function setState(s){document.querySelectorAll('[data-state]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.state===s)));if(s==='loading'){authRows.innerHTML='';status.className='status loading';status.textContent='正在读取已配置提供商…';status.hidden=false}else if(s==='ready'){authRows.innerHTML='<div class="row"><span class="icon">O</span><span class="name">ChatGPT Plus/Pro</span><span class="dot"></span></div><div class="row"><span class="icon">G</span><span class="name">Grok CLI</span><span class="dot"></span></div><div class="row"><span class="icon">AG</span><span class="name">Antigravity</span><span class="dot"></span></div><div class="row"><span class="icon">OC</span><span class="name">OpenCode Go</span><span class="dot"></span></div>';status.hidden=true}else{authRows.innerHTML='';status.hidden=false;status.className='status error';status.innerHTML='提供商状态加载失败　<u>重试</u>'}}
+document.querySelectorAll('[data-state]').forEach(b=>b.addEventListener('click',()=>setState(b.dataset.state)));setState('loading');
+</script>
+</body>
+</html>

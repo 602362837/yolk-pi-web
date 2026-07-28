@@ -1,5 +1,6 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { clearOAuthActiveAccount, isSupportedOAuthAccountProvider } from "@/lib/oauth-accounts";
+import { invalidateProviderVerification } from "@/lib/models-provider-auth-summary";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
@@ -25,5 +26,6 @@ export async function POST(
     await runtime.logout(provider);
   }
   await Promise.resolve(reloadRpcAuthState());
+  invalidateProviderVerification(provider);
   return Response.json({ ok: true });
 }

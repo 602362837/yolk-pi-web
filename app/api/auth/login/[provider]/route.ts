@@ -11,6 +11,7 @@ import {
   reauthenticateOAuthAccount,
 } from "@/lib/oauth-accounts";
 import { sanitizeGrokLoginError, isGrokLoginCancelled } from "@/lib/grok-login-errors";
+import { invalidateProviderVerification } from "@/lib/models-provider-auth-summary";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 import { createInMemoryWebCredentialStore } from "@/lib/web-credential-store";
 import { createWebModelRuntime, getWebModelRuntime } from "@/lib/web-model-runtime";
@@ -284,6 +285,7 @@ export async function GET(
           if (active) {
             await Promise.resolve(reloadRpcAuthState());
           }
+          invalidateProviderVerification(provider);
           send(controller, {
             type: "success",
             account,
@@ -295,6 +297,7 @@ export async function GET(
           });
         } else if (addAccountMode) {
           const account = await saveOAuthAccountCredential(provider, credential as Credential);
+          invalidateProviderVerification(provider);
           send(controller, { type: "success", account, message: "Account saved successfully." });
         } else {
           if (isSupportedOAuthAccountProvider(provider)) {
@@ -302,6 +305,7 @@ export async function GET(
             if (!adopted) throw new Error("Failed to save the active OAuth credential.");
           }
           await Promise.resolve(reloadRpcAuthState());
+          invalidateProviderVerification(provider);
           send(controller, { type: "success" });
         }
       } catch (err) {

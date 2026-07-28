@@ -8,9 +8,8 @@ import { getWebModelRuntime } from "@/lib/web-model-runtime";
 
 export const dynamic = "force-dynamic";
 
-// Providers that use OAuth — handled separately via /api/auth/providers
+// Providers that use OAuth — handled separately via /api/auth/providers.
 const OAUTH_PROVIDER_IDS = new Set(["anthropic", "github-copilot", "openai-codex"]);
-
 const ANYROUTER_DISPLAY_NAME = "AnyRouter";
 
 interface ProviderListItem {
@@ -22,72 +21,55 @@ interface ProviderListItem {
   authMode?: "managed_accounts" | "single";
   accountCount?: number;
   activeAccountDisplayName?: string | null;
-  /**
-   * Present only for the fixed AnyRouter entry when the runtime catalog did
-   * not register models (0 models, config missing, or extension load failure).
-   * Safe diagnostic only — never a path, key, or raw stack.
-   */
   providerLoadError?: string | null;
 }
 
 export async function GET() {
   const runtime = await getWebModelRuntime();
-  const all = runtime.getModels();
-
-  // Deduplicate by provider, skip OAuth-only providers and custom providers (source=models_json_key)
-  const seen = new Set<string>();
-  const result: ProviderListItem[] = [];
-
-  for (const m of all) {
-    if (seen.has(m.provider)) continue;
-    seen.add(m.provider);
-    if (OAUTH_PROVIDER_IDS.has(m.provider)) continue;
-    const status = runtime.getProviderAuthStatus(m.provider);
-    // Skip providers whose key comes from models.json (those are custom providers)
-    if (status.source === "models_json_key") continue;
-    const providerMeta = runtime.getProvider(m.provider);
-    const displayName =
-      m.provider === ANYROUTER_PROVIDER_ID
-        ? (providerMeta?.name ?? ANYROUTER_DISPLAY_NAME)
-        : (providerMeta?.name ?? m.provider);
-    const modelCount = all.filter((x) => x.provider === m.provider).length;
-
-    const item: ProviderListItem = {
-      id: m.provider,
-      displayName,
-      configured: status.configured,
-      source: status.source,
-      modelCount,
-    };
-
-    // Include managed-account metadata for providers in the allowlist.
-    // getApiKeyProviderSummary does not trigger legacy import, so this is
-    // safe as a lightweight enrichment without side effects.
-    if (isManagedApiKeyProvider(m.provider)) {
-      const summary = await getApiKeyProviderSummary(m.provider);
-      if (summary) {
-        item.authMode = summary.authMode;
-        item.accountCount = summary.accountCount;
-        item.activeAccountDisplayName = summary.activeAccountDisplayName;
-        // Prefer managed-account configured signal for AnyRouter so a source
-        // legacy key / managed slot still shows as configured even when the
-        // runtime catalog is empty.
-        if (m.provider === ANYROUTER_PROVIDER_ID) {
-          item.configured = summary.configured || status.configured;
-        }
-      }
-    }
-
-    if (m.provider === ANYROUTER_PROVIDER_ID) {
-      item.providerLoadError = getLastAnyrouterProviderLoadError();
-    }
-
-    result.push(item);
+  const models = runtime.getModels();
+  const firstModelByProvider = new Map<string, typeof models[number]>();
+  const modelCountByProvider = new Map<string, number>();
+  for (const model of models) {
+    if (!firstModelByProvider.has(model.provider)) firstModelByProvider.set(model.provider, model);
+    modelCountByProvider.set(model.provider, (modelCountByProvider.get(model.provider) ?? 0) + 1);
   }
 
-  // Recoverable fixed AnyRouter entry: always expose management UI even when
-  // zero models or provider load failure prevents catalog registration.
-  if (!seen.has(ANYROUTER_PROVIDER_ID)) {
+  const providerIds = [...firstModelByProvider.keys()].filter((id) => {
+    if (OAUTH_PROVIDER_IDS.has(id)) return false;
+    return runtime.getProviderAuthStatus(id).source !== "models_json_key";
+  });
+  // Account summaries are metadata-only and independent, so never serialize
+  // their filesystem reads behind a provider/catalog loop.
+  const summaries = new Map(await Promise.all(providerIds
+    .filter((id) => isManagedApiKeyProvider(id))
+    .map(async (id) => [id, await getApiKeyProviderSummary(id)] as const)));
+
+  const result: ProviderListItem[] = providerIds.map((id) => {
+    const model = firstModelByProvider.get(id)!;
+    const status = runtime.getProviderAuthStatus(id);
+    const summary = summaries.get(id);
+    const providerMeta = runtime.getProvider(id);
+    const item: ProviderListItem = {
+      id,
+      displayName: id === ANYROUTER_PROVIDER_ID
+        ? (providerMeta?.name ?? ANYROUTER_DISPLAY_NAME)
+        : (providerMeta?.name ?? model.provider),
+      configured: id === ANYROUTER_PROVIDER_ID
+        ? Boolean(summary?.configured || status.configured)
+        : status.configured,
+      source: status.source,
+      modelCount: modelCountByProvider.get(id) ?? 0,
+    };
+    if (summary) {
+      item.authMode = summary.authMode;
+      item.accountCount = summary.accountCount;
+      item.activeAccountDisplayName = summary.activeAccountDisplayName;
+    }
+    if (id === ANYROUTER_PROVIDER_ID) item.providerLoadError = getLastAnyrouterProviderLoadError();
+    return item;
+  });
+
+  if (!firstModelByProvider.has(ANYROUTER_PROVIDER_ID)) {
     const status = runtime.getProviderAuthStatus(ANYROUTER_PROVIDER_ID);
     const summary = await getApiKeyProviderSummary(ANYROUTER_PROVIDER_ID);
     const providerMeta = runtime.getProvider(ANYROUTER_PROVIDER_ID);
@@ -103,9 +85,5 @@ export async function GET() {
       providerLoadError: getLastAnyrouterProviderLoadError(),
     });
   }
-
-  return Response.json(
-    { providers: result },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return Response.json({ providers: result }, { headers: { "Cache-Control": "no-store" } });
 }

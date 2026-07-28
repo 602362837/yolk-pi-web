@@ -1,4 +1,5 @@
 import { isOAuthAccountImportMode } from "@/lib/oauth-account-converters";
+import { invalidateProviderVerification } from "@/lib/models-provider-auth-summary";
 import { bootstrapOAuthActiveAccountCredential, deleteOAuthAccount, importOAuthAccountCredential, listOAuthAccounts, OAuthAccountStoreError, updateOAuthAccountMetadata } from "@/lib/oauth-accounts";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,9 @@ export async function POST(
   }
 
   try {
-    return Response.json(await importOAuthAccountCredential(provider, body.mode, body.credential));
+    const result = await importOAuthAccountCredential(provider, body.mode, body.credential);
+    invalidateProviderVerification(provider);
+    return Response.json(result);
   } catch (error) {
     return errorResponse(error);
   }
@@ -57,7 +60,9 @@ export async function PATCH(
     const updates: { label?: unknown; extraInfo?: unknown } = {};
     if ("label" in body) updates.label = body.label;
     if ("extraInfo" in body) updates.extraInfo = body.extraInfo;
-    return Response.json(await updateOAuthAccountMetadata(provider, body.accountId, updates));
+    const result = await updateOAuthAccountMetadata(provider, body.accountId, updates);
+    invalidateProviderVerification(provider);
+    return Response.json(result);
   } catch (error) {
     return errorResponse(error);
   }
@@ -75,7 +80,9 @@ export async function DELETE(
   }
 
   try {
-    return Response.json(await deleteOAuthAccount(provider, body.accountId));
+    const result = await deleteOAuthAccount(provider, body.accountId);
+    invalidateProviderVerification(provider);
+    return Response.json(result);
   } catch (error) {
     return errorResponse(error);
   }
