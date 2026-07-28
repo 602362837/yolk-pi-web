@@ -1,0 +1,480 @@
+{
+  "schemaVersion": 1,
+  "id": "20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题",
+  "title": "修复代码匹配一键匹配模式数据过多时无法滚动问题",
+  "workflowId": "feature-dev",
+  "status": "cancelled",
+  "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
+  "createdAt": "2026-07-28T08:02:23.399Z",
+  "updatedAt": "2026-07-28T08:34:55.954Z",
+  "completedAt": "2026-07-28T08:34:55.954Z",
+  "contextIds": [
+    "pi_019fa7bd-9fb5-7037-b2f8-38f67db67c54"
+  ],
+  "currentMember": "main",
+  "artifacts": {
+    "plan-review": "plan-review.md",
+    "brief": "brief.md",
+    "prd": "prd.md",
+    "ui": "ui.md",
+    "design": "design.md",
+    "implement": "implement.md",
+    "checks": "checks.md",
+    "handoff": "handoff.md",
+    "review": "review.md",
+    "summary": "summary.md"
+  },
+  "subagents": [
+    {
+      "id": "architect-cd39aecb7412047c50d88451",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T08:02:29.868Z",
+      "finishedAt": "2026-07-28T08:03:29.750Z",
+      "runner": "sdk",
+      "childSessionId": "019fa7bf-2579-7654-bf64-90ff849bcf69",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T08-02-29-881Z_019fa7bf-2579-7654-bf64-90ff849bcf69.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa7bd-9fb5-7037-b2f8-38f67db67c54",
+        "childSessionId": "019fa7bf-2579-7654-bf64-90ff849bcf69",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "请分析“代码匹配的一键匹配模式下，当数据比较多时不出滚动条导致看不到下方数据”的问题。遵循项目现有文档和代码，定位相关页面/组件，产出 PRD、Design、Implement、Checks 以及 plan-review.md。由于这是用户可见交互问题，必须派 ui-designer 制作基于现有项目的 HTML 原型，并在设计中说明滚动容器、布局约束、兼容性和验收标准。暂不实现代码，完成规划后等待用户审批。",
+      "summary": "SDK child run finished without a captured final assistant message.",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T08:02:29.868Z",
+        "updatedAt": "2026-07-28T08:03:29.750Z",
+        "eventCount": 72,
+        "lastTextPreview": "SDK child run finished without a captured final assistant message.",
+        "itemsPreview": [
+          {
+            "kind": "status",
+            "at": "2026-07-28T08:03:13.036Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T08:03:18.489Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T08:03:26.489Z",
+            "text": "SDK child Pi agent started.",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T08:03:29.746Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T08:03:29.746Z",
+            "text": "SDK child run finished without a captured final assistant message.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 66,
+        "tokens": 17,
+        "tokenSource": "estimated_chars",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-cd39aecb7412047c50d88451",
+        "taskId": "20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-160223-/architect-cd39aecb7412047c50d88451.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T08:02:29.868Z",
+        "finishedAt": "2026-07-28T08:03:29.749Z",
+        "updatedAt": "2026-07-28T08:03:29.749Z",
+        "itemCount": 19,
+        "messageCount": 1,
+        "toolCallCount": 4,
+        "stderrBytes": 0,
+        "bytes": 59953,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa7bf-2579-7654-bf64-90ff849bcf69",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T08-02-29-881Z_019fa7bf-2579-7654-bf64-90ff849bcf69.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "architect-c1abd8fd6a307c2129208be6",
+      "member": "architect",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T08:03:38.561Z",
+      "finishedAt": "2026-07-28T08:32:53.806Z",
+      "runner": "sdk",
+      "childSessionId": "019fa7c0-31d7-7fcc-b89c-5533779d8da7",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T08-03-38-583Z_019fa7c0-31d7-7fcc-b89c-5533779d8da7.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa7bd-9fb5-7037-b2f8-38f67db67c54",
+        "childSessionId": "019fa7c0-31d7-7fcc-b89c-5533779d8da7",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "high",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "prompt": "上一次运行没有返回内容，请重新完成架构分析并实际写入任务 artifacts。请先读取 AGENTS.md、docs/modules/frontend.md，以及代码匹配/一键匹配相关组件。输出并写入 brief.md、prd.md、design.md、implement.md、checks.md、plan-review.md。此任务改变用户可见交互，必须调用 ui-designer 产出 HTML 原型，并将 ui.md 写成包含原型 HTML 或 HTML 文件链接的内…",
+      "summary": "架构规划已完成并写入： ` .ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/` ### 产物 - `brief.md` - `prd.md` - `design.md` - `implement.md` - `checks.md` - `plan-review.md` - `ui.md` - `code-match-scroll-prototype.html` 已调用 `ui-designer` 产出可交互 HTML 原型，覆盖 6/50/120 条、空/错误/加载及桌面/低高度/375px 场景。 ### 验证 - 8 个必需产物完整且无 TBD - `ypi-implementation-plan` JSON 解析通过，含 2 个串行子任务 - Markdown 相对链接有效 - HTML 原型控件齐全，脚本语法通过 - 未修改生产代码；未运行 lint/tsc，未 commit/push/merge ### 待主会话决定 1. 确认问题目标确为 `FileViewer` 的定义/引用/Java 实现共享结果区。 2. 请用户审批 HTML 原型及“只修滚动，不新增计数、关闭、拖拽”的范围。 3. 审批前，主会话需保存 implementation plan 并切换至 `awaiting_approval`。 剩余风险：尚未在生产页面复现根因；当前代码已有匿名 `overflow:auto`，因此实现后必须以真实浏览器末条可达证据验收。",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "high",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "architect",
+        "member": "architect",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "high",
+          "arg": "high",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "high",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T08:03:38.561Z",
+        "updatedAt": "2026-07-28T08:32:53.805Z",
+        "eventCount": 16424,
+        "lastTextPreview": "架构规划已完成并写入：\n\n` .ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/`\n\n### 产物\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `ui.md`\n- `code-match-scroll-prototype.html`\n\n已调用 `ui-designer` 产出可交互 HTML 原型，覆盖 6/50/120 条、空/错误/加载及桌面/低高度/375px 场景。\n\n### 验证\n\n- 8 个必需产物完整且无 TBD\n- `ypi-implementation-plan` JSON 解析通过，含 2 个串行子任务\n- Markdown 相对链接有效\n- HTML 原型控件齐全，脚本语法通过\n- 未修改生产代码；未运行 lint/tsc，未 commit/push/merge\n\n### 待主会话决定\n\n1. 确认问题目标确为 `FileViewer` 的定义/引用/Java 实现共享结果区。\n2. 请用户审批 HTML 原型及“只修滚动，不新增计数、关闭、拖拽”的范围。\n3. 审批前，主会话需保存 implementation plan 并切换至 `awaiting_approval`。\n\n剩余风险：尚未在生产页面复现根因；当前代码已有匿名 `overflow:auto`，因此实现后必须以真实浏览器末条可达证据验收。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:31:56.704Z",
+            "toolCallId": "call_JnZbdPgQv83g8UlAPRDZ8XKH|fc_02a9ef95087ae216016a6868f931bc819a9a5d6f0570a47ec3",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in .ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/plan-review.md.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T08:32:30.402Z",
+            "toolCallId": "call_6R8ZG0GMXEmD3D2s1RZ5FRne|fc_02a9ef95087ae216016a68690f68dc819a94c90a642ff45b4e",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"node <<'NODE'\\nconst fs = require('fs');\\nconst path = require('path');\\nconst root = '.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题';\\nconst required = ['brief.md','prd.md','ui.md','design.md','implement.md','checks.md','plan-review.md','code-match-scroll-prototype.html'];\\nfor (const file of required) {\\n  const p = path.join(root, file);\\n  if (!fs.existsSync(p)) throw new Error(`missing ${file}`);\\n  const text = fs.readFileSync(p, 'utf8');\\n  if (text.includes('_TBD by YPI Studio workflow._')) throw new Error(`TBD remains in ${file}`);\\n  if (text.trim().length < 200) throw new Error(`too short ${file}`);\\n}\\nconst implement = fs.readFileSync(path.join(root, 'implement.md'), 'utf8');\\nconst match = implement.match(/```json ypi-implementation-plan\\\\n([\\\\s\\\\S]*?)\\\\n```/);\\nif (!match) throw new Error('implementation plan block missing');\\nconst plan = JSON.parse(match[1]);\\nif (plan.schemaVersion !== 2 || plan.maxConcurrency !== 1 || plan.subtasks.length !== 2) throw new Error('unexpected implementation plan shape');\\nfor (const item of plan.subtasks) {\\n  for (const key of ['id','title','phase','order','dependsOn','files','instructions','acceptance','validation','risks','parallelizable','localReview']) {\\n    if (!(key in item)) throw new Error(`${item.id} missing ${key}`);\\n  }\\n}\\nfor (const md of ['ui.md','plan-review.md']) {\\n  const text = fs.readFileSync(path.join(root, md), 'utf8');\\n  for (const m of text.matchAll(/\\\\]\\\\(\\\\.\\\\/([^)#?]+)(?:[)#?][^)]*)?\\\\)/g)) {\\n    const target = decodeURIComponent(m[1]);\\n    if (!fs.existsSync(path.join(root, target))) throw new Error(`${md} broken link ${target}`);\\n  }\\n}\\nconst html = fs.readFileSync(path.join(root, 'code-match-scroll-prototype.html'), 'utf8');\\nfor (const token of ['data-state=\\\"6\\\"','data-state=\\\"50\\\"','data-state=\\\"120\\\"','data-state=\\\"empty\\\"','data-state=\\\"error\\\"','data-state=\\\"loading\\\"','data-view=\\\"desktop\\\"','data-view=\\\"low\\\"','data-view=\\\"mobile\\\"','code-match-results-list','editor-scroll']) {\\n  if (!html.includes(token)) throw new Error(`prototype missing ${token}`);\\n}\\nconst script = html.match(/<script>([\\\\s\\\\S]*?)<\\\\/script>/)?.[1];\\nif (!script) throw new Error('prototype script missing');\\nnew Function(script);\\nconsole.log(`artifact validation passed: ${required.length} files, ${plan.subtasks.length} plan subtasks, prototype script syntax OK`);\\nNODE\\n\\nprintf '\\\\n--- task artifact status ---\\\\n'\\ngit status --short -- '.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题'\\n\\nprintf '\\\\n--- production diff touched by this planning directory check ---\\\\n'\\nfind '.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题' -maxdepth 1 -type f -print | sort\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T08:32:30.555Z",
+            "toolCallId": "call_6R8ZG0GMXEmD3D2s1RZ5FRne|fc_02a9ef95087ae216016a68690f68dc819a94c90a642ff45b4e",
+            "toolName": "bash",
+            "text": "artifact validation passed: 8 files, 2 plan subtasks, prototype script syntax OK\n\n--- task artifact status ---\n?? \".ypi/tasks/20260728-160223-\\344\\277\\256\\345\\244\\215\\344\\273\\243\\347\\240\\201\\345\\214\\271\\351\\205\\215\\344\\270\\200\\351\\224\\256\\345\\214\\271\\351\\205\\215\\346\\250\\241\\345\\274\\217\\346\\225\\260\\346\\215\\256\\350\\277\\207\\345\\244\\232\\346\\227\\266\\346\\227\\240\\346\\263\\225\\346\\273\\232\\345\\212\\250\\351\\227\\256\\351\\242\\230/\"\n\n--- production diff touched by this planning directory check ---\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/brief.md\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/checks.md\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/code-match-scroll-prototype.html\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/design.md\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/events.jsonl\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/handoff.md\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/implement.md\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/plan-review.md\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/prd.md\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/review.md\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/summary.md\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/task.json\n.ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/ui.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T08:32:53.783Z",
+            "text": "架构规划已完成并写入：\n\n` .ypi/tasks/20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题/`\n\n### 产物\n\n- `brief.md`\n- `prd.md`\n- `design.md`\n- `implement.md`\n- `checks.md`\n- `plan-review.md`\n- `ui.md`\n- `code-match-scroll-prototype.html`\n\n已调用 `ui-designer` 产出可交互 HTML 原型，覆盖 6/50/120 条、空/错误/加载及桌面/低高度/375px 场景。\n\n### 验证\n\n- 8 个必需产物完整且无 TBD\n- `ypi-implementation-plan` JSON 解析通过，含 2 个串行子任务\n- Markdown 相对链接有效\n- HTML 原型控件齐全，脚本语法通过\n- 未修改生产代码；未运行 lint/tsc，未 commit/push/merge\n\n### 待主会话决定\n\n1. 确认问题目标确为 `FileViewer` 的定义/引用/Java 实现共享结果区。\n2. 请用户审批 HTML 原型及“只修滚动，不新增计数、关闭、拖拽”的范围。\n3. 审批前，主会话需保存 implementation plan 并切换至 `awaiting_approval`。\n\n剩余风险：尚未在生产页面复现根因；当前代码已有匿名 `overflow:auto`，因此实现后必须以真实浏览器末条可达证据验收。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T08:32:53.790Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 666,
+        "tokens": 737,
+        "tokenSource": "usage",
+        "tps": 104.46,
+        "firstTokenAt": "2026-07-28T08:32:46.511Z",
+        "lastTokenAt": "2026-07-28T08:32:53.566Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "architect-c1abd8fd6a307c2129208be6",
+        "taskId": "20260728-160223-修复代码匹配一键匹配模式数据过多时无法滚动问题",
+        "member": "architect",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-160223-/architect-c1abd8fd6a307c2129208be6.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T08:03:38.561Z",
+        "finishedAt": "2026-07-28T08:32:53.791Z",
+        "updatedAt": "2026-07-28T08:32:53.791Z",
+        "itemCount": 103,
+        "messageCount": 1,
+        "toolCallCount": 49,
+        "stderrBytes": 0,
+        "bytes": 468598,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa7c0-31d7-7fcc-b89c-5533779d8da7",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T08-03-38-583Z_019fa7c0-31d7-7fcc-b89c-5533779d8da7.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    }
+  ],
+  "meta": {
+    "approvalGate": {
+      "enteredAt": "2026-07-28T08:33:45.509Z",
+      "contextId": "pi_019fa7bd-9fb5-7037-b2f8-38f67db67c54",
+      "from": "planning",
+      "to": "awaiting_approval"
+    }
+  },
+  "implementationPlan": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-28T08:33:42.434Z",
+    "sourceArtifact": "implement.md",
+    "summary": "修复 FileViewer 代码匹配结果区在长列表下无法滚动的问题，保持 Monaco 独立滚动及搜索业务行为不变。",
+    "strategy": "前端最小改动：增加受约束的非滚动面板、唯一纵向滚动列表和明确的 flex min-height 高度链；补充 focused contract、文档及真实浏览器验证。",
+    "maxConcurrency": 1,
+    "execution": {
+      "mode": "serial",
+      "maxParallel": 1,
+      "groups": [
+        {
+          "id": "CM-SCROLL-01",
+          "title": "frontend",
+          "relation": "serial",
+          "dependencies": [],
+          "subtaskIds": [
+            "CM-SCROLL-01"
+          ]
+        },
+        {
+          "id": "CM-SCROLL-02",
+          "title": "regression-docs",
+          "relation": "serial",
+          "dependencies": [
+            "CM-SCROLL-01"
+          ],
+          "subtaskIds": [
+            "CM-SCROLL-02"
+          ]
+        }
+      ]
+    },
+    "subtasks": [
+      {
+        "id": "CM-SCROLL-01",
+        "title": "建立代码匹配结果面板的唯一滚动容器与稳定高度链",
+        "phase": "frontend",
+        "order": 10,
+        "dependsOn": [],
+        "dependencies": [],
+        "relation": "serial",
+        "files": [
+          "components/FileViewer.tsx",
+          "app/globals.css"
+        ],
+        "instructions": [
+          "将匿名结果容器拆为 code-match-results-panel 与 code-match-results-list，保留现有状态、handler、结果内容和 openResult 行为。",
+          "panel 负责约束和裁切且不可滚动；list 是唯一纵向滚动容器，补齐 min-height:0、overflow-y:auto、overscroll containment、scrollbar gutter 和触摸滚动。",
+          "内容区增加 file-viewer-content 与 min-height:0，保持 Monaco、Diff、Preview 的剩余空间和独立滚动。",
+          "补充低高度和窄屏规则，避免横向结果滚动或嵌套纵向滚动。",
+          "不修改 API、搜索编排、快捷键、上限、排序、schema、设置或依赖。"
+        ],
+        "acceptance": [
+          "50/80/120 条结果可从首条滚动到末条。",
+          "panel 不滚动且不遮挡状态栏和编辑器。",
+          "桌面、低高度和 375px 下编辑器仍可见并独立滚动。",
+          "definitions、references、implementations 共用结果结构且触发路径不变。",
+          "空、错误、loading、文件切换和导航语义不变。"
+        ],
+        "validation": [
+          "node_modules/.bin/tsc --noEmit",
+          "npm run lint",
+          "git diff --check"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      },
+      {
+        "id": "CM-SCROLL-02",
+        "title": "补齐滚动契约测试、文档与真实浏览器矩阵",
+        "phase": "regression-docs",
+        "order": 20,
+        "dependsOn": [
+          "CM-SCROLL-01"
+        ],
+        "dependencies": [
+          "CM-SCROLL-01"
+        ],
+        "relation": "serial",
+        "files": [
+          "scripts/test-file-viewer-code-match-scroll.mjs",
+          "package.json",
+          "docs/modules/frontend.md"
+        ],
+        "instructions": [
+          "增加 focused source contract test，覆盖 panel/list/content class、overflow、min-height、containment、gutter、touch、button 和共享结果 wiring。",
+          "注册 test:file-viewer-code-match-scroll，不增加依赖。",
+          "更新 frontend 模块文档，说明结果区唯一 scroller 及 API 不变。",
+          "使用运行中的应用或受控浏览器 fixture 验证 6/50/80/120 条及 1440x900、1024x600、640x480、375x667。",
+          "验证 wheel、滚动条、touch、键盘 focus、首中末条导航，并明确静态测试不能替代浏览器证据。"
+        ],
+        "acceptance": [
+          "focused test 能检测唯一 scroller 或 min-height 链被破坏。",
+          "真实浏览器显示 scrollHeight 大于 clientHeight 且末条可达。",
+          "键盘可聚焦离屏按钮并打开预期文件行。",
+          "无 API、Monaco 快捷键、设置、依赖或无关文档变更。"
+        ],
+        "validation": [
+          "npm run test:file-viewer-code-match-scroll",
+          "npm run lint",
+          "node_modules/.bin/tsc --noEmit",
+          "git diff --check"
+        ],
+        "parallelizable": false,
+        "member": "implementer",
+        "localReview": {
+          "required": true,
+          "reviewer": "checker"
+        }
+      }
+    ]
+  },
+  "implementationProgress": {
+    "schemaVersion": 2,
+    "updatedAt": "2026-07-28T08:34:55.954Z",
+    "activeSubtaskIds": [],
+    "queuedSubtaskIds": [],
+    "counts": {
+      "pending": 1,
+      "waiting": 0,
+      "ready": 1,
+      "queued": 0,
+      "running": 0,
+      "blocked": 0,
+      "failed": 0,
+      "done": 0,
+      "skipped": 0
+    },
+    "subtasks": {
+      "CM-SCROLL-01": {
+        "id": "CM-SCROLL-01",
+        "status": "ready",
+        "updatedAt": "2026-07-28T08:33:42.434Z",
+        "attempts": 0,
+        "runIds": []
+      },
+      "CM-SCROLL-02": {
+        "id": "CM-SCROLL-02",
+        "status": "pending",
+        "updatedAt": "2026-07-28T08:33:42.434Z",
+        "attempts": 0,
+        "runIds": [],
+        "waitingOn": [
+          {
+            "id": "CM-SCROLL-01",
+            "title": "建立代码匹配结果面板的唯一滚动容器与稳定高度链",
+            "status": "ready"
+          }
+        ]
+      }
+    },
+    "nextSubtaskId": "CM-SCROLL-01",
+    "nextSubtaskIds": [
+      "CM-SCROLL-01"
+    ]
+  }
+}
