@@ -114,6 +114,7 @@ import {
 } from "./github-validation-broker";
 import {
   assertDiffArgsNotFromIssue,
+  collectGithubDiffSnapshot,
   evaluateGithubDiffPolicy,
   isGithubFinalDiffAllowed,
 } from "./github-diff-policy";
@@ -181,6 +182,25 @@ export interface GithubAutomationRunnerStateV1 {
   checkerPrepareReservation?: { generation: number; runFence: string; attemptOrdinal: number; commandHash: string } | null;
   /** Bounded generation-scoped consumed prepare hashes, including pre-report crashes. */
   checkerPrepareReservations?: Array<{ generation: number; runFence: string; attemptOrdinal: number; commandHash: string; started: boolean }>;
+  /**
+   * Generation-scoped implementer reservation and terminal outcome. This is
+   * intentionally opaque: no child transcript, session file, prompt, or diff paths.
+   */
+  implementerRetry?: {
+    generation: number;
+    attemptOrdinal: number;
+    retryCount: number;
+    runId: string;
+    runFence: string;
+    childSessionIdHash?: string | null;
+    /** null means the public child adapter could not prove the request boundary. */
+    providerRequestStarted: boolean | null;
+    outcomeKind: "provider_transport_failure" | "succeeded" | "failed" | "cancelled" | "unknown";
+    nextRetryAt?: string | null;
+    /** Hash of the fixed-base WorkTree snapshot immediately before this child launch. */
+    worktreeDiffHash: string;
+    launchState: "reserved" | "terminal";
+  } | null;
 }
 
 function runnerStatePath(jobId: string): string {
@@ -198,6 +218,21 @@ export function readGithubAutomationRunnerState(
     if (!raw || raw.schemaVersion !== 1 || raw.jobId !== jobId) return null;
     // Refuse to load if secret markers ever appear (corruption / bug).
     if (containsGithubAutomationSecretInjectionMarker(raw)) return null;
+    const retry = raw.implementerRetry;
+    if (retry !== undefined && retry !== null) {
+      const valid =
+        retry.generation === raw.generation &&
+        Number.isInteger(retry.attemptOrdinal) && retry.attemptOrdinal >= 1 && retry.attemptOrdinal <= 3 &&
+        Number.isInteger(retry.retryCount) && retry.retryCount >= 0 && retry.retryCount <= 2 &&
+        retry.attemptOrdinal === retry.retryCount + 1 &&
+        typeof retry.runId === "string" && /^[a-z0-9-]{1,80}$/i.test(retry.runId) &&
+        typeof retry.runFence === "string" && /^[a-z0-9-]{1,80}$/i.test(retry.runFence) &&
+        (retry.providerRequestStarted === true || retry.providerRequestStarted === false || retry.providerRequestStarted === null) &&
+        ["provider_transport_failure", "succeeded", "failed", "cancelled", "unknown"].includes(retry.outcomeKind) &&
+        ["reserved", "terminal"].includes(retry.launchState) &&
+        typeof retry.worktreeDiffHash === "string" && /^[a-f0-9]{64}$/.test(retry.worktreeDiffHash);
+      if (!valid) return null;
+    }
     return raw;
   } catch {
     return null;
@@ -221,6 +256,93 @@ export function writeGithubAutomationRunnerState(
   writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
   renameSync(tmp, path);
   return next;
+}
+
+type GithubImplementerOutcome = {
+  kind: "provider_transport_failure" | "succeeded" | "failed" | "cancelled" | "unknown";
+  stage: "before_first_provider_request" | "provider_request_started" | "unknown";
+  retryable: boolean;
+  childSessionId?: string | null;
+};
+
+const IMPLEMENTER_RETRY_DELAYS_MS = [20_000, 60_000] as const;
+
+function hashImplementerChildSessionId(value: string | null | undefined): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  return createHash("sha256").update(`gha-implementer-child:v1:${value.trim()}`).digest("hex").slice(0, 24);
+}
+
+function getImplementerOutcome(value: unknown): GithubImplementerOutcome {
+  const candidate = value && typeof value === "object" && "outcome" in value
+    ? (value as { outcome?: unknown }).outcome
+    : value && typeof value === "object" && "childOutcome" in value
+      ? (value as { childOutcome?: unknown }).childOutcome
+      : null;
+  if (!candidate || typeof candidate !== "object") {
+    return { kind: "unknown", stage: "unknown", retryable: false };
+  }
+  const raw = candidate as Record<string, unknown>;
+  const kind = raw.kind === "provider_transport_failure" ? "provider_transport_failure" : "unknown";
+  const stage = raw.stage === "before_first_provider_request"
+    ? "before_first_provider_request"
+    : raw.stage === "provider_request_started"
+      ? "provider_request_started"
+      : "unknown";
+  return {
+    kind,
+    stage,
+    retryable: raw.retryable === true && kind === "provider_transport_failure",
+    childSessionId: typeof raw.childSessionId === "string" ? raw.childSessionId : null,
+  };
+}
+
+async function collectImplementerWorktreeDiffHash(state: GithubAutomationRunnerStateV1): Promise<string> {
+  const snapshot = await collectGithubDiffSnapshot({
+    cwd: state.worktreePath!,
+    baseRef: state.baseRef || "main",
+  });
+  return createHash("sha256")
+    .update(JSON.stringify(snapshot.files.map((file) => [file.status ?? null, file.path, file.additions ?? null, file.deletions ?? null, file.isBinary === true, file.isSymlink === true, file.isSubmodule === true])))
+    .digest("hex");
+}
+
+function hasLaterImplementerEffect(job: GithubAutomationJobRecord, state: GithubAutomationRunnerStateV1): boolean {
+  if (["checking", "awaiting_publish", "publishing", "pr_open", "blocked"].includes(state.checkpoint)) return true;
+  if (["checking", "final_policy", "publishing", "pr_open"].includes(job.phase)) return true;
+  return job.effects.some((effect) => effect.name === "pull_request" || (effect.name === "branch" && effect.generation !== state.generation));
+}
+
+/**
+ * Select the furthest durable post-implementer checkpoint visible in either
+ * sidecar. A crash between the state and job writes must resume downstream,
+ * never launch an implementer again.
+ */
+export function resolveGithubAutomationPostImplementerCheckpoint(
+  job: Pick<GithubAutomationJobRecord, "phase" | "checkpoint" | "effects">,
+  state: Pick<GithubAutomationRunnerStateV1, "checkpoint">,
+): "checking" | "awaiting_publish" | "publishing" | "pr_open" | null {
+  if (
+    state.checkpoint === "pr_open" ||
+    job.phase === "pr_open" ||
+    job.checkpoint === "pr_open" ||
+    job.effects.some((effect) => effect.name === "pull_request")
+  ) {
+    return "pr_open";
+  }
+  if (state.checkpoint === "publishing" || job.phase === "publishing" || job.checkpoint === "publishing") {
+    return "publishing";
+  }
+  if (
+    state.checkpoint === "awaiting_publish" ||
+    job.phase === "final_policy" ||
+    job.checkpoint === "awaiting_publish"
+  ) {
+    return "awaiting_publish";
+  }
+  if (state.checkpoint === "checking" || job.phase === "checking" || job.checkpoint === "checking") {
+    return "checking";
+  }
+  return null;
 }
 
 function emptyRunnerState(job: GithubAutomationJobRecord): GithubAutomationRunnerStateV1 {
@@ -679,6 +801,60 @@ export async function runGithubUnattendedImplementation(
     // env copies (GHA-CLOSE-03). Server publisher credentials stay intact.
 
     let state = readGithubAutomationRunnerState(job.jobId) ?? emptyRunnerState(job);
+
+    // State and job are separate durable writes. If one records a downstream
+    // checkpoint before a crash, converge on it before considering implementer
+    // work so a retry/resume cannot replay a completed or uncertain child.
+    // A transport retry remains an implementer-owned terminal record until its
+    // retry gate validates that no later effect exists. Do not let a torn/later
+    // job checkpoint bypass that fail-closed check and enter checker/publisher.
+    const transportRetryPending =
+      state.implementerRetry?.generation === state.generation &&
+      state.implementerRetry.outcomeKind === "provider_transport_failure";
+    const postImplementerCheckpoint = transportRetryPending
+      ? null
+      : resolveGithubAutomationPostImplementerCheckpoint(job, state);
+    if (postImplementerCheckpoint) {
+      if (state.checkpoint !== postImplementerCheckpoint) {
+        state = writeGithubAutomationRunnerState({
+          ...state,
+          checkpoint: postImplementerCheckpoint,
+        });
+      }
+      const phase =
+        postImplementerCheckpoint === "checking"
+          ? "checking"
+          : postImplementerCheckpoint === "publishing"
+            ? "publishing"
+            : postImplementerCheckpoint === "pr_open"
+              ? "pr_open"
+              : "final_policy";
+      if (job.phase !== phase || job.checkpoint !== postImplementerCheckpoint) {
+        job = await persistJob({
+          ...job,
+          phase,
+          checkpoint: postImplementerCheckpoint,
+        });
+      }
+      // A persisted PR effect is terminal for this generation. Do not fall
+      // through to the generic retry path, which could otherwise spin a stale
+      // implementing sidecar after publication.
+      if (postImplementerCheckpoint === "pr_open") {
+        job = await persistJob({
+          ...job,
+          status: "completed",
+          phase: "pr_open",
+          checkpoint: "pr_open",
+          leaseOwner: null,
+          leaseExpiresAt: null,
+        });
+        return {
+          job,
+          wakeAgain: false,
+          disposition: { kind: "terminal", status: "completed" },
+        };
+      }
+    }
 
     // Jobs parked at awaiting_publish (final_policy) are not operator-paused; they
     // continue into the GHA-07 publisher path even if status was historically "paused".
@@ -1380,7 +1556,49 @@ export async function runGithubUnattendedImplementation(
         }
       }
 
+      const priorImplementerRetry = state.implementerRetry;
+      if (priorImplementerRetry?.generation === state.generation) {
+        // A crash after reservation makes child effects unknowable; never launch again.
+        if (priorImplementerRetry.launchState === "reserved") {
+          const reasonCode = "implementer_attempt_uncertain";
+          state = writeGithubAutomationRunnerState({ ...state, checkpoint: "blocked", reasonCode });
+          job = await persistJob({ ...job, phase: "blocked", status: "blocked", checkpoint: "blocked", reasonCode, blockedAtLayer: "agent", retryability: "operator", leaseOwner: null, leaseExpiresAt: null });
+          return { job, wakeAgain: false, disposition: blockedDisposition({ reasonCode, layer: "agent", checkpoint: "blocked", retryability: "operator" }) };
+        }
+        const qualifyingRetry = priorImplementerRetry.outcomeKind === "provider_transport_failure" && priorImplementerRetry.providerRequestStarted === false && priorImplementerRetry.retryCount < IMPLEMENTER_RETRY_DELAYS_MS.length && !hasLaterImplementerEffect(job, state);
+        if (!qualifyingRetry) {
+          const reasonCode = priorImplementerRetry.outcomeKind === "provider_transport_failure" ? "implementer_provider_transport_failure_after_start" : "implementer_attempt_uncertain";
+          state = writeGithubAutomationRunnerState({ ...state, checkpoint: "blocked", reasonCode });
+          job = await persistJob({ ...job, phase: "blocked", status: "blocked", checkpoint: "blocked", reasonCode, blockedAtLayer: "agent", retryability: "operator", leaseOwner: null, leaseExpiresAt: null });
+          return { job, wakeAgain: false, disposition: blockedDisposition({ reasonCode, layer: "agent", checkpoint: "blocked", retryability: "operator" }) };
+        }
+        if (priorImplementerRetry.nextRetryAt && Date.parse(priorImplementerRetry.nextRetryAt) > Date.now()) {
+          return { job, wakeAgain: false, disposition: retryDueDisposition({ reasonCode: "implementer_provider_transport_failure", nextRetryAt: priorImplementerRetry.nextRetryAt, retryClass: "network" }) };
+        }
+        try {
+          if ((await collectImplementerWorktreeDiffHash(state)) !== priorImplementerRetry.worktreeDiffHash) throw new Error("diff changed");
+        } catch {
+          const reasonCode = "implementer_provider_transport_failure_after_start";
+          state = writeGithubAutomationRunnerState({ ...state, checkpoint: "blocked", reasonCode });
+          job = await persistJob({ ...job, phase: "blocked", status: "blocked", checkpoint: "blocked", reasonCode, blockedAtLayer: "agent", retryability: "operator", leaseOwner: null, leaseExpiresAt: null });
+          return { job, wakeAgain: false, disposition: blockedDisposition({ reasonCode, layer: "agent", checkpoint: "blocked", retryability: "operator" }) };
+        }
+      }
+      let worktreeDiffHash: string;
+      try {
+        worktreeDiffHash = await collectImplementerWorktreeDiffHash(state);
+      } catch {
+        const reasonCode = "implementer_attempt_uncertain";
+        state = writeGithubAutomationRunnerState({ ...state, checkpoint: "blocked", reasonCode });
+        job = await persistJob({ ...job, phase: "blocked", status: "blocked", checkpoint: "blocked", reasonCode, blockedAtLayer: "agent", retryability: "operator", leaseOwner: null, leaseExpiresAt: null });
+        return { job, wakeAgain: false, disposition: blockedDisposition({ reasonCode, layer: "agent", checkpoint: "blocked", retryability: "operator" }) };
+      }
       const runId = `gha-impl-${randomUUID().slice(0, 12)}`;
+      const retryCount = priorImplementerRetry?.generation === state.generation ? priorImplementerRetry.retryCount + 1 : 0;
+      state = writeGithubAutomationRunnerState({
+        ...state,
+        implementerRetry: { generation: state.generation, attemptOrdinal: retryCount + 1, retryCount, runId, runFence: priorImplementerRetry?.generation === state.generation ? priorImplementerRetry.runFence : `impl-${randomUUID().slice(0, 16)}`, providerRequestStarted: null, outcomeKind: "unknown", nextRetryAt: null, worktreeDiffHash, launchState: "reserved" },
+      });
       const prompt = buildGithubFullAgentPromptEnvelope({
         member: "implementer",
         taskId: state.taskId!,
@@ -1408,6 +1626,14 @@ export async function runGithubUnattendedImplementation(
           parentSessionFile: state.sessionFile ?? undefined,
         });
 
+        if (result.status !== "succeeded" && result.status !== "cancelled") {
+          const failure = new GithubAutomationError("internal_error", "Implementer child did not succeed", {
+            status: 500,
+          });
+          Object.assign(failure, { childOutcome: getImplementerOutcome(result) });
+          throw failure;
+        }
+
         state = writeGithubAutomationRunnerState({
           ...state,
           checkpoint: "checking",
@@ -1415,6 +1641,17 @@ export async function runGithubUnattendedImplementation(
           lastRunId: runId,
           reasonCode:
             result.status === "succeeded" ? null : `implementer_${result.status}`,
+          implementerRetry: state.implementerRetry
+            ? {
+                ...state.implementerRetry,
+                childSessionIdHash: hashImplementerChildSessionId(
+                  (result as { childSessionId?: string }).childSessionId,
+                ),
+                providerRequestStarted: result.status === "succeeded" ? true : null,
+                outcomeKind: result.status === "succeeded" ? "succeeded" : "cancelled",
+                launchState: "terminal",
+              }
+            : null,
         });
 
         job = await persistJob({
@@ -1444,6 +1681,11 @@ export async function runGithubUnattendedImplementation(
         });
 
         if (result.status === "cancelled") {
+          state = writeGithubAutomationRunnerState({
+            ...state,
+            checkpoint: "paused",
+            reasonCode: "implementer_cancelled",
+          });
           job = await persistJob({
             ...job,
             phase: "paused",
@@ -1460,29 +1702,6 @@ export async function runGithubUnattendedImplementation(
           };
         }
 
-        if (result.status === "failed") {
-          job = await persistJob({
-            ...job,
-            phase: "blocked",
-            status: "blocked",
-            checkpoint: "blocked",
-            reasonCode: "implementer_failed",
-            blockedAtLayer: "agent",
-            retryability: "operator",
-            leaseOwner: null,
-            leaseExpiresAt: null,
-          });
-          return {
-            job,
-            wakeAgain: false,
-            disposition: blockedDisposition({
-              reasonCode: "implementer_failed",
-              layer: "agent",
-              checkpoint: "blocked",
-              retryability: "operator",
-            }),
-          };
-        }
       } catch (err) {
         const message = safeGithubAutomationErrorMessage(err);
         const errDetails =
@@ -1503,33 +1722,48 @@ export async function runGithubUnattendedImplementation(
           /^[a-z][a-z0-9_]{0,63}$/i.test(errDetails.stage)
             ? errDetails.stage
             : null;
-        // runtime_lost / preflight: park for retry rather than hard block when recoverable
-        const retryable =
-          errDetails?.retryable === true ||
-          /runtime_lost|ECONNRESET|timed out/i.test(
-            err instanceof Error ? err.message : String(err),
-          );
-        // Prompt-sentinel / hard preflight refusals are operator-visible blocks, not auto-retry spin.
-        const hardPreflight =
-          implementerCode === "full_agent_prompt_sentinel" ||
-          implementerStage === "full_agent_preflight";
-        const reasonCode = hardPreflight
-          ? "implementer_error"
-          : retryable
-            ? "implementer_retry"
-            : "implementer_error";
-        const nextRetryAt =
-          !hardPreflight && retryable
-            ? new Date(Date.now() + 20_000).toISOString()
-            : null;
+        // Retry needs public, structured child evidence. Error text is diagnostic only.
+        const outcome = getImplementerOutcome(err);
+        const qualifyingTransport =
+          outcome.kind === "provider_transport_failure" &&
+          outcome.stage === "before_first_provider_request" &&
+          outcome.retryable === true;
+        const priorAttempt = state.implementerRetry;
+        const retryOrdinal = priorAttempt?.generation === state.generation
+          ? priorAttempt.retryCount
+          : IMPLEMENTER_RETRY_DELAYS_MS.length;
+        const retryable = qualifyingTransport && retryOrdinal < IMPLEMENTER_RETRY_DELAYS_MS.length;
+        const reasonCode = qualifyingTransport
+          ? retryable
+            ? "implementer_provider_transport_failure"
+            : "implementer_provider_transport_failure_after_start"
+          : "implementer_error";
+        const nextRetryAt = retryable
+          ? new Date(Date.now() + IMPLEMENTER_RETRY_DELAYS_MS[retryOrdinal]!).toISOString()
+          : null;
+        state = writeGithubAutomationRunnerState({
+          ...state,
+          checkpoint: retryable ? "implementing" : "blocked",
+          reasonCode,
+          implementerRetry: priorAttempt && priorAttempt.generation === state.generation
+            ? {
+                ...priorAttempt,
+                childSessionIdHash: hashImplementerChildSessionId(outcome.childSessionId),
+                providerRequestStarted: outcome.stage === "before_first_provider_request" ? false : outcome.stage === "provider_request_started" ? true : null,
+                outcomeKind: qualifyingTransport ? "provider_transport_failure" : "failed",
+                nextRetryAt,
+                launchState: "terminal",
+              }
+            : null,
+        });
         job = await persistJob({
           ...job,
-          phase: !hardPreflight && retryable ? "implementing" : "blocked",
-          status: !hardPreflight && retryable ? "retry_due" : "blocked",
-          checkpoint: !hardPreflight && retryable ? "implementing" : "blocked",
+          phase: retryable ? "implementing" : "blocked",
+          status: retryable ? "retry_due" : "blocked",
+          checkpoint: retryable ? "implementing" : "blocked",
           reasonCode,
           blockedAtLayer: "agent",
-          retryability: !hardPreflight && retryable ? "automatic" : "operator",
+          retryability: retryable ? "automatic" : "operator",
           nextRetryAt,
           leaseOwner: null,
           leaseExpiresAt: null,
@@ -1546,12 +1780,12 @@ export async function runGithubUnattendedImplementation(
           traceId: job.traceId,
           meta: {
             message: message.slice(0, 160),
-            retryable: !hardPreflight && retryable,
+            retryable,
             ...(implementerCode ? { implementerCode } : {}),
             ...(implementerStage ? { stage: implementerStage } : {}),
           },
         });
-        if (!hardPreflight && retryable && nextRetryAt) {
+        if (retryable && nextRetryAt) {
           return {
             job,
             wakeAgain: false,

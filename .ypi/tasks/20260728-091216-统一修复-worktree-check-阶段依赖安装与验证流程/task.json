@@ -3,15 +3,15 @@
   "id": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
   "title": "统一修复 WorkTree Check 阶段依赖安装与验证流程",
   "workflowId": "feature-dev",
-  "status": "review",
+  "status": "waiting_for_improvements",
   "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
   "createdAt": "2026-07-28T01:12:16.085Z",
-  "updatedAt": "2026-07-28T04:19:54.014Z",
+  "updatedAt": "2026-07-28T06:28:58.591Z",
   "completedAt": null,
   "contextIds": [
     "pi_019fa644-b890-7540-a361-d5cf147ba045"
   ],
-  "currentMember": "main",
+  "currentMember": "checker",
   "artifacts": {
     "plan-review": "plan-review.md",
     "brief": "brief.md",
@@ -3830,6 +3830,1182 @@
           "itemBytesLimit": 16384
         }
       }
+    },
+    {
+      "id": "improver-9ea8d6f06cddf0e529a84148",
+      "member": "improver",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T05:53:08.779Z",
+      "finishedAt": "2026-07-28T05:56:32.008Z",
+      "runner": "sdk",
+      "childSessionId": "019fa748-b8d1-736e-a6cc-ae24127eb0f5",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T05-53-08-817Z_019fa748-b8d1-736e-a6cc-ae24127eb0f5.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa748-b8d1-736e-a6cc-ae24127eb0f5",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已完成 IMP-001 改进规划，未修改生产代码。\n\n产物位于：\n`.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/`\n\n包含 `brief/prd/design/implement/checks/ui/plan-review/summary/handoff`。\n\n验证：\n- 规划文件完整性检查通过\n- `git diff --check`（该改进目录）通过\n\n待主会话决策：\n1. 批准 Pi 作为唯一 retry 权威，Web 不新增 diagnostic/error-text 重试。\n2. 确认仅覆盖普通 Chat，不含 WorkTree/GitHub/AnyRouter 内部重试。\n3. 提供脱敏实际事件时间线（provider/model、retry start/end、取消时机、期望终态）后再实现。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "improver",
+        "member": "improver",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T05:53:08.779Z",
+        "updatedAt": "2026-07-28T05:56:32.008Z",
+        "eventCount": 4956,
+        "lastTextPreview": "已完成 IMP-001 改进规划，未修改生产代码。\n\n产物位于：\n`.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/`\n\n包含 `brief/prd/design/implement/checks/ui/plan-review/summary/handoff`。\n\n验证：\n- 规划文件完整性检查通过\n- `git diff --check`（该改进目录）通过\n\n待主会话决策：\n1. 批准 Pi 作为唯一 retry 权威，Web 不新增 diagnostic/error-text 重试。\n2. 确认仅覆盖普通 Chat，不含 WorkTree/GitHub/AnyRouter 内部重试。\n3. 提供脱敏实际事件时间线（provider/model、retry start/end、取消时机、期望终态）后再实现。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T05:56:16.064Z",
+            "toolCallId": "call_FVkWQtM1myl5CXwcA6rWaxUu|fc_0482eeb3003503c3016a68447a89e4819b9cbc54e7d271a910",
+            "toolName": "write",
+            "text": "Successfully wrote 1050 bytes to .ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/handoff.md",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T05:56:25.356Z",
+            "toolCallId": "call_kLd7Xrtbqo10Qh79ez8PDUS8|fc_0482eeb3003503c3016a6844864c88819b9b358be421ef02b8",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"for f in .ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/{brief,prd,design,implement,checks,ui,plan-review,summary,handoff}.md; do test -s \\\"$f\\\" || exit 1; done\\ngit diff --check -- .ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s\\ngit status --short -- .ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s\",\n  \"timeout\": 20\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T05:56:25.415Z",
+            "toolCallId": "call_kLd7Xrtbqo10Qh79ez8PDUS8|fc_0482eeb3003503c3016a6844864c88819b9b358be421ef02b8",
+            "toolName": "bash",
+            "text": "?? \".ypi/tasks/20260728-091216-\\347\\273\\237\\344\\270\\200\\344\\277\\256\\345\\244\\215-worktree-check-\\351\\230\\266\\346\\256\\265\\344\\276\\235\\350\\265\\226\\345\\256\\211\\350\\243\\205\\344\\270\\216\\351\\252\\214\\350\\257\\201\\346\\265\\201\\347\\250\\213/improvements/imp_nk4hrw4s/\"",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T05:56:31.996Z",
+            "text": "已完成 IMP-001 改进规划，未修改生产代码。\n\n产物位于：\n`.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/`\n\n包含 `brief/prd/design/implement/checks/ui/plan-review/summary/handoff`。\n\n验证：\n- 规划文件完整性检查通过\n- `git diff --check`（该改进目录）通过\n\n待主会话决策：\n1. 批准 Pi 作为唯一 retry 权威，Web 不新增 diagnostic/error-text 重试。\n2. 确认仅覆盖普通 Chat，不含 WorkTree/GitHub/AnyRouter 内部重试。\n3. 提供脱敏实际事件时间线（provider/model、retry start/end、取消时机、期望终态）后再实现。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T05:56:31.997Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 420,
+        "tokens": 194,
+        "tokenSource": "usage",
+        "tps": 57.28,
+        "firstTokenAt": "2026-07-28T05:56:28.375Z",
+        "lastTokenAt": "2026-07-28T05:56:31.762Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "improver-9ea8d6f06cddf0e529a84148",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "improver",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/improver-9ea8d6f06cddf0e529a84148.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T05:53:08.779Z",
+        "finishedAt": "2026-07-28T05:56:32.001Z",
+        "updatedAt": "2026-07-28T05:56:32.001Z",
+        "itemCount": 77,
+        "messageCount": 1,
+        "toolCallCount": 36,
+        "stderrBytes": 0,
+        "bytes": 193716,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa748-b8d1-736e-a6cc-ae24127eb0f5",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T05-53-08-817Z_019fa748-b8d1-736e-a6cc-ae24127eb0f5.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "improver-3634ffd60247cf575fdc7df4",
+      "member": "improver",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T05:57:02.808Z",
+      "finishedAt": "2026-07-28T05:59:44.537Z",
+      "runner": "sdk",
+      "childSessionId": "019fa74c-4af3-7ac4-bd86-3793c5a0932f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T05-57-02-835Z_019fa74c-4af3-7ac4-bd86-3793c5a0932f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa74c-4af3-7ac4-bd86-3793c5a0932f",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "已修正 IMP-001，产物位于：\n\n`.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/`\n\n更新了 Brief/PRD/Design/Implement/Checks/Plan Review/Handoff 等规划文档。\n\n- 范围已收敛为 GitHub automation runner + YPI Studio implementer child。\n- 明确 `check_runtime_unavailable` 保持 checker 专用；implementer transport failure 使用专属 reason。\n- 计划包含有限退避、durable attempt/session/run provenance、resume 幂等与防重复实现/发布。\n- 不改 Chat/UI，不实现代码。\n\n验证：`git diff --check` 通过。\n\n待主会话批准 `plan-review.md` 的 D1–D5，尤其是无法证明“首次 provider 请求前”时必须 fail-closed、不得自动重试。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "improver",
+        "member": "improver",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T05:57:02.808Z",
+        "updatedAt": "2026-07-28T05:59:44.536Z",
+        "eventCount": 525,
+        "lastTextPreview": "已修正 IMP-001，产物位于：\n\n`.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/`\n\n更新了 Brief/PRD/Design/Implement/Checks/Plan Review/Handoff 等规划文档。\n\n- 范围已收敛为 GitHub automation runner + YPI Studio implementer child。\n- 明确 `check_runtime_unavailable` 保持 checker 专用；implementer transport failure 使用专属 reason。\n- 计划包含有限退避、durable attempt/session/run provenance、resume 幂等与防重复实现/发布。\n- 不改 Chat/UI，不实现代码。\n\n验证：`git diff --check` 通过。\n\n待主会话批准 `plan-review.md` 的 D1–D5，尤其是无法证明“首次 provider 请求前”时必须 fail-closed、不得自动重试。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T05:59:25.229Z",
+            "toolCallId": "call_gYPZGaHr3lkXdOOxQfSSwqj6|fc_0df93866252e72c8016a68453ce8ac8198a31994f45724a2ce",
+            "toolName": "read",
+            "text": "# Plan Review — IMP-001 GitHub implementer transport failure\n\n> 状态：**已纠正范围；等待主会话/用户批准；未实现生产代码。**\n\n## 审阅入口\n\n- [Brief](brief.md)\n- [PRD](prd.md)\n- [Design](design.md)\n- [Implement](implement.md)\n- [Checks](checks.md)\n- [UI](ui.md)\n\n## 修订结论\n\nattempt 906 不是普通 Chat retry 问题，而是 GitHub automation runner 启动的 YPI Studio **implementer child** 首次 provider 请求失败后的错误映射与恢复问题。\n\n当前 runner 的 implementer 路径以 `details.retryable`/错误文本判断；checker 路径单独使用 `check_runtime_unavailable`。计划要求将两者彻底隔离：implementer transport 失败使用 implementer 专属 reason 与 durable provenance，绝不借用 checker reason。\n\n## 推荐方案\n\n1. 先在 child session adapter 建立 public/owned structured outcome，确认是否能观测 `before_first_provider_request`。\n2. 仅该严格条件下允许总计三次 implementer run（首次 + 2 retry），20s/60s bounded backoff；持久化 reservation/fence 后才启动 child。\n3. request 已开始、边界未知、WorkTree 有不确定实现 diff、已进入 checking/validation/final/publish、持久化失败或预算耗尽时一律 fail closed/operator block。\n4. 同一 job/generation/WorkTree/fence resume 不得重复启动 child；成功只允许一次推进 checking，既有 publisher effect 禁止回退重做 implementer。\n5. 用真实 GitHub runner + child adapter fault boundary 覆盖；不以 `checkResult` override、message regex 或普通 Chat fixture 代替。\n\n## UI 门禁\n\n不新增 UI，**无需 HTML 原型**。只复用既有 Jobs 安全 reason/retryability 投影。\n\n## 需要批准的决策\n\n- **D1（建议批准）：**transport 自动重试仅适用于已确认 `before_first_provider_request` 的 implementer child；无法可靠证明时阻断而非猜测重试。\n- **D2（建议批准）：**预算为首次 + 最多 2 次 retry，退避 20s、60s（bounded jitter）；预算耗尽需 operator action。\n- **D3（建议批准）：**任何 request-started/未知起点/WorkTree diff/后续 gate evidence 都禁止自动重试，以防重复实现或发布。\n- **D4（建议批准）：**新增 implementer 专属 reason/provenance；`check_runtime_unavailable` 保持 checker-only。\n- **D5（建议批准）：**无 UI 改动。\n\n批准后按 `implement.md` 的 IMP-01→04 串行执行；未批准前不得改生产代码。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T05:59:25.229Z",
+            "toolCallId": "call_ftOgQlnVGwBMrjtOJQh4HgaT|fc_0df93866252e72c8016a68453ce8c08198b8d80fe9e6fafa45",
+            "toolName": "read",
+            "text": "# Handoff — IMP-001 replanning\n\n## Artifacts updated\n\n`improvements/imp_nk4hrw4s/`:\n\n- `brief.md`, `prd.md`, `design.md`, `implement.md`, `checks.md`\n- `plan-review.md`, `ui.md`, `review.md`, `summary.md`\n\n## Result\n\nCorrected scope from ordinary Chat provider retry to GitHub automation runner / YPI Studio implementer child. Plan covers structured error mapping, bounded durable retry/backoff, attempt/session/run provenance, and fail-closed idempotence against duplicate implementation or publish. No UI and no production implementation.\n\n## Evidence reviewed\n\n- `lib/github-automation-session.ts`: child result currently lacks structured request/failure provenance.\n- `lib/github-automation-runner.ts`: implementer retry currently uses error-message fallback; checker owns `check_runtime_unavailable`; state only has `lastMember/lastRunId`.\n\n## Validation run\n\nDocumentation-only planning; no test command run. Verified artifact files were written. No commit/push/merge.\n\n## Remaining risks / decision needed\n\nApprove D1–D5 in `plan-review.md`, especially the fail-closed rule if Pi public child evidence cannot prove failure occurred before the first provider request. The main session should also supply/retain a redacted attempt-906 event timeline for IMP-01 reproduction; do not infer it from sanitized error text.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T05:59:25.323Z",
+            "toolCallId": "call_YID7iIrdGg27tDSN29b4cftv|fc_0df93866252e72c8016a68453ce894819887db6b370eeb9a7f",
+            "toolName": "bash",
+            "text": "M \".ypi/tasks/20260728-091216-\\347\\273\\237\\344\\270\\200\\344\\277\\256\\345\\244\\215-worktree-check-\\351\\230\\266\\346\\256\\265\\344\\276\\235\\350\\265\\226\\345\\256\\211\\350\\243\\205\\344\\270\\216\\351\\252\\214\\350\\257\\201\\346\\265\\201\\347\\250\\213/task.json\"\n?? \".ypi/tasks/20260728-091216-\\347\\273\\237\\344\\270\\200\\344\\277\\256\\345\\244\\215-worktree-check-\\351\\230\\266\\346\\256\\265\\344\\276\\235\\350\\265\\226\\345\\256\\211\\350\\243\\205\\344\\270\\216\\351\\252\\214\\350\\257\\201\\346\\265\\201\\347\\250\\213/improvements/\"\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/prd.md:5:当 GitHub unattended implementer child 的首次 provider 请求发生已确认的 transport failure 时，保留其真实原因并在同一 job/generation/WorkTree 中进行**有界、持久化、幂等**重试；不得误写为 `check_runtime_unavailable`、重复执行实现，或越过 checker/final-diff/publisher 门禁。\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/prd.md:9:- **R1 分类边界：**新增 implementer 专属 allowlisted reason（建议 `implementer_provider_transport_failure`）；`check_runtime_unavailable` 仅保留给 checker restricted runtime/reservation 语义。未知、认证、配额、上下文、取消、policy 与代码失败不得提升为 transport retry。\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/prd.md:19:不改普通 Chat/UI、不改 Pi provider 重试策略、不增加 Settings/按钮、不把所有网络异常视作 retryable、不自动 retry 已开始的实现或发布。\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/handoff.md:17:- `lib/github-automation-runner.ts`: implementer retry currently uses error-message fallback; checker owns `check_runtime_unavailable`; state only has `lastMember/lastRunId`.\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/design.md:33:| SDK/session runtime unavailable before child launch | existing implementer runtime reason; never `check_runtime_unavailable` |\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/implement.md:18:- Map only qualifying outcome to `implementer_provider_transport_failure`; remove any route that maps implementer failure to checker `check_runtime_unavailable`.\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/summary.md:3:Replanned from ordinary Chat retry to GitHub unattended implementer transport failure handling. The approved target is a durable, bounded, provenance-backed retry lane that never reuses checker `check_runtime_unavailable` and never duplicates implementation or publication.\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/brief.md:5:attempt 906 的 **GitHub automation / YPI Studio child implementer** 在 child Pi 首次 provider 请求前/时出现 `provider_transport_failure`；runner 随后把该运行期失败写成 `check_runtime_unavailable` 并阻断。上一版误把它规划为普通 Chat retry，现已废弃。\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/brief.md:11:- 同一 runner 的 checker 分支专门使用 `check_runtime_unavailable` 作为 WorkTree Check reservation/policy 失败 reason。它不应承载 implementer provider transport failure。\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/brief.md:18:不处理普通 Chat、Chat UI、provider SDK/AnyRouter retry 算法、checker WorkTree Check policy 或发布器业务逻辑。\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/plan-review.md:16:attempt 906 不是普通 Chat retry 问题，而是 GitHub automation runner 启动的 YPI Studio **implementer child** 首次 provider 请求失败后的错误映射与恢复问题。\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/plan-review.md:18:当前 runner 的 implementer 路径以 `details.retryable`/错误文本判断；checker 路径单独使用 `check_runtime_unavailable`。计划要求将两者彻底隔离：implementer transport 失败使用 implementer 专属 reason 与 durable provenance，绝不借用 checker reason。\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/plan-review.md:26:5. 用真实 GitHub runner + child adapter fault boundary 覆盖；不以 `checkResult` override、message regex 或普通 Chat fixture 代替。\n.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/plan-review.md:37:- **D4（建议批准）：**新增 implementer 专属 reason/provenance；`check_runtime_unavailable` 保持 checker-only。",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T05:59:44.524Z",
+            "text": "已修正 IMP-001，产物位于：\n\n`.ypi/tasks/20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程/improvements/imp_nk4hrw4s/`\n\n更新了 Brief/PRD/Design/Implement/Checks/Plan Review/Handoff 等规划文档。\n\n- 范围已收敛为 GitHub automation runner + YPI Studio implementer child。\n- 明确 `check_runtime_unavailable` 保持 checker 专用；implementer transport failure 使用专属 reason。\n- 计划包含有限退避、durable attempt/session/run provenance、resume 幂等与防重复实现/发布。\n- 不改 Chat/UI，不实现代码。\n\n验证：`git diff --check` 通过。\n\n待主会话批准 `plan-review.md` 的 D1–D5，尤其是无法证明“首次 provider 请求前”时必须 fail-closed、不得自动重试。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T05:59:44.530Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 527,
+        "tokens": 401,
+        "tokenSource": "usage",
+        "tps": 60.75,
+        "firstTokenAt": "2026-07-28T05:59:37.823Z",
+        "lastTokenAt": "2026-07-28T05:59:44.424Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "improver-3634ffd60247cf575fdc7df4",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "improver",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/improver-3634ffd60247cf575fdc7df4.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T05:57:02.808Z",
+        "finishedAt": "2026-07-28T05:59:44.530Z",
+        "updatedAt": "2026-07-28T05:59:44.530Z",
+        "itemCount": 75,
+        "messageCount": 1,
+        "toolCallCount": 35,
+        "stderrBytes": 0,
+        "bytes": 232042,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa74c-4af3-7ac4-bd86-3793c5a0932f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T05-57-02-835Z_019fa74c-4af3-7ac4-bd86-3793c5a0932f.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-2e98c3b0a314aea4b1e9f155",
+      "subtaskId": "IMP-01",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T06:05:36.410Z",
+      "finishedAt": "2026-07-28T06:11:01.951Z",
+      "runner": "sdk",
+      "childSessionId": "019fa754-2149-7791-a8bf-a0edf9edbae5",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-05-36-458Z_019fa754-2149-7791-a8bf-a0edf9edbae5.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa754-2149-7791-a8bf-a0edf9edbae5",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-session.ts` — 新增实现员 child 的无诊断结构化 outcome；生产失败无法证明 provider 请求边界时一律 `unknown`/不可重试。\n- `scripts/test-github-unattended-runner.mjs` — 增加确定性 transport-before-first-request 故障夹具与 fail-closed 断言。\n\n#### Verification\n- `npm run test:github-unattended-runner` — passed 21\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n- `npm run lint` — 无 error；存在既有/并行 `github-automation-runner.ts` 等 warning。\n\n#### Notes / Risks\n- 已确认当前公共 Pi child API 没有可证明的“首次 provider request 已开始”事件。因此真实生产失败只能标为 `unknown`，不会自动 retry；仅测试夹具可提供确认的 before-request transport outcome。\n- 主会话需确认是否接受该 fail-closed 结论；若要生产自动重试，需要 SDK 提供受支持的 request-boundary 证据。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T06:05:36.410Z",
+        "updatedAt": "2026-07-28T06:11:01.951Z",
+        "eventCount": 4997,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-session.ts` — 新增实现员 child 的无诊断结构化 outcome；生产失败无法证明 provider 请求边界时一律 `unknown`/不可重试。\n- `scripts/test-github-unattended-runner.mjs` — 增加确定性 transport-before-first-request 故障夹具与 fail-closed 断言。\n\n#### Verification\n- `npm run test:github-unattended-runner` — passed 21\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n- `npm run lint` — 无 error；存在既有/并行 `github-automation-runner.ts` 等 warning。\n\n#### Notes / Risks\n- 已确认当前公共 Pi child API 没有可证明的“首次 provider request 已开始”事件。因此真实生产失败只能标为 `unknown`，不会自动 retry；仅测试夹具可提供确认的 before-request transport outcome。\n- 主会话需确认是否接受该 fail-closed 结论；若要生产自动重试，需要 SDK 提供受支持的 request-boundary 证据。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:10:43.645Z",
+            "toolCallId": "call_6GAI9eJPsG4QIPtw2S9PPDWC|fc_0a552861a409766d016a6847e09b388198af06b510713d7984",
+            "toolName": "bash",
+            "text": "(no output)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T06:10:53.974Z",
+            "toolCallId": "call_bHOIJcXffNvbZ5Ulz9hqvLxu|fc_0a552861a409766d016a6847ed60ec819885021a5bd2e28e71",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"git diff -- lib/github-automation-session.ts scripts/test-github-unattended-runner.mjs | sed -n '1,260p'\",\n  \"timeout\": 30\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:10:54.023Z",
+            "toolCallId": "call_bHOIJcXffNvbZ5Ulz9hqvLxu|fc_0a552861a409766d016a6847ed60ec819885021a5bd2e28e71",
+            "toolName": "bash",
+            "text": "diff --git a/lib/github-automation-session.ts b/lib/github-automation-session.ts\nindex 78e60d9..a21a481 100644\n--- a/lib/github-automation-session.ts\n+++ b/lib/github-automation-session.ts\n@@ -143,16 +143,45 @@ export type GithubAutomationBootstrapOverride = (\n   | Promise<GithubAutomationAgentSessionBootstrapResult>\n   | GithubAutomationAgentSessionBootstrapResult;\n \n-export type GithubFullAgentMemberOverride = (\n-  input: RunGithubFullAgentMemberInput,\n-) => Promise<{\n+export type GithubImplementerOutcomeKind =\n+  | \"succeeded\"\n+  | \"cancelled\"\n+  | \"failed\"\n+  | \"runtime_unavailable\"\n+  | \"provider_transport_failure\";\n+\n+/**\n+ * Server-owned, diagnostic-free terminal classification for unattended\n+ * implementer children. Pi's public child API currently has no first-provider-\n+ * request event, so production failures are deliberately `unknown` rather than\n+ * inferred from an error message. Only the test hook can supply the confirmed\n+ * before-request transport boundary used by the later retry lane.\n+ */\n+export interface GithubImplementerRunOutcome {\n+  kind: GithubImplementerOutcomeKind;\n+  stage: \"before_first_provider_request\" | \"provider_request_started\" | \"unknown\";\n+  providerRequestStarted: boolean | null;\n+  retryable: boolean;\n+  /** Server-only opaque child id; the runner hashes before durable projection. */\n+  childSessionId?: string;\n+}\n+\n+export interface GithubFullAgentMemberResult {\n   output: string;\n   status: string;\n   warnings: string[];\n   childSessionId?: string;\n   childSessionFile?: string;\n   checkResult?: WorktreeCheckExecutionResult;\n-}>;\n+  /** Present only for the GitHub unattended implementer member. */\n+  outcome?: GithubImplementerRunOutcome;\n+  /** Compatibility alias while runner callers migrate to `outcome`. */\n+  implementerOutcome?: GithubImplementerRunOutcome;\n+}\n+\n+export type GithubFullAgentMemberOverride = (\n+  input: RunGithubFullAgentMemberInput,\n+) => Promise<GithubFullAgentMemberResult>;\n \n declare global {\n   // Test-only process-global overrides for GHR-03 fault injection.\n@@ -638,6 +667,70 @@ export async function bootstrapGithubAutomationAgentSession(\n \n // ─── Full-agent child run ────────────────────────────────────────────────────\n \n+function isGithubImplementerRunOutcome(value: unknown): value is GithubImplementerRunOutcome {\n+  if (!value || typeof value !== \"object\") return false;\n+  const outcome = value as Partial<GithubImplementerRunOutcome>;\n+  if (\n+    ![\"succeeded\", \"cancelled\", \"failed\", \"runtime_unavailable\", \"provider_transport_failure\"].includes(\n+      outcome.kind ?? \"\",\n+    ) ||\n+    ![\"before_first_provider_request\", \"provider_request_started\", \"unknown\"].includes(\n+      outcome.stage ?? \"\",\n+    ) ||\n+    typeof outcome.retryable !== \"boolean\" ||\n+    (outcome.providerRequestStarted !== true &&\n+      outcome.providerRequestStarted !== false &&\n+      outcome.providerRequestStarted !== null)\n+  ) {\n+    return false;\n+  }\n+  // The retry lane may only trust this exact evidence tuple. All other input\n+  // stays fail-closed, including an injected transport failure after/without a\n+  // proven request boundary.\n+  if (outcome.kind === \"provider_transport_failure\") {\n+    return outcome.stage === \"before_first_provider_request\" &&\n+      outcome.providerRequestStarted === false &&\n+      outcome.retryable === true;\n+  }\n+  return outcome.kind === \"succeeded\"\n+    ? outcome.stage === \"provider_request_started\" && outcome.providerRequestStarted === true && !outcome.retryable\n+    : outcome.stage === \"unknown\" && outcome.providerRequestStarted === null && !outcome.retryable;\n+}\n+\n+/**\n+ * Convert a public child terminal result to the runner's narrow outcome.\n+ * There is no supported Pi SDK event proving a provider request has started.\n+ * Therefore only success proves it happened; all non-success production\n+ * terminals remain unknown and are never eligible for transport retry.\n+ */\n+export function toGithubImplementerRunOutcome(input: {\n+  status: string;\n+  childSessionId?: string;\n+  injectedOutcome?: unknown;\n+}): GithubImplementerRunOutcome {\n+  const childSessionId =\n+    typeof input.childSessionId === \"string\" && input.childSessionId.trim()\n+      ? input.childSessionId.trim()\n+      : undefined;\n+  const withChildSession = (outcome: GithubImplementerRunOutcome): GithubImplementerRunOutcome =>\n+    childSessionId ? { ...outcome, childSessionId } : outcome;\n+  if (isGithubImplementerRunOutcome(input.injectedOutcome)) {\n+    return withChildSession({ ...input.injectedOutcome });\n+  }\n+  if (input.status === \"succeeded\") {\n+    return withChildSession({\n+      kind: \"succeeded\",\n+      stage: \"provider_request_started\",\n+      providerRequestStarted: true,\n+      retryable: false,\n+    });\n+  }\n+  if (input.status === \"cancelled\") {\n+    return withChildSession({ kind: \"cancelled\", stage: \"unknown\", providerRequestStarted: null, retryable: false });\n+  }\n+  return withChildSession({ kind: \"failed\", stage: \"unknown\", providerRequestStarted: null, retryable: false });\n+}\n+\n /**\n  * Build a prompt envelope that marks GitHub content as untrusted data and\n  * states residual risk. Never includes App/machine tokens.\n@@ -706,14 +799,7 @@ export function buildGithubFullAgentPromptEnvelope(input: {\n  */\n export async function runGithubFullAgentMember(\n   input: RunGithubFullAgentMemberInput,\n-): Promise<{\n-  output: string;\n-  status: string;\n-  warnings: string[];\n-  childSessionId?: string;\n-  childSessionFile?: string;\n-  checkResult?: WorktreeCheckExecutionResult;\n-}> {\n+): Promise<GithubFullAgentMemberResult> {\n   if (containsGithubAutomationSecretInjectionMarker(input.prompt)) {\n     // Typed preflight failure so operator events keep an allowlisted code/stage\n     // instead of only \"Internal GitHub automation error\" (IMP-001).\n@@ -732,7 +818,14 @@ export async function runGithubFullAgentMember(\n   // asserted without launching a real Studio child / network.\n   const memberOverride = globalThis.__piGithubFullAgentMemberOverride;\n   if (typeof memberOverride === \"function\") {\n-    return memberOverride(input);\n+    const overridden = await memberOverride(input);\n+    if (input.member !== \"implementer\") return overridden;\n+    const outcome = toGithubImplementerRunOutcome({\n+      status: overridden.status,\n+      childSessionId: overridden.childSessionId,\n+      injectedOutcome: overridden.outcome ?? overridden.implementerOutcome,\n+    });\n+    return { ...overridden, outcome, implementerOutcome: outcome };\n   }\n \n   // Per-run scrubbed env *copy* — never mutate shared Next process.env.\n@@ -797,7 +890,13 @@ export async function runGithubFullAgentMember(\n     toolEnv: scrubbedEnv,\n     ...(controller ? { worktreeCheckController: controller } : {}),\n   });\n-    return controller ? { ...child, checkResult: controller.finalize() } : child;\n+    const result = controller ? { ...child, checkResult: controller.finalize() } : child;\n+    if (input.member !== \"implementer\") return result;\n+    const outcome = toGithubImplementerRunOutcome({\n+      status: result.status,\n+      childSessionId: result.childSessionId,\n+    });\n+    return { ...result, outcome, implementerOutcome: outcome };\n   } finally {\n     await controller?.releaseLease();\n   }\ndiff --git a/scripts/test-github-unattended-runner.mjs b/scripts/test-github-unattended-runner.mjs\nindex 3ebef69..61b0fd9 100644\n--- a/scripts/test-github-unattended-runner.mjs\n+++ b/scripts/test-github-unattended-runner.mjs\n@@ -929,6 +929,72 @@ await test(\"session/runner sources no longer delete shared process.env\", () => {\n   );\n });\n \n+// ─── IMP-01: implementer transport outcome boundary ─────────────────────────\n+\n+await test(\"IMP-01 implementer adapter keeps transport retry evidence structured and fail-closed\", async () => {\n+  const confirmed = session.toGithubImplementerRunOutcome({\n+    status: \"failed\",\n+    injectedOutcome: {\n+      kind: \"provider_transport_failure\",\n+      stage: \"before_first_provider_request\",\n+      providerRequestStarted: false,\n+      retryable: true,\n+    },\n+  });\n+  assert.deepEqual(confirmed, {\n+    kind: \"provider_transport_failure\",\n+    stage: \"before_first_provider_request\",\n+    providerRequestStarted: false,\n+    retryable: true,\n+  });\n+\n+  // A terminal status/error text cannot prove the request boundary. The adapter\n+  // must return unknown/fail-closed rather than use a message regex.\n+  assert.deepEqual(session.toGithubImplementerRunOutcome({ status: \"failed\" }), {\n+    kind: \"failed\",\n+    stage: \"unknown\",\n+    providerRequestStarted: null,\n+    retryable: false,\n+  });\n+  assert.deepEqual(\n+    session.toGithubImplementerRunOutcome({\n+      status: \"failed\",\n+      injectedOutcome: {\n+        kind: \"provider_transport_failure\",\n+        stage: \"request_started\",\n+        providerRequestStarted: true,\n+        retryable: true,\n+      },\n+    }),\n+    {\n+      kind: \"failed\",\n+      stage: \"unknown\",\n+      providerRequestStarted: null,\n+      retryable: false,\n+    },\n+  );\n+\n+  session._testSetGithubFullAgentMemberOverride(async () => ({\n+    output: \"\",\n+    status: \"failed\",\n+    warnings: [],\n+    implementerOutcome: confirmed,\n+  }));\n+  try {\n+    const result = await session.runGithubFullAgentMember({\n+      worktreePath: agentDir,\n+      taskId: \"task-imp-01\",\n+      member: \"implementer\",\n+      prompt: \"fixture prompt\",\n+      runId: \"imp-01-run\",\n+    });\n+    assert.deepEqual(result.implementerOutcome, confirmed);\n+    assertNoSentinel(result.implementerOutcome, \"implementer outcome\");\n+  } finally {\n+    session._testSetGithubFullAgentMemberOverride(null);\n+  }\n+});\n+\n // ─── Cleanup ─────────────────────────────────────────────────────────────────\n \n runner._testResetGithubUnattendedInFlight?.();",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T06:11:01.940Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-session.ts` — 新增实现员 child 的无诊断结构化 outcome；生产失败无法证明 provider 请求边界时一律 `unknown`/不可重试。\n- `scripts/test-github-unattended-runner.mjs` — 增加确定性 transport-before-first-request 故障夹具与 fail-closed 断言。\n\n#### Verification\n- `npm run test:github-unattended-runner` — passed 21\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n- `npm run lint` — 无 error；存在既有/并行 `github-automation-runner.ts` 等 warning。\n\n#### Notes / Risks\n- 已确认当前公共 Pi child API 没有可证明的“首次 provider request 已开始”事件。因此真实生产失败只能标为 `unknown`，不会自动 retry；仅测试夹具可提供确认的 before-request transport outcome。\n- 主会话需确认是否接受该 fail-closed 结论；若要生产自动重试，需要 SDK 提供受支持的 request-boundary 证据。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T06:11:01.941Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 716,
+        "tokens": 345,
+        "tokenSource": "usage",
+        "tps": 83.23,
+        "firstTokenAt": "2026-07-28T06:10:57.608Z",
+        "lastTokenAt": "2026-07-28T06:11:01.753Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-2e98c3b0a314aea4b1e9f155",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/implementer-2e98c3b0a314aea4b1e9f155.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T06:05:36.410Z",
+        "finishedAt": "2026-07-28T06:11:01.945Z",
+        "updatedAt": "2026-07-28T06:11:01.945Z",
+        "itemCount": 69,
+        "messageCount": 1,
+        "toolCallCount": 32,
+        "stderrBytes": 0,
+        "bytes": 227147,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa754-2149-7791-a8bf-a0edf9edbae5",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-05-36-458Z_019fa754-2149-7791-a8bf-a0edf9edbae5.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-f3efff2b51a2963f4a4766a4",
+      "subtaskId": "IMP-02",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T06:05:36.439Z",
+      "finishedAt": "2026-07-28T06:12:55.835Z",
+      "runner": "sdk",
+      "childSessionId": "019fa754-2154-7f70-bb26-bf13c418ac2e",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-05-36-468Z_019fa754-2154-7f70-bb26-bf13c418ac2e.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa754-2154-7f70-bb26-bf13c418ac2e",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-runner.ts`\n  - 新增 generation-scoped implementer reservation/provenance。\n  - 仅确认的 `provider_transport_failure` + `before_first_provider_request` 自动重试。\n  - 限制首次 + 2 次重试，20s / 60s 退避。\n  - 使用 WorkTree diff hash、阶段/effect guard、持久化 reservation 防止重复实现。\n  - 移除基于错误文本的 transport retry 判断；不再使用 checker reason。\n  - 未知 request 边界、崩溃后 reservation、diff 变化、预算耗尽均 fail-closed。\n\n#### Verification\n- `npx eslint lib/github-automation-runner.ts` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n- `npm run test:github-unattended-runner` — passed (21 tests)\n\n#### Notes / Risks\n- 工作区同时存在 IMP-01 对 `lib/github-automation-session.ts` 和测试的并发改动；本实现已消费其 structured `outcome` 边界，未修改其文件。\n- 尚需主会话/后续 IMP-04 补充真实 runner→adapter 的 retry/backoff、crash-resume、diff-guard 专项故障注入测试。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T06:05:36.439Z",
+        "updatedAt": "2026-07-28T06:12:55.835Z",
+        "eventCount": 7958,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-runner.ts`\n  - 新增 generation-scoped implementer reservation/provenance。\n  - 仅确认的 `provider_transport_failure` + `before_first_provider_request` 自动重试。\n  - 限制首次 + 2 次重试，20s / 60s 退避。\n  - 使用 WorkTree diff hash、阶段/effect guard、持久化 reservation 防止重复实现。\n  - 移除基于错误文本的 transport retry 判断；不再使用 checker reason。\n  - 未知 request 边界、崩溃后 reservation、diff 变化、预算耗尽均 fail-closed。\n\n#### Verification\n- `npx eslint lib/github-automation-runner.ts` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n- `npm run test:github-unattended-runner` — passed (21 tests)\n\n#### Notes / Risks\n- 工作区同时存在 IMP-01 对 `lib/github-automation-session.ts` 和测试的并发改动；本实现已消费其 structured `outcome` 边界，未修改其文件。\n- 尚需主会话/后续 IMP-04 补充真实 runner→adapter 的 retry/backoff、crash-resume、diff-guard 专项故障注入测试。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:12:33.149Z",
+            "toolCallId": "call_d9GP2dEloMnwxFElnz1bHFLc|fc_07d3bf939c7d8068016a68484de960819aa5c92aabfd135b97",
+            "toolName": "edit",
+            "text": "Successfully replaced 1 block(s) in lib/github-automation-runner.ts.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T06:12:37.773Z",
+            "toolCallId": "call_hrplVMnlbgNd9b4U0L2sy4Xe|fc_07d3bf939c7d8068016a6848551f84819a87ac8d12e0eaa56a",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npx eslint lib/github-automation-runner.ts && node_modules/.bin/tsc --noEmit && git diff --check && npm run test:github-unattended-runner\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:12:44.864Z",
+            "toolCallId": "call_hrplVMnlbgNd9b4U0L2sy4Xe|fc_07d3bf939c7d8068016a6848551f84819a87ac8d12e0eaa56a",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.7 test:github-unattended-runner\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended-runner.mjs\n\n(node:53479) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - full-agent profile is not sandboxed and keeps residual risk codes\nok - scrubGithubAutomationOwnedSecretsFromEnv removes App/machine env keys\nok - validation commands come from config only; Issue cannot set them\nok - branch name is deterministic and not derived from Issue title\nok - resolve project root requires Project Registry membership\nok - ensureGithubAutomationWorktree creates and reuses one path per generation\nok - ensure unattended Studio task records owner+policy without interactive grant\nok - UI fail-closed policyGrant cannot authorize implementing\nok - start gates require unattended mode, complete claim, allowlist root\nok - queue without unattended parks at accepted_waiting_automation (P0 path)\nok - pause request and retry wake keep injectsCommentText=false\nok - TEST-04 structured pause/retry never accept free-text comment injection\nok - runner state refuses secret markers\nok - source modules document residual risk and do not claim host isolation\nok - resolveGithubAutomationWorktreeSpaceId read-back works after ensure\nok - bootstrapGithubAutomationAgentSession requires projectId+spaceId pair\nok - GHR-02 classifyAgentSessionBootstrapFailure is typed before sanitize\nok - GHR-02 runner bootstrap catch returns explicit disposition (not no-progress)\nok - buildGithubUnattendedScrubbedEnv is a copy and preserves process.env\nok - session/runner sources no longer delete shared process.env\nok - IMP-01 implementer adapter keeps transport retry evidence structured and fail-closed\n\npassed=21 failed=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T06:12:55.822Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-runner.ts`\n  - 新增 generation-scoped implementer reservation/provenance。\n  - 仅确认的 `provider_transport_failure` + `before_first_provider_request` 自动重试。\n  - 限制首次 + 2 次重试，20s / 60s 退避。\n  - 使用 WorkTree diff hash、阶段/effect guard、持久化 reservation 防止重复实现。\n  - 移除基于错误文本的 transport retry 判断；不再使用 checker reason。\n  - 未知 request 边界、崩溃后 reservation、diff 变化、预算耗尽均 fail-closed。\n\n#### Verification\n- `npx eslint lib/github-automation-runner.ts` — passed\n- `node_modules/.bin/tsc --noEmit` — passed\n- `git diff --check` — passed\n- `npm run test:github-unattended-runner` — passed (21 tests)\n\n#### Notes / Risks\n- 工作区同时存在 IMP-01 对 `lib/github-automation-session.ts` 和测试的并发改动；本实现已消费其 structured `outcome` 边界，未修改其文件。\n- 尚需主会话/后续 IMP-04 补充真实 runner→adapter 的 retry/backoff、crash-resume、diff-guard 专项故障注入测试。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T06:12:55.828Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 856,
+        "tokens": 372,
+        "tokenSource": "usage",
+        "tps": 3100,
+        "firstTokenAt": "2026-07-28T06:12:55.474Z",
+        "lastTokenAt": "2026-07-28T06:12:55.594Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-f3efff2b51a2963f4a4766a4",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/implementer-f3efff2b51a2963f4a4766a4.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T06:05:36.439Z",
+        "finishedAt": "2026-07-28T06:12:55.828Z",
+        "updatedAt": "2026-07-28T06:12:55.828Z",
+        "itemCount": 87,
+        "messageCount": 1,
+        "toolCallCount": 41,
+        "stderrBytes": 0,
+        "bytes": 247740,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa754-2154-7f70-bb26-bf13c418ac2e",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-05-36-468Z_019fa754-2154-7f70-bb26-bf13c418ac2e.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-c6713f1c7aed2ce6381c1849",
+      "subtaskId": "IMP-03",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T06:14:18.397Z",
+      "finishedAt": "2026-07-28T06:19:04.519Z",
+      "runner": "sdk",
+      "childSessionId": "019fa75c-1851-7dcd-9a60-e90fab4c6a17",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-14-18-449Z_019fa75c-1851-7dcd-9a60-e90fab4c6a17.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa75c-1851-7dcd-9a60-e90fab4c6a17",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-runner.ts` — 收敛 job/runner sidecar 的下游 checkpoint，崩溃后的 checking、validation/publish、PR evidence 不会重放 implementer；transport retry 仍优先 fail-closed。\n- `scripts/test-github-unattended-runner.mjs` — 覆盖 torn-write checkpoint 收敛及 PR effect 防重放。\n\n#### Verification\n- `npm run test:github-unattended-runner` — passed 25\n- `npm run test:github-unattended` — passed 21\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed with 11 existing warnings\n- `git diff --check` — passed\n\n#### Notes / Risks\n- 未提交、未推送。\n- PR effect 会终止该 generation，避免落入通用 retry spin。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T06:14:18.397Z",
+        "updatedAt": "2026-07-28T06:19:04.519Z",
+        "eventCount": 2761,
+        "lastTextPreview": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-runner.ts` — 收敛 job/runner sidecar 的下游 checkpoint，崩溃后的 checking、validation/publish、PR evidence 不会重放 implementer；transport retry 仍优先 fail-closed。\n- `scripts/test-github-unattended-runner.mjs` — 覆盖 torn-write checkpoint 收敛及 PR effect 防重放。\n\n#### Verification\n- `npm run test:github-unattended-runner` — passed 25\n- `npm run test:github-unattended` — passed 21\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed with 11 existing warnings\n- `git diff --check` — passed\n\n#### Notes / Risks\n- 未提交、未推送。\n- PR effect 会终止该 generation，避免落入通用 retry spin。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:18:28.494Z",
+            "toolCallId": "call_VITHMz28Ne2Ev3z2sbOEXjuq|fc_09bc6fca167253ea016a6849b12ad8819b9625a7e2028e7d26",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.7 test:github-unattended-runner\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended-runner.mjs\n\n(node:60834) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - full-agent profile is not sandboxed and keeps residual risk codes\nok - scrubGithubAutomationOwnedSecretsFromEnv removes App/machine env keys\nok - validation commands come from config only; Issue cannot set them\nok - branch name is deterministic and not derived from Issue title\nok - resolve project root requires Project Registry membership\nok - ensureGithubAutomationWorktree creates and reuses one path per generation\nok - ensure unattended Studio task records owner+policy without interactive grant\nok - UI fail-closed policyGrant cannot authorize implementing\nok - start gates require unattended mode, complete claim, allowlist root\nok - queue without unattended parks at accepted_waiting_automation (P0 path)\nok - pause request and retry wake keep injectsCommentText=false\nok - TEST-04 structured pause/retry never accept free-text comment injection\nok - runner state refuses secret markers\nok - source modules document residual risk and do not claim host isolation\nok - resolveGithubAutomationWorktreeSpaceId read-back works after ensure\nok - bootstrapGithubAutomationAgentSession requires projectId+spaceId pair\nok - GHR-02 classifyAgentSessionBootstrapFailure is typed before sanitize\nok - GHR-02 runner bootstrap catch returns explicit disposition (not no-progress)\nok - buildGithubUnattendedScrubbedEnv is a copy and preserves process.env\nok - session/runner sources no longer delete shared process.env\nok - IMP-03 converges torn post-implementer writes without replaying implementer\nok - IMP-01 implementer adapter keeps transport retry evidence structured and fail-closed\nok - IMP-04 retries confirmed pre-request transport only twice with durable 20s/60s budget\nok - IMP-04 cancellation pauses without transport retry or checker/publisher progression\nok - IMP-04 later publish evidence rejects a persisted retry without relaunch\n\npassed=25 failed=0",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T06:18:31.964Z",
+            "toolCallId": "call_yZt9mNaUf55eewY2JfwXB403|fc_09bc6fca167253ea016a6849b7d1fc819bb9a39e3a238cba3e",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run test:github-unattended && npm run lint\",\n  \"timeout\": 180\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:18:56.811Z",
+            "toolCallId": "call_yZt9mNaUf55eewY2JfwXB403|fc_09bc6fca167253ea016a6849b7d1fc819bb9a39e3a238cba3e",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.7 test:github-unattended\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended.mjs\n\n(node:62251) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - full-agent residual risk is explicit and not a sandbox claim\nok - nonowner authorization never starts unattended implementation\nok - incomplete assignee claim never starts full agent\nok - malicious Issue excerpt stays untrusted; secrets are not injected into prompt/env/task\nok - stale plan revision invalidates unattended implementing authorization\nok - high-risk final diff blocks publish; docs final diff can allow\nok - singleStep restart reuses one WorkTree/task and does not fork generation\nok - E2E docs path: owner+claim → worktree → validation → one unmerged PR\nok - E2E high-risk path blocks at final policy and never opens PR\nok - 429 github_rate_limited maps to retryable publish error\nok - permission_missing and installation_missing block without fallback identity\nok - unknown publish outcome reconciles existing PR without token leak\nok - pause at checkpoint does not inject comment text; wake resumes same job\nok - retry from plan-policy blocked rolls back to studio_task_ready so session can start\nok - TEST-04 owner comment free text never enters prompt/task/runner/validation\nok - durable checker stage precedes operator validation and resume keeps its report\nok - checker evidence failure blocks before operator validation\nok - automation store under PI_CODING_AGENT_DIR has no credential sentinels\nok - App client rate-limit and auth failures never embed tokens in errors\nok - docs state P1 default-off, full-agent residual risk, low-priv recommendation\nok - source modules keep residual risk wording and no host-isolation claim\n\npassed=21 failed=0\n\n> @alan-zhao/yolk-pi-web@0.8.7 lint\n> eslint .\n\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/.ypi/tasks/archive/2026-07/20260714-100411-完善计费模块与模型价格配置/pre01-verification.mjs\n  14:33  warning  'readFileSync' is defined but never used  @typescript-eslint/no-unused-vars\n  87:12  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/components/ChatMinimap.tsx\n  158:9  warning  The 'scrollToMinimapRatio' function makes the dependencies of useCallback Hook (at line 191) change on every render. Move it inside the useCallback callback. Alternatively, wrap the definition of 'scrollToMinimapRatio' in its own useCallback() Hook  react-hooks/exhaustive-deps\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/antigravity-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  127:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/lib/grok-credential-transaction.ts\n  103:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  128:17  warning  '_type' is assigned a value but never used  @typescript-eslint/no-unused-vars\n\n/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/scripts/test-model-prices.mjs\n  17:22  warning  'mkdirSync' is defined but never used                         @typescript-eslint/no-unused-vars\n  35:3   warning  'MODEL_PRICE_MAX_VALUE' is assigned a value but never used    @typescript-eslint/no-unused-vars\n  46:3   warning  'getModelsJsonBackupPath' is assigned a value but never used  @typescript-eslint/no-unused-vars\n  78:10  warning  'assertStringNotContains' is defined but never used           @typescript-eslint/no-unused-vars\n\n✖ 11 problems (0 errors, 11 warnings)",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T06:19:04.513Z",
+            "text": "### Implementation Complete\n\n#### Files Changed\n- `lib/github-automation-runner.ts` — 收敛 job/runner sidecar 的下游 checkpoint，崩溃后的 checking、validation/publish、PR evidence 不会重放 implementer；transport retry 仍优先 fail-closed。\n- `scripts/test-github-unattended-runner.mjs` — 覆盖 torn-write checkpoint 收敛及 PR effect 防重放。\n\n#### Verification\n- `npm run test:github-unattended-runner` — passed 25\n- `npm run test:github-unattended` — passed 21\n- `node_modules/.bin/tsc --noEmit` — passed\n- `npm run lint` — passed with 11 existing warnings\n- `git diff --check` — passed\n\n#### Notes / Risks\n- 未提交、未推送。\n- PR effect 会终止该 generation，避免落入通用 retry spin。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T06:19:04.513Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 633,
+        "tokens": 264,
+        "tokenSource": "usage",
+        "tps": 65.04,
+        "firstTokenAt": "2026-07-28T06:19:00.453Z",
+        "lastTokenAt": "2026-07-28T06:19:04.512Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-c6713f1c7aed2ce6381c1849",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/implementer-c6713f1c7aed2ce6381c1849.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T06:14:18.397Z",
+        "finishedAt": "2026-07-28T06:19:04.514Z",
+        "updatedAt": "2026-07-28T06:19:04.514Z",
+        "itemCount": 71,
+        "messageCount": 1,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 244969,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa75c-1851-7dcd-9a60-e90fab4c6a17",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-14-18-449Z_019fa75c-1851-7dcd-9a60-e90fab4c6a17.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "implementer-da16b87a2504d58439191226",
+      "subtaskId": "IMP-04",
+      "member": "implementer",
+      "status": "succeeded",
+      "startedAt": "2026-07-28T06:14:18.429Z",
+      "finishedAt": "2026-07-28T06:20:41.566Z",
+      "runner": "sdk",
+      "childSessionId": "019fa75c-1860-7009-90f0-ec22e0d02c58",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-14-18-464Z_019fa75c-1860-7009-90f0-ec22e0d02c58.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa75c-1860-7009-90f0-ec22e0d02c58",
+        "model": "openai-codex/gpt-5.6-terra",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### IMP-04 Handoff\n\n#### Files Changed\n- `scripts/test-github-unattended-runner.mjs` — 增加 transport retry 上限/20s-60s、专属 reason、终态 publish checkpoint、取消路径回归用例。\n- `docs/architecture/overview.md` — 补充 implementer 专属 durable retry 语义。\n- `docs/modules/library.md` — 更新 session/runner retry 边界说明。\n\n#### Verification\n- ✅ `npm run test:github-unattended`\n- ✅ `npm run test:github-handler-runtime`\n- ✅ `npm run test:github-publish-policy`\n- ✅ `npm run lint`（仅既有 warnings）\n- ✅ `node_modules/.bin/tsc --noEmit`\n- ✅ `git diff --check`\n- ❌ `npm run test:github-unattended-runner`\n\n#### Blocker\n取消用例暴露生产实现缺陷：`lib/github-automation-runner.ts` 在 implementer 返回 `cancelled` 时，先将 runner state 写为 `checkpoint: \"checking\"`，随后仅将 job 写为 `paused`。这违背“仅成功 implementer 才进入 checking”，恢复后可能进入 checker。\n\n新增测试正确期望 `checkpoint: \"paused\"`，当前实际为 `\"checking\"`。需主会话/IMP-03 修复该状态迁移后再完成 IMP-04 验证。未提交、未推送。",
+      "model": "openai-codex/gpt-5.6-terra",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "implementer",
+        "member": "implementer",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-terra",
+          "arg": "openai-codex/gpt-5.6-terra",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T06:14:18.429Z",
+        "updatedAt": "2026-07-28T06:20:41.566Z",
+        "eventCount": 6068,
+        "lastTextPreview": "### IMP-04 Handoff\n\n#### Files Changed\n- `scripts/test-github-unattended-runner.mjs` — 增加 transport retry 上限/20s-60s、专属 reason、终态 publish checkpoint、取消路径回归用例。\n- `docs/architecture/overview.md` — 补充 implementer 专属 durable retry 语义。\n- `docs/modules/library.md` — 更新 session/runner retry 边界说明。\n\n#### Verification\n- ✅ `npm run test:github-unattended`\n- ✅ `npm run test:github-handler-runtime`\n- ✅ `npm run test:github-publish-policy`\n- ✅ `npm run lint`（仅既有 warnings）\n- ✅ `node_modules/.bin/tsc --noEmit`\n- ✅ `git diff --check`\n- ❌ `npm run test:github-unattended-runner`\n\n#### Blocker\n取消用例暴露生产实现缺陷：`lib/github-automation-runner.ts` 在 implementer 返回 `cancelled` 时，先将 runner state 写为 `checkpoint: \"checking\"`，随后仅将 job 写为 `paused`。这违背“仅成功 implementer 才进入 checking”，恢复后可能进入 checker。\n\n新增测试正确期望 `checkpoint: \"paused\"`，当前实际为 `\"checking\"`。需主会话/IMP-03 修复该状态迁移后再完成 IMP-04 验证。未提交、未推送。",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:20:20.581Z",
+            "toolCallId": "call_0RI34GQCtyyFFelxM9IUUTuM|fc_06a423928cbe13e5016a684a20bf40819aacdae6e2fbe1323b",
+            "toolName": "edit",
+            "text": "Successfully replaced 2 block(s) in scripts/test-github-unattended-runner.mjs.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T06:20:28.528Z",
+            "toolCallId": "call_mrrABEBHEDActjxSeS1w2KUZ|fc_06a423928cbe13e5016a684a2c438c819aa75fa92669f0eb25",
+            "toolName": "bash",
+            "inputPreview": "{\n  \"command\": \"npm run test:github-unattended-runner; git diff --check\",\n  \"timeout\": 120\n}",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:20:31.270Z",
+            "toolCallId": "call_mrrABEBHEDActjxSeS1w2KUZ|fc_06a423928cbe13e5016a684a2c438c819aa75fa92669f0eb25",
+            "toolName": "bash",
+            "text": "> @alan-zhao/yolk-pi-web@0.8.7 test:github-unattended-runner\n> node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-unattended-runner.mjs\n\n(node:70930) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:\n--import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"./scripts/ts-extension-loader.mjs\", pathToFileURL(\"./\"));'\n(Use `node --trace-warnings ...` to show where the warning was created)\nok - full-agent profile is not sandboxed and keeps residual risk codes\nok - scrubGithubAutomationOwnedSecretsFromEnv removes App/machine env keys\nok - validation commands come from config only; Issue cannot set them\nok - branch name is deterministic and not derived from Issue title\nok - resolve project root requires Project Registry membership\nok - ensureGithubAutomationWorktree creates and reuses one path per generation\nok - ensure unattended Studio task records owner+policy without interactive grant\nok - UI fail-closed policyGrant cannot authorize implementing\nok - start gates require unattended mode, complete claim, allowlist root\nok - queue without unattended parks at accepted_waiting_automation (P0 path)\nok - pause request and retry wake keep injectsCommentText=false\nok - TEST-04 structured pause/retry never accept free-text comment injection\nok - runner state refuses secret markers\nok - source modules document residual risk and do not claim host isolation\nok - resolveGithubAutomationWorktreeSpaceId read-back works after ensure\nok - bootstrapGithubAutomationAgentSession requires projectId+spaceId pair\nok - GHR-02 classifyAgentSessionBootstrapFailure is typed before sanitize\nok - GHR-02 runner bootstrap catch returns explicit disposition (not no-progress)\nok - buildGithubUnattendedScrubbedEnv is a copy and preserves process.env\nok - session/runner sources no longer delete shared process.env\nok - IMP-03 converges torn post-implementer writes without replaying implementer\nok - IMP-01 implementer adapter keeps transport retry evidence structured and fail-closed\nok - IMP-04 retries confirmed pre-request transport only twice with durable 20s/60s budget\nnot ok - IMP-04 cancellation pauses without transport retry or checker/publisher progression\nAssertionError [ERR_ASSERTION]: cancel must not advance to checker\n+ actual - expected\n\n+ 'checking'\n- 'paused'\n\n    at file:///Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/scripts/test-github-unattended-runner.mjs:1176:12\n    at async file:///Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web/scripts/test-github-unattended-runner.mjs:1163:1 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: 'checking',\n  expected: 'paused',\n  operator: 'strictEqual',\n  diff: 'simple'\n}\nok - IMP-04 terminal publish checkpoint outranks persisted retry metadata\n\npassed=24 failed=1",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T06:20:41.556Z",
+            "text": "### IMP-04 Handoff\n\n#### Files Changed\n- `scripts/test-github-unattended-runner.mjs` — 增加 transport retry 上限/20s-60s、专属 reason、终态 publish checkpoint、取消路径回归用例。\n- `docs/architecture/overview.md` — 补充 implementer 专属 durable retry 语义。\n- `docs/modules/library.md` — 更新 session/runner retry 边界说明。\n\n#### Verification\n- ✅ `npm run test:github-unattended`\n- ✅ `npm run test:github-handler-runtime`\n- ✅ `npm run test:github-publish-policy`\n- ✅ `npm run lint`（仅既有 warnings）\n- ✅ `node_modules/.bin/tsc --noEmit`\n- ✅ `git diff --check`\n- ❌ `npm run test:github-unattended-runner`\n\n#### Blocker\n取消用例暴露生产实现缺陷：`lib/github-automation-runner.ts` 在 implementer 返回 `cancelled` 时，先将 runner state 写为 `checkpoint: \"checking\"`，随后仅将 job 写为 `paused`。这违背“仅成功 implementer 才进入 checking”，恢复后可能进入 checker。\n\n新增测试正确期望 `checkpoint: \"paused\"`，当前实际为 `\"checking\"`。需主会话/IMP-03 修复该状态迁移后再完成 IMP-04 验证。未提交、未推送。",
+            "model": "openai-codex/gpt-5.6-terra",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T06:20:41.560Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 869,
+        "tokens": 431,
+        "tokenSource": "usage",
+        "tps": 82.65,
+        "firstTokenAt": "2026-07-28T06:20:36.147Z",
+        "lastTokenAt": "2026-07-28T06:20:41.362Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": true,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": true,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        }
+      },
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "implementer-da16b87a2504d58439191226",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "implementer",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/implementer-da16b87a2504d58439191226.jsonl",
+        "status": "succeeded",
+        "startedAt": "2026-07-28T06:14:18.429Z",
+        "finishedAt": "2026-07-28T06:20:41.560Z",
+        "updatedAt": "2026-07-28T06:20:41.560Z",
+        "itemCount": 105,
+        "messageCount": 1,
+        "toolCallCount": 50,
+        "stderrBytes": 0,
+        "bytes": 278033,
+        "truncated": true,
+        "runner": "sdk",
+        "childSessionId": "019fa75c-1860-7009-90f0-ec22e0d02c58",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-14-18-464Z_019fa75c-1860-7009-90f0-ec22e0d02c58.jsonl",
+        "truncation": {
+          "itemTruncated": true,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-ab2c2afe2892d4684b950fdf",
+      "member": "checker",
+      "status": "failed",
+      "startedAt": "2026-07-28T06:21:17.067Z",
+      "finishedAt": "2026-07-28T06:24:26.435Z",
+      "runner": "sdk",
+      "childSessionId": "019fa762-7c68-7f56-889a-99a79bff3c92",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-21-17-289Z_019fa762-7c68-7f56-889a-99a79bff3c92.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa762-7c68-7f56-889a-99a79bff3c92",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete — IMP-001\n\n#### Findings Fixed\n\n- None；按要求未修改生产代码。\n\n#### Remaining Findings\n\n- **阻塞：生产路径无法产生重试 provenance。** `lib/github-automation-session.ts` 仅允许测试 override 注入 `provider_transport_failure + before_first_provider_request`；真实 child 失败始终归为 `failed/unknown`，因此 attempt 906 无法进入有限重试通道。\n- **阻塞：耗尽重试后的归类矛盾。** 第三次仍明确发生在 provider request 前，却被标记为 `implementer_provider_transport_failure_after_start`；durable state 同时记录 `providerRequestStarted=false`。\n- **阻塞：回归测试仅证明注入路径。** `scripts/test-github-unattended-runner.mjs` 使用 `_testSetGithubFullAgentMemberOverride()`，没有覆盖真实 provider transport → child adapter → runner provenance。\n- **风险：跨 generation 发布去重过宽。** `resolveGithubAutomationPostImplementerCheckpoint()` 将任意 `pull_request` effect 视为当前 generation 的 `pr_open`，未校验 effect generation，可能错误跳过新 generation。\n\n#### Verification\n\n- `npm --version` — pass（11.12.1）\n- `node_modules/.bin/tsc --version` — pass（5.9.3）\n- `git diff --check` — pass\n- GitHub automation tests、lint、tsc — **未启动**：检查服务要求 contained-read evidence，但当前未暴露对应读取工具，返回 `check_dependency_discovery_inconclusive`。\n\n#### Artifacts\n\n- 本检查未改文件。\n- 无法更新 improvement `checks.md` / `review.md`：当前工具集未提供 Write/Edit，且受限 executor 拒绝访问该受保护路径。\n\n#### Verdict\n\n**Needs work / blocked。**\n\n主会话需决定并实现真实 provider 请求边界的可信结构化来源；若 Pi SDK 暂不提供该事件，应明确 fail-closed，而不能宣称 attempt 906 已获得有限自动重试。\n\nWorkTree Check: A requested check command was rejected by policy.",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T06:21:17.067Z",
+        "updatedAt": "2026-07-28T06:24:26.435Z",
+        "eventCount": 1758,
+        "lastTextPreview": "### Check Complete — IMP-001\n\n#### Findings Fixed\n\n- None；按要求未修改生产代码。\n\n#### Remaining Findings\n\n- **阻塞：生产路径无法产生重试 provenance。** `lib/github-automation-session.ts` 仅允许测试 override 注入 `provider_transport_failure + before_first_provider_request`；真实 child 失败始终归为 `failed/unknown`，因此 attempt 906 无法进入有限重试通道。\n- **阻塞：耗尽重试后的归类矛盾。** 第三次仍明确发生在 provider request 前，却被标记为 `implementer_provider_transport_failure_after_start`；durable state 同时记录 `providerRequestStarted=false`。\n- **阻塞：回归测试仅证明注入路径。** `scripts/test-github-unattended-runner.mjs` 使用 `_testSetGithubFullAgentMemberOverride()`，没有覆盖真实 provider transport → child adapter → runner provenance。\n- **风险：跨 generation 发布去重过宽。** `resolveGithubAutomationPostImplementerCheckpoint()` 将任意 `pull_request` effect 视为当前 generation 的 `pr_open`，未校验 effect generation，可能错误跳过新 generation。\n\n#### Verification\n\n- `npm --version` — pass（11.12.1）\n- `node_modules/.bin/tsc --version` — pass（5.9.3）\n- `git diff --check` — pass\n- GitHub automation tests、lint、tsc — **未启动**：检查服务要求 contained-read evidence，但当前未暴露对应读取工具，返回 `check_dependency_discovery_inconclusive`。\n\n#### Artifacts\n\n- 本检查未改文件。\n- 无法更新 improvement `checks.md` / `review.md`：当前工具集未提供 Write/Edit，且受限 executor 拒绝访问该受保护路径。\n\n#### Verdict\n\n**Needs work / blocked。**\n\n主会话需决定并实现真实 provider 请求边界的可信结构化来源；若 Pi SDK 暂不提供该事件，应明确 fail-closed，而不能宣称 attempt 906 已获得有限自动重试。\n\nWorkTree Check: A requested check command was rejected by policy.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:23:40.415Z",
+            "toolCallId": "call_QZvLAWnG54mbP4fEI0gH9Xsz|fc_0719291ce4b40745016a684adebdec8198945d72dd4b8d33c3",
+            "toolName": "submit_check_report",
+            "text": "Restricted WorkTree Check command completed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T06:24:03.233Z",
+            "toolCallId": "call_IepFyVsCAzYI6srlrY46hrhv|fc_0719291ce4b40745016a684afc30348198915f254c37454366",
+            "toolName": "submit_check_report",
+            "inputPreview": "Server-owned restricted WorkTree Check tool.",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:24:03.233Z",
+            "toolCallId": "call_IepFyVsCAzYI6srlrY46hrhv|fc_0719291ce4b40745016a684afc30348198915f254c37454366",
+            "toolName": "submit_check_report",
+            "text": "Restricted WorkTree Check command completed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T06:24:26.425Z",
+            "text": "### Check Complete — IMP-001\n\n#### Findings Fixed\n\n- None；按要求未修改生产代码。\n\n#### Remaining Findings\n\n- **阻塞：生产路径无法产生重试 provenance。** `lib/github-automation-session.ts` 仅允许测试 override 注入 `provider_transport_failure + before_first_provider_request`；真实 child 失败始终归为 `failed/unknown`，因此 attempt 906 无法进入有限重试通道。\n- **阻塞：耗尽重试后的归类矛盾。** 第三次仍明确发生在 provider request 前，却被标记为 `implementer_provider_transport_failure_after_start`；durable state 同时记录 `providerRequestStarted=false`。\n- **阻塞：回归测试仅证明注入路径。** `scripts/test-github-unattended-runner.mjs` 使用 `_testSetGithubFullAgentMemberOverride()`，没有覆盖真实 provider transport → child adapter → runner provenance。\n- **风险：跨 generation 发布去重过宽。** `resolveGithubAutomationPostImplementerCheckpoint()` 将任意 `pull_request` effect 视为当前 generation 的 `pr_open`，未校验 effect generation，可能错误跳过新 generation。\n\n#### Verification\n\n- `npm --version` — pass（11.12.1）\n- `node_modules/.bin/tsc --version` — pass（5.9.3）\n- `git diff --check` — pass\n- GitHub automation tests、lint、tsc — **未启动**：检查服务要求 contained-read evidence，但当前未暴露对应读取工具，返回 `check_dependency_discovery_inconclusive`。\n\n#### Artifacts\n\n- 本检查未改文件。\n- 无法更新 improvement `checks.md` / `review.md`：当前工具集未提供 Write/Edit，且受限 executor 拒绝访问该受保护路径。\n\n#### Verdict\n\n**Needs work / blocked。**\n\n主会话需决定并实现真实 provider 请求边界的可信结构化来源；若 Pi SDK 暂不提供该事件，应明确 fail-closed，而不能宣称 attempt 906 已获得有限自动重试。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T06:24:26.432Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1337,
+        "tokens": 830,
+        "tokenSource": "usage",
+        "tps": 102.12,
+        "firstTokenAt": "2026-07-28T06:24:18.242Z",
+        "lastTokenAt": "2026-07-28T06:24:26.370Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
+        },
+        "terminationReason": "check_command_rejected"
+      },
+      "terminationReason": "check_command_rejected",
+      "error": "### Check Complete — IMP-001 #### Findings Fixed - None；按要求未修改生产代码。 #### Remaining Findings - **阻塞：生产路径无法产生重试 provenance。** `lib/github-automation-session.ts` 仅允许测试 override 注入 `provider_transport_failure + before_first_provider_request`；真实 child 失败始终归为 `failed/unknown`，因此 attempt 906 无法进入有限重试通道。 - **阻塞：耗尽重试后的归类矛盾。** 第三次仍明确发生在 provider request 前，却被标记为 `implementer_provider_transport_failure_after_start`；durable state 同时记录 `providerRequestStarted=false`。 - **阻塞：回归测试仅证明注入路径。** `scripts/test-github-unattended-runner.mjs` 使用 `_testSetGithubFullAgentMemberOverride()`，没有覆盖真实 provider transport → child adapter → runner provenance。 - **风险：跨 generation 发布去重过宽。** `resolveGithubAutomationPostImplementerCheckpoint()` 将任意 `pull_request` effect 视为当前 generation 的 `pr_open`，未校验 effect generation，可能错误跳过新 generation。 #### Verification - `npm --version` — pass（11.12.1） - `node_modules/.bin/tsc --version` — pass（5.9.3） - `git diff --check` — pass - GitHub automation tests、lint、tsc — **未启动**：检查服务要求 contai…",
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-ab2c2afe2892d4684b950fdf",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/checker-ab2c2afe2892d4684b950fdf.jsonl",
+        "status": "failed",
+        "startedAt": "2026-07-28T06:21:17.067Z",
+        "finishedAt": "2026-07-28T06:24:26.432Z",
+        "updatedAt": "2026-07-28T06:24:26.432Z",
+        "itemCount": 67,
+        "messageCount": 1,
+        "toolCallCount": 31,
+        "stderrBytes": 0,
+        "bytes": 19680,
+        "truncated": false,
+        "runner": "sdk",
+        "childSessionId": "019fa762-7c68-7f56-889a-99a79bff3c92",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-21-17-289Z_019fa762-7c68-7f56-889a-99a79bff3c92.jsonl",
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
+    },
+    {
+      "id": "checker-0e0546a03dc2cbf6a55bcea3",
+      "member": "checker",
+      "status": "failed",
+      "startedAt": "2026-07-28T06:25:11.262Z",
+      "runner": "sdk",
+      "childSessionId": "019fa766-0f70-73e6-a7af-654501c8193f",
+      "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-25-11-536Z_019fa766-0f70-73e6-a7af-654501c8193f.jsonl",
+      "requestAffinity": {
+        "schemaVersion": 1,
+        "providerSessionIdSource": "childSessionId",
+        "parentSessionId": "019fa644-b890-7540-a361-d5cf147ba045",
+        "childSessionId": "019fa766-0f70-73e6-a7af-654501c8193f",
+        "model": "openai-codex/gpt-5.6-sol",
+        "modelSource": "memberConfig",
+        "thinking": "medium",
+        "thinkingSource": "memberConfig",
+        "note": "Studio SDK child runs use the same Pi SDK/provider/auth/model-registry path as the parent chat, but provider request affinity is keyed by the independent child session id rather than reusing the parent session id."
+      },
+      "summary": "### Check Complete — IMP-001\n\n#### Remaining Findings\n\n- **阻塞：生产环境无法产生可重试 transport evidence。** `lib/github-automation-session.ts` 仅允许测试 override 注入 `before_first_provider_request`；真实 child 失败始终归为 `failed/unknown`，attempt 906 类故障不会自动重试。\n- **阻塞：下游 durable checkpoint 可能被降级。** pending transport metadata 会跳过 checkpoint convergence；已有 checking/PR evidence 时实际 runner 可能转为 blocked。新增测试只调用纯 resolver，未覆盖真实 runner。\n- **阻塞：损坏的 `implementerRetry` 状态未 fail closed。** reader 返回 `null` 后 runner 可建立空状态并重新启动 implementer。\n- **阻塞：原有 pre-launch runtime transient 分类被弱化。** structured runtime failures现在可能统一变成 `implementer_error`，不符合 Design 中保留 implementer runtime 语义的要求。\n- **阻塞：验收覆盖不足。** 缺 reservation persistence failure、reservation 后崩溃恢复、重复调度、diff 改变、成功重试仅推进一次 checker、auth/quota、safe projection、malformed state 等真实路径。\n- 第三次“请求前失败”被标为 `implementer_provider_transport_failure_after_start`，原因不准确。\n\n#### Files Changed / Artifacts\n\n- None。未修改生产代码。\n- 未能更新 IMP-001 `checks.md` / `review.md`：受限执行器耗尽 discovery/probe gate，且当前未提供文件编辑工具。\n\n#### Verification\n\nGitHub focused tests、lint、tsc 和 `git diff --check` 均被 WorkTree Check discovery gate 在启动前拒绝；没有执行依赖准备。结构化报告提交也因 observed evidence reconciliation 返回 `check_report_inconsistent`。\n\n#### Verdict\n\n**Needs work / blocked。**\n\n主会话需决定：若 Pi 公共 API 无法证明首次 provider request 边界，是接受“生产环境永不自动重试”的 fail-closed 行为，还是先增加可信的 owned child lifecycle evidence。当前实现不应视为完成 IMP-001。\n\nWorkTree Check: A requested check command was rejected by policy.",
+      "model": "openai-codex/gpt-5.6-sol",
+      "thinking": "medium",
+      "modelSource": "memberConfig",
+      "thinkingSource": "memberConfig",
+      "policy": {
+        "schemaVersion": 1,
+        "memberInput": "checker",
+        "member": "checker",
+        "memberPolicyFound": true,
+        "config": {
+          "exists": true,
+          "pathLabel": "~/.pi/agent/pi-web.json"
+        },
+        "model": {
+          "label": "openai-codex/gpt-5.6-sol",
+          "arg": "openai-codex/gpt-5.6-sol",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "specific",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        },
+        "thinking": {
+          "label": "medium",
+          "arg": "medium",
+          "effectiveSource": "memberConfig",
+          "configuredSource": "memberConfig",
+          "configuredMode": "medium",
+          "fallbackChain": [
+            "memberConfig"
+          ]
+        }
+      },
+      "progress": {
+        "schemaVersion": 1,
+        "phase": "finished",
+        "startedAt": "2026-07-28T06:25:11.262Z",
+        "updatedAt": "2026-07-28T06:28:58.589Z",
+        "eventCount": 2869,
+        "lastTextPreview": "### Check Complete — IMP-001\n\n#### Remaining Findings\n\n- **阻塞：生产环境无法产生可重试 transport evidence。** `lib/github-automation-session.ts` 仅允许测试 override 注入 `before_first_provider_request`；真实 child 失败始终归为 `failed/unknown`，attempt 906 类故障不会自动重试。\n- **阻塞：下游 durable checkpoint 可能被降级。** pending transport metadata 会跳过 checkpoint convergence；已有 checking/PR evidence 时实际 runner 可能转为 blocked。新增测试只调用纯 resolver，未覆盖真实 runner。\n- **阻塞：损坏的 `implementerRetry` 状态未 fail closed。** reader 返回 `null` 后 runner 可建立空状态并重新启动 implementer。\n- **阻塞：原有 pre-launch runtime transient 分类被弱化。** structured runtime failures现在可能统一变成 `implementer_error`，不符合 Design 中保留 implementer runtime 语义的要求。\n- **阻塞：验收覆盖不足。** 缺 reservation persistence failure、reservation 后崩溃恢复、重复调度、diff 改变、成功重试仅推进一次 checker、auth/quota、safe projection、malformed state 等真实路径。\n- 第三次“请求前失败”被标为 `implementer_provider_transport_failure_after_start`，原因不准确。\n\n#### Files Changed / Artifacts\n\n- None。未修改生产代码。\n- 未能更新 IMP-001 `checks.md` / `review.md`：受限执行器耗尽 discovery/probe gate，且当前未提供文件编辑工具。\n\n#### Verification\n\nGitHub focused tests、lint、tsc 和 `git diff --check` 均被 WorkTree Check discovery gate 在启动前拒绝；没有执行依赖准备。结构化报告提交也因 observed evidence reconciliation 返回 `check_report_inconsistent`。\n\n#### Verdict\n\n**Needs work / blocked。**\n\n主会话需决定：若 Pi 公共 API 无法证明首次 provider request 边界，是接受“生产环境永不自动重试”的 fail-closed 行为，还是先增加可信的 owned child lifecycle evidence。当前实现不应视为完成 IMP-001。\n\nWorkTree Check: A requested check command was rejected by policy.",
+        "itemsPreview": [
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:28:06.516Z",
+            "toolCallId": "call_Poli5iVrq8rDdTegGKcEd7bB|fc_092036d0248164c7016a684bed8df8819abc55011ad7111620",
+            "toolName": "submit_check_report",
+            "text": "Restricted WorkTree Check command completed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "tool_call",
+            "at": "2026-07-28T06:28:28.299Z",
+            "toolCallId": "call_Cvhy2lzWzw6BOCeo4Get7mnW|fc_092036d0248164c7016a684c01d628819aa7df93d744ae040d",
+            "toolName": "submit_check_report",
+            "inputPreview": "Server-owned restricted WorkTree Check tool.",
+            "truncated": false
+          },
+          {
+            "kind": "tool_result",
+            "at": "2026-07-28T06:28:28.302Z",
+            "toolCallId": "call_Cvhy2lzWzw6BOCeo4Get7mnW|fc_092036d0248164c7016a684c01d628819aa7df93d744ae040d",
+            "toolName": "submit_check_report",
+            "text": "Restricted WorkTree Check command completed.",
+            "isError": false,
+            "truncated": false
+          },
+          {
+            "kind": "assistant",
+            "at": "2026-07-28T06:28:58.572Z",
+            "text": "### Check Complete — IMP-001\n\n#### Remaining Findings\n\n- **阻塞：生产环境无法产生可重试 transport evidence。** `lib/github-automation-session.ts` 仅允许测试 override 注入 `before_first_provider_request`；真实 child 失败始终归为 `failed/unknown`，attempt 906 类故障不会自动重试。\n- **阻塞：下游 durable checkpoint 可能被降级。** pending transport metadata 会跳过 checkpoint convergence；已有 checking/PR evidence 时实际 runner 可能转为 blocked。新增测试只调用纯 resolver，未覆盖真实 runner。\n- **阻塞：损坏的 `implementerRetry` 状态未 fail closed。** reader 返回 `null` 后 runner 可建立空状态并重新启动 implementer。\n- **阻塞：原有 pre-launch runtime transient 分类被弱化。** structured runtime failures现在可能统一变成 `implementer_error`，不符合 Design 中保留 implementer runtime 语义的要求。\n- **阻塞：验收覆盖不足。** 缺 reservation persistence failure、reservation 后崩溃恢复、重复调度、diff 改变、成功重试仅推进一次 checker、auth/quota、safe projection、malformed state 等真实路径。\n- 第三次“请求前失败”被标为 `implementer_provider_transport_failure_after_start`，原因不准确。\n\n#### Files Changed / Artifacts\n\n- None。未修改生产代码。\n- 未能更新 IMP-001 `checks.md` / `review.md`：受限执行器耗尽 discovery/probe gate，且当前未提供文件编辑工具。\n\n#### Verification\n\nGitHub focused tests、lint、tsc 和 `git diff --check` 均被 WorkTree Check discovery gate 在启动前拒绝；没有执行依赖准备。结构化报告提交也因 observed evidence reconciliation 返回 `check_report_inconsistent`。\n\n#### Verdict\n\n**Needs work / blocked。**\n\n主会话需决定：若 Pi 公共 API 无法证明首次 provider request 边界，是接受“生产环境永不自动重试”的 fail-closed 行为，还是先增加可信的 owned child lifecycle evidence。当前实现不应视为完成 IMP-001。",
+            "model": "openai-codex/gpt-5.6-sol",
+            "truncated": false
+          },
+          {
+            "kind": "status",
+            "at": "2026-07-28T06:28:58.583Z",
+            "text": "SDK child Pi agent finished.",
+            "truncated": false
+          }
+        ],
+        "outputChars": 1388,
+        "tokens": 925,
+        "tokenSource": "usage",
+        "tps": 63.47,
+        "firstTokenAt": "2026-07-28T06:28:43.904Z",
+        "lastTokenAt": "2026-07-28T06:28:58.478Z",
+        "display": {
+          "recentLimit": 5,
+          "previewTruncated": false,
+          "finalOutputTruncated": false,
+          "transcriptItemTruncated": false,
+          "transcriptCaptureLimited": false
+        },
+        "terminationReason": "check_command_rejected"
+      },
+      "terminationReason": "check_command_rejected",
+      "error": "### Check Complete — IMP-001 #### Remaining Findings - **阻塞：生产环境无法产生可重试 transport evidence。** `lib/github-automation-session.ts` 仅允许测试 override 注入 `before_first_provider_request`；真实 child 失败始终归为 `failed/unknown`，attempt 906 类故障不会自动重试。 - **阻塞：下游 durable checkpoint 可能被降级。** pending transport metadata 会跳过 checkpoint convergence；已有 checking/PR evidence 时实际 runner 可能转为 blocked。新增测试只调用纯 resolver，未覆盖真实 runner。 - **阻塞：损坏的 `implementerRetry` 状态未 fail closed。** reader 返回 `null` 后 runner 可建立空状态并重新启动 implementer。 - **阻塞：原有 pre-launch runtime transient 分类被弱化。** structured runtime failures现在可能统一变成 `implementer_error`，不符合 Design 中保留 implementer runtime 语义的要求。 - **阻塞：验收覆盖不足。** 缺 reservation persistence failure、reservation 后崩溃恢复、重复调度、diff 改变、成功重试仅推进一次 checker、auth/quota、safe projection、malformed state 等真实路径。 - 第三次“请求前失败”被标为 `implementer_provider_transport_failure_after_start`，原因不准确。 #### Files Changed / Artifacts - None。未修改生产代码。 - 未能更新 IMP-001 `checks.md` / `review.md`：受限执行器耗尽 discovery/probe gate，且当前…",
+      "transcript": {
+        "schemaVersion": 1,
+        "format": "ypi-studio-subagent-transcript",
+        "runId": "checker-0e0546a03dc2cbf6a55bcea3",
+        "taskId": "20260728-091216-统一修复-worktree-check-阶段依赖安装与验证流程",
+        "member": "checker",
+        "pathLabel": ".ypi/.runtime/studio-subagents/20260728-091216-_-worktree-check-/checker-0e0546a03dc2cbf6a55bcea3.jsonl",
+        "status": "failed",
+        "startedAt": "2026-07-28T06:25:11.262Z",
+        "updatedAt": "2026-07-28T06:28:58.584Z",
+        "itemCount": 71,
+        "messageCount": 1,
+        "toolCallCount": 33,
+        "stderrBytes": 0,
+        "bytes": 20760,
+        "truncated": false,
+        "truncation": {
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        },
+        "runner": "sdk",
+        "childSessionId": "019fa766-0f70-73e6-a7af-654501c8193f",
+        "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-28T06-25-11-536Z_019fa766-0f70-73e6-a7af-654501c8193f.jsonl",
+        "finishedAt": "2026-07-28T06:28:58.584Z"
+      },
+      "finishedAt": "2026-07-28T06:28:58.589Z"
     }
   ],
   "meta": {
@@ -4309,7 +5485,7 @@
   },
   "implementationProgress": {
     "schemaVersion": 2,
-    "updatedAt": "2026-07-28T04:19:54.014Z",
+    "updatedAt": "2026-07-28T06:28:58.591Z",
     "activeSubtaskIds": [],
     "queuedSubtaskIds": [],
     "counts": {
@@ -4577,6 +5753,292 @@
         "subtaskId": "WDP-10",
         "from": "ready",
         "to": "running"
+      }
+    ]
+  },
+  "improvements": {
+    "schemaVersion": 1,
+    "parentStatus": "waiting_for_improvements",
+    "instances": [
+      {
+        "id": "imp_nk4hrw4s",
+        "displayId": "IMP-001",
+        "title": "修复 GitHub 自动化 Provider Transport 失败后的重试与状态归类",
+        "feedback": "Issue #22 attempt 906 在 implementer 首次模型请求阶段发生 openai-codex/gpt-5.6-terra WebSocket error（phase=before_message_stream_start，fetch failed，eventsEmitted=false），尚未执行任何 WorkTree Check。当前 runner 将 provider transport failure 归类为 check_runtime_unavailable 并阻断任务，导致瞬时上游故障被误显示为验证失败。请改进：区分 provider transport failure 与 WorkTree Check/runtime 检查失败；对明确可重试的上游传输失败安全重试并限制次数/退避；持久化真实失败原因和 attempt/session/run 关联；避免重复执行已有实现或发布动作；无可重试条件时给出明确人工处理状态。补充回归测试。",
+        "status": "checking",
+        "owner": "main",
+        "createdAt": "2026-07-28T05:52:10.307Z",
+        "updatedAt": "2026-07-28T06:20:57.411Z",
+        "completedAt": null,
+        "approval": {
+          "revision": 3,
+          "approvedAt": "2026-07-28T06:05:04.817Z",
+          "contextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+          "inputHash": "9f5ffcd6238a8dae66a257dd",
+          "source": "user-input"
+        },
+        "artifacts": {
+          "plan-review": "plan-review.md",
+          "brief": "brief.md",
+          "prd": "prd.md",
+          "ui": "ui.md",
+          "design": "design.md",
+          "implement": "implement.md",
+          "checks": "checks.md",
+          "review": "review.md",
+          "summary": "summary.md"
+        },
+        "implementationPlan": {
+          "schemaVersion": 1,
+          "updatedAt": "2026-07-28T06:04:31.498Z",
+          "summary": "修复 GitHub automation implementer child 的 provider transport failure 错误归类、有限安全重试与 exactly-once 阶段推进。",
+          "strategy": "先建立 child 首次请求结构化 outcome，再实现 runner 持久化 retry provenance/reservation 和有界退避，最后补齐 exactly-once 与真实 fault-injection 回归测试；不改 UI/publisher。",
+          "maxConcurrency": 2,
+          "execution": {
+            "mode": "mixed",
+            "maxParallel": 2,
+            "groups": [
+              {
+                "id": "IMP-01",
+                "title": "建立 child provider transport 结构化 outcome 与确定性故障夹具",
+                "relation": "serial",
+                "dependencies": [],
+                "subtaskIds": [
+                  "IMP-01"
+                ]
+              },
+              {
+                "id": "IMP-02",
+                "title": "实现 runner 专属状态归类与有限退避重试",
+                "relation": "serial",
+                "dependencies": [],
+                "subtaskIds": [
+                  "IMP-02"
+                ]
+              },
+              {
+                "id": "IMP-03",
+                "title": "保证 exactly-once 阶段推进",
+                "relation": "serial",
+                "dependencies": [],
+                "subtaskIds": [
+                  "IMP-03"
+                ]
+              },
+              {
+                "id": "IMP-04",
+                "title": "补齐回归测试与文档",
+                "relation": "serial",
+                "dependencies": [],
+                "subtaskIds": [
+                  "IMP-04"
+                ]
+              }
+            ]
+          },
+          "subtasks": [
+            {
+              "id": "IMP-01",
+              "title": "建立 child provider transport 结构化 outcome 与确定性故障夹具",
+              "description": "区分 before-first-provider-request、request-started 和 unknown，并补 focused tests。",
+              "order": 10,
+              "dependsOn": [],
+              "dependencies": [],
+              "relation": "serial",
+              "parallelizable": false
+            },
+            {
+              "id": "IMP-02",
+              "title": "实现 runner 专属状态归类与有限退避重试",
+              "description": "新增 implementer transport failure provenance/reservation，最多 2 次重试，20s/60s backoff。",
+              "order": 20,
+              "dependsOn": [],
+              "dependencies": [],
+              "relation": "serial",
+              "parallelizable": false
+            },
+            {
+              "id": "IMP-03",
+              "title": "保证 exactly-once 阶段推进",
+              "description": "防止 checking、validation、publisher 或 PR effect 已存在时重放 implementer。",
+              "order": 30,
+              "dependsOn": [],
+              "dependencies": [],
+              "relation": "serial",
+              "parallelizable": false
+            },
+            {
+              "id": "IMP-04",
+              "title": "补齐回归测试与文档",
+              "description": "覆盖 fault injection、重试上限、取消/暂停、防重复发布，并运行 lint/tsc/diff。",
+              "order": 40,
+              "dependsOn": [],
+              "dependencies": [],
+              "relation": "serial",
+              "parallelizable": false
+            }
+          ]
+        },
+        "implementationProgress": {
+          "schemaVersion": 1,
+          "updatedAt": "2026-07-28T06:28:58.591Z",
+          "activeSubtaskIds": [],
+          "queuedSubtaskIds": [],
+          "counts": {
+            "pending": 0,
+            "waiting": 0,
+            "ready": 0,
+            "queued": 0,
+            "running": 0,
+            "blocked": 0,
+            "failed": 0,
+            "done": 4,
+            "skipped": 0
+          },
+          "subtasks": {
+            "IMP-01": {
+              "id": "IMP-01",
+              "status": "done",
+              "updatedAt": "2026-07-28T06:13:48.113Z",
+              "startedAt": "2026-07-28T06:05:27.480Z",
+              "finishedAt": "2026-07-28T06:13:48.113Z",
+              "attempts": 1,
+              "runIds": [
+                "implementer-2e98c3b0a314aea4b1e9f155"
+              ],
+              "lastRunId": "implementer-2e98c3b0a314aea4b1e9f155",
+              "currentRunId": "implementer-2e98c3b0a314aea4b1e9f155",
+              "claimedAt": "2026-07-28T06:05:27.480Z",
+              "claimedByContextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+              "summary": "Implementer run succeeded; child outcome and deterministic transport fault work completed.",
+              "validation": [
+                "Studio implementer run succeeded"
+              ]
+            },
+            "IMP-02": {
+              "id": "IMP-02",
+              "status": "done",
+              "updatedAt": "2026-07-28T06:13:48.160Z",
+              "startedAt": "2026-07-28T06:05:27.498Z",
+              "finishedAt": "2026-07-28T06:13:48.160Z",
+              "attempts": 1,
+              "runIds": [
+                "implementer-f3efff2b51a2963f4a4766a4"
+              ],
+              "lastRunId": "implementer-f3efff2b51a2963f4a4766a4",
+              "currentRunId": "implementer-f3efff2b51a2963f4a4766a4",
+              "claimedAt": "2026-07-28T06:05:27.498Z",
+              "claimedByContextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+              "summary": "Implementer run succeeded; runner mapping and bounded retry work completed.",
+              "validation": [
+                "Studio implementer run succeeded"
+              ]
+            },
+            "IMP-03": {
+              "id": "IMP-03",
+              "status": "done",
+              "updatedAt": "2026-07-28T06:20:53.441Z",
+              "startedAt": "2026-07-28T06:14:08.727Z",
+              "finishedAt": "2026-07-28T06:20:53.441Z",
+              "attempts": 1,
+              "runIds": [
+                "implementer-c6713f1c7aed2ce6381c1849"
+              ],
+              "lastRunId": "implementer-c6713f1c7aed2ce6381c1849",
+              "currentRunId": "implementer-c6713f1c7aed2ce6381c1849",
+              "claimedAt": "2026-07-28T06:14:08.727Z",
+              "claimedByContextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+              "summary": "Implementer run succeeded; exactly-once stage progression work completed.",
+              "validation": [
+                "Studio implementer run succeeded"
+              ]
+            },
+            "IMP-04": {
+              "id": "IMP-04",
+              "status": "done",
+              "updatedAt": "2026-07-28T06:20:53.455Z",
+              "startedAt": "2026-07-28T06:14:08.745Z",
+              "finishedAt": "2026-07-28T06:20:53.455Z",
+              "attempts": 1,
+              "runIds": [
+                "implementer-da16b87a2504d58439191226"
+              ],
+              "lastRunId": "implementer-da16b87a2504d58439191226",
+              "currentRunId": "implementer-da16b87a2504d58439191226",
+              "claimedAt": "2026-07-28T06:14:08.745Z",
+              "claimedByContextId": "pi_019fa644-b890-7540-a361-d5cf147ba045",
+              "summary": "Implementer run succeeded; regression and documentation work completed.",
+              "validation": [
+                "Studio implementer run succeeded"
+              ]
+            }
+          },
+          "history": [
+            {
+              "at": "2026-07-28T06:05:27.480Z",
+              "subtaskId": "IMP-01",
+              "from": "ready",
+              "to": "running"
+            },
+            {
+              "at": "2026-07-28T06:05:27.498Z",
+              "subtaskId": "IMP-02",
+              "from": "ready",
+              "to": "running"
+            },
+            {
+              "at": "2026-07-28T06:13:48.113Z",
+              "subtaskId": "IMP-01",
+              "from": "running",
+              "to": "done",
+              "runId": "implementer-2e98c3b0a314aea4b1e9f155",
+              "message": "Implementer run succeeded; child outcome and deterministic transport fault work completed."
+            },
+            {
+              "at": "2026-07-28T06:13:48.160Z",
+              "subtaskId": "IMP-02",
+              "from": "running",
+              "to": "done",
+              "runId": "implementer-f3efff2b51a2963f4a4766a4",
+              "message": "Implementer run succeeded; runner mapping and bounded retry work completed."
+            },
+            {
+              "at": "2026-07-28T06:14:08.727Z",
+              "subtaskId": "IMP-03",
+              "from": "ready",
+              "to": "running"
+            },
+            {
+              "at": "2026-07-28T06:14:08.745Z",
+              "subtaskId": "IMP-04",
+              "from": "ready",
+              "to": "running"
+            },
+            {
+              "at": "2026-07-28T06:20:53.441Z",
+              "subtaskId": "IMP-03",
+              "from": "running",
+              "to": "done",
+              "runId": "implementer-c6713f1c7aed2ce6381c1849",
+              "message": "Implementer run succeeded; exactly-once stage progression work completed."
+            },
+            {
+              "at": "2026-07-28T06:20:53.455Z",
+              "subtaskId": "IMP-04",
+              "from": "running",
+              "to": "done",
+              "runId": "implementer-da16b87a2504d58439191226",
+              "message": "Implementer run succeeded; regression and documentation work completed."
+            }
+          ]
+        },
+        "runIds": [
+          "implementer-2e98c3b0a314aea4b1e9f155",
+          "implementer-f3efff2b51a2963f4a4766a4",
+          "implementer-c6713f1c7aed2ce6381c1849",
+          "implementer-da16b87a2504d58439191226"
+        ],
+        "attempts": 0
       }
     ]
   }

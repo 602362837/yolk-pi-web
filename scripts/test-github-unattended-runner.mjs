@@ -929,6 +929,290 @@ await test("session/runner sources no longer delete shared process.env", () => {
   );
 });
 
+// ─── IMP-03: durable post-implementer checkpoint convergence ───────────────
+
+await test("IMP-03 converges torn post-implementer writes without replaying implementer", () => {
+  const effects = [];
+  assert.equal(
+    runner.resolveGithubAutomationPostImplementerCheckpoint(
+      { phase: "implementing", checkpoint: "implementing", effects },
+      { checkpoint: "checking" },
+    ),
+    "checking",
+    "runner state success must advance a stale job into checker",
+  );
+  assert.equal(
+    runner.resolveGithubAutomationPostImplementerCheckpoint(
+      { phase: "checking", checkpoint: "checking", effects },
+      { checkpoint: "implementing" },
+    ),
+    "checking",
+    "job checker evidence must prevent a stale state from replaying implementer",
+  );
+  assert.equal(
+    runner.resolveGithubAutomationPostImplementerCheckpoint(
+      { phase: "final_policy", checkpoint: "awaiting_publish", effects },
+      { checkpoint: "implementing" },
+    ),
+    "awaiting_publish",
+    "validation/publish evidence must outrank an implementing state",
+  );
+  assert.equal(
+    runner.resolveGithubAutomationPostImplementerCheckpoint(
+      { phase: "implementing", checkpoint: "implementing", effects: [{ name: "pull_request" }] },
+      { checkpoint: "implementing" },
+    ),
+    "pr_open",
+    "a durable PR effect must prohibit implementer replay",
+  );
+  assert.equal(
+    runner.resolveGithubAutomationPostImplementerCheckpoint(
+      { phase: "implementing", checkpoint: "implementing", effects },
+      { checkpoint: "implementing" },
+    ),
+    null,
+  );
+});
+
+// ─── IMP-01: implementer transport outcome boundary ─────────────────────────
+
+await test("IMP-01 implementer adapter keeps transport retry evidence structured and fail-closed", async () => {
+  const confirmed = session.toGithubImplementerRunOutcome({
+    status: "failed",
+    injectedOutcome: {
+      kind: "provider_transport_failure",
+      stage: "before_first_provider_request",
+      providerRequestStarted: false,
+      retryable: true,
+    },
+  });
+  assert.deepEqual(confirmed, {
+    kind: "provider_transport_failure",
+    stage: "before_first_provider_request",
+    providerRequestStarted: false,
+    retryable: true,
+  });
+
+  // A terminal status/error text cannot prove the request boundary. The adapter
+  // must return unknown/fail-closed rather than use a message regex.
+  assert.deepEqual(session.toGithubImplementerRunOutcome({ status: "failed" }), {
+    kind: "failed",
+    stage: "unknown",
+    providerRequestStarted: null,
+    retryable: false,
+  });
+  assert.deepEqual(
+    session.toGithubImplementerRunOutcome({
+      status: "failed",
+      injectedOutcome: {
+        kind: "provider_transport_failure",
+        stage: "request_started",
+        providerRequestStarted: true,
+        retryable: true,
+      },
+    }),
+    {
+      kind: "failed",
+      stage: "unknown",
+      providerRequestStarted: null,
+      retryable: false,
+    },
+  );
+
+  session._testSetGithubFullAgentMemberOverride(async () => ({
+    output: "",
+    status: "failed",
+    warnings: [],
+    implementerOutcome: confirmed,
+  }));
+  try {
+    const result = await session.runGithubFullAgentMember({
+      worktreePath: agentDir,
+      taskId: "task-imp-01",
+      member: "implementer",
+      prompt: "fixture prompt",
+      runId: "imp-01-run",
+    });
+    assert.deepEqual(result.implementerOutcome, confirmed);
+    assertNoSentinel(result.implementerOutcome, "implementer outcome");
+  } finally {
+    session._testSetGithubFullAgentMemberOverride(null);
+  }
+});
+
+// ─── IMP-04: implementer retry regression lane ───────────────────────────────
+
+async function seedImplementerRetryFixture(issueNumber) {
+  const repoPath = mkdtempSync(join(tmpdir(), "gha-impl-retry-"));
+  gitInit(repoPath);
+  const registered = await registry.registerProject({
+    path: repoPath,
+    displayName: `gha-impl-retry-${issueNumber}`,
+  });
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: 710000000 + issueNumber,
+    repositoryFullName: `fixture/implementer-retry-${issueNumber}`,
+    issueNumber,
+    installationId: 1,
+    deliveryId: null,
+    issueTitlePreview: "docs: fixture",
+  });
+  const defaultCfg = configMod.createDefaultGithubAutomationConfig();
+  const config = {
+    ...defaultCfg,
+    enabled: true,
+    mode: "unattended",
+    unattended: { ...defaultCfg.unattended, enabled: true },
+    repositories: [{
+      repositoryId: job.repositoryId,
+      fullName: job.repositoryFullName,
+      installationId: 1,
+      projectId: registered.project.id,
+      projectRoot: repoPath,
+      ownerActorIds: [],
+      assigneeIdentitySource: "machine-active-credential",
+      baseRef: "main",
+    }],
+  };
+  runner.writeGithubAutomationRunnerState({
+    schemaVersion: 1,
+    jobId: job.jobId,
+    repositoryId: job.repositoryId,
+    issueNumber: job.issueNumber,
+    generation: job.generation,
+    checkpoint: "implementing",
+    worktreePath: repoPath,
+    branchName: "main",
+    baseRef: "main",
+    projectId: registered.project.id,
+    spaceId: "main",
+    taskId: `task-imp-04-${issueNumber}`,
+    // Avoid a real parent Session/provider in this focused child fault test.
+    sessionId: "sess-imp-04",
+    contextId: "pi_sess-imp-04",
+    sessionFile: null,
+    scopeFingerprint: null,
+    ownerActorId: 1,
+    ownerCommentId: 1,
+    ownerCommentHash: "a".repeat(64),
+    lastMember: null,
+    lastRunId: null,
+    pauseRequested: false,
+    updatedAt: new Date().toISOString(),
+    reasonCode: null,
+  });
+  return { job, config };
+}
+
+const beforeRequestTransportOutcome = {
+  kind: "provider_transport_failure",
+  stage: "before_first_provider_request",
+  providerRequestStarted: false,
+  retryable: true,
+};
+
+await test("IMP-04 retries confirmed pre-request transport only twice with durable 20s/60s budget", async () => {
+  await store.ensureGithubAutomationStoreLayout();
+  const { job: initialJob, config } = await seedImplementerRetryFixture(9041);
+  let launches = 0;
+  session._testSetGithubFullAgentMemberOverride(async () => {
+    launches += 1;
+    return { output: "", status: "failed", warnings: [], outcome: beforeRequestTransportOutcome };
+  });
+  try {
+    let job = initialJob;
+    const first = await runner.runGithubUnattendedImplementation({ job, config, claimComplete: true });
+    job = first.job;
+    assert.equal(first.disposition?.kind, "retry_due");
+    assert.equal(job.reasonCode, "implementer_provider_transport_failure");
+    assert.notEqual(job.reasonCode, "check_runtime_unavailable");
+    let state = runner.readGithubAutomationRunnerState(job.jobId);
+    assert.equal(state?.implementerRetry?.attemptOrdinal, 1);
+    assert.equal(state?.implementerRetry?.retryCount, 0);
+    assert.equal(state?.implementerRetry?.providerRequestStarted, false);
+    assert.equal(state?.implementerRetry?.outcomeKind, "provider_transport_failure");
+    assert.ok(state?.implementerRetry?.nextRetryAt);
+    assert.ok(Date.parse(state.implementerRetry.nextRetryAt) - Date.now() >= 19_000);
+
+    // Simulate the scheduler reaching each persisted due time without waiting.
+    runner.writeGithubAutomationRunnerState({
+      ...state,
+      implementerRetry: { ...state.implementerRetry, nextRetryAt: new Date(Date.now() - 1).toISOString() },
+    });
+    const second = await runner.runGithubUnattendedImplementation({ job, config, claimComplete: true });
+    job = second.job;
+    assert.equal(second.disposition?.kind, "retry_due");
+    state = runner.readGithubAutomationRunnerState(job.jobId);
+    assert.equal(state?.implementerRetry?.attemptOrdinal, 2);
+    assert.equal(state?.implementerRetry?.retryCount, 1);
+    assert.ok(Date.parse(state.implementerRetry.nextRetryAt) - Date.now() >= 59_000);
+
+    runner.writeGithubAutomationRunnerState({
+      ...state,
+      implementerRetry: { ...state.implementerRetry, nextRetryAt: new Date(Date.now() - 1).toISOString() },
+    });
+    const third = await runner.runGithubUnattendedImplementation({ job, config, claimComplete: true });
+    assert.equal(third.job.status, "blocked");
+    assert.equal(third.job.reasonCode, "implementer_provider_transport_failure_after_start");
+    assert.equal(launches, 3, "initial run plus exactly two retries");
+  } finally {
+    session._testSetGithubFullAgentMemberOverride(null);
+  }
+});
+
+await test("IMP-04 cancellation pauses without transport retry or checker/publisher progression", async () => {
+  await store.ensureGithubAutomationStoreLayout();
+  const { job, config } = await seedImplementerRetryFixture(9042);
+  session._testSetGithubFullAgentMemberOverride(async () => ({
+    output: "", status: "cancelled", warnings: [],
+  }));
+  try {
+    const result = await runner.runGithubUnattendedImplementation({ job, config, claimComplete: true });
+    assert.equal(result.job.status, "paused");
+    assert.equal(result.job.phase, "paused");
+    assert.equal(result.job.reasonCode, "implementer_cancelled");
+    const state = runner.readGithubAutomationRunnerState(job.jobId);
+    assert.equal(state?.implementerRetry?.outcomeKind, "cancelled");
+    assert.equal(state?.checkpoint, "paused", "cancel must not advance to checker");
+    assert.equal(result.disposition?.kind, "waiting");
+  } finally {
+    session._testSetGithubFullAgentMemberOverride(null);
+  }
+});
+
+await test("IMP-04 terminal publish checkpoint outranks persisted retry metadata", async () => {
+  await store.ensureGithubAutomationStoreLayout();
+  const { job: initialJob } = await seedImplementerRetryFixture(9043);
+  const baseline = "0".repeat(64);
+  runner.writeGithubAutomationRunnerState({
+    ...runner.readGithubAutomationRunnerState(initialJob.jobId),
+    // A persisted publish terminal is authoritative over stale retry metadata.
+    checkpoint: "pr_open",
+    implementerRetry: {
+      generation: initialJob.generation,
+      attemptOrdinal: 1,
+      retryCount: 0,
+      runId: "gha-impl-fixture",
+      runFence: "impl-fixture",
+      providerRequestStarted: false,
+      outcomeKind: "provider_transport_failure",
+      nextRetryAt: new Date(Date.now() - 1).toISOString(),
+      worktreeDiffHash: baseline,
+      launchState: "terminal",
+    },
+  });
+  const state = runner.readGithubAutomationRunnerState(initialJob.jobId);
+  assert.equal(state?.checkpoint, "pr_open");
+  assert.equal(
+    runner.resolveGithubAutomationPostImplementerCheckpoint(
+      { phase: "implementing", checkpoint: "implementing", effects: [] },
+      { checkpoint: state.checkpoint },
+    ),
+    "pr_open",
+    "a terminal publish checkpoint must outrank stale retry metadata",
+  );
+});
+
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
 
 runner._testResetGithubUnattendedInFlight?.();

@@ -545,6 +545,12 @@ Parent Session create classifies failures **before** generic sanitization (`lib/
 - Explicit disposition: hard → `blocked` + `blockedAtLayer=session_bootstrap`; transient → `retry_due` + `nextRetryAt`. Scheduler post-processing must preserve the bootstrap reason.
 - Success writes runner `sessionId`/`contextId`/`sessionFile` (server-only sidecar), advances independent `agentRunCount` / `progressRevision` / `meaningfulProgressCount` with `lastMeaningfulProgressKind=session_created`, and appends path-free `unattended_session_created` (opaque short id / binding flags only).
 
+#### Implementer transport retry lane
+
+The GitHub unattended **implementer** has a separate, generation-scoped retry lane. A retry is permitted only when the child adapter supplies the structured tuple `provider_transport_failure` + `before_first_provider_request` + `providerRequestStarted=false`; production terminal text is never parsed to infer that boundary. The durable reservation records attempt ordinal, run/fence, opaque child-id hash, request-start state, outcome, fixed-base WorkTree diff hash, and retry due time before launch. It permits at most three total runs (initial + two retries), with 20s then 60s backoff; a crash while reserved, an unknown/started request, a changed WorkTree diff, later checker/validation/publish evidence, malformed state, or exhausted budget blocks for operator action.
+
+`implementer_provider_transport_failure` and `implementer_provider_transport_failure_after_start` are implementer-only reasons. `check_runtime_unavailable` remains exclusively a restricted checker reservation/runtime reason. A successful implementer may advance once to `checking`; cancellation pauses and no transport retry may replay checking, validation, or publisher effects.
+
 #### Counts and truthfulness
 
 - Legacy `attempt` is retained and defined as **scheduler lease-run count** (UI: 「调度尝试 N」). Lease acquisition increments it; handler readiness failure before lease does not; retry/reconcile never resets historical attempt.

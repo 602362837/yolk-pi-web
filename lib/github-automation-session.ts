@@ -143,16 +143,45 @@ export type GithubAutomationBootstrapOverride = (
   | Promise<GithubAutomationAgentSessionBootstrapResult>
   | GithubAutomationAgentSessionBootstrapResult;
 
-export type GithubFullAgentMemberOverride = (
-  input: RunGithubFullAgentMemberInput,
-) => Promise<{
+export type GithubImplementerOutcomeKind =
+  | "succeeded"
+  | "cancelled"
+  | "failed"
+  | "runtime_unavailable"
+  | "provider_transport_failure";
+
+/**
+ * Server-owned, diagnostic-free terminal classification for unattended
+ * implementer children. Pi's public child API currently has no first-provider-
+ * request event, so production failures are deliberately `unknown` rather than
+ * inferred from an error message. Only the test hook can supply the confirmed
+ * before-request transport boundary used by the later retry lane.
+ */
+export interface GithubImplementerRunOutcome {
+  kind: GithubImplementerOutcomeKind;
+  stage: "before_first_provider_request" | "provider_request_started" | "unknown";
+  providerRequestStarted: boolean | null;
+  retryable: boolean;
+  /** Server-only opaque child id; the runner hashes before durable projection. */
+  childSessionId?: string;
+}
+
+export interface GithubFullAgentMemberResult {
   output: string;
   status: string;
   warnings: string[];
   childSessionId?: string;
   childSessionFile?: string;
   checkResult?: WorktreeCheckExecutionResult;
-}>;
+  /** Present only for the GitHub unattended implementer member. */
+  outcome?: GithubImplementerRunOutcome;
+  /** Compatibility alias while runner callers migrate to `outcome`. */
+  implementerOutcome?: GithubImplementerRunOutcome;
+}
+
+export type GithubFullAgentMemberOverride = (
+  input: RunGithubFullAgentMemberInput,
+) => Promise<GithubFullAgentMemberResult>;
 
 declare global {
   // Test-only process-global overrides for GHR-03 fault injection.
@@ -638,6 +667,70 @@ export async function bootstrapGithubAutomationAgentSession(
 
 // ─── Full-agent child run ────────────────────────────────────────────────────
 
+function isGithubImplementerRunOutcome(value: unknown): value is GithubImplementerRunOutcome {
+  if (!value || typeof value !== "object") return false;
+  const outcome = value as Partial<GithubImplementerRunOutcome>;
+  if (
+    !["succeeded", "cancelled", "failed", "runtime_unavailable", "provider_transport_failure"].includes(
+      outcome.kind ?? "",
+    ) ||
+    !["before_first_provider_request", "provider_request_started", "unknown"].includes(
+      outcome.stage ?? "",
+    ) ||
+    typeof outcome.retryable !== "boolean" ||
+    (outcome.providerRequestStarted !== true &&
+      outcome.providerRequestStarted !== false &&
+      outcome.providerRequestStarted !== null)
+  ) {
+    return false;
+  }
+  // The retry lane may only trust this exact evidence tuple. All other input
+  // stays fail-closed, including an injected transport failure after/without a
+  // proven request boundary.
+  if (outcome.kind === "provider_transport_failure") {
+    return outcome.stage === "before_first_provider_request" &&
+      outcome.providerRequestStarted === false &&
+      outcome.retryable === true;
+  }
+  return outcome.kind === "succeeded"
+    ? outcome.stage === "provider_request_started" && outcome.providerRequestStarted === true && !outcome.retryable
+    : outcome.stage === "unknown" && outcome.providerRequestStarted === null && !outcome.retryable;
+}
+
+/**
+ * Convert a public child terminal result to the runner's narrow outcome.
+ * There is no supported Pi SDK event proving a provider request has started.
+ * Therefore only success proves it happened; all non-success production
+ * terminals remain unknown and are never eligible for transport retry.
+ */
+export function toGithubImplementerRunOutcome(input: {
+  status: string;
+  childSessionId?: string;
+  injectedOutcome?: unknown;
+}): GithubImplementerRunOutcome {
+  const childSessionId =
+    typeof input.childSessionId === "string" && input.childSessionId.trim()
+      ? input.childSessionId.trim()
+      : undefined;
+  const withChildSession = (outcome: GithubImplementerRunOutcome): GithubImplementerRunOutcome =>
+    childSessionId ? { ...outcome, childSessionId } : outcome;
+  if (isGithubImplementerRunOutcome(input.injectedOutcome)) {
+    return withChildSession({ ...input.injectedOutcome });
+  }
+  if (input.status === "succeeded") {
+    return withChildSession({
+      kind: "succeeded",
+      stage: "provider_request_started",
+      providerRequestStarted: true,
+      retryable: false,
+    });
+  }
+  if (input.status === "cancelled") {
+    return withChildSession({ kind: "cancelled", stage: "unknown", providerRequestStarted: null, retryable: false });
+  }
+  return withChildSession({ kind: "failed", stage: "unknown", providerRequestStarted: null, retryable: false });
+}
+
 /**
  * Build a prompt envelope that marks GitHub content as untrusted data and
  * states residual risk. Never includes App/machine tokens.
@@ -706,14 +799,7 @@ export function buildGithubFullAgentPromptEnvelope(input: {
  */
 export async function runGithubFullAgentMember(
   input: RunGithubFullAgentMemberInput,
-): Promise<{
-  output: string;
-  status: string;
-  warnings: string[];
-  childSessionId?: string;
-  childSessionFile?: string;
-  checkResult?: WorktreeCheckExecutionResult;
-}> {
+): Promise<GithubFullAgentMemberResult> {
   if (containsGithubAutomationSecretInjectionMarker(input.prompt)) {
     // Typed preflight failure so operator events keep an allowlisted code/stage
     // instead of only "Internal GitHub automation error" (IMP-001).
@@ -732,7 +818,14 @@ export async function runGithubFullAgentMember(
   // asserted without launching a real Studio child / network.
   const memberOverride = globalThis.__piGithubFullAgentMemberOverride;
   if (typeof memberOverride === "function") {
-    return memberOverride(input);
+    const overridden = await memberOverride(input);
+    if (input.member !== "implementer") return overridden;
+    const outcome = toGithubImplementerRunOutcome({
+      status: overridden.status,
+      childSessionId: overridden.childSessionId,
+      injectedOutcome: overridden.outcome ?? overridden.implementerOutcome,
+    });
+    return { ...overridden, outcome, implementerOutcome: outcome };
   }
 
   // Per-run scrubbed env *copy* — never mutate shared Next process.env.
@@ -797,7 +890,13 @@ export async function runGithubFullAgentMember(
     toolEnv: scrubbedEnv,
     ...(controller ? { worktreeCheckController: controller } : {}),
   });
-    return controller ? { ...child, checkResult: controller.finalize() } : child;
+    const result = controller ? { ...child, checkResult: controller.finalize() } : child;
+    if (input.member !== "implementer") return result;
+    const outcome = toGithubImplementerRunOutcome({
+      status: result.status,
+      childSessionId: result.childSessionId,
+    });
+    return { ...result, outcome, implementerOutcome: outcome };
   } finally {
     await controller?.releaseLease();
   }
