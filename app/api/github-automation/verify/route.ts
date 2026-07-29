@@ -1,10 +1,12 @@
 /**
  * POST /api/github-automation/verify
  *
- * Fixed setup readiness re-check (IMP-001 / IMP-03).
+ * Fixed analysis setup readiness re-check (GIA-04).
  * - Cache-Control: no-store
  * - No request body fields required (body ignored / rejected if secret-like)
- * - Does not enqueue jobs, wake the scheduler, or mutate GitHub (read-only App probes)
+ * - Does not enqueue jobs, wake the scheduler, mutate GitHub, or run a model turn
+ * - Checks App credentials, installation, Metadata+Issues, allowlist, project
+ *   readability, analysis model readiness, and webhook health
  * - Never returns secrets, absolute paths, or raw webhook bodies
  */
 

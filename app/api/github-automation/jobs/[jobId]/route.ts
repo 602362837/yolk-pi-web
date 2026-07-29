@@ -1,11 +1,12 @@
 /**
  * GET /api/github-automation/jobs/[jobId]
- * POST /api/github-automation/jobs/[jobId]  { action: "retry"|"pause"|"resume" }
+ * POST /api/github-automation/jobs/[jobId]  { action: "retry" }
  *
- * Safe job projection + fixed state-gated actions (GHA-09).
+ * Safe analysis job projection + state-gated retry (GIA-04).
  * - Cache-Control: no-store
- * - Actions are idempotent-ish, rate-limited, state-gated
- * - Client cannot pass phase/repo/policy/token/command
+ * - Only action "retry" is accepted; pause/resume per-job semantics are removed
+ * - Retry resumes the first unconfirmed checkpoint; never accepts phase/repo/policy/token/command
+ * - Client cannot smuggle closed-loop fields
  */
 
 import { NextResponse } from "next/server";
@@ -21,10 +22,7 @@ import {
   isGithubAutomationError,
   safeGithubAutomationErrorMessage,
 } from "@/lib/github-automation-errors";
-import {
-  readGithubAutomationIssueState,
-  readGithubAutomationJob,
-} from "@/lib/github-automation-store";
+import { readGithubAutomationJob } from "@/lib/github-automation-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,11 +31,7 @@ const NO_STORE_HEADERS = {
   "Cache-Control": "no-store",
 } as const;
 
-const ALLOWED_ACTIONS = new Set<GithubAutomationJobActionName>([
-  "retry",
-  "pause",
-  "resume",
-]);
+const ALLOWED_ACTIONS = new Set<GithubAutomationJobActionName>(["retry"]);
 
 interface RouteContext {
   params: Promise<{ jobId: string }>;
@@ -75,23 +69,8 @@ export async function GET(
     }
 
     const config = await readGithubAutomationConfig();
-    const issue = await readGithubAutomationIssueState(
-      job.repositoryId,
-      job.issueNumber,
-    );
-    const claimStatus =
-      issue?.claimStatus === "complete"
-        ? "complete"
-        : issue?.claimStatus === "blocked_claim_assignee"
-          ? "blocked_claim_assignee"
-          : issue?.claimStatus === "incomplete"
-            ? "incomplete"
-            : "unknown";
-
     const projection = toGithubAutomationJobSafeProjection(job, {
-      claimStatus,
       automationEnabled: config.enabled,
-      mode: config.mode,
       globalPaused: config.paused,
     });
     assertGithubAutomationProjectionSafe(projection);
@@ -188,12 +167,15 @@ export async function POST(
     }
 
     const actionRaw = rec.action;
-    if (typeof actionRaw !== "string" || !ALLOWED_ACTIONS.has(actionRaw as GithubAutomationJobActionName)) {
+    if (
+      typeof actionRaw !== "string" ||
+      !ALLOWED_ACTIONS.has(actionRaw as GithubAutomationJobActionName)
+    ) {
       return NextResponse.json(
         {
           ok: false,
           code: "invalid_config",
-          message: 'action must be "retry", "pause", or "resume"',
+          message: 'action must be "retry"',
         },
         { status: 400, headers: NO_STORE_HEADERS },
       );

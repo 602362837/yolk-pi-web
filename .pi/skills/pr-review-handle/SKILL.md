@@ -21,25 +21,25 @@ Handle an inbound GitHub PR end-to-end for **yolk-pi-web / pi-agnet-web**: claim
 - User asks to 认领、打标签、审核、review、approve、合并、拒绝合并、request changes.
 - Default product context is this workspace; resolve the concrete `owner/repo` from the PR URL when present.
 
-## Identity vs automation publisher
+## Identity vs historical automation PRs
 
 - **Manual review (this Skill):** uses the current `gh` user for claim/review/merge.
-- **Automation PRs:** authored by the GitHub App; branch usually `ypi/gha/<repoId>/issue-<n>/g<gen>`; machine credential user may appear only as Issue assignee, not as PR author.
-- Do not treat App bot as the Issue assignee. Do not use personal PAT to “fix” App-authored PRs by rewriting history.
-- full agent residual risk: a green PR does not mean the agent was sandboxed during implementation.
+- **Historical automation PRs** (product no longer creates these): authored by a GitHub App; branch usually `ypi/gha/<repoId>/issue-<n>/g<gen>`; machine credential user may appear only as Issue assignee, not as PR author.
+- Do not treat App bot as the Issue assignee. Do not use personal PAT to “fix” App-authored history by rewriting commits.
+- A green historical automation PR does not prove the former full-agent path was sandboxed.
 
-## Automation closing contract (hard merge gate)
+## Historical automation closing contract (hard merge gate)
 
-For **YPI automation PRs**, a missing/invalid Development closing contract is a **blocking** review failure. Do not approve or merge until fixed.
+For **historical YPI automation PRs**, a missing/invalid Development closing contract is a **blocking** review failure. Do not approve or merge until fixed. The former runtime module `lib/github-pr-contract.ts` has been removed; keep the rules self-contained here.
 
-Identify automation PRs when **any** of these hold:
+Identify historical automation PRs when **any** of these hold:
 
 - head branch matches `ypi/gha/<repoId>/issue-<n>/g<gen>`
 - body contains `ypi-github-automation:pr-contract`
 - author is the GitHub App bot for this installation
-- user/context says the PR was created by GitHub automation / unattended publisher
+- user/context says the PR was created by the retired GitHub automation / unattended publisher
 
-Required body contract (see `lib/github-pr-contract.ts`):
+Required body contract:
 
 1. **Exactly one** same-repo closing keyword: `Fixes #N` / `Closes #N` / `Resolves #N`
 2. **Zero** cross-repo closings such as `Fixes owner/repo#N`
@@ -48,13 +48,13 @@ Required body contract (see `lib/github-pr-contract.ts`):
 If the contract is missing, multi-issue, mismatched, or cross-repo:
 
 1. `--request-changes` with reason code `missing_closing_contract` / `closing_mismatch` / `cross_repo_closing`
-2. State clearly that automation PRs must keep Issue Development via a single same-repo `Fixes #N`
+2. State clearly that historical automation PRs must keep Issue Development via a single same-repo `Fixes #N`
 3. **Do not merge**
 4. Keep the linked Issue open (closed-unmerged must not close the Issue)
 
-After a valid automation PR is squash-merged, verify the Issue closed (or is pending auto-close). If the PR is closed without merge, confirm the Issue **remains open** and report `closed-unmerged` — do not close the Issue manually unless the user asks.
+After a valid historical automation PR is squash-merged, verify the Issue closed (or is pending auto-close). If the PR is closed without merge, confirm the Issue **remains open** and report `closed-unmerged` — do not close the Issue manually unless the user asks.
 
-Manual human PRs without the automation marker are not forced through this gate unless the user identifies them as automation or an expected Issue number is supplied.
+Manual human PRs without the automation marker are not forced through this gate unless the user identifies them as automation or an expected Issue number is supplied. The live product path is Issue analysis comments only — it does **not** open new automation PRs.
 
 ## Preconditions
 
@@ -282,7 +282,7 @@ Pre-merge gates (all must hold):
 ```bash
 # Inspect closing contract (automation PRs)
 gh pr view "$N" --repo "$OWNER/$REPO" --json body,headRefName,author,title
-# Body must match a single same-repo Fixes/Closes/Resolves #N (see lib/github-pr-contract.ts).
+# Body must match a single same-repo Fixes/Closes/Resolves #N (historical automation contract; self-contained in this skill).
 ```
 
 Default merge action for this project is **squash**. Once the gates pass, use:

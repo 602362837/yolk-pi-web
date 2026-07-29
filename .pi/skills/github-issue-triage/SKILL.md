@@ -1,7 +1,7 @@
 ---
 name: github-issue-triage
 description: >
-  扫描并处理本项目 GitHub Issues：只针对 yolk-pi-web 仓库中处于 open 状态且没有任何 assignee 的议题，先认领，再分析是否采纳，在议题下发布中文结论评论，最后用 Markdown 表格汇报。只要用户要求处理、筛选、认领、评估、采纳本项目 GitHub 议题，或说“看看有哪些 issue 要处理”，都使用本 Skill；即使用户没有明确说出 Skill 名称，也不要用临时流程替代。
+  扫描并处理本项目 GitHub Issues：只针对 yolk-pi-web 仓库中处于 open 状态且没有任何 assignee 的议题，先由当前 gh 用户 manual 认领，再分析是否采纳，在议题下发布中文结论评论，最后用 Markdown 表格汇报。不触发服务端 Issue 分析 job、不实现代码、也不创建 PR。只要用户要求处理、筛选、认领、评估、采纳本项目 GitHub 议题，或说“看看有哪些 issue 要处理”，都使用本 Skill；即使用户没有明确说出 Skill 名称，也不要用临时流程替代。
 ---
 
 # GitHub 议题处理（项目级）
@@ -22,33 +22,28 @@ description: >
 
 ## 身份矩阵（必读）
 
-| 身份 | 职责 | 本 Skill（manual） | 自动化 runner（App） |
+| 身份 | 职责 | 本 Skill（manual） | 服务端 Issue 分析（App，live） |
 | --- | --- | --- | --- |
-| 当前 `gh` 用户 | 本机 active 凭据用户 | 作为 assignee **并**执行 `gh` 写操作 | 仅作为 assignee **展示**；token 不用于 Bot 写 |
-| GitHub App Bot | webhook / labels / 评论 / assign API / PR | 不使用 | 唯一 mutation / 评论作者 |
-| 仓库 owner | 是否授权自动实现 | 人工沟通 | 评论自然语言采纳（actor id 校验） |
+| 当前 `gh` 用户 | 本机 active 凭据用户 | 作为 assignee **并**执行 `gh` 写操作 | **不使用**（分析路径不认领、不写 Assignee） |
+| GitHub App Bot | webhook / Issues 评论 / 可选 type label / 严格关闭 | 不使用 | 唯一 App mutation 身份 |
+| 仓库 owner / 维护者 | 人工决策是否进入实现 | 人工沟通 | **无** Owner 评论指令；不会因评论启动实现 |
 
-- **Manual 模式（本 Skill）**：继续使用当前用户 `gh` 认领与评论；身份是操作者本人。
-- **Automation 模式**：App Bot 是评论/labels/assignment API 作者；本机 active `gh`/git credential 用户只出现在 Assignees。成功认领必须**同时**有：
-  1. `ypi:claimed` label（回读确认）；
-  2. Assignees 含本机凭据解析出的 login（回读确认，**不能**只看 assign API 2xx）；
-  3. 本地 issue lease / durable job；
-  4. 带 marker 的 Bot 中文结论评论。
+- **Manual 模式（本 Skill）**：使用当前用户 `gh` 认领与评论；身份是操作者本人。不启动服务端分析 job，也不创建 PR。
+- **服务端 live 模式**：仅对人类 `issues.opened` 做只读仓库证据分析，发布一条 `kind=issue_analysis` 规范评论；严格门禁下才可能 close。**不再**自动认领、Assignee、`ypi:claimed`、Owner 指令、unattended 实现或自动 PR。
 - **禁止**把 App bot 描述成 assignee。
-- **禁止**在认领不完整时写“已认领成功”。
-- 凭据/assign/回读失败时自动化进入 `blocked_claim_assignee`，可保留 `ypi:claim-blocked`，**不**保留误导性的 `ypi:claimed`。
+- **禁止**在认领回读失败时写“已认领成功”。
 
-## 与自动化的互斥（manual 必须跳过）
+## 与服务端分析 / 历史自动化的互斥（manual 必须跳过）
 
-在扫描或处理每个议题前，若发现该议题已有 **active YPI automation claim**，则 **跳过** 该议题的认领/评论写操作，并在报告中标明原因。判定信号（任一即可）：
+在扫描或处理每个议题前，若发现该议题已有 **服务端分析评论或历史闭环痕迹**，则 **默认跳过** 该议题的认领/结论写操作，并在报告中标明原因。判定信号（任一即可）：
 
-- labels 含 `ypi:claimed` 且 Assignees 非空，评论含 `<!-- ypi-github-automation:` marker；
-- labels 含 `ypi:claim-blocked` / `ypi:triaged` / `ypi:awaiting-owner` 等自动化生命周期标签且存在自动化结论评论；
-- 本地 durable store（若可检查）显示该 `repoId#issue` 的 `claimStatus` 为 `complete` 或 `blocked_claim_assignee`，或 active job phase 为 claim/triage/awaiting_owner。
+- 评论含 `<!-- ypi-github-automation:v3 kind=issue_analysis`（或同族 `ypi-github-automation:` 且 `kind=issue_analysis`）；
+- labels 含历史 `ypi:claimed` / `ypi:claim-blocked` / `ypi:awaiting-owner` 等生命周期标签且存在自动化结论评论；
+- 本地 durable store（若可检查）显示该 `repoId#issue` 存在 active/completed `issue_analysis` job，或历史 retired pipeline 记录仍指向该 Issue。
 
-跳过时表格“是否采纳”写 `跳过（自动化认领中）` 或 `跳过（自动化认领未完成）`，不要再 `gh issue edit --add-assignee`，不要再发第二条人工结论盖过 Bot marker 评论。
+跳过时表格“是否采纳”写 `跳过（服务端分析中/已有分析评论）` 或 `跳过（历史自动化痕迹）`，不要再 `gh issue edit --add-assignee`，不要再发第二条人工结论盖过 Bot marker 评论。
 
-用户明确要求“强制人工接管”时，先说明会与自动化 dual-write 风险，再按用户指示操作；默认不强制。
+用户明确要求“强制人工接管”时，先说明会与服务端分析评论 dual-write 风险，再按用户指示操作；默认不强制。
 
 ## 前置检查
 
@@ -80,7 +75,7 @@ gh issue list \
   --json number,title,url,body,author,labels,assignees,createdAt,updatedAt
 ```
 
-同时建议复查 open 且已有自动化 label 的议题，避免与 automation 冲突（只读，不写）：
+同时建议复查 open 议题评论中是否已有服务端分析 marker，以及历史 `ypi:claimed` 标签（只读，不写）：
 
 ```bash
 gh issue list \
@@ -88,7 +83,7 @@ gh issue list \
   --state open \
   --label "ypi:claimed" \
   --limit 100 \
-  --json number,title,url,labels,assignees
+  --json number,title,url,labels,assignees,comments
 ```
 
 `gh issue list` 返回真正的 Issues，不把 Pull Request 当作待处理议题。处理顺序固定为 API 返回顺序；如需排序，按 `number` 升序。若结果达到 1000 条上限，停止写操作并明确报告只扫描到的范围，不得静默遗漏。
@@ -99,9 +94,9 @@ gh issue list \
 
 对每个候选议题逐条执行，**认领成功后才能分析和评论**。不要先批量分析再批量认领。
 
-### 0. 自动化互斥检查
+### 0. 服务端分析 / 历史自动化互斥检查
 
-若命中上文“与自动化的互斥”，跳过写操作并记入报告。
+若命中上文互斥规则，跳过写操作并记入报告。
 
 ### 1. 认领
 
@@ -174,8 +169,8 @@ gh issue comment <NUMBER> --repo 602362837/yolk-pi-web --body "$COMMENT"
 规则：
 
 - `id` 使用 Issue number；标题中的 `|` 必须转义为 `\\|`；链接使用 GitHub 返回的 canonical URL。
-- “是否采纳”只写 `是`、`否`，或带失败标记的 `是（认领失败）`、`否（评论失败）`、`跳过（自动化认领中）` 等，不要写模糊词。
-- 表格后简要汇总：扫描数量、认领成功/失败数量、评论成功/失败数量、自动化跳过数量，以及每个失败的原因。
+- “是否采纳”只写 `是`、`否`，或带失败标记的 `是（认领失败）`、`否（评论失败）`、`跳过（服务端分析中/已有分析评论）` 等，不要写模糊词。
+- 表格后简要汇总：扫描数量、认领成功/失败数量、评论成功/失败数量、服务端/历史跳过数量，以及每个失败的原因。
 - 不要把未扫描的已认领、closed、PR 条目混入表格。
 - 如果扫描失败，说明失败阶段和错误，不要输出看似完整的成功表格。
 
@@ -190,11 +185,11 @@ gh issue comment <NUMBER> --repo 602362837/yolk-pi-web --body "$COMMENT"
 - 目标仓库校验失败；
 - `gh` 未登录或无法解析当前用户；
 - 用户取消；
-- 候选议题均因自动化互斥而跳过（报告后结束，不要强行改写 Bot 状态）。
+- 候选议题均因服务端分析/历史互斥而跳过（报告后结束，不要强行改写 Bot 状态）。
 
-## 与自动实现 / 提 PR 的边界
+## 与服务端 Issue 分析 / 提 PR 的边界
 
 - 本 Skill **只**做 manual triage（认领 + 分析 + 中文结论），**不**创建 WorkTree、**不**实现代码、**不** push/PR。
-- Owner 采纳后的 unattended 实现契约见 `github-issue-auto-implement`（full agent + 残留风险；agent 不持有 App token、不自行 publish）。
-- Automation 发布由 server `github-git-publisher` 执行，PR 必须带唯一同仓库 `Fixes #N`；manual `submit-pr` 仍用当前用户 `gh`。
-- 审查自动化 PR 时用 `pr-review-handle`：缺 closing contract 则阻塞合并。
+- 服务端 GitHub App 自动化已收敛为 **新议题只读分析**（`issues.opened` → 分类/真实性评论，严格门禁下才可能 close）。**不再**自动认领、不再 Owner 评论指令、不再 unattended 实现、不再自动开 PR。
+- 若议题已有服务端 `issue_analysis` 规范评论（marker `kind=issue_analysis`），manual 认领前先说明，避免覆盖或重复结论；默认跳过 automation 生命周期议题的规则仍适用。
+- 人工提 PR 继续用 `submit-pr`（当前用户 `gh`）。历史自动化 PR 审查用 `pr-review-handle`（见该 Skill 的历史分支/closing 规则）。

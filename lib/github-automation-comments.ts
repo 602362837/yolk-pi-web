@@ -25,13 +25,15 @@ export const GITHUB_AUTOMATION_COMMENT_MARKER_PREFIX =
   "<!-- ypi-github-automation:" as const;
 
 /** Canonical marker schema versions we read/write. */
-export type GithubAutomationCommentMarkerVersion = 1 | 2;
+export type GithubAutomationCommentMarkerVersion = 1 | 2 | 3;
 
 /**
  * Canonical comment kinds.
- * receipt/status kinds are reserved for CMD-03 builders; marker identity already supports them.
+ * `issue_analysis` is the live v3 analysis product (GIA-03).
+ * Legacy receipt/status/triage kinds remain parseable for historical comments.
  */
 export type GithubAutomationCommentKind =
+  | "issue_analysis"
   | "triage"
   | "claim_blocked"
   | "owner_waiting"
@@ -52,6 +54,7 @@ export interface ParsedGithubAutomationCommentMarker {
 }
 
 const KNOWN_COMMENT_KINDS = new Set<string>([
+  "issue_analysis",
   "triage",
   "claim_blocked",
   "owner_waiting",
@@ -65,9 +68,10 @@ function isCommentKind(value: string): value is GithubAutomationCommentKind {
 }
 
 /**
- * Stable v2 marker identity: kind + repositoryId + issueNumber.
- * Receipt markers additionally bind commentId.
- * Trace/time/phase must never enter identity (they stay in local safe audit only).
+ * Stable marker identity: kind + repositoryId + issueNumber.
+ * - v3: live `issue_analysis` (GIA-03).
+ * - v2: legacy closed-loop kinds; receipt markers additionally bind commentId.
+ * Trace/time/phase/job/result hash must never enter identity.
  */
 export function buildGithubAutomationCommentMarker(options: {
   kind: GithubAutomationCommentKind;
@@ -85,7 +89,15 @@ export function buildGithubAutomationCommentMarker(options: {
   const issue = Math.trunc(options.issueNumber);
   if (!Number.isFinite(repo) || repo <= 0 || !Number.isFinite(issue) || issue <= 0) {
     // Fail closed to a clearly invalid but non-secret marker rather than throw mid-render.
-    return `${GITHUB_AUTOMATION_COMMENT_MARKER_PREFIX}v2 kind=${options.kind} repo=0 issue=0 -->`;
+    const prefix =
+      options.kind === "issue_analysis"
+        ? `${GITHUB_AUTOMATION_COMMENT_MARKER_PREFIX}v3`
+        : `${GITHUB_AUTOMATION_COMMENT_MARKER_PREFIX}v2`;
+    return `${prefix} kind=${options.kind} repo=0 issue=0 -->`;
+  }
+
+  if (options.kind === "issue_analysis") {
+    return `${GITHUB_AUTOMATION_COMMENT_MARKER_PREFIX}v3 kind=issue_analysis repo=${repo} issue=${issue} -->`;
   }
 
   if (options.kind === "command_receipt") {
@@ -103,13 +115,38 @@ export function buildGithubAutomationCommentMarker(options: {
 
 /**
  * Parse the first automation marker found in a comment body.
- * Supports stable v2 and legacy v1 (`kind repo=… issue=… trace=…`).
+ * Supports live v3 issue_analysis, stable v2 closed-loop kinds, and legacy v1.
+ * v1/v2 markers are never treated as v3 analysis authority.
  */
 export function parseGithubAutomationCommentMarker(
   body: string | null | undefined,
 ): ParsedGithubAutomationCommentMarker | null {
   if (typeof body !== "string" || !body.includes(GITHUB_AUTOMATION_COMMENT_MARKER_PREFIX)) {
     return null;
+  }
+
+  // v3: <!-- ypi-github-automation:v3 kind=issue_analysis repo=1 issue=2 -->
+  const v3 = body.match(
+    /<!-- ypi-github-automation:v3 kind=([a-z_]+) repo=(\d+) issue=(\d+) -->/,
+  );
+  if (v3) {
+    const kindRaw = v3[1] ?? "";
+    if (!isCommentKind(kindRaw)) return null;
+    // Live authority is only issue_analysis; other kinds on v3 fail closed.
+    if (kindRaw !== "issue_analysis") return null;
+    const repositoryId = Number(v3[2]);
+    const issueNumber = Number(v3[3]);
+    if (!Number.isInteger(repositoryId) || repositoryId <= 0) return null;
+    if (!Number.isInteger(issueNumber) || issueNumber <= 0) return null;
+    return {
+      version: 3,
+      kind: kindRaw,
+      repositoryId,
+      issueNumber,
+      commentId: null,
+      trace: null,
+      raw: v3[0],
+    };
   }
 
   // v2: <!-- ypi-github-automation:v2 kind=triage repo=1 issue=2 -->
@@ -120,6 +157,8 @@ export function parseGithubAutomationCommentMarker(
   if (v2) {
     const kindRaw = v2[1] ?? "";
     if (!isCommentKind(kindRaw)) return null;
+    // issue_analysis is v3-only; ignore if someone forged a v2 analysis marker.
+    if (kindRaw === "issue_analysis") return null;
     const repositoryId = Number(v2[2]);
     const issueNumber = Number(v2[3]);
     const commentIdRaw = v2[4];
@@ -150,6 +189,7 @@ export function parseGithubAutomationCommentMarker(
   if (v1) {
     const kindRaw = v1[1] ?? "";
     if (!isCommentKind(kindRaw)) return null;
+    if (kindRaw === "issue_analysis") return null;
     const repositoryId = Number(v1[2]);
     const issueNumber = Number(v1[3]);
     if (!Number.isInteger(repositoryId) || repositoryId <= 0) return null;
@@ -226,6 +266,119 @@ export function extractAutomationMarkerTrace(
 ): string | null {
   const parsed = parseGithubAutomationCommentMarker(body);
   return parsed?.trace ?? null;
+}
+
+// ─── Issue analysis (v3) comment builder ─────────────────────────────────────
+
+export type IssueAnalysisCommentDisposition =
+  | "keep_open"
+  | "closing"
+  | "closed"
+  | "not_closed";
+
+export interface IssueAnalysisCommentEvidenceLine {
+  relativePath: string;
+  lineStart: number | null;
+  lineEnd: number | null;
+  note: string;
+}
+
+export interface BuildIssueAnalysisCommentBodyInput {
+  marker: string;
+  category: string;
+  verdict: string;
+  confidence: string;
+  reasonSummary: string;
+  directionSummary: string;
+  evidence: IssueAnalysisCommentEvidenceLine[];
+  disposition: IssueAnalysisCommentDisposition;
+  /** Safe operator-facing reason when disposition is not_closed. */
+  notClosedReason?: string | null;
+}
+
+function formatEvidencePath(line: IssueAnalysisCommentEvidenceLine): string {
+  const path = line.relativePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (
+    typeof line.lineStart === "number" &&
+    Number.isInteger(line.lineStart) &&
+    line.lineStart > 0
+  ) {
+    if (
+      typeof line.lineEnd === "number" &&
+      Number.isInteger(line.lineEnd) &&
+      line.lineEnd > line.lineStart
+    ) {
+      return `${path}:${line.lineStart}-${line.lineEnd}`;
+    }
+    return `${path}:${line.lineStart}`;
+  }
+  return path;
+}
+
+function dispositionLabel(
+  disposition: IssueAnalysisCommentDisposition,
+  notClosedReason?: string | null,
+): string {
+  switch (disposition) {
+    case "closed":
+      return "已关闭";
+    case "closing":
+      return "满足关闭门禁，准备关闭";
+    case "not_closed":
+      return notClosedReason && notClosedReason.trim()
+        ? `未自动关闭：${notClosedReason.trim()}`
+        : "未自动关闭";
+    case "keep_open":
+    default:
+      return "保持打开";
+  }
+}
+
+/**
+ * Deterministic v3 issue_analysis Markdown body.
+ * Never includes absolute paths, Issue body, prompts, tool payloads, or stack traces.
+ */
+export function buildIssueAnalysisCommentBody(
+  input: BuildIssueAnalysisCommentBodyInput,
+): string {
+  const evidenceLines =
+    input.evidence.length === 0
+      ? ["- （无已核验的仓库证据引用）"]
+      : input.evidence.slice(0, 16).map((e) => {
+          const path = formatEvidencePath(e);
+          const note = (e.note || "").trim() || "（无说明）";
+          return `- \`${path}\` — ${note}`;
+        });
+
+  const directionHeading =
+    input.verdict === "inconclusive"
+      ? "需要补充的信息"
+      : input.verdict === "not_applicable"
+        ? "需求缺口 / 建议方向"
+        : "解决方向";
+
+  return `${input.marker}
+## 新议题分析（YPI）
+
+| 项目 | 结果 |
+| --- | --- |
+| 议题分类 | \`${input.category}\` |
+| 真实性 | \`${input.verdict}\` |
+| 置信度 | \`${input.confidence}\` |
+| 处理结果 | ${dispositionLabel(input.disposition, input.notClosedReason)} |
+
+### 仓库证据
+${evidenceLines.join("\n")}
+
+### 原因分析
+${input.reasonSummary.trim() || "（未提供）"}
+
+### ${directionHeading}
+${input.directionSummary.trim() || "（未提供）"}
+
+### 自动化边界
+本结论仅基于当前绑定的本地仓库静态只读证据；不会修改代码、创建分支或 PR。证据不足时保持议题打开。
+`;
 }
 
 /**
