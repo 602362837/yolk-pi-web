@@ -698,6 +698,23 @@ async function reloadLiveAuthStateAfterUnlock(): Promise<void> {
 }
 
 /**
+ * Advance the shared model-catalog epoch after a successful managed API-key
+ * account mutation that does not go through reloadRpcAuthState (non-active
+ * create/update/delete/enable). Active paths already invalidate via reload.
+ * Failures must never call this.
+ */
+async function invalidateModelCatalogAfterAccountMutation(): Promise<void> {
+  try {
+    const { invalidateWebModelCatalog } = await import(
+      "@/lib/model-catalog-service"
+    );
+    invalidateWebModelCatalog("account_mutation");
+  } catch {
+    // Catalog invalidation must not fail a committed account mutation.
+  }
+}
+
+/**
  * Rebuild AnyRouter Active runtime bridge + auth.json mirror under the
  * provider lock. Does not reload live wrappers — callers must call
  * {@link reloadLiveAuthStateAfterUnlock} after unlock.
@@ -982,6 +999,8 @@ export async function createApiKeyAccount(
   });
   if (needsLiveReload) {
     await reloadLiveAuthStateAfterUnlock();
+  } else {
+    await invalidateModelCatalogAfterAccountMutation();
   }
   return listed;
 }
@@ -1089,6 +1108,8 @@ export async function updateApiKeyAccount(
   });
   if (needsLiveReload) {
     await reloadLiveAuthStateAfterUnlock();
+  } else {
+    await invalidateModelCatalogAfterAccountMutation();
   }
   return listed;
 }
@@ -1226,6 +1247,8 @@ export async function deleteApiKeyAccount(
   });
   if (needsLiveReload) {
     await reloadLiveAuthStateAfterUnlock();
+  } else {
+    await invalidateModelCatalogAfterAccountMutation();
   }
   return listed;
 }
@@ -1499,6 +1522,8 @@ export async function disableApiKeyAccount(
   });
   if (needsLiveReload) {
     await reloadLiveAuthStateAfterUnlock();
+  } else {
+    await invalidateModelCatalogAfterAccountMutation();
   }
   return listed;
 }
@@ -1519,7 +1544,8 @@ export async function enableApiKeyAccount(
   const normalizedId = accountId.trim();
   if (!normalizedId) throw new ApiKeyAccountStoreError("accountId is required", 400);
 
-  return withApiKeyProviderLock(provider, async () => {
+  let didEnable = false;
+  const listed = await withApiKeyProviderLock(provider, async () => {
     if (!(await pathExists(secretPath(provider, normalizedId)))) {
       throw new ApiKeyAccountStoreError("Account not found", 404);
     }
@@ -1556,9 +1582,16 @@ export async function enableApiKeyAccount(
       activeAccountId: metadata.activeAccountId,
       accounts,
     });
+    didEnable = true;
 
     return listApiKeyAccountsUnlocked(provider);
   });
+  // Enable only restores eligibility; it never reloads live auth. Still
+  // advance the shared catalog epoch when a real enable write committed.
+  if (didEnable) {
+    await invalidateModelCatalogAfterAccountMutation();
+  }
+  return listed;
 }
 
 /**

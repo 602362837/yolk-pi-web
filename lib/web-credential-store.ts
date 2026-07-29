@@ -36,6 +36,7 @@ import type {
   CredentialStore,
 } from "@earendil-works/pi-ai";
 import { resolveConfigValue } from "./web-auth-config-value";
+import { recordModelCatalogCount, recordModelCatalogDuration } from "./model-catalog-metrics";
 
 const AUTH_DIR_MODE = 0o700;
 const AUTH_FILE_MODE = 0o600;
@@ -220,7 +221,11 @@ async function withProcessQueue<T>(authPath: string, fn: () => Promise<T>): Prom
   const chain = previous.catch(() => {}).then(() => gate);
   processQueues.set(key, chain);
 
+  recordModelCatalogCount("credential.queue_enter");
+  const waitStarted = performance.now();
   await previous.catch(() => {});
+  // totalsMs + maxMs for the same name give sum and observed peak wait.
+  recordModelCatalogDuration("credential.queue_wait_ms", performance.now() - waitStarted);
   try {
     return await fn();
   } finally {
@@ -259,6 +264,7 @@ function parseAuthFileData(content: string | undefined): {
 }
 
 async function readAuthFileRaw(authPath: string): Promise<string | undefined> {
+  recordModelCatalogCount("credential.raw_read");
   try {
     return await readFile(authPath, "utf8");
   } catch (err) {
@@ -342,6 +348,7 @@ class FileWebCredentialStore implements WebCredentialStore {
   async read(providerId: string): Promise<Credential | undefined> {
     // Read does not need the write lock, but still goes through the process
     // queue so it cannot observe a partial rename mid-write from this process.
+    // Metric counters intentionally omit providerId to stay content-safe.
     return withProcessQueue(this.authPath, async () => {
       const raw = await readAuthFileRaw(this.authPath);
       const parsed = parseAuthFileData(raw);
@@ -357,6 +364,7 @@ class FileWebCredentialStore implements WebCredentialStore {
   }
 
   async list(): Promise<readonly CredentialInfo[]> {
+    recordModelCatalogCount("credential.list");
     return withProcessQueue(this.authPath, async () => {
       const raw = await readAuthFileRaw(this.authPath);
       const parsed = parseAuthFileData(raw);
@@ -377,6 +385,7 @@ class FileWebCredentialStore implements WebCredentialStore {
     providerId: string,
     fn: (current: Credential | undefined) => Promise<Credential | undefined>,
   ): Promise<Credential | undefined> {
+    recordModelCatalogCount("credential.modify");
     return this.withAuthFileLock(async (raw) => {
       const parsed = parseAuthFileData(raw);
       if (!parsed.ok) {
@@ -406,6 +415,7 @@ class FileWebCredentialStore implements WebCredentialStore {
   }
 
   async delete(providerId: string): Promise<void> {
+    recordModelCatalogCount("credential.delete");
     await this.withAuthFileLock(async (raw) => {
       const parsed = parseAuthFileData(raw);
       if (!parsed.ok) {

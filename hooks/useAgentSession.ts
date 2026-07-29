@@ -17,6 +17,7 @@ import {
   shouldPinSessionModel,
   type SessionModelRef,
 } from "@/lib/session-model-pin";
+import { useModelCatalog } from "@/hooks/useModelCatalog";
 
 export interface SessionData {
   sessionId: string;
@@ -190,7 +191,6 @@ export interface UseAgentSessionOptions {
   onAgentEnd?: () => void;
   onSessionCreated?: (session: SessionInfo) => void;
   onSessionForked?: (newSessionId: string) => void;
-  modelsRefreshKey?: number;
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
   onSystemPromptChange?: (prompt: string | null) => void;
   autoScrollEnabled?: boolean;
@@ -221,7 +221,7 @@ export interface AttachedImage {
 export function useAgentSession(opts: UseAgentSessionOptions) {
   const {
     session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked,
-    modelsRefreshKey, onSystemPromptChange,
+    onSystemPromptChange,
     autoScrollEnabled = true,
     defaultToolPreset = "default",
     defaultThinkingLevel = "auto",
@@ -238,10 +238,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [entryIds, setEntryIds] = useState<string[]>([]);
   const [streamState, dispatch] = useReducer(streamReducer, { isStreaming: false, streamingMessage: null });
   const [agentRunning, setAgentRunning] = useState(false);
-  const [modelNames, setModelNames] = useState<Record<string, string>>({});
-  const [modelList, setModelList] = useState<{ id: string; name: string; provider: string; providerDisplayName?: string }[]>([]);
-  const [modelThinkingLevels, setModelThinkingLevels] = useState<Record<string, string[]>>({});
-  const [modelThinkingLevelMaps, setModelThinkingLevelMaps] = useState<Record<string, Record<string, string | null>>>({});
+  const modelCatalog = useModelCatalog();
+  const modelNames = modelCatalog.models;
+  const modelList = modelCatalog.modelList;
+  const modelThinkingLevels = modelCatalog.thinkingLevels;
+  const modelThinkingLevelMaps = modelCatalog.thinkingLevelMaps;
   const [newSessionModel, setNewSessionModelState] = useState<{ provider: string; modelId: string } | null>(null);
   const [toolPreset, setToolPreset] = useState<PiWebToolPreset>(isNew ? defaultToolPreset : "default");
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelOption>(isNew ? defaultThinkingLevel : "auto");
@@ -1531,43 +1532,46 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     }
   }, [hasMessages, messages.length, agentRunning, streamState.isStreaming, streamState.streamingMessage, autoScrollEnabled, scrollToBottom, scrollUserMsgToTop]);
 
-  // Load model list and seed new-session model from yolk.defaultModel (specific) or Pi default.
+  // Seed new-session model from shared catalog + yolk.defaultModel (specific) or Pi default.
+  // Catalog fetch is owned by useModelCatalog; defaultModel/catalog generation changes recompute seed only.
+  // Do not depend on newSessionModel — user Chat model picks must not be overwritten by this seed.
   useEffect(() => {
-    fetch("/api/models").then((r) => r.json()).then((d: { models: Record<string, string>; modelList?: { id: string; name: string; provider: string; providerDisplayName?: string }[]; defaultModel?: { provider: string; modelId: string } | null; thinkingLevels?: Record<string, string[]>; thinkingLevelMaps?: Record<string, Record<string, string | null>> }) => {
-      setModelNames(d.models);
-      if (d.thinkingLevels) setModelThinkingLevels(d.thinkingLevels);
-      if (d.thinkingLevelMaps) setModelThinkingLevelMaps(d.thinkingLevelMaps);
-      if (d.modelList) {
-        setModelList(d.modelList);
-        if (isNew && d.modelList.length > 0) {
-          // Prefer yolk.defaultModel (specific); otherwise Pi settings default; else first model.
-          const yolkPref = defaultModel;
-          const yolkMatch = yolkPref
-            && d.modelList.find((m) => m.id === yolkPref.modelId && m.provider === yolkPref.provider);
-          const piDef = d.defaultModel;
-          const piMatch = !yolkMatch && piDef
-            && d.modelList.find((m) => m.id === piDef.modelId && m.provider === piDef.provider);
-          const selected = yolkMatch
-            ? { provider: yolkMatch.provider, modelId: yolkMatch.id }
-            : piMatch
-              ? { provider: piMatch.provider, modelId: piMatch.id }
-              : yolkPref?.provider && yolkPref.modelId
-                // Keep configured ref even if not in list (user may add credentials later).
-                ? { provider: yolkPref.provider, modelId: yolkPref.modelId }
-                : { provider: d.modelList[0].provider, modelId: d.modelList[0].id };
-          setNewSessionModel(selected);
+    if (!isNew || modelList.length === 0) return;
 
-          // Clamp default thinking against the selected model's capabilities once levels load.
-          if (!thinkingLevelTouchedRef.current) {
-            const levels = d.thinkingLevels?.[`${selected.provider}:${selected.modelId}`] ?? null;
-            if (levels) {
-              setThinkingLevel((prev) => clampThinkingLevelToSupported(prev, levels));
-            }
-          }
-        }
+    // Prefer yolk.defaultModel (specific); otherwise Pi settings default; else first model.
+    const yolkPref = defaultModel;
+    const yolkMatch = yolkPref
+      && modelList.find((m) => m.id === yolkPref.modelId && m.provider === yolkPref.provider);
+    const piDef = modelCatalog.defaultModel;
+    const piMatch = !yolkMatch && piDef
+      && modelList.find((m) => m.id === piDef.modelId && m.provider === piDef.provider);
+    const selected = yolkMatch
+      ? { provider: yolkMatch.provider, modelId: yolkMatch.id }
+      : piMatch
+        ? { provider: piMatch.provider, modelId: piMatch.id }
+        : yolkPref?.provider && yolkPref.modelId
+          // Keep configured ref even if not in list (user may add credentials later).
+          ? { provider: yolkPref.provider, modelId: yolkPref.modelId }
+          : { provider: modelList[0].provider, modelId: modelList[0].id };
+
+    setNewSessionModel(selected);
+
+    // Clamp default thinking against the selected model's capabilities once levels load.
+    if (!thinkingLevelTouchedRef.current) {
+      const levels = modelThinkingLevels[`${selected.provider}:${selected.modelId}`] ?? null;
+      if (levels) {
+        setThinkingLevel((prev) => clampThinkingLevelToSupported(prev, levels));
       }
-    }).catch(() => {});
-  }, [defaultModel, isNew, modelsRefreshKey, setNewSessionModel]);
+    }
+  }, [
+    defaultModel,
+    isNew,
+    modelCatalog.defaultModel,
+    modelCatalog.generation,
+    modelList,
+    modelThinkingLevels,
+    setNewSessionModel,
+  ]);
 
   // Compact error auto-dismiss
   useEffect(() => {

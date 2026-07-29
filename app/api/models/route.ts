@@ -1,27 +1,18 @@
 import { stat } from "fs/promises";
-import { getAgentDir, type SettingsManager } from "@earendil-works/pi-coding-agent";
-import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
-import { createWebAgentSessionServices } from "@/lib/web-model-runtime";
+import { getWebModelCatalogSnapshot } from "@/lib/model-catalog-service";
 
 export const dynamic = "force-dynamic";
 
-const modelNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-
-function compareModelEntries(
-  a: { id: string; name: string; provider: string; providerDisplayName?: string },
-  b: { id: string; name: string; provider: string; providerDisplayName?: string }
-): number {
-  return modelNameCollator.compare(a.name || a.id, b.name || b.id)
-    || modelNameCollator.compare(a.provider, b.provider)
-    || modelNameCollator.compare(a.id, b.id);
-}
-
+/**
+ * GET /api/models — offline shared model catalog.
+ *
+ * Uses the fixed-provider administrative catalog service (epoch + single-flight
+ * + short burst cache). Does not create session services, does not load cwd
+ * project extensions, and does not call `getAvailable()` (no extra availability
+ * scan). Wire fields remain: models, modelList, defaultModel, thinkingLevels,
+ * thinkingLevelMaps.
+ */
 export async function GET(req: Request) {
-  const nameMap = new Map<string, string>();
-  let modelList: { id: string; name: string; provider: string; providerDisplayName?: string }[] = [];
-  let defaultModel: { provider: string; modelId: string } | null = null;
-  const thinkingLevels: Record<string, string[]> = {};
-  const thinkingLevelMaps: Record<string, Record<string, string | null>> = {};
   const cwd = new URL(req.url).searchParams.get("cwd") || process.cwd();
 
   let cwdStat;
@@ -35,38 +26,27 @@ export async function GET(req: Request) {
   }
 
   try {
-    const agentDir = getAgentDir();
-    // Admin listing only needs fixed providers; avoid loading project extensions.
-    const services = await createWebAgentSessionServices({
-      cwd,
-      agentDir,
-      fixedProvidersOnly: true,
+    const catalog = await getWebModelCatalogSnapshot({ cwd });
+    return Response.json(catalog, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
     });
-    const runtime = services.modelRuntime;
-    const available = await runtime.getAvailable();
-    modelList = available.map((m) => {
-      const providerDisplayName = runtime.getProvider(m.provider)?.name;
-      return {
-        id: m.id,
-        name: m.name,
-        provider: m.provider,
-        ...(providerDisplayName && providerDisplayName !== m.provider ? { providerDisplayName } : {}),
-      };
-    }).sort(compareModelEntries);
-    for (const m of available) {
-      const key = `${m.provider}:${m.id}`;
-      nameMap.set(key, m.name);
-      thinkingLevels[key] = getSupportedThinkingLevels(m);
-      if (m.thinkingLevelMap) thinkingLevelMaps[key] = m.thinkingLevelMap;
-    }
-
-    const settings: SettingsManager = services.settingsManager;
-    const provider = settings.getDefaultProvider();
-    const modelId = settings.getDefaultModel();
-    if (provider && modelId && available.some((m) => m.provider === provider && m.id === modelId)) {
-      defaultModel = { provider, modelId };
-    }
-  } catch { /* return empty */ }
-
-  return Response.json({ models: Object.fromEntries(nameMap), modelList, defaultModel, thinkingLevels, thinkingLevelMaps });
+  } catch {
+    // Catalog build failures must be non-2xx so shared client last-good is
+    // retained. A soft 200 empty body would parse as a successful empty catalog
+    // and wipe prior models. Fixed safe code only — no paths/credentials.
+    return Response.json(
+      {
+        error: "model_catalog_unavailable",
+        code: "model_catalog_unavailable",
+      },
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
 }

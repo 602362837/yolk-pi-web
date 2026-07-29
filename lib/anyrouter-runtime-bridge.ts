@@ -8,11 +8,14 @@
  *
  * This module never mutates process env per request. The fixed provider loader
  * points `PI_ANYROUTER_CC_CONFIG` at the stable bridge path once before the
- * package is first imported. Lock order for Active work is always
- * AnyRouter provider lock → auth.json (raw WebCredentialStore).
+ * package is first imported, but must not call reconcile on catalog/target
+ * runtime registration (pure-read). Explicit mutations and
+ * `ensureAnyRouterRuntimeMirrorsBootstrapped()` repair derived mirrors with
+ * equal-value no-op + process single-flight. Lock order for Active work is
+ * always AnyRouter provider lock → auth.json (raw WebCredentialStore).
  */
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   access,
   chmod,
@@ -25,7 +28,7 @@ import {
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import type { ApiKeyCredential } from "@earendil-works/pi-ai";
+import type { ApiKeyCredential, Credential } from "@earendil-works/pi-ai";
 import {
   ANYROUTER_PROVIDER_ID,
   ANYROUTER_RETRY_DEFAULTS,
@@ -35,6 +38,10 @@ import {
   resolveAnyRouterRetryPolicy,
 } from "@/lib/anyrouter-config";
 import { getWebCredentialStore } from "@/lib/web-credential-store";
+import { recordModelCatalogCount } from "./model-catalog-metrics";
+
+/** Process-local single-flight for explicit reconcile callers (mutations/bootstrap). */
+let pendingReconcile: Promise<AnyRouterRuntimeBridgeSyncResult> | undefined;
 
 // ── Paths / modes ─────────────────────────────────────────────────────────────
 
@@ -135,10 +142,20 @@ async function ensureDir(dir: string): Promise<void> {
   await chmod(dir, DIR_MODE).catch(() => {});
 }
 
+function stableJsonStringify(value: unknown): string {
+  // Deterministic enough for equality: bridge snapshots are plain objects with
+  // fixed key order from buildBridgeSnapshot / read path reconstruction.
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function contentFingerprint(body: string): string {
+  return createHash("sha256").update(body).digest("hex");
+}
+
 async function writeJsonFileAtomic(targetPath: string, value: unknown): Promise<void> {
   await ensureDir(dirname(targetPath));
   const temp = `${targetPath}.tmp.${process.pid}.${randomBytes(6).toString("hex")}`;
-  const body = `${JSON.stringify(value, null, 2)}\n`;
+  const body = stableJsonStringify(value);
   try {
     const handle = await open(temp, "w", FILE_MODE);
     try {
@@ -154,6 +171,44 @@ async function writeJsonFileAtomic(targetPath: string, value: unknown): Promise<
     await rm(temp, { force: true }).catch(() => {});
     throw error;
   }
+}
+
+/**
+ * Write the bridge only when serialized content differs from the on-disk file.
+ * Returns true when a write happened.
+ */
+async function writeJsonFileAtomicIfChanged(
+  targetPath: string,
+  value: unknown,
+): Promise<boolean> {
+  const body = stableJsonStringify(value);
+  const nextFp = contentFingerprint(body);
+  try {
+    const existing = await readFile(targetPath, "utf8");
+    if (contentFingerprint(existing) === nextFp) {
+      return false;
+    }
+  } catch (error) {
+    if (!(isNodeError(error) && error.code === "ENOENT")) throw error;
+  }
+  await ensureDir(dirname(targetPath));
+  const temp = `${targetPath}.tmp.${process.pid}.${randomBytes(6).toString("hex")}`;
+  try {
+    const handle = await open(temp, "w", FILE_MODE);
+    try {
+      await handle.writeFile(body, "utf8");
+      await handle.sync().catch(() => {});
+    } finally {
+      await handle.close();
+    }
+    await chmod(temp, FILE_MODE).catch(() => {});
+    await rename(temp, targetPath);
+    await chmod(targetPath, FILE_MODE).catch(() => {});
+  } catch (error) {
+    await rm(temp, { force: true }).catch(() => {});
+    throw error;
+  }
+  return true;
 }
 
 async function removeFileIfExists(targetPath: string): Promise<void> {
@@ -277,7 +332,7 @@ function buildBridgeSnapshot(input: {
  */
 export async function writeAnyRouterRuntimeBridgeUnlocked(
   snapshot: AnyRouterRuntimeBridgeSnapshot,
-): Promise<void> {
+): Promise<boolean> {
   if (snapshot.webManaged !== true) {
     throw new AnyRouterRuntimeBridgeError(
       "Runtime bridge must set webManaged: true",
@@ -295,7 +350,17 @@ export async function writeAnyRouterRuntimeBridgeUnlocked(
     );
   }
   try {
-    await writeJsonFileAtomic(getAnyRouterRuntimeBridgePath(), snapshot);
+    // Equal-content no-op: avoid thrashing mtime/locks when authority is unchanged.
+    const changed = await writeJsonFileAtomicIfChanged(
+      getAnyRouterRuntimeBridgePath(),
+      snapshot,
+    );
+    if (changed) {
+      recordModelCatalogCount("anyrouter.bridge_write");
+    } else {
+      recordModelCatalogCount("anyrouter.bridge_noop");
+    }
+    return changed;
   } catch (error) {
     throw new AnyRouterRuntimeBridgeError(
       error instanceof Error ? error.message : "Failed to write AnyRouter runtime bridge",
@@ -309,10 +374,18 @@ export async function writeAnyRouterRuntimeBridgeUnlocked(
 /**
  * Remove the derived runtime bridge file. Used when there is no usable Active
  * snapshot (disconnect) or effective endpoint cannot be resolved.
+ * Returns true when a file was removed.
  */
-export async function removeAnyRouterRuntimeBridgeUnlocked(): Promise<void> {
+export async function removeAnyRouterRuntimeBridgeUnlocked(): Promise<boolean> {
   try {
-    await removeFileIfExists(getAnyRouterRuntimeBridgePath());
+    const path = getAnyRouterRuntimeBridgePath();
+    if (!(await pathExists(path))) {
+      recordModelCatalogCount("anyrouter.bridge_noop");
+      return false;
+    }
+    recordModelCatalogCount("anyrouter.bridge_remove");
+    await removeFileIfExists(path);
+    return true;
   } catch (error) {
     throw new AnyRouterRuntimeBridgeError(
       error instanceof Error ? error.message : "Failed to remove AnyRouter runtime bridge",
@@ -372,16 +445,59 @@ export async function readAnyRouterRuntimeBridgeUnlocked(): Promise<AnyRouterRun
 
 // ── Auth mirror (CAS against managed Active) ──────────────────────────────────
 
+function isApiKeyCredential(value: Credential | undefined): value is ApiKeyCredential {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    (value as { type?: unknown }).type === "api_key" &&
+    typeof (value as { key?: unknown }).key === "string"
+  );
+}
+
+function apiKeyCredentialsEqual(
+  a: ApiKeyCredential | undefined,
+  b: ApiKeyCredential,
+): boolean {
+  return !!a && a.type === "api_key" && a.key === b.key;
+}
+
+/**
+ * Mirror or clear auth.json.anyrouter with equal-value no-op.
+ * Returns true when the store was mutated.
+ */
 async function mirrorAuthJson(
   action: { type: "set"; credential: ApiKeyCredential } | { type: "clear" },
-): Promise<void> {
+): Promise<boolean> {
   try {
     const store = await getWebCredentialStore();
     if (action.type === "set") {
-      await store.modify(ANYROUTER_PROVIDER_ID, async () => action.credential);
-    } else {
-      await store.delete(ANYROUTER_PROVIDER_ID);
+      let wrote = false;
+      await store.modify(ANYROUTER_PROVIDER_ID, async (current) => {
+        const currentApiKey = isApiKeyCredential(current) ? current : undefined;
+        if (apiKeyCredentialsEqual(currentApiKey, action.credential)) {
+          // Leave the entry unchanged (pi-ai: undefined keeps current).
+          return undefined;
+        }
+        wrote = true;
+        return action.credential;
+      });
+      if (wrote) {
+        recordModelCatalogCount("anyrouter.auth_mirror_set");
+      } else {
+        recordModelCatalogCount("anyrouter.auth_mirror_noop");
+      }
+      return wrote;
     }
+
+    // clear
+    const current = await store.read(ANYROUTER_PROVIDER_ID);
+    if (!current) {
+      recordModelCatalogCount("anyrouter.auth_mirror_noop");
+      return false;
+    }
+    recordModelCatalogCount("anyrouter.auth_mirror_clear");
+    await store.delete(ANYROUTER_PROVIDER_ID);
+    return true;
   } catch (error) {
     throw new AnyRouterRuntimeBridgeError(
       error instanceof Error ? error.message : "Failed to mirror AnyRouter auth.json",
@@ -397,15 +513,21 @@ async function mirrorAuthJson(
 /**
  * Rebuild derived mirrors from managed Active authority.
  *
- * Call only while holding the AnyRouter provider lock (or from a cold-load
- * path that acquires it). Does **not** call `reloadRpcAuthState` — callers
- * must reload after releasing the provider lock.
+ * Call only while holding the AnyRouter provider lock (or from an explicit
+ * bootstrap / mutation path that acquires it). Does **not** call
+ * `reloadRpcAuthState` — callers must reload after releasing the provider
+ * lock when a live refresh is required.
+ *
+ * Equal-value no-op: bridge bytes and auth.json.anyrouter are left untouched
+ * (including mtime) when authority already matches. Target-runtime fixed
+ * provider registration must not call this — catalog GET is pure-read.
  *
  * Failure semantics:
  * - Managed slot/pointer is never rolled back here (caller already committed).
  * - Bridge / auth failures throw a retryable `AnyRouterRuntimeBridgeError`
  *   so the API surface can report failure without false success.
- * - Same-account Activate / cold load re-run this to repair missing mirrors.
+ * - Same-account Activate / explicit reconcile re-run this to repair missing
+ *   or incomplete mirrors.
  */
 export async function syncAnyRouterDerivedMirrorsUnlocked(options?: {
   /**
@@ -449,8 +571,9 @@ export async function syncAnyRouterDerivedMirrorsUnlocked(options?: {
       storedGlobalBaseUrl: source.baseUrl,
     });
 
+    let bridgeMutated = false;
     if (globalBaseUrl && models.length > 0) {
-      await writeAnyRouterRuntimeBridgeUnlocked(
+      bridgeMutated = await writeAnyRouterRuntimeBridgeUnlocked(
         buildBridgeSnapshot({
           apiKey: "",
           baseUrl: globalBaseUrl,
@@ -459,13 +582,17 @@ export async function syncAnyRouterDerivedMirrorsUnlocked(options?: {
         }),
       );
     } else {
-      await removeAnyRouterRuntimeBridgeUnlocked();
+      bridgeMutated = await removeAnyRouterRuntimeBridgeUnlocked();
     }
 
-    await mirrorAuthJson({ type: "clear" });
+    const authMutated = await mirrorAuthJson({ type: "clear" });
+    if (!bridgeMutated && !authMutated) {
+      recordModelCatalogCount("anyrouter.reconcile_noop");
+    }
     return {
       activeAccountId: null,
       bridgePresent: Boolean(globalBaseUrl && models.length > 0),
+      // True when the compatibility mirror matches authority (cleared).
       authMirrored: true,
       effectiveBaseUrl: globalBaseUrl && models.length > 0 ? globalBaseUrl : null,
     };
@@ -517,11 +644,12 @@ export async function syncAnyRouterDerivedMirrorsUnlocked(options?: {
     );
   }
 
+  let bridgeMutated = false;
   if (models.length === 0) {
     // Write Active key+baseUrl+retry with empty models so request-time path can
     // still see credentials if models are added later without re-Activate; the
     // package registration path will fail closed on empty models until fixed.
-    await writeAnyRouterRuntimeBridgeUnlocked(
+    bridgeMutated = await writeAnyRouterRuntimeBridgeUnlocked(
       buildBridgeSnapshot({
         apiKey,
         baseUrl: effectiveBaseUrl,
@@ -530,7 +658,7 @@ export async function syncAnyRouterDerivedMirrorsUnlocked(options?: {
       }),
     );
   } else {
-    await writeAnyRouterRuntimeBridgeUnlocked(
+    bridgeMutated = await writeAnyRouterRuntimeBridgeUnlocked(
       buildBridgeSnapshot({
         apiKey,
         baseUrl: effectiveBaseUrl,
@@ -554,14 +682,18 @@ export async function syncAnyRouterDerivedMirrorsUnlocked(options?: {
     );
   }
 
-  await mirrorAuthJson({
+  const authMutated = await mirrorAuthJson({
     type: "set",
     credential: { type: "api_key", key: apiKey },
   });
+  if (!bridgeMutated && !authMutated) {
+    recordModelCatalogCount("anyrouter.reconcile_noop");
+  }
 
   return {
     activeAccountId,
     bridgePresent: true,
+    // True when the compatibility mirror matches authority (set or already equal).
     authMirrored: true,
     effectiveBaseUrl,
     incomplete: models.length === 0 ? true : undefined,
@@ -571,14 +703,36 @@ export async function syncAnyRouterDerivedMirrorsUnlocked(options?: {
 
 /**
  * Acquire the AnyRouter provider lock and reconcile derived mirrors.
- * Safe for cold provider load and repeated same-account Activate repair.
+ *
+ * Explicit mutation / bootstrap / repair entry only — not used by fixed
+ * provider registration on catalog GET. Concurrent callers share one process
+ * flight; failure clears the flight so the next call can retry.
  * Does not reload live RPC wrappers — caller should `reloadRpcAuthState`
  * after this returns when a live refresh is required.
  */
 export async function reconcileAnyRouterRuntimeMirrors(): Promise<AnyRouterRuntimeBridgeSyncResult> {
+  if (pendingReconcile) {
+    recordModelCatalogCount("anyrouter.reconcile_shared");
+    return pendingReconcile;
+  }
+
+  recordModelCatalogCount("anyrouter.reconcile");
   // Dynamic import breaks the static cycle with api-key-accounts.
-  const { withApiKeyProviderLock } = await import("@/lib/api-key-accounts");
-  return withApiKeyProviderLock(ANYROUTER_PROVIDER_ID, () => syncAnyRouterDerivedMirrorsUnlocked());
+  const flight = (async () => {
+    const { withApiKeyProviderLock } = await import("@/lib/api-key-accounts");
+    return withApiKeyProviderLock(ANYROUTER_PROVIDER_ID, () =>
+      syncAnyRouterDerivedMirrorsUnlocked(),
+    );
+  })();
+
+  pendingReconcile = flight;
+  try {
+    return await flight;
+  } finally {
+    if (pendingReconcile === flight) {
+      pendingReconcile = undefined;
+    }
+  }
 }
 
 /**
@@ -587,4 +741,18 @@ export async function reconcileAnyRouterRuntimeMirrors(): Promise<AnyRouterRunti
  */
 export async function rebuildAnyRouterRuntimeBridgeAfterConfigChange(): Promise<AnyRouterRuntimeBridgeSyncResult> {
   return reconcileAnyRouterRuntimeMirrors();
+}
+
+/**
+ * Explicit server/bootstrap repair for derived mirrors when the bridge may be
+ * missing (fresh install, external delete). Not called from catalog GET or
+ * target-runtime provider registration.
+ */
+export async function ensureAnyRouterRuntimeMirrorsBootstrapped(): Promise<AnyRouterRuntimeBridgeSyncResult> {
+  return reconcileAnyRouterRuntimeMirrors();
+}
+
+/** Test helper: drop process-local reconcile single-flight. */
+export function __resetAnyRouterRuntimeBridgeStateForTests(): void {
+  pendingReconcile = undefined;
 }

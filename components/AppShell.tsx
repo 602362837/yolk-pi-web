@@ -38,6 +38,7 @@ import { getRelativeFilePath } from "@/lib/file-paths";
 import { formatWorkspaceTitle, sameWorkspacePathForTitle, spaceContextMatchesSession } from "@/lib/workspace-title";
 import { useTheme } from "@/hooks/useTheme";
 import { useAppearance } from "@/hooks/useAppearance";
+import { refreshModelCatalog } from "@/hooks/useModelCatalog";
 import type { GitInfo, SessionInfo, StudioChildSessionListItem } from "@/lib/types";
 import type { PiWebConfig } from "@/lib/pi-web-config";
 import type { TrellisSessionTaskLinkResult, TrellisTaskDetail } from "@/lib/trellis-types";
@@ -346,7 +347,6 @@ function AppShellContent() {
   const previewContentRef = useRef<HTMLDivElement>(null);
 
   const [modelsConfigOpen, setModelsConfigOpen] = useState(false);
-  const [modelsRefreshKey, setModelsRefreshKey] = useState(0);
   // Models focus context from top-bar deep-link (provider → account). Consumed once by ModelsConfig.
   const [modelsInitialProviderId, setModelsInitialProviderId] = useState<string | null>(null);
   const [modelsInitialAccountId, setModelsInitialAccountId] = useState<string | null>(null);
@@ -1850,7 +1850,6 @@ function AppShellContent() {
               onSessionCreated={handleSessionCreated}
               onSessionForked={handleSessionForked}
               onReturnToParentSession={handleReturnToParentSession}
-              modelsRefreshKey={modelsRefreshKey}
               chatInputRef={chatInputRef}
               onSystemPromptChange={handleSystemPromptChange}
               onSessionStatsChange={handleSessionStatsChange}
@@ -2196,7 +2195,11 @@ function AppShellContent() {
     </div>
     {modelsConfigOpen && (
       <ModelsConfig
-        onClose={() => { setModelsConfigOpen(false); setModelsRefreshKey((k) => k + 1); }}
+        onClose={() => {
+          setModelsConfigOpen(false);
+          // Shared catalog: one invalidate+refresh for Chat and Settings subscribers.
+          void refreshModelCatalog({ force: true });
+        }}
         initialProviderId={modelsInitialProviderId}
         initialAccountId={modelsInitialAccountId}
         onConsumedFocus={() => {

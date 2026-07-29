@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useModelCatalog } from "@/hooks/useModelCatalog";
 import { ModelSelect, type ModelSelectOption } from "./ModelSelect";
 import { SelectDropdown, type SelectDropdownOption } from "./SelectDropdown";
 import { TerminalKnownHostsPanel } from "./TerminalKnownHostsPanel";
@@ -72,13 +73,6 @@ interface ModelListItem {
   name: string;
   provider: string;
   providerDisplayName?: string;
-}
-
-interface ModelsResponse {
-  modelList?: ModelListItem[];
-  defaultModel?: { provider: string; modelId: string } | null;
-  thinkingLevels?: Record<string, string[]>;
-  error?: string;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -852,9 +846,11 @@ export function SettingsConfig({
   const [trellisAction, setTrellisAction] = useState<"install" | "update" | null>(null);
   const [trellisOutput, setTrellisOutput] = useState<string | null>(null);
   const [trellisWorkflowOpen, setTrellisWorkflowOpen] = useState(false);
-  const [modelList, setModelList] = useState<ModelListItem[]>([]);
-  const [modelThinkingLevels, setModelThinkingLevels] = useState<Record<string, string[]>>({});
-  const [modelsError, setModelsError] = useState<string | null>(null);
+  // Shared with Chat via module-level catalog resource (no per-view refetch).
+  const modelCatalog = useModelCatalog();
+  const modelList = modelCatalog.modelList as ModelListItem[];
+  const modelThinkingLevels = modelCatalog.thinkingLevels;
+  const modelsError = modelCatalog.error;
   const studioMemberRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [highlightedStudioMember, setHighlightedStudioMember] = useState<string | null>(studioFocusMember?.id ?? null);
 
@@ -907,22 +903,6 @@ export function SettingsConfig({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
-    }
-  }, []);
-
-  const loadModels = useCallback(async (signal?: AbortSignal) => {
-    setModelsError(null);
-    try {
-      const res = await fetch("/api/models", { signal });
-      const data = await res.json() as ModelsResponse;
-      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setModelList(data.modelList ?? []);
-      setModelThinkingLevels(data.thinkingLevels ?? {});
-    } catch (err) {
-      if ((err as { name?: string }).name === "AbortError") return;
-      setModelsError(err instanceof Error ? err.message : String(err));
-      setModelList([]);
-      setModelThinkingLevels({});
     }
   }, []);
 
@@ -981,13 +961,12 @@ export function SettingsConfig({
   }, [cwd]);
 
   useEffect(() => {
-    // Model/status loading still keys on real sections only — never providerHub.
-    if (view !== "trellis" && view !== "terminal" && view !== "studio" && view !== "yolk") return;
+    // Trellis status only; model catalog is shared via useModelCatalog (not view-keyed).
+    if (view !== "trellis") return;
     const controller = new AbortController();
-    if (view === "trellis") void loadTrellisStatus(controller.signal);
-    void loadModels(controller.signal);
+    void loadTrellisStatus(controller.signal);
     return () => controller.abort();
-  }, [view, loadModels, loadTrellisStatus]);
+  }, [view, loadTrellisStatus]);
 
   const handleSelectView = useCallback((nextView: SettingsView) => {
     setExpandedGroups((prev) => expandAncestorsForView(prev, nextView));

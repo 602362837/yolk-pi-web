@@ -34,6 +34,11 @@ import {
 import { createAntigravityCoordinatedCredentialStore } from "./antigravity-active-credential-store";
 import { createGrokCoordinatedCredentialStore } from "./grok-active-credential-store";
 import { webExtensionFactories, webProviderExtensions } from "./pi-provider-extensions";
+import {
+  instrumentModelRuntimeForCatalogMetrics,
+  measureModelCatalogAsync,
+  recordModelCatalogCount,
+} from "./model-catalog-metrics";
 
 export interface CreateWebModelRuntimeOptions {
   agentDir?: string;
@@ -150,13 +155,15 @@ export async function createWebModelRuntime(
       ? join(agentDir, "models.json")
       : options.modelsPath;
 
-  return ModelRuntime.create({
+  recordModelCatalogCount("runtime.create");
+  const runtime = await ModelRuntime.create({
     credentials,
     authPath,
     modelsPath,
     allowModelNetwork: options.allowModelNetwork,
     modelRefreshTimeoutMs: options.modelRefreshTimeoutMs,
   });
+  return instrumentModelRuntimeForCatalogMetrics(runtime);
 }
 
 /**
@@ -228,9 +235,13 @@ async function refreshAdminRuntimeOffline(
 ): Promise<void> {
   let pending = adminRuntimeRefreshPending.get(key);
   if (!pending) {
-    pending = adminRuntimeTestHooks?.refreshOffline
-      ? adminRuntimeTestHooks.refreshOffline(entry)
-      : entry.runtime.refresh({ allowNetwork: false }).then(() => undefined);
+    pending = measureModelCatalogAsync("runtime.admin_refresh", async () => {
+      if (adminRuntimeTestHooks?.refreshOffline) {
+        await adminRuntimeTestHooks.refreshOffline(entry);
+        return;
+      }
+      await entry.runtime.refresh({ allowNetwork: false });
+    });
     adminRuntimeRefreshPending.set(key, pending);
     void pending.finally(() => {
       if (adminRuntimeRefreshPending.get(key) === pending) {
@@ -249,23 +260,25 @@ async function createAdminRuntimeEntry(
   agentDir: string,
   modelsPath: string | null | undefined,
 ): Promise<AdminRuntimeCacheEntry> {
-  const authPath = join(agentDir, "auth.json");
-  const credentials = await getWebCredentialStore({ authPath, agentDir });
-  // Initialization is always offline. In particular, a first caller that
-  // asks for a network refresh must not alter the shared runtime's cold
-  // startup semantics.
-  const runtime = await createWebModelRuntime({
-    agentDir,
-    credentials,
-    authPath,
-    modelsPath,
-    allowModelNetwork: false,
+  return measureModelCatalogAsync("runtime.admin_init", async () => {
+    const authPath = join(agentDir, "auth.json");
+    const credentials = await getWebCredentialStore({ authPath, agentDir });
+    // Initialization is always offline. In particular, a first caller that
+    // asks for a network refresh must not alter the shared runtime's cold
+    // startup semantics.
+    const runtime = await createWebModelRuntime({
+      agentDir,
+      credentials,
+      authPath,
+      modelsPath,
+      allowModelNetwork: false,
+    });
+    // Load fixed providers into this runtime via a throwaway services build
+    // that skips project extension discovery (noExtensions) while still
+    // applying webExtensionFactories.
+    await registerFixedProvidersOnRuntime(runtime, agentDir);
+    return { runtime, credentials, authPath, modelsPath };
   });
-  // Load fixed providers into this runtime via a throwaway services build
-  // that skips project extension discovery (noExtensions) while still
-  // applying webExtensionFactories.
-  await registerFixedProvidersOnRuntime(runtime, agentDir);
-  return { runtime, credentials, authPath, modelsPath };
 }
 
 async function registerFixedProvidersOnRuntime(
@@ -346,14 +359,20 @@ export async function createWebAgentSessionServices(
       : {}),
   };
 
-  return createAgentSessionServices({
-    cwd,
-    agentDir,
-    modelRuntime,
-    settingsManager: options.settingsManager,
-    extensionFlagValues: options.extensionFlagValues,
-    resourceLoaderOptions,
-    resourceLoaderReloadOptions: options.resourceLoaderReloadOptions,
+  return measureModelCatalogAsync("runtime.services_create", async () => {
+    const services = await createAgentSessionServices({
+      cwd,
+      agentDir,
+      modelRuntime,
+      settingsManager: options.settingsManager,
+      extensionFlagValues: options.extensionFlagValues,
+      resourceLoaderOptions,
+      resourceLoaderReloadOptions: options.resourceLoaderReloadOptions,
+    });
+    // Services may wrap/refresh the target runtime; keep refresh/getAvailable
+    // countable when diagnostics are enabled without changing identity.
+    instrumentModelRuntimeForCatalogMetrics(services.modelRuntime);
+    return services;
   });
 }
 

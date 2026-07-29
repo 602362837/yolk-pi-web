@@ -1474,6 +1474,20 @@ export function getActiveRpcSessionIds(): string[] {
  * - Cleans provider session resources after refresh so sockets reconnect.
  */
 export async function reloadRpcAuthState(): Promise<number> {
+  // Auth/account authority already committed by the caller. Advance the shared
+  // model-catalog epoch before refreshing live wrappers so the next
+  // GET /api/models rebuilds against the new credentials (not the burst cache).
+  // Failures/cancels must never reach this function. Lazy import avoids a
+  // static cycle with catalog/runtime modules.
+  try {
+    const { invalidateWebModelCatalog } = await import(
+      "@/lib/model-catalog-service",
+    );
+    invalidateWebModelCatalog("auth_mutation");
+  } catch {
+    // Catalog invalidation must not block live auth reload.
+  }
+
   const wrappers = [...getRegistry().values()].filter((wrapper) => wrapper.isAlive());
   const results = await Promise.all(
     wrappers.map(async (wrapper) => {

@@ -703,6 +703,20 @@ export async function applyPricePatch(
     };
   }
 
+  // models.json price patch committed. Invalidate shared catalog before success
+  // so availability/thinking projections rebuild on the next GET /api/models.
+  // 422/409/500 paths above never reach here; skip/no-write outcomes return earlier.
+  if (outcome.written) {
+    try {
+      const { invalidateWebModelCatalog } = await import(
+        "./model-catalog-service"
+      );
+      invalidateWebModelCatalog("model_prices");
+    } catch {
+      // Catalog invalidation must not roll back a committed price write.
+    }
+  }
+
   // Update explicit free models in pi-web.json (best-effort after models.json write).
   if (explicitFreeToAdd.length > 0 || explicitFreeToRemove.length > 0) {
     const newExplicitFree = new Set(explicitFreeSet);

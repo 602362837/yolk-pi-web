@@ -22,7 +22,6 @@ interface Props {
   onSessionForked?: (newSessionId: string) => void;
   /** Navigate from a Studio child audit view back to its parent Chat. */
   onReturnToParentSession?: (parentSessionId: string) => void;
-  modelsRefreshKey?: number;
   chatInputRef?: React.RefObject<ChatInputHandle | null>;
   onSystemPromptChange?: (prompt: string | null) => void;
   onSessionStatsChange?: (stats: SessionUsageTopbarStats | null) => void;
@@ -172,7 +171,7 @@ function Typewriter({ phrases }: { phrases: string[] }) {
   );
 }
 
-export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, onReturnToParentSession, modelsRefreshKey, chatInputRef, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel, onComposeSendReady }: Props) {
+export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked, onReturnToParentSession, chatInputRef, onSystemPromptChange, onSessionStatsChange, onContextUsageChange, onStudioToolProgressChange, onSessionListRefreshNeeded, defaultToolPreset, defaultThinkingLevel, defaultModel, onComposeSendReady }: Props) {
   const { autoScrollEnabled, onAutoScrollToggle } = useAutoScroll();
   const {
     loading, error, messages, entryIds, streamState,
@@ -188,7 +187,7 @@ export function ChatWindow({ session, newSessionCwd, newSessionProjectContext, o
     handleToolPresetChange, handleThinkingLevelChange, handleAgentEventRef,
   } = useAgentSession({
     session, newSessionCwd, newSessionProjectContext, onAgentEnd, onSessionCreated, onSessionForked,
-    modelsRefreshKey, onSystemPromptChange,
+    onSystemPromptChange,
     autoScrollEnabled, defaultToolPreset, defaultThinkingLevel, defaultModel,
   });
 

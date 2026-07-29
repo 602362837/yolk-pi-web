@@ -137,7 +137,12 @@ test("AnyRouter load failure is isolated and does not use AuthStorage/ModelRegis
   // Best-effort catch around the factory so other providers continue.
   const factoryIdx = peSource.indexOf("export const anyrouterProviderExtension");
   assert.ok(factoryIdx >= 0, "factory present");
-  const slice = peSource.slice(factoryIdx, factoryIdx + 1800);
+  // Factory body is longer after pure-read comments; scan until the next export.
+  const nextExport = peSource.indexOf("\nexport ", factoryIdx + 1);
+  const slice = peSource.slice(
+    factoryIdx,
+    nextExport > factoryIdx ? nextExport : factoryIdx + 4000,
+  );
   assertIncludes(slice, "catch", "has failure isolation catch");
   const codeOnly = peSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
   assert.ok(!/\bModelRegistry\.create\s*\(/.test(codeOnly), "no ModelRegistry.create");
@@ -151,12 +156,30 @@ test("AnyRouter registration intercepts static apiKey so CredentialStore remains
     "ensureAnyRouterConfigEnvPointsAtBridge",
     "points PI_ANYROUTER_CC_CONFIG at the Web-managed runtime bridge before package import",
   );
-  assertIncludes(
+  // Catalog/target-runtime registration is pure-read: no implicit bridge/auth repair.
+  assertNotIncludes(
     peSource,
     "reconcileAnyRouterRuntimeMirrors",
-    "cold-load reconciles Active bridge before package registration",
+    "fixed provider factory must not reconcile derived mirrors on load",
   );
   assertIncludes(peSource, "apiKey: undefined", "strips static register-time apiKey");
+});
+
+test("AnyRouter runtime bridge exports explicit reconcile + equal-value no-op helpers", () => {
+  const bridgeSource = read("lib/anyrouter-runtime-bridge.ts");
+  assertIncludes(
+    bridgeSource,
+    "export async function reconcileAnyRouterRuntimeMirrors",
+    "explicit reconcile remains available for mutations/bootstrap",
+  );
+  assertIncludes(
+    bridgeSource,
+    "export async function ensureAnyRouterRuntimeMirrorsBootstrapped",
+    "bootstrap helper for missing-bridge repair outside catalog GET",
+  );
+  assertIncludes(bridgeSource, "anyrouter.bridge_noop", "bridge equal-content no-op counter");
+  assertIncludes(bridgeSource, "anyrouter.auth_mirror_noop", "auth equal-value no-op counter");
+  assertIncludes(bridgeSource, "anyrouter.reconcile_shared", "reconcile single-flight shared counter");
 });
 
 test("web-model-runtime documents / injects fixed providers including AnyRouter", () => {

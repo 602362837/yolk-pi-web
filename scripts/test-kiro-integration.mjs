@@ -121,13 +121,15 @@ test("key call sites use ModelRuntime helpers", () => {
   const sessionSites = [
     ["lib/rpc-manager.ts", "createWebAgentSessionServices"],
     ["lib/ypi-studio-child-session-runner.ts", "createWebAgentSessionServices"],
-    ["app/api/models/route.ts", "createWebAgentSessionServices"],
     ["app/api/terminal/env/assist/route.ts", "createWebAgentSessionServices"],
     ["app/api/trellis/workflow/assist/route.ts", "createWebAgentSessionServices"],
   ];
   for (const [path, needle] of sessionSites) {
     assertIncludes(read(path), needle, path);
   }
+  // Catalog route uses shared offline admin catalog service (not session services).
+  assertIncludes(read("app/api/models/route.ts"), "getWebModelCatalogSnapshot", "models route catalog service");
+  assertIncludes(read("lib/model-catalog-service.ts"), "getWebModelRuntime", "catalog service admin runtime");
   const adminSites = [
     ["app/api/auth/providers/route.ts", "getWebModelRuntime"],
     ["app/api/auth/all-providers/route.ts", "getWebModelRuntime"],

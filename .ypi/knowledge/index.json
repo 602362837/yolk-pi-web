@@ -3,20 +3,26 @@
   "updatedAt": "2026-07-29T03:05:51.026Z",
   "entries": [
     {
-      "id": "20260729-110551-精简议题自动化为新议题规范化评论与真实性分析",
-      "title": "精简议题自动化为新议题规范化评论与真实性分析",
-      "taskId": "20260729-084811-精简议题自动化为新议题规范化评论与真实性分析",
-      "taskKey": "archived:2026-07:20260729-084811-精简议题自动化为新议题规范化评论与真实性分析",
+      "id": "20260729-103343-深度排查-chat-模型与-settings-加载缓慢问题",
+      "title": "深度排查 Chat 模型与 Settings 加载缓慢问题",
+      "taskId": "20260729-090309-深度排查-chat-模型与-settings-加载缓慢问题",
+      "taskKey": "archived:2026-07:20260729-090309-深度排查-chat-模型与-settings-加载缓慢问题",
       "workflowId": "feature-dev",
-      "summary": "## Status **GIA-05 complete** — `GithubAutomationConfig` rebuilt to the approved analysis-only HTML IA and GIA-04 wire surface. No commit / push / merge performed. HTML prototype was **not** modified. ## Files Changed | Path | Summary | | --- | --- | | `components/GithubAutomationConfig.tsx` | Full rewrite (~2886 lines): single enabled + global paused + concurrency; local App credentials (never-echo); analysis checklist (Metadata+Issues, project readable, model ready); allowlist without baseRef/ownerActorIds; recent analysis + retry-only; safety boundary. Removed mode segmented, Assignee, unattended/full-agent, dual-layer Session/WorkTree/PR jobs UI. | | `app/globals.css` | Analysis-only control switch, warn-banner, analysis-row, boundary/env-details, pill--muted, sr-only; ≤640px stacked control rows. | | `docs/modules/frontend.md` | `GithubAutomationConfig` module map updated to GIA-05…",
+      "summary": "Chat 模型与 Settings 加载慢的根因是 /api/models 每次重建 Runtime、重复 provider/auth refresh、AnyRouter catalog GET 隐式 reconcile 写盘，以及 Chat/Settings 重复请求。修复为离线共享 model catalog：admin runtime + epoch/single-flight/短缓存、按 canonical agentDir 隔离、AnyRouter catalog 纯读、显式 mutation 后失效、客户端共享 resource + AbortController/generation guard/last-good。目录失败返回 500，避免空目录覆盖旧数据。验证：冷启动约491–744ms，warm p95约105–180ms，8并发共享请求；focused tests、lint、tsc、git diff --check通过。30142接口实测冷启动含编译约2.7s，warm约2–60ms，8并发约56–58ms；web-config warm约4–10ms。MLP-06 CredentialStore深层缓存因性能已达标跳过。",
       "tags": [
+        "performance",
+        "chat-models",
+        "settings",
+        "model-catalog",
+        "anyrouter",
+        "reusable-knowledge",
         "studio",
         "feature-dev"
       ],
-      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260729-084811-精简议题自动化为新议题规范化评论与真实性分析",
-      "knowledgePath": ".ypi/knowledge/20260729-110551-精简议题自动化为新议题规范化评论与真实性分析.md",
-      "createdAt": "2026-07-29T03:05:51.026Z",
-      "archivedAt": "2026-07-29T03:05:51.026Z",
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260729-090309-深度排查-chat-模型与-settings-加载缓慢问题",
+      "knowledgePath": ".ypi/knowledge/20260729-103343-深度排查-chat-模型与-settings-加载缓慢问题.md",
+      "createdAt": "2026-07-29T02:33:43.707Z",
+      "archivedAt": "2026-07-29T02:33:43.707Z",
       "sourceArtifacts": [
         "handoff.md",
         "review.md",
@@ -2450,6 +2456,33 @@
       "knowledgePath": ".ypi/knowledge/20260727-170946-修复-github-自动化手动重试空跑-handler-未注册-bootstrap-失败不可见-.md",
       "createdAt": "2026-07-27T09:09:46.353Z",
       "archivedAt": "2026-07-27T09:09:46.353Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
+    {
+      "id": "20260729-110551-精简议题自动化为新议题规范化评论与真实性分析",
+      "title": "精简议题自动化为新议题规范化评论与真实性分析",
+      "taskId": "20260729-084811-精简议题自动化为新议题规范化评论与真实性分析",
+      "taskKey": "archived:2026-07:20260729-084811-精简议题自动化为新议题规范化评论与真实性分析",
+      "workflowId": "feature-dev",
+      "summary": "## Status **GIA-05 complete** — `GithubAutomationConfig` rebuilt to the approved analysis-only HTML IA and GIA-04 wire surface. No commit / push / merge performed. HTML prototype was **not** modified. ## Files Changed | Path | Summary | | --- | --- | | `components/GithubAutomationConfig.tsx` | Full rewrite (~2886 lines): single enabled + global paused + concurrency; local App credentials (never-echo); analysis checklist (Metadata+Issues, project readable, model ready); allowlist without baseRef/ownerActorIds; recent analysis + retry-only; safety boundary. Removed mode segmented, Assignee, unattended/full-agent, dual-layer Session/WorkTree/PR jobs UI. | | `app/globals.css` | Analysis-only control switch, warn-banner, analysis-row, boundary/env-details, pill--muted, sr-only; ≤640px stacked control rows. | | `docs/modules/frontend.md` | `GithubAutomationConfig` module map updated to GIA-05…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260729-084811-精简议题自动化为新议题规范化评论与真实性分析",
+      "knowledgePath": ".ypi/knowledge/20260729-110551-精简议题自动化为新议题规范化评论与真实性分析.md",
+      "createdAt": "2026-07-29T03:05:51.026Z",
+      "archivedAt": "2026-07-29T03:05:51.026Z",
       "sourceArtifacts": [
         "handoff.md",
         "review.md",
