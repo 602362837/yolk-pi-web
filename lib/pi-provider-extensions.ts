@@ -423,22 +423,16 @@ export const anyrouterProviderExtension: InlineExtension = {
       // Point the package at the Web-managed Active bridge BEFORE the package
       // module is first evaluated (CONFIG_PATH is a module-level constant).
       // Never rewrite this env per request / per account.
-      const { ensureAnyRouterConfigEnvPointsAtBridge, reconcileAnyRouterRuntimeMirrors } =
-        await import("./anyrouter-runtime-bridge");
+      //
+      // Target-runtime registration is intentionally pure-read: do NOT reconcile
+      // or rewrite bridge/auth here. Derived mirrors are repaired only by
+      // explicit account/config mutations (or server bootstrap helpers), so a
+      // catalog GET cannot thrash mtime/locks. Missing bridge degrades to no
+      // AnyRouter models for this runtime; other providers continue.
+      const { ensureAnyRouterConfigEnvPointsAtBridge } = await import(
+        "./anyrouter-runtime-bridge",
+      );
       ensureAnyRouterConfigEnvPointsAtBridge();
-
-      // Cold-load reconcile: repair bridge/auth from managed Active authority
-      // before the package reads the bridge for catalog registration.
-      try {
-        await reconcileAnyRouterRuntimeMirrors();
-      } catch (reconcileErr) {
-        // Incomplete Active / missing models must not block registration when a
-        // catalog-only bridge can still be written; hard failures are recorded
-        // but other providers continue.
-        const msg =
-          reconcileErr instanceof Error ? reconcileErr.message : String(reconcileErr);
-        console.error("[pi-web] anyrouter runtime bridge reconcile failed:", msg);
-      }
 
       const loaded = await createRuntimeJiti().import("pi-anyrouter");
       const factory = (loaded as { default?: ExtensionFactory }).default;

@@ -11,6 +11,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { invalidateWebModelCatalog } from "@/lib/model-catalog-service";
 import {
   mutateModelsJsonUnderLock,
   readModelsJsonRaw,
@@ -164,6 +165,13 @@ export async function PUT(req: Request) {
         },
         { status: 500, headers: revisionHeaders(outcome.revision) },
       );
+    }
+
+    // models.json committed. Advance catalog epoch before the success response
+    // so Chat/Settings rebuild the offline catalog (not the burst cache).
+    // Failed/stale outcomes above never reach here.
+    if (outcome.written) {
+      invalidateWebModelCatalog("models_config");
     }
 
     // Additive revision field; success remains true for legacy clients.

@@ -1,7 +1,40 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-28T04:15:15.573Z",
+  "updatedAt": "2026-07-29T02:33:43.707Z",
   "entries": [
+    {
+      "id": "20260729-103343-深度排查-chat-模型与-settings-加载缓慢问题",
+      "title": "深度排查 Chat 模型与 Settings 加载缓慢问题",
+      "taskId": "20260729-090309-深度排查-chat-模型与-settings-加载缓慢问题",
+      "taskKey": "archived:2026-07:20260729-090309-深度排查-chat-模型与-settings-加载缓慢问题",
+      "workflowId": "feature-dev",
+      "summary": "Chat 模型与 Settings 加载慢的根因是 /api/models 每次重建 Runtime、重复 provider/auth refresh、AnyRouter catalog GET 隐式 reconcile 写盘，以及 Chat/Settings 重复请求。修复为离线共享 model catalog：admin runtime + epoch/single-flight/短缓存、按 canonical agentDir 隔离、AnyRouter catalog 纯读、显式 mutation 后失效、客户端共享 resource + AbortController/generation guard/last-good。目录失败返回 500，避免空目录覆盖旧数据。验证：冷启动约491–744ms，warm p95约105–180ms，8并发共享请求；focused tests、lint、tsc、git diff --check通过。30142接口实测冷启动含编译约2.7s，warm约2–60ms，8并发约56–58ms；web-config warm约4–10ms。MLP-06 CredentialStore深层缓存因性能已达标跳过。",
+      "tags": [
+        "performance",
+        "chat-models",
+        "settings",
+        "model-catalog",
+        "anyrouter",
+        "reusable-knowledge",
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260729-090309-深度排查-chat-模型与-settings-加载缓慢问题",
+      "knowledgePath": ".ypi/knowledge/20260729-103343-深度排查-chat-模型与-settings-加载缓慢问题.md",
+      "createdAt": "2026-07-29T02:33:43.707Z",
+      "archivedAt": "2026-07-29T02:33:43.707Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260728-121515-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
       "title": "排查并修复 Models 弹窗渲染慢及未配置三方覆盖模型展示问题",

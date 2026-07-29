@@ -120,6 +120,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
     // Config mutation must rebuild the Active bridge (effective baseUrl/retry)
     // and only then reload live wrappers. Never report success before both finish.
+    // reloadRpcAuthState advances the shared model-catalog epoch (auth_mutation).
     await rebuildAnyRouterRuntimeBridgeAfterConfigChange();
     await Promise.resolve(reloadRpcAuthState());
 

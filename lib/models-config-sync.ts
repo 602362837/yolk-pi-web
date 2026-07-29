@@ -1284,7 +1284,21 @@ export async function applyModelsConfigSync(
       }
       // Keep preview so the client can re-apply only after a successful re-preview
       // if the config was restored; do not delete on verification failure.
+      // Do not advance the model-catalog epoch: verification failed / rolled back.
       throw new ModelsConfigSyncError("verification_failed");
+    }
+  }
+
+  // Persist + verify succeeded (or no verifier). Advance catalog epoch even when
+  // the subsequent live-wrapper reload is only best-effort / partial.
+  if (outcome.written) {
+    try {
+      const { invalidateWebModelCatalog } = await import(
+        "@/lib/model-catalog-service"
+      );
+      invalidateWebModelCatalog("models_config_sync");
+    } catch {
+      // Catalog invalidation must not fail the verified models.json write.
     }
   }
 

@@ -11,6 +11,7 @@ import {
   reauthenticateOAuthAccount,
 } from "@/lib/oauth-accounts";
 import { sanitizeGrokLoginError, isGrokLoginCancelled } from "@/lib/grok-login-errors";
+import { invalidateWebModelCatalog } from "@/lib/model-catalog-service";
 import { invalidateProviderVerification } from "@/lib/models-provider-auth-summary";
 import { reloadRpcAuthState } from "@/lib/rpc-manager";
 import { createInMemoryWebCredentialStore } from "@/lib/web-credential-store";
@@ -282,8 +283,12 @@ export async function GET(
             credential as Credential,
           );
           // Only reload live auth if the target was (and still is) Active.
+          // reloadRpcAuthState also advances the model-catalog epoch.
           if (active) {
             await Promise.resolve(reloadRpcAuthState());
+          } else {
+            // Non-active reauth still must drop catalog burst cache.
+            invalidateWebModelCatalog("account_mutation");
           }
           invalidateProviderVerification(provider);
           send(controller, {
@@ -297,6 +302,8 @@ export async function GET(
           });
         } else if (addAccountMode) {
           const account = await saveOAuthAccountCredential(provider, credential as Credential);
+          // Non-active add-account: no live reload, but catalog must rebuild.
+          invalidateWebModelCatalog("account_mutation");
           invalidateProviderVerification(provider);
           send(controller, { type: "success", account, message: "Account saved successfully." });
         } else {

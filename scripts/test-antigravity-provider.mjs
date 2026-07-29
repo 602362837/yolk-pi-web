@@ -185,7 +185,6 @@ console.log("\n=== Entry point audit ===");
 const sessionServiceFiles = [
   { path: "lib/rpc-manager.ts", label: "rpc-manager" },
   { path: "lib/ypi-studio-child-session-runner.ts", label: "studio child runner" },
-  { path: "app/api/models/route.ts", label: "models route" },
   { path: "app/api/terminal/env/assist/route.ts", label: "terminal env assist" },
   { path: "app/api/trellis/workflow/assist/route.ts", label: "trellis workflow assist" },
   { path: "app/api/model-prices/suggest/route.ts", label: "model-prices suggest route" },
@@ -201,6 +200,28 @@ for (const file of sessionServiceFiles) {
     assertNotIncludes(source, "extensionFactories: [antigravityProviderExtension]", `${file.label} does not pass Antigravity-only list`);
   });
 }
+
+test("models route uses shared offline model catalog service", () => {
+  const source = read("app/api/models/route.ts");
+  assertIncludes(source, "getWebModelCatalogSnapshot", "models route uses catalog service");
+  assertNotIncludes(source, "createWebAgentSessionServices", "models route does not create session services");
+  assertNotIncludes(source, "ModelRegistry.create", "models route does not use ModelRegistry.create");
+  // Route must not invoke runtime.getAvailable (comments may mention the name).
+  assert.equal(
+    /\bruntime\.getAvailable\s*\(/.test(source) || /\bawait\s+[^;\n]*\.getAvailable\s*\(/.test(source),
+    false,
+    "models route must not invoke getAvailable()",
+  );
+  const catalog = read("lib/model-catalog-service.ts");
+  assertIncludes(catalog, "getWebModelRuntime", "catalog service uses admin runtime");
+  assertIncludes(catalog, "getAvailableSnapshot", "catalog service uses available snapshot");
+  assertIncludes(catalog, "allowModelNetwork: false", "catalog service stays offline");
+  assert.equal(
+    /\bruntime\.getAvailable\s*\(/.test(catalog) || /\bawait\s+[^;\n]*\.getAvailable\s*\(/.test(catalog),
+    false,
+    "catalog service must not invoke getAvailable()",
+  );
+});
 
 const adminRuntimeFiles = [
   { path: "app/api/auth/providers/route.ts", label: "auth providers route" },

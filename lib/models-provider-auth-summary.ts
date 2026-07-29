@@ -6,6 +6,7 @@ import {
   isSupportedOAuthAccountProvider,
   listOAuthAccounts,
 } from "@/lib/oauth-accounts";
+import { invalidateWebModelCatalog } from "@/lib/model-catalog-service";
 
 const VERIFY_CACHE_TTL_MS = 15_000;
 const VERIFY_DEADLINE_MS = 8_000;
@@ -261,6 +262,16 @@ export function invalidateProviderVerification(providerId: string): void {
     if (flight.providerId !== providerId) continue;
     flight.publishable = false;
     flight.finish(verification("superseded", key.split("\u0000", 3)[2] ?? ""));
+  }
+  // Account mutations that do not call reloadRpcAuthState (non-active import,
+  // metadata, delete, add-account) still must advance the shared model catalog
+  // epoch so Chat/Settings do not keep a pre-mutation burst snapshot. Active
+  // paths that also reload will bump the epoch twice; that is intentional and
+  // harmless (monotonic epoch only).
+  try {
+    invalidateWebModelCatalog("account_mutation");
+  } catch {
+    // Catalog invalidation must not block verification supersede.
   }
 }
 
