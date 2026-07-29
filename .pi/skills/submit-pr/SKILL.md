@@ -19,17 +19,16 @@ description: >
 - 合并不是创建 PR 的默认动作。除非用户明确要求合并，不要执行 `gh pr merge`。
 - PR 被合并时必须使用 `gh pr merge ... --delete-branch`，或在合并已由他人完成后删除对应远程和本地源分支；删除前确认 PR 的 `state` 为 `MERGED`，绝不删除未合并分支。
 
-## 与 GitHub 自动化 publisher 的边界（必读）
+## 与 GitHub 服务端自动化的边界（必读）
 
 | 模式 | 谁 push/开 PR | 身份 | Closing 契约 |
 | --- | --- | --- | --- |
 | **Manual（本 Skill）** | 当前用户 `gh` / git | 操作者本人 | 关联 Issue 可写“暂无”；有议题时**推荐**同仓库 `Fixes #N` |
-| **Automation runner publisher** | server-owned GitHub App（`github-git-publisher`） | App installation；**不是**本机 personal token | **必须**且仅有一条同仓库 `Fixes #N`；创建前按 head/base 复用已有 PR；**不** merge、**不**关 Issue |
+| **历史 Automation PR** | 已退役的 server App publisher（不再创建新 PR） | 历史 App installation | 历史 PR 常含唯一同仓库 `Fixes #N` 与 `ypi/gha/...` 分支；仅供审查识别 |
 
-- 本 Skill **保持 manual 流程不变**；不要在 manual 路径改用 App installation token。
-- 当分支名匹配 `ypi/gha/...` 或任务上下文标明 GitHub unattended automation 时：**不要**由 agent/本 Skill 自行 `git push` / `gh pr create`；发布由 server publisher 在 final diff + validation 通过后执行。
-- Automation PR 正文禁止跨仓库 closing（如 `Fixes other/repo#1`），禁止用“关联 Issue：暂无”代替 `Fixes #N`。
-- full agent 残留风险：即使随后由 server 发布，执行期副作用也不由本 Skill 撤销。
+- 本 Skill **只服务 manual 提 PR**；不要改用 App installation token。
+- 服务端 GitHub 自动化**不再**自动 push/开 PR。若仍看到 `ypi/gha/...` 分支或历史 automation PR，按历史工件处理，不要假设会有新的 server publisher 续跑。
+- 审查历史 automation PR 时用 `pr-review-handle` 的历史 closing 规则；本 Skill 不负责 merge 那些 PR。
 
 ## 固定流程
 

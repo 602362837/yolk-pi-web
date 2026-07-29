@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-28T04:15:15.573Z",
+  "updatedAt": "2026-07-29T03:05:51.026Z",
   "entries": [
+    {
+      "id": "20260729-110551-精简议题自动化为新议题规范化评论与真实性分析",
+      "title": "精简议题自动化为新议题规范化评论与真实性分析",
+      "taskId": "20260729-084811-精简议题自动化为新议题规范化评论与真实性分析",
+      "taskKey": "archived:2026-07:20260729-084811-精简议题自动化为新议题规范化评论与真实性分析",
+      "workflowId": "feature-dev",
+      "summary": "## Status **GIA-05 complete** — `GithubAutomationConfig` rebuilt to the approved analysis-only HTML IA and GIA-04 wire surface. No commit / push / merge performed. HTML prototype was **not** modified. ## Files Changed | Path | Summary | | --- | --- | | `components/GithubAutomationConfig.tsx` | Full rewrite (~2886 lines): single enabled + global paused + concurrency; local App credentials (never-echo); analysis checklist (Metadata+Issues, project readable, model ready); allowlist without baseRef/ownerActorIds; recent analysis + retry-only; safety boundary. Removed mode segmented, Assignee, unattended/full-agent, dual-layer Session/WorkTree/PR jobs UI. | | `app/globals.css` | Analysis-only control switch, warn-banner, analysis-row, boundary/env-details, pill--muted, sr-only; ≤640px stacked control rows. | | `docs/modules/frontend.md` | `GithubAutomationConfig` module map updated to GIA-05…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260729-084811-精简议题自动化为新议题规范化评论与真实性分析",
+      "knowledgePath": ".ypi/knowledge/20260729-110551-精简议题自动化为新议题规范化评论与真实性分析.md",
+      "createdAt": "2026-07-29T03:05:51.026Z",
+      "archivedAt": "2026-07-29T03:05:51.026Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260728-121515-排查并修复-models-弹窗渲染慢及未配置三方覆盖模型展示问题",
       "title": "排查并修复 Models 弹窗渲染慢及未配置三方覆盖模型展示问题",

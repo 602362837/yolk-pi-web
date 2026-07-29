@@ -585,240 +585,103 @@ To fully revoke the GitHub authorization:
 
 This is a GitHub-side operation only; the yolk pi web Links module does not call GitHub's revocation API in P0.
 
-## GitHub App automation (P0 triage)
+## GitHub App issue analysis
 
 ### App credentials missing / not configured after restart
 
-Default path is **Settings → GitHub 自动化 → 本机 GitHub App 凭据** (not shell env). Checklist:
-
-1. Save a complete local bundle (App ID + RSA PEM + Webhook secret) via **保存到本机**.
-2. Confirm status/credentials GET shows `configured` with sources `local` (or `env` if advanced override is intentional).
-3. Fully stop and restart `ypi` with no `YPI_GITHUB_APP_*` in the process environment; local bundle should still load.
-4. If local readiness is `invalid` / `unsupported`, use **移除本机凭据** then re-save a complete bundle — do not hand-edit `credentials.v1.json`.
-5. Advanced env only: non-empty `YPI_GITHUB_APP_ID` / `YPI_GITHUB_APP_PRIVATE_KEY_FILE` / `YPI_GITHUB_APP_WEBHOOK_SECRET` override matching fields; blank env falls back to local. Mixed env+local values must belong to the **same** App.
-
-APIs never return App ID value, secret, PEM, path, or fingerprint — diagnose via readiness/source enums and verify next steps only.
+1. Open Settings → GitHub 自动化 → 本机凭据 and confirm readiness shows configured.
+2. If the process relied only on env, ensure `YPI_GITHUB_APP_*` is present in the service unit/container.
+3. Prefer saving local credentials so restart without env still works.
+4. After local PUT/DELETE, installation token cache is cleared automatically; if you rotated the PEM outside Settings, restart `ypi`.
 
 ### Local credential save/delete errors
 
-| Code / symptom | Operator action |
-| --- | --- |
-| `invalid_app_id` / `invalid_webhook_secret` / `invalid_private_key` | Fix the submitted field; paste/file must be a GitHub App RSA private key |
-| `private_key_too_large` / `invalid_credentials_request` | Single reasonable-size PEM; paste and file are mutually exclusive; no JSON/path fields |
-| `local_credentials_invalid` / `local_credentials_unsupported` | Delete local fallback and reconfigure fully; unknown schema is fail-closed |
-| `credentials_lock_timeout` / `credentials_store_error` | Retry; do not delete live lock dirs by hand; check agent-dir permissions (`0700`/`0600`) |
-| Saved but UI still shows env sources | Process still has non-empty env overrides; local fallback was updated but effective runtime prefers env |
-| Delete local but still configured | Expected when env still supplies a complete set |
-
-Successful save/delete clears installation token cache; a post-rotation App/key must not reuse an old cached installation token.
+- First save must include App ID + webhook secret + RSA PEM.
+- Blank rotation fields preserve local values; they do not import env onto disk.
+- DELETE requires exact `{ "confirm": "remove_local_credentials" }` and only removes the local bundle.
+- Safe API errors use fixed codes (`invalid_app_id`, `invalid_private_key`, `credentials_lock_timeout`, …) without PEM/path leakage.
 
 ### Webhook returns 401
 
-`X-Hub-Signature-256` missing/wrong, or the **effective** webhook secret (non-empty env override, else local bundle) does not match the App webhook secret. Re-save the secret in Settings local credentials, or align advanced env; never log the raw body or signature. Oversized bodies return 413.
+HMAC mismatch: Webhook secret on GitHub App ≠ effective secret (env-over-local). Reverse proxies must not alter the raw body before signature verification.
 
 ### Webhook 202 but no job / “ignored”
 
-Common safe ignore reasons:
+Expected when any of:
 
-- repository not in allowlist (immutable `repository.id`)
-- `enabled=false` (`automation_disabled`) or `mode=off` (`mode_off`)
-- global `paused=true` (delivery disposition `paused`; command/runner not executed)
-- **self App event** (`self_app_event`): `performed_via_github_app.id` matches effective App ID (Bot label/assign/comment create/edit)
-- **Bot/App actor fallback** (`bot_actor_event`): sender type Bot/App without definite self match — still non-actionable
-- non-actionable human Issue actions (`assigned` / `labeled` / …) and `issue_comment.deleted`
-- unknown/unsupported event or `unknown_actor` (fail closed)
-- installation id mismatch for a configured repo
-- terminal job + non-generation-eligible event (no automatic generation++)
+- `enabled=false` or `paused=true`
+- repository id not allowlisted / installation id mismatch
+- event is not human `issues.opened` (reopen/edit/close/label/comment/PR are audit-only)
+- actor is self App / Bot / unknown
+- same delivery id replay (duplicate)
+- same repo/issue already has an analysis lifecycle
 
-Deliveries still leave an audit record under `~/.pi/agent/github-automation/deliveries/` without Issue body text. **Ignored self/Bot traffic with zero jobs is healthy**, not a misconfiguration — it is the permanent anti-loop layer.
+Deliveries still leave an audit record under `~/.pi/agent/github-automation/deliveries/` without Issue body text. **Ignored self/Bot traffic with zero jobs is healthy** (anti-loop).
 
-### Claim shows incomplete / `blocked_claim_assignee`
+### Analysis stays inconclusive
 
-Successful claim requires **both** `ypi:claimed` and Assignees containing the machine active GitHub login after App read-back. Failures include:
+Common safe reasons:
 
-1. `gh` not installed / not logged in / multi-account with no active account
-2. git credential fallback only works for fixed `github.com` + canonical `/user` (username alone is not login)
-3. login not a collaborator / not assignable (GitHub may return 2xx but omit assignee)
-4. App Issues write permission missing
+- evidence insufficient / only “grep miss”
+- Issue title/body truncated
+- budget exhausted (ops/files/bytes/time)
+- model unavailable or invalid JSON / unknown evidence id
+- non-bug category forced to `not_applicable` (not a close candidate)
 
-Operator actions: `gh auth login` / `gh auth switch`, ensure collaborator access, reinstall App with Issues write, then retry the same job. Automation must not keep a false `ypi:claimed` (may show `ypi:claim-blocked`) and must not start implementation.
+Inconclusive **keeps the Issue open**. Fix local project binding, model readiness, or ask reporters for reproduction detail — do not loosen close gates.
 
-### App vs assignee vs Links confusion
+### Comment missing / duplicate concern
 
-- **Links** OAuth (`YPI_LINKS_GITHUB_OAUTH_CLIENT_ID`, `read:user`) is unrelated and cannot power App webhooks or assignment.
-- **App Bot** authors comments/labels/assignment API calls; it is **not** the human Assignee.
-- **Machine active credential user** is the Assignee display identity only; its token is never a Bot/API fallback.
+- Product writes at most one v3 `kind=issue_analysis` marker comment per repo/issue.
+- Semantic body equality skips PATCH.
+- Unknown POST/PATCH outcomes re-list by marker before any retry.
+- Historical v1/v2 markers are not reused as v3 authority and are not auto-deleted.
 
-### Owner commented “采纳” but nothing implements
+### Unexpected auto-close / failed close
 
-**Command targeting (Phase 1):** prefer `@AppBot 采纳` or `/ypi 采纳`. While the job is awaiting owner, bare affirmative phrases (`采纳` / `可以做` / `开始实现` / …) remain compatible. Mentioning the **machine Assignee** alone does **not** invoke automation.
+Close requires **all** gates: `bug` + `not_exists` + `high` + complete contradiction evidence + remote-confirmed comment + content hash unchanged + fence + enabled/not paused.
+Comment/label can change Issue `updated_at`; the runner re-baselines after comment confirmation and still compares title/body hash.
+Unknown close PATCH → GET Issue; open means retry_due, not an immediate second PATCH.
+If a close was wrong: reopen manually; set `paused=true` while investigating local-checkout freshness.
 
-Expected when **P1 is off** (`mode=triage` or `unattended.enabled=false`, the default): complete claim + owner actor + affirmative intent only records `accepted_waiting_automation` — no WorkTree/PR. You should still see a **command receipt** when the comment is a recognized Owner command.
+### Retry behavior
 
-If still no implement / no receipt:
+Settings job **retry** only resumes the first unconfirmed checkpoint (result/comment/close). It must not re-run a validated analysis or re-POST a confirmed comment/close. Rate-limited; does not clear global `paused`.
 
-1. Comment not bound as actionable: missing `@AppBot`/`/ypi` outside awaiting-owner bare adopt; quote/code/HTML-commented command; negation/question wins.
-2. Not the exact delivery comment path: worker only GET/processes the webhook’s comment id/version; historical “采纳” is **not** re-scanned on unrelated events.
-3. Non-owner / Bot / `unknown_actor` (Bot never authorizes).
-4. Claim incomplete (`blocked_claim_assignee` / missing machine assignee read-back) or recommendation ≠ yes / Issue closed.
-5. Policy blocked (UI, workflow/release, secret/auth, lockfile, over-limit, uncertain).
-6. Global `paused=true` (commands do not run; Settings/`PATCH config` only can clear) or per-job `pauseRequested` at a checkpoint.
-7. `installation_missing` / `permission_missing` (App uninstalled or Contents/PR scopes missing).
-8. Job is `retry_due` after 429/`github_rate_limited` or network — wait for nextRetryAt or operator/Settings retry (or `@AppBot 继续` when state allows; continue never clears global paused).
+### Model readiness false
 
-Non-owner, incomplete claims, and high-risk final diffs must never open a PR. Free-text comments never set validation/branch/remote/publisher.
+Analysis follows the pi main default model. Restore provider credentials / default model in Models settings. Status/verify never accept model secrets in the GitHub automation API.
 
-### `blocked_manual_ui_approval` / Issue status notification
+### Project binding / path errors
 
-A child may technically finish with `status=succeeded` while its server-validated disposition says `blocked_manual_ui_approval` or another needs-user/policy result. That disposition is authoritative: the job must remain blocked and checker, operator validation, final policy, and publisher must have made **zero** calls. Do not retry it automatically. Complete the required UI/HTML design and approval, then have an operator explicitly retry the job.
+Browser never sends absolute project roots. Server resolves Project Registry `projectId`. Missing/archived/unreadable projects fail verify and block high-confidence close paths.
 
-The App maintains only approved `ypi:*` labels and one canonical Chinese `automation_status` marker comment. The comment is a status explanation, **not** approval. If labels or comment delivery fails/has an unknown result, the business reason remains durable but the job surfaces `blockedAtLayer=operator_notification`. Fix App Issues permissions/connectivity and use the notification retry/drain action; it reconciles remote labels/comment first and must not rerun implementer, checker, validation, or publisher. Do not delete unrelated user labels or manually duplicate the marker comment.
+### v1 upgrade leftovers
 
-If a job unexpectedly reaches `checking` after a visible manual/UI block, preserve the job sidecar and report it as `automation_state_inconsistent`; stale child/checker status must not be used to force it forward.
-
-### Full agent residual risk (not a sandbox)
-
-P1 uses the **standard full agent** (file/bash/network). Owner gate, WorkTree, and final diff gate are publish/business controls only. The agent may still run arbitrary commands, access the network, or read same-OS-user files outside the WorkTree before any publish gate runs. Product code scrubs App/machine automation secrets from child env and refuses secret markers in runner state/prompts; **sentinel tests do not prove host isolation**. Prefer a dedicated low-privilege OS account/container.
-
-### WorkTree Check blocked before GitHub validation
-
-GitHub unattended and Studio `member=checker` use the same restricted, evidence-backed Check profile. The checker first reads repository docs/CI/config/wrappers as data, uses bounded probes, may prepare dependencies only in a linked WorkTree when project evidence supports it, then submits a structured report. The platform does not select a package manager or invent an install command. A checker failure means the GitHub operator validation broker ran **zero** commands.
-
-| Safe reason | Operator action |
-| --- | --- |
-| `check_dependency_discovery_inconclusive` | Add/repair repository documentation, CI, wrapper, or toolchain evidence; do not guess an install command in Issue/task text. |
-| `check_dependency_tool_missing` | Provide the required host tool through the managed image/environment or repository-supported local wrapper. Do not use sudo/system/global installation. |
-| `check_command_rejected` | Use a project-local argv command compatible with the policy; remove shell/eval, privilege, global/system/service/remote/download, Git-mutation, path-escape, or secret-like arguments. |
-| `check_dependency_prepare_failed` / `check_dependency_prepare_timeout` | Inspect the project environment securely, fix the underlying dependency/tool/config issue, then use an explicit operator retry. A started prepare is not automatically repeated. |
-| `check_dependency_prepare_attempt_limit` | Start a new operator-directed checker run only after new evidence or an environment change; restart/resume in the same GitHub generation preserves prepare usage. |
-| `check_dependency_prepare_mutated_sources` | Review and intentionally resolve the tracked source/config/lock/toolchain change. The controller never resets it automatically. |
-| `check_validation_failed` / `check_validation_timeout` | Repair the work or test environment, then retry; do not classify it as missing dependencies without evidence. |
-| `check_report_missing` / `check_report_inconsistent` | Treat the checker result as untrusted/incomplete. Fix runner/profile/report behavior; assistant prose cannot replace controller evidence. |
-| `check_runner_policy_unavailable` | Repair released server-owned CLI extension/asset or SDK profile packaging. Do not fall back to normal `pi`/bash. |
-| `check_runtime_unavailable` / `check_execution_lease_timeout` | Check linked WorkTree existence and competing checker process; only command-not-started runtime/lease cases may be bounded automatic retries. |
-
-Safe status/progress intentionally contains phase, counts, durations, flags, report hash, and stable reason only. It must not expose command argv, cwd, output, env, URLs, paths, or credentials. The argv/path guard is **not an OS sandbox**: repository wrappers/lifecycle scripts can still run code and use network or same-user resources. Run unattended jobs in a dedicated low-privilege account/container; do not claim a WorkTree or final-diff gate contains host side effects.
-
-Rollback is code/config only: disable unattended or the checker profile as appropriate and retain WorkTrees, tasks, sessions, dependency/build outputs, and external tool caches. Never remove user files, reset a WorkTree, or copy/link main-tree dependencies as a recovery shortcut.
-
-### Pause / resume / retry (per-job vs global)
-
-| Control | Scope | Clears global `paused`? |
-| --- | --- | --- |
-| Settings / `POST .../jobs/{id}` `pause`/`resume`/`retry` | Single durable job | No |
-| Owner `@AppBot 暂停` / `继续` (or `/ypi …`) | Single durable job | No |
-| `config.paused` / Settings global pause | All new business execution | N/A (this **is** the kill switch) |
-
-- Per-job pause records a checkpoint flag; it does **not** force-kill an in-flight OS command.
-- Resume/retry wakes the **same** durable job/generation and reconciles remote effects (labels/comment/worktree/PR); it must not inject comment text as an agent shell command.
-- After `issues.closed`, active jobs park as `issue_closed` (blocked/paused); WorkTree is kept; reopen + explicit Owner/Settings continue is required.
-- Unknown push/PR outcomes must list existing head/base PRs before creating another.
-
-### Unattended planning spin / no Session (#22 class)
-
-Symptoms: Settings Jobs shows `planning` / `queued`/`running` with rising **调度尝试** (legacy `attempt`), checkpoint stuck at `studio_task_ready`, runner sidecar `sessionId` null, WorkTree `.ypi/sessions/index.v1.json` empty, Studio task still `intake`. This is **scheduler / handler readiness / policy / command replay / Session bootstrap**, not “Agent is implementing”.
-
-Root chain (fixed across GHA-CLOSE-01…05 and GHR handler/bootstrap readiness):
-
-1. Old plan gate treated empty plan as `blocked_uncertain`.
-2. After retry, already-handled Owner adoption (`owner_command` + `remote_confirmed`) was re-read every tick and cut off unattended runner continuation.
-3. Scheduler parked the still-`running` result as `queued` and re-leased about every 2s → attempt explosion without Session.
-4. Even after spin stop, missing WorkTree `spaceId` can still fail parent Session bootstrap.
-5. **Handler readiness gap:** Settings retry/resume used to wake the scheduler without ensuring the full triage/unattended handler was registered (webhook-only ensure). After restart with no new webhook, planning jobs fell through `defaultJobHandler` and became `runner_no_progress` without Session.
-6. **Bootstrap opacity:** raw SDK/jiti/fs failures were sanitized to `Internal GitHub automation error` first, then regex-classified, so retryability and disposition could be wrong or collapsed back to no-progress.
-7. **Empty parent Session + instant `implementer_error` (IMP-001):** parent bootstrap is binding-only (JSONL may have only header/model). Full-agent child used to die in preflight because the security bullet “installation tokens” false-positive-matched `/installation[_\s-]?token/i`. Fix: assignment-only sentinel + envelope wording + typed `full_agent_prompt_sentinel` meta. **Do not treat `sessionId!=null` alone as Agent implementing** when `lastMeaningfulProgressKind=session_created` and implementer failed.
-
-**Stop-bleed (before or while deploying fix):**
-
-1. Per-job **pause** on that job (`POST /api/github-automation/jobs/{jobId}` `{ "action":"pause" }`). If action race prevents a stable pause, set global `paused=true` in Settings.
-2. Do **not** keep retrying, do **not** hand-edit job/task JSON, do **not** delete job/events/WorkTree/task/session, do **not** create a new generation (g2).
-3. Deploy the fix package and **fully restart** `ypi` (hot reload is not enough). Confirm status `runtimeProvenance` (`packageVersion` / `buildId` / `codeRevision` / `policyVersion` / `processEpoch`) matches the fixed build. Stop or isolate **other** `ypi` processes that share the same `PI_CODING_AGENT_DIR` so a later proof port cannot race the job.
-
-**Safe recovery (same generation / WorkTree / branch / task):**
-
-1. After restart, open the job once (GET status or job). Retry/resume paths run **idempotent legacy reconcile** first, then **`ensureGithubAutomationJobHandlerReady()`** before queue mutation/wake:
-   - mark already `remote_confirmed` owner commands as consumed (no re-side-effect);
-   - repair missing runner `spaceId` from Project Registry when `projectId` + WorkTree path exist;
-   - normalize checkpoint to last safe resume point (for #22: usually `studio_task_ready`);
-   - preserve legacy `attempt` as scheduler-run audit; never rewrite history events;
-   - cold process without webhook still loads the full `github_issue_triage` handler; tick itself re-checks readiness before lease.
-2. Operator **single** `retry` (or `resume` if paused). Same `jobId` / `generation` / WorkTree / branch / Studio task. Do not loop retry, and do not pair resume+retry.
-3. Allowed outcomes only:
-   - **stable policy/manual block** (e.g. real UI / high-risk scope) with **no Session** — correct; do not skip gate;
-   - **implementing** with parent Session in the **WorkTree space** (not main), safe `unattended_session_created` (or equivalent Session proof), runner `sessionId!=null`, and dual-layer projection `sessionAvailability=active|ended` with `counts.agentRuns>=1`.
-4. Visible failure outcomes (diagnose; **do not claim “fixed”** if the goal was Session start):
-   - `handler_not_ready` / event `github_automation_handler_not_ready` — load/register/verify stage; **attempt must not have increased** for that readiness failure (no business lease); Session none; blocked layer scheduler. Bounded backoff/dedupe — not a new spin.
-   - `session_bootstrap_failed` / `session_bootstrap_transient` + `unattended_session_bootstrap_failed` with allowlisted `bootstrapCode`/`stage`/`retryable` — reason must **not** fold into `runner_no_progress` after scheduler apply; meta must not be only generic internal error.
-5. Forbidden outcomes: queued/running jitter every ~2s, attempt skyrocketing, “实现中” without Session, silent default-handler no-progress, new generation, deleted audit trail, manual skip-policy.
-
-**Deterministic block retry:** if the job is blocked with `retryability=operator_after_change` and the same `blockFingerprint` + evaluated build/policy provenance as the live process, Settings marks retry **`retry_conditions_unchanged`** — fix code/policy/input (and restart) before retrying. There is **no** “skip policy” action.
-
-**UI truthfulness:** prefer dual-layer fields (`agentExecutionState`, `sessionAvailability`, `blockedAtLayer`, `counts.schedulerRuns`) over raw `phase`/`status`/`attempt`. No Session ⇒ “尚未启动 Agent”, never “第 N 次执行 = Agent working”. Handler/bootstrap use the **existing** Jobs fields only (no UI redesign required).
-
-#### When offline tests are not enough (30142 regression proof)
-
-Focused suites under temp agent dir prove control flow and privacy; they **do not** by themselves prove the production empty-run class is fixed. For that regression class, operators/checkers use a **direct** release-candidate listener (convention port **30142**):
-
-```bash
-npm run build   # never bare next build for release candidate
-# isolate other shared-agent-dir ypi schedulers first
-PI_CODING_AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" \
-  node bin/pi-web.js --port 30142 --no-open
-
-# read-only baseline (no mutation)
-npm run verify:github-automation-30142 -- \
-  --job-id job_1278854433_22_g1_01a6cdde \
-  --base-url http://localhost:30142
-
-# GHR-06 only: exactly one retry after operator confirmation
-npm run verify:github-automation-30142 -- \
-  --job-id job_1278854433_22_g1_01a6cdde \
-  --base-url http://localhost:30142 \
-  --confirm-single-retry --pause-first --post-proof-pause
-```
-
-Hard rules for claiming the regression fixed:
-
-- Health/status must be answered by the 30142 PID with matching `runtimeProvenance`; **reject HTTP 301/302** attribution.
-- Exactly one retry POST; expected safe sequence includes `unattended_retry_wake` → `job_started` → `unattended_implementing` → `unattended_session_created`.
-- Cross-check job API, status, safe events, runner sidecar, and WorkTree Session header `projectId+spaceId`.
-- Same generation / WorkTree / branch / task / history; attempt not reset; pause immediately after Session proof so Issue business work is not part of the automation fix.
-- Any `handler_not_ready`, bootstrap failure, `runner_no_progress`, generic internal-only diagnostic, missing Session, provenance mismatch, redirect, or g2 ⇒ **FAIL — do not claim fixed**.
-
-Ordinary operator recovery for a single stuck job still follows pause → single retry above; 30142 theatre is the mandatory bar for the historical “tests green but production still empty-runs” regression class, not for every day-to-day block.
-
-### Generation storm / Bot comment loop
-
-
-Symptoms: many deliveries for the same `repo#issue` with rising generation (historical g1–g80), sender App Bot, actions `issue_comment.edited` / `issues.labeled` / `assigned`, Settings recent jobs growing without new human opens.
-
-Stop-bleed (in order):
-
-1. **Do not** unpause if already paused. Set global `paused=true` via Settings/config if not already (user/operator only).
-2. Confirm running build includes ingress self/Bot audit-only filter + generation gate + stable markers (no trace in marker identity).
-3. Inspect safe delivery audit for ignore reasons `self_app_event` / `bot_actor_event` and **job/generation counts not increasing** on further Bot edits.
-4. **Do not** bulk-delete `deliveries/` / `jobs/` / events or rewrite historical generations; retain for forensics.
-5. Optional: stop public receipt/status updates if command UX is noisy; **never** remove self-event filtering as a “fix”.
-6. Only after user decision: clear global paused and watch a single test Issue for ≥2 minutes with no self-loop.
+- Config migrates to schema v2 with `enabled=false`.
+- Old non-terminal jobs are retired (`legacy_pipeline_retired`) and never leased.
+- Historical `ypi:claimed`, Assignees, WorkTrees, Studio tasks, branches, and PRs are **not** auto-cleaned; handle manually if needed.
+- Do not expect Owner comment commands or unattended PR publishing to work — those product paths are removed.
 
 ### Disable without losing audit
 
-Set `paused=true` and/or `enabled=false` or `mode=off`. Set `unattended.enabled=false` to return to P0 adoption parking. Historical deliveries/jobs/events/worktrees/PRs remain; do not bulk-delete `github-automation/` unless intentionally wiping operator data. Disable must not rewrite blocked claims into `complete`. Issue comments cannot change these knobs.
+Set `paused=true` and/or `enabled=false`. Historical deliveries/jobs/events remain. Issue comments cannot change these knobs.
+
+### Confusion with Links / Studio / WorkTree Check
+
+| Domain | Role |
+| --- | --- |
+| Links | Human GitHub OAuth identities (Device Flow) — unrelated to App mutations |
+| GitHub Issue analysis | App webhook + Issues comment/close + local read-only evidence |
+| Studio WorkTree Check | Studio checker member evidence/exec profile — not the GitHub analysis path |
 
 ### Tests
 
 ```bash
 npm run test:github-automation
-npm run test:github-unattended
-npm run test:github-unattended-runner
-npm run test:github-publish-policy
-npm run test:github-handler-runtime
-npm run test:github-session-bootstrap
 ```
 
-Must pass offline with temp agent dir + mocks (no real GitHub network / operator credentials). Handler-runtime suite covers cold Settings retry without webhook, concurrent ensure, load/register/verify faults → `handler_not_ready` without lease/attempt/`runner_no_progress`. Session-bootstrap suite covers typed bootstrap catch → disposition preservation, success Session event/counters, and #22-shaped finite-tick control flow. Architecture/status semantics: `docs/architecture/overview.md` (P1 durable state machine + handler readiness + bootstrap observability); operator setup recovery table: `docs/integrations/github-app-automation-setup.md`.
-
-**Important:** offline suite green is a **precondition**, not completion, for the #22-class manual-retry empty-run regression. That class still requires the 30142 same-generation Session proof described above (`npm run verify:github-automation-30142`, default read-only).
+Uses temporary `PI_CODING_AGENT_DIR` and mocks only — never real operator agent dir or live GitHub/provider network. Mock green does **not** replace dedicated test-App UAT for live comment `updated_at` / close behavior.
 
 ## Memory Diagnostic Snapshots
 

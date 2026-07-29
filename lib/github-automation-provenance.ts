@@ -9,12 +9,18 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { GITHUB_UNATTENDED_POLICY_VERSION } from "./github-full-agent-profile";
 import { getGithubAutomationProcessEpoch } from "./github-automation-store";
 import type {
   GithubAutomationEvaluatedProvenance,
   GithubAutomationRuntimeProvenance,
 } from "./github-automation-types";
+
+/**
+ * Analysis-only policy stamp for runtime/evaluated provenance.
+ * Historical unattended policy versions remain readable on old Studio tasks;
+ * this constant is independent of the retired full-agent graph.
+ */
+export const GITHUB_ISSUE_ANALYSIS_POLICY_VERSION = "issue-analysis-1.0";
 
 /** Process start time (module load) — restarts produce a new value. */
 const PROCESS_STARTED_AT = new Date().toISOString();
@@ -96,7 +102,7 @@ export function getGithubAutomationRuntimeProvenance(): GithubAutomationRuntimeP
     codeRevision: getGithubAutomationCodeRevision(),
     processEpoch: getGithubAutomationProcessEpoch(),
     processStartedAt: PROCESS_STARTED_AT,
-    policyVersion: GITHUB_UNATTENDED_POLICY_VERSION,
+    policyVersion: GITHUB_ISSUE_ANALYSIS_POLICY_VERSION,
   };
 }
 
@@ -104,7 +110,7 @@ export function getGithubAutomationRuntimeProvenance(): GithubAutomationRuntimeP
 export function getGithubAutomationEvaluatedProvenance(): GithubAutomationEvaluatedProvenance {
   return {
     codeRevision: getGithubAutomationCodeRevision(),
-    policyVersion: GITHUB_UNATTENDED_POLICY_VERSION,
+    policyVersion: GITHUB_ISSUE_ANALYSIS_POLICY_VERSION,
   };
 }
 

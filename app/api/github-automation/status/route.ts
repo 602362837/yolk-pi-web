@@ -1,10 +1,11 @@
 /**
  * GET /api/github-automation/status
  *
- * Safe App / assignee / full-agent policy / job projection (GHA-09 / GHCRED-04).
+ * Safe analysis readiness / runtime / recent jobs projection (GIA-04).
  * - Cache-Control: no-store
- * - Does not enqueue work or start the scheduler
- * - Never returns credentials, absolute paths, Issue/comment bodies, prompts
+ * - Does not enqueue work, start the scheduler, or run a model turn
+ * - Never returns credentials, absolute paths, Issue/comment bodies, prompts,
+ *   Session/WorkTree/PR/assignee/full-agent fields
  * - Consumes additive effective App credential projection (sources/local booleans only)
  * - Read-only: no credential store mutation
  */

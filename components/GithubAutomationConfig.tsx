@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * GitHub 自动化 Settings leaf (GHA-10 / GHCRED-05).
+ * GitHub 自动化 Settings leaf — analysis-only (GIA-05).
  *
- * Product surface (approved local-credentials prototype):
- * - Local GitHub App credential card (save/rotate/delete) above checklist/status/jobs
- * - Safe projection only: configured/source/readiness; never App ID value / secret / PEM / path
- * - Setup checklist + collapsed advanced env override guidance
- * - Empty default allowlist; operator-managed repositories linked to Project Registry
- * - Independent CAS / immediate credential save; polling never enqueues work
- * - Full-agent residual-risk warning is non-dismissible
+ * Approved IA (task prototype github-issue-analysis-settings-prototype.html):
+ * - 运行控制: single enabled + global paused + auto-close warning
+ * - 本机 GitHub App 凭据 / Setup checklist / 允许仓库 (Project Registry 只读证据)
+ * - 最近分析: category / verdict / comment / close / retry only
+ * - 安全边界说明；无 Assignee / mode / unattended / Session / WorkTree / PR
+ *
+ * Wire surface mirrors GIA-04 projections only. Immediate-save leaf;
+ * global Settings Save/Reset stays disabled.
  */
 
 import {
@@ -25,20 +26,7 @@ import { usePrompt } from "./AppPromptProvider";
 
 // ─── Wire types (mirror server projection; client never invents policy truth) ─
 
-type AutomationMode = "off" | "triage" | "unattended";
-
-interface AssigneeProjection {
-  login: string | null;
-  actorId: number | null;
-  identitySource: "gh" | "git-credential" | null;
-  checkedAt: string;
-  readiness: string;
-  assignable: boolean | null;
-  reasonCode: string | null;
-}
-
 type CredentialValueSource = "env" | "local" | "missing";
-
 type LocalCredentialReadiness = "ready" | "missing" | "invalid" | "unsupported";
 
 interface LocalCredentialSummary {
@@ -68,172 +56,113 @@ interface AppCredentialProjection {
   };
 }
 
+type JobActionName = "retry";
+
 interface JobActionAvailability {
-  action: "retry" | "pause" | "resume";
+  action: JobActionName;
   available: boolean;
   reasonCode: string | null;
 }
 
-type JobSchedulerState =
+type AnalysisCategory = "bug" | "feature" | "docs" | "question" | "other";
+type TruthVerdict =
+  | "confirmed"
+  | "not_exists"
+  | "inconclusive"
+  | "not_applicable";
+type Confidence = "high" | "medium" | "low";
+type AnalysisOutcome =
   | "queued"
-  | "leased"
-  | "backoff"
-  | "paused"
-  | "idle"
-  | "terminal"
-  | "unknown";
-
-type JobAgentExecutionState =
-  | "not_started"
-  | "bootstrapping"
-  | "implementing"
-  | "checking"
-  | "publishing"
-  | "ended"
+  | "running"
+  | "retry_due"
+  | "blocked"
+  | "completed_open"
+  | "completed_closed"
+  | "inconclusive";
+type JobPhase =
+  | "received"
+  | "analyzing"
+  | "result_ready"
+  | "commenting"
+  | "closing"
+  | "completed"
+  | "blocked"
+  | "retry_due"
+  | "cancelled"
+  | string;
+type JobStatus =
+  | "queued"
+  | "running"
+  | "retry_due"
+  | "blocked"
+  | "completed"
+  | "cancelled"
+  | string;
+type EffectStatus =
+  | "pending"
+  | "remote_confirmed"
+  | "reconcile_needed"
   | "failed"
-  | "unknown";
+  | string;
 
-type JobSessionAvailability =
-  | "none"
-  | "creating"
-  | "active"
-  | "ended"
-  | "failed"
-  | "unknown_legacy";
-
-type JobBlockedLayer =
-  | "start_gate"
-  | "worktree"
-  | "studio_task"
-  | "policy_pre"
-  | "policy_plan"
-  | "session_bootstrap"
-  | "agent"
-  | "validation"
-  | "policy_final"
-  | "publisher"
-  | "lifecycle"
-  | "scheduler"
-  | "unknown";
-
-type JobRetryability =
-  | "automatic"
-  | "operator_after_change"
-  | "operator"
-  | "none";
-
-type JobSafeProgressKind =
-  | "checkpoint_advanced"
-  | "session_created"
-  | "child_run_terminal"
-  | "validation_terminal"
-  | "policy_terminal"
-  | "publisher_terminal"
-  | "command_consumed"
-  | "reconciled";
-
-interface JobProgressCounts {
-  schedulerRuns: number;
-  agentRuns: number;
-  noProgressRuns: number;
-  meaningfulProgress: number;
-}
-
-interface JobSafeProgressSummary {
-  at: string | null;
-  kind: JobSafeProgressKind | null;
-}
-
-interface JobEvaluatedProvenance {
-  codeRevision: string;
-  policyVersion: string;
-}
-
-interface RuntimeProvenance {
-  packageVersion: string;
-  buildId: string;
-  codeRevision: string;
-  processEpoch: string;
-  processStartedAt: string;
-  policyVersion: string;
+interface EffectSafeProjection {
+  status: EffectStatus | null;
+  remoteId: string | null;
+  reasonCode: string | null;
 }
 
 interface JobSafeProjection {
   jobId: string;
+  kind: "issue_analysis" | "legacy_pipeline" | "unknown";
   repositoryId: number;
   repositoryFullName: string;
   issueNumber: number;
   issueTitlePreview: string | null;
-  phase: string;
-  status: string;
-  /**
-   * Legacy field: scheduler lease run count only.
-   * UI labels as "调度尝试", never "第 N 次执行" / Agent runs.
-   */
+  phase: JobPhase;
+  status: JobStatus;
   attempt: number;
-  generation: number;
   traceId: string;
   reasonCode: string | null;
   nextRetryAt: string | null;
   createdAt: string;
   updatedAt: string;
   checkpoint: string | null;
-  claimStatus: "complete" | "blocked_claim_assignee" | "incomplete" | "unknown";
-  prNumber: number | null;
-  headBranch: string | null;
-  hasPullRequest: boolean;
+  category: AnalysisCategory | null;
+  verdict: TruthVerdict | null;
+  confidence: Confidence | null;
+  completeness: string | null;
+  budgetExceeded: boolean | null;
+  outcome: AnalysisOutcome | string;
+  retryability: string;
+  comment: EffectSafeProjection;
+  close: EffectSafeProjection;
   actions: JobActionAvailability[];
-  // Additive GHA-CLOSE-04/06 observability — server projection only; never invent truth.
-  schedulerState?: JobSchedulerState;
-  agentExecutionState?: JobAgentExecutionState;
-  sessionAvailability?: JobSessionAvailability;
-  blockedAtLayer?: JobBlockedLayer | null;
-  retryability?: JobRetryability;
-  lastMeaningfulProgress?: JobSafeProgressSummary;
-  counts?: JobProgressCounts;
-  workspaceLabel?: string | null;
-  sessionIdShort?: string | null;
-  evaluatedProvenance?: JobEvaluatedProvenance | null;
 }
 
 interface RepositorySafeProjection {
   repositoryId: number;
   fullName: string;
-  installationId: number | null;
+  installationId: number;
   hasInstallationId: boolean;
-  baseRef: string;
-  assigneeIdentitySource: "machine-active-credential";
-  ownerActorIds: number[];
-  ownerActorIdCount: number;
-  projectId: string | null;
+  projectId: string;
   projectRootConfigured: boolean;
   legacySeeded: boolean;
 }
 
 interface RepositoryStatusProjection extends RepositorySafeProjection {
   installationBound: boolean;
-  assignee: AssigneeProjection;
-  claimSemantics: "ypi_claimed_plus_machine_login";
   projectDisplayName: string | null;
 }
 
 interface ConfigSafeProjection {
   schemaVersion: number;
   enabled: boolean;
-  mode: AutomationMode;
   paused: boolean;
   revision: string;
   updatedAt: string;
   repositories: RepositorySafeProjection[];
-  triage: { maxConcurrency: number };
-  unattended: {
-    enabled: boolean;
-    executionProfile: "full-agent";
-    riskProfile: "docs-and-small-bugfix";
+  analysis: {
     maxConcurrency: number;
-    maxFiles: number;
-    maxChangedLines: number;
-    validationCommandCount: number;
   };
 }
 
@@ -243,6 +172,22 @@ interface ProjectChoice {
   pathStatus: "ok" | "missing" | "archived";
   archived: boolean;
   missing: boolean;
+}
+
+interface AnalysisPermissionProjection {
+  analysisReady: boolean;
+  missing: Array<"metadata" | "issues">;
+  snapshot: {
+    metadata: string;
+    issues: string;
+  };
+}
+
+interface AnalysisModelProjection {
+  ready: boolean;
+  reasonCode: string;
+  provider: string | null;
+  modelId: string | null;
 }
 
 interface StatusProjection {
@@ -255,13 +200,8 @@ interface StatusProjection {
       installationIdCount: number;
       readiness: "ready" | "missing" | "partial";
     };
-    permissions: {
-      p0Triage: boolean;
-      p1Unattended: boolean;
-      missingForP0: string[];
-      missingForP1: string[];
-    };
-    assignee: AssigneeProjection;
+    permissions: AnalysisPermissionProjection;
+    model: AnalysisModelProjection;
     webhook: {
       health: "unknown" | "healthy" | "error";
       lastVerifiedAt: string | null;
@@ -273,46 +213,23 @@ interface StatusProjection {
   };
   runtime: {
     enabled: boolean;
-    mode: AutomationMode;
     paused: boolean;
-    executionProfile: "full-agent";
-    riskProfile: "docs-and-small-bugfix";
-    residualRiskWarningRequired: true;
-    residualRiskCodes: readonly string[];
-    residualRiskSummary: string;
+    analysisMaxConcurrency: number;
     counts: {
       queued: number;
       running: number;
       retry: number;
       blocked: number;
-      paused: number;
-      prOpen: number;
       completed: number;
     };
   };
   repositories: RepositoryStatusProjection[];
-  policy: {
-    policyId: string;
-    policyVersion: string;
-    riskProfile: "docs-and-small-bugfix";
-    executionProfile: "full-agent";
-    unattendedEnabled: boolean;
-    maxConcurrency: number;
-    maxFiles: number;
-    maxChangedLines: number;
-    validationCommandCount: number;
-    residualRiskWarningRequired: true;
-    residualRiskCodes: readonly string[];
-    residualRiskSummary: string;
-    recommendedDeployment: string;
-    sandboxed: false;
-    alwaysManual: readonly string[];
-    capabilityBlockers: string[];
-  };
   jobs: JobSafeProjection[];
   config: ConfigSafeProjection;
-  /** Running process package/build/policy provenance (additive; may be absent on older servers). */
-  runtimeProvenance?: RuntimeProvenance;
+  runtimeProvenance?: {
+    codeRevision: string;
+    policyVersion: string;
+  };
 }
 
 type SetupItemState = "ready" | "pending" | "needs_fix" | "unknown";
@@ -332,9 +249,7 @@ interface VerifyResult {
   generatedAt: string;
   revision: string;
   allReady: boolean;
-  p0Ready: boolean;
-  p1Ready: boolean;
-  unattendedEligible: boolean;
+  analysisReady: boolean;
   checklist: SetupChecklistItem[];
   summary: {
     app: Pick<
@@ -355,19 +270,8 @@ interface VerifyResult {
       installationIdCount: number;
       readiness: "ready" | "missing" | "partial";
     };
-    permissions: {
-      p0Triage: boolean;
-      p1Unattended: boolean;
-      missingForP0: string[];
-      missingForP1: string[];
-    };
-    assignee: {
-      readiness: AssigneeProjection["readiness"];
-      login: string | null;
-      assignable: boolean | null;
-      identitySource: AssigneeProjection["identitySource"];
-      checkedAt: string;
-    };
+    permissions: AnalysisPermissionProjection;
+    model: AnalysisModelProjection;
     allowlist: {
       repositoryCount: number;
       ready: boolean;
@@ -391,9 +295,7 @@ interface RepositoryDraft {
   repositoryId: string;
   fullName: string;
   installationId: string;
-  baseRef: string;
   projectId: string;
-  ownerActorIds: string;
 }
 
 type InlineNoticeTone = "info" | "warning" | "error" | "success";
@@ -405,7 +307,12 @@ interface InlineNotice {
 }
 
 type LoadState = "loading" | "ready" | "error";
-type FormMode = { kind: "closed" } | { kind: "add" } | { kind: "edit"; repositoryId: number };
+type FormMode =
+  | { kind: "closed" }
+  | { kind: "add" }
+  | { kind: "edit"; repositoryId: number };
+type UiTone = "ok" | "warn" | "bad" | "info" | "muted";
+type PrivateKeyInputMode = "paste" | "file";
 
 const POLL_INTERVAL_MS = 20_000;
 const SAVED_FLASH_MS = 2200;
@@ -419,15 +326,6 @@ const ENV_WEBHOOK_SECRET = "YPI_GITHUB_APP_WEBHOOK_SECRET";
 const ENV_APP_SLUG = "YPI_GITHUB_APP_SLUG";
 
 const CREDENTIALS_DELETE_CONFIRM = "remove_local_credentials";
-type PrivateKeyInputMode = "paste" | "file";
-
-const ALWAYS_MANUAL_CHIPS = [
-  "UI / 交互",
-  "大重构",
-  "workflow / release",
-  "secret / auth",
-  "依赖 / lockfile",
-] as const;
 
 const ALLOWED_ERROR_CODES = new Set([
   "revision_conflict",
@@ -440,13 +338,10 @@ const ALLOWED_ERROR_CODES = new Set([
   "installation_missing",
   "permission_denied",
   "permission_missing",
-  "method_not_allowed",
-  "internal_error",
-  "repository_not_allowlisted",
   "github_network_error",
   "github_timeout",
-  "github_bad_response",
   "github_auth_failed",
+  "github_bad_response",
   "github_rate_limited",
   "invalid_credentials_request",
   "invalid_app_id",
@@ -457,61 +352,97 @@ const ALLOWED_ERROR_CODES = new Set([
   "local_credentials_unsupported",
   "credentials_lock_timeout",
   "credentials_store_error",
+  "project_not_found",
+  "project_path_missing",
+  "repository_mismatch",
+  "active_jobs_block_delete",
 ]);
 
 const FALLBACK_CHECKLIST: SetupChecklistItem[] = [
   {
     code: "app_id",
     order: 1,
-    state: "pending",
-    title: "配置 App ID（本机凭据）",
-    reasonCode: "missing_app_id",
-    nextStep:
-      "在上方「本机 GitHub App 凭据」卡填写 App ID 并「保存到本机」，然后重新验证。高级覆盖可设置 YPI_GITHUB_APP_ID；页面不会回显已保存值。",
+    state: "unknown",
+    title: "GitHub App ID",
+    reasonCode: null,
+    nextStep: "在本机凭据卡填写 App ID 并保存，或配置高级 env 覆盖。",
     envNames: [ENV_APP_ID],
   },
   {
     code: "private_key_file",
     order: 2,
-    state: "pending",
-    title: "配置 GitHub App 私钥（本机凭据）",
-    reasonCode: "missing_private_key_file",
-    nextStep:
-      "在上方「本机 GitHub App 凭据」卡粘贴或选择 GitHub App RSA 私钥 PEM 并「保存到本机」。高级覆盖可设置 YPI_GITHUB_APP_PRIVATE_KEY_FILE 指向 0600 PEM（仅服务器）。",
+    state: "unknown",
+    title: "App 私钥",
+    reasonCode: null,
+    nextStep: "粘贴或选择 PEM 并保存到本机。",
     envNames: [ENV_PRIVATE_KEY_FILE],
   },
   {
     code: "webhook_secret",
     order: 3,
-    state: "pending",
-    title: "配置 Webhook secret（本机凭据）",
-    reasonCode: "missing_webhook_secret",
-    nextStep:
-      "在上方「本机 GitHub App 凭据」卡填写 Webhook secret 并「保存到本机」，且与 GitHub App webhook secret 一致。高级覆盖可设置 YPI_GITHUB_APP_WEBHOOK_SECRET。",
+    state: "unknown",
+    title: "Webhook secret",
+    reasonCode: null,
+    nextStep: "填写与 GitHub App 一致的 Webhook secret。",
     envNames: [ENV_WEBHOOK_SECRET],
   },
   {
     code: "installation",
     order: 4,
-    state: "pending",
-    title: "安装 App 并关联仓库",
-    reasonCode: "allowlist_empty",
-    nextStep:
-      "安装到目标 owner/repo，授予最小权限；在下方添加该仓库并关联已注册的本地项目。默认不会预置 yolk-pi-web。",
+    state: "unknown",
+    title: "App 安装",
+    reasonCode: null,
+    nextStep: "将 App 安装到目标仓库并填写 installation id。",
     envNames: [],
   },
   {
-    code: "assignee",
+    code: "permissions",
     order: 5,
-    state: "pending",
-    title: "验证 readiness",
-    reasonCode: "not_verified",
-    nextStep: "点击「验证配置」检查 App、安装、权限、webhook 和本机 Assignee；不会提交任何 secret。",
+    state: "unknown",
+    title: "权限（Metadata + Issues）",
+    reasonCode: null,
+    nextStep: "App 需要 Metadata read 与 Issues read/write。",
+    envNames: [],
+  },
+  {
+    code: "allowlist",
+    order: 6,
+    state: "unknown",
+    title: "允许仓库",
+    reasonCode: null,
+    nextStep: "至少关联一个允许仓库。",
+    envNames: [],
+  },
+  {
+    code: "project_binding",
+    order: 7,
+    state: "unknown",
+    title: "本地项目可读",
+    reasonCode: null,
+    nextStep: "为每个仓库绑定 Project Registry 项目（只读证据）。",
+    envNames: [],
+  },
+  {
+    code: "analysis_model",
+    order: 8,
+    state: "unknown",
+    title: "分析模型可用",
+    reasonCode: null,
+    nextStep: "确保 pi 主默认模型可用；页面不配置专用 secret。",
+    envNames: [],
+  },
+  {
+    code: "webhook_health",
+    order: 9,
+    state: "unknown",
+    title: "Webhook 健康",
+    reasonCode: null,
+    nextStep: "确认公网 webhook 可达且 secret 一致。",
     envNames: [],
   },
 ];
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
@@ -538,7 +469,7 @@ function allowlistedMessage(code: string | undefined, fallback: string): string 
         return "请求参数无效";
       case "permission_denied":
       case "permission_missing":
-        return "安装权限不足";
+        return "安装权限不足（需要 Metadata read + Issues read/write）";
       case "github_network_error":
       case "github_timeout":
         return "无法联系 GitHub 完成仓库核验";
@@ -564,6 +495,14 @@ function allowlistedMessage(code: string | undefined, fallback: string): string 
         return "凭据写入锁超时，请稍后重试";
       case "credentials_store_error":
         return "本机凭据存储失败，服务端配置未更新";
+      case "project_not_found":
+        return "Project Registry 中找不到所选项目";
+      case "project_path_missing":
+        return "本地项目路径缺失或不可读";
+      case "repository_mismatch":
+        return "repository id 与 owner/repo 不匹配";
+      case "active_jobs_block_delete":
+        return "仍有进行中的分析任务，无法移除该仓库";
       default:
         return fallback;
     }
@@ -585,79 +524,6 @@ function formatSafeTime(iso: string | null | undefined): string {
   }
 }
 
-function assigneeLoginLabel(assignee: AssigneeProjection): string {
-  return assignee.login ? `@${assignee.login}` : "未解析";
-}
-
-function identitySourceLabel(source: AssigneeProjection["identitySource"]): string {
-  if (source === "gh") return "active gh";
-  if (source === "git-credential") return "git credential";
-  return "来源未知";
-}
-
-function assigneeValueText(assignee: AssigneeProjection, stale: boolean): string {
-  if (stale) {
-    return assignee.login
-      ? `${assigneeLoginLabel(assignee)} · 状态可能过期`
-      : "状态可能过期";
-  }
-  if (assignee.readiness === "ready" && assignee.login) {
-    const assignPart =
-      assignee.assignable === true
-        ? "可 assign"
-        : assignee.assignable === false
-          ? "不可 assign"
-          : "assign 未验证";
-    return `${assigneeLoginLabel(assignee)} · ${identitySourceLabel(assignee.identitySource)} · ${assignPart}`;
-  }
-  if (
-    assignee.readiness === "gh_no_active_account" ||
-    assignee.readiness === "gh_not_logged_in" ||
-    assignee.readiness === "gh_unavailable"
-  ) {
-    return `blocked_claim_assignee · 无 active 账号`;
-  }
-  if (assignee.readiness === "unassignable") {
-    return `${assigneeLoginLabel(assignee)} · 不可 assign`;
-  }
-  if (assignee.readiness === "readback_failed") {
-    return `${assigneeLoginLabel(assignee)} · 回读失败`;
-  }
-  return `blocked_claim_assignee · ${assignee.reasonCode ?? assignee.readiness}`;
-}
-
-function assigneePill(
-  assignee: AssigneeProjection,
-  stale: boolean,
-): { tone: "ok" | "warn" | "bad" | "info"; label: string } {
-  if (stale) return { tone: "warn", label: "可能过期" };
-  if (assignee.readiness === "ready" && assignee.assignable !== false) {
-    return { tone: "ok", label: "健康" };
-  }
-  if (
-    assignee.readiness === "unassignable" ||
-    assignee.readiness === "readback_failed" ||
-    assignee.readiness === "gh_no_active_account" ||
-    assignee.readiness === "gh_not_logged_in" ||
-    assignee.readiness === "gh_unavailable" ||
-    assignee.readiness === "credential_invalid"
-  ) {
-    return { tone: "bad", label: "需处理" };
-  }
-  return { tone: "warn", label: "未知" };
-}
-
-function appCredentialText(app: AppCredentialProjection): string {
-  if (app.configured && app.readiness === "ready") return "已配置";
-  if (app.readiness === "missing_app_id") return "缺失 App ID";
-  if (app.readiness === "missing_private_key_file") return "缺失 private key";
-  if (app.readiness === "private_key_unreadable" || app.readiness === "private_key_invalid") {
-    return "private key 不可用";
-  }
-  if (app.readiness === "missing_webhook_secret") return "缺失 webhook secret";
-  return "缺失";
-}
-
 function hasEffectivePrivateKey(app: AppCredentialProjection): boolean {
   return app.hasPrivateKey === true || app.hasPrivateKeyFile === true;
 }
@@ -674,116 +540,74 @@ function credentialSourceOf(
     if (field === "webhook") return app.hasWebhookSecret ? "local" : "missing";
     return app.appSlug ? "local" : "missing";
   }
-  return sources[field];
+  return sources[field] ?? "missing";
 }
 
 function sourceLabel(source: CredentialValueSource): string {
-  if (source === "env") return "env";
+  if (source === "env") return "环境变量";
   if (source === "local") return "本机";
   return "未配置";
 }
 
-function sourcePillTone(source: CredentialValueSource): "ok" | "warn" | "bad" | "info" {
-  if (source === "env") return "info";
-  if (source === "local") return "ok";
-  return "warn";
+function sourcePillTone(source: CredentialValueSource): UiTone {
+  if (source === "env" || source === "local") return "ok";
+  return "bad";
 }
 
 function fieldConfiguredLabel(
   configured: boolean,
-  options?: { unavailable?: boolean },
+  source: CredentialValueSource,
 ): string {
-  if (options?.unavailable) return "不可用";
-  return configured ? "已配置" : "未配置";
-}
-
-function sourceDetailText(source: CredentialValueSource, localInvalid: boolean): string {
-  if (source === "env") return "环境变量覆盖";
-  if (source === "local") return localInvalid ? "本机 bundle 损坏" : "本机持久凭据";
-  return "未配置";
+  if (!configured || source === "missing") return "未配置";
+  return `已配置 · ${sourceLabel(source)} · 不回显`;
 }
 
 function overallCredentialPill(
-  app: AppCredentialProjection | null,
-  local: LocalCredentialSummary | null,
-  saving: boolean,
-): { label: string; tone: "ok" | "warn" | "bad" | "info" } {
-  if (saving) return { label: "保存中…", tone: "info" };
-  if (!app) return { label: "待配置", tone: "warn" };
+  app: AppCredentialProjection | null | undefined,
+  stale: boolean,
+): { tone: UiTone; label: string } {
+  if (stale) return { tone: "warn", label: "可能过期" };
+  if (!app) return { tone: "info", label: "未知" };
   if (app.configured && app.readiness === "ready") {
-    return { label: "已配置", tone: "ok" };
+    return { tone: "ok", label: "已配置 · 不回显" };
   }
-  if (local?.readiness === "invalid" || local?.readiness === "unsupported") {
-    return { label: "需修复", tone: "bad" };
+  if (app.local?.readiness === "invalid") {
+    return { tone: "bad", label: "本机损坏" };
   }
-  return { label: "待配置", tone: "warn" };
-}
-
-function installationText(status: StatusProjection): string {
-  const inst = status.readiness.installation;
-  if (inst.readiness === "ready") return "已安装";
-  if (inst.readiness === "partial") return "部分安装";
-  return "未安装";
-}
-
-function permissionsText(status: StatusProjection): string {
-  const perms = status.readiness.permissions;
-  if (perms.p1Unattended) return "P1 权限满足";
-  if (perms.p0Triage) {
-    if (perms.missingForP1.length > 0) {
-      return `缺少 ${perms.missingForP1.slice(0, 4).join(" / ")}`;
-    }
-    return "P0 权限满足";
+  if (app.local?.readiness === "unsupported") {
+    return { tone: "bad", label: "schema 不支持" };
   }
-  if (perms.missingForP0.length > 0) {
-    return `缺少 ${perms.missingForP0.slice(0, 4).join(" / ")}`;
+  if (!app.configured) return { tone: "bad", label: "未配置" };
+  return { tone: "warn", label: app.readiness || "不完整" };
+}
+
+function permissionsText(status: StatusProjection | null): string {
+  if (!status) return "—";
+  const p = status.readiness.permissions;
+  if (p.analysisReady) return "Metadata read · Issues read/write";
+  const missing = p.missing.length > 0 ? p.missing.join(" / ") : "权限不足";
+  return `缺少：${missing}`;
+}
+
+function modelText(status: StatusProjection | null): string {
+  if (!status) return "—";
+  const m = status.readiness.model;
+  if (m.ready) {
+    const id =
+      m.provider && m.modelId ? `${m.provider}/${m.modelId}` : "主默认模型";
+    return `可用 · ${id}`;
   }
-  return "权限不足";
+  return `不可用 · ${m.reasonCode || "model_unavailable"}`;
 }
 
-function webhookText(status: StatusProjection, stale: boolean): string {
-  if (stale) return "状态可能过期";
-  const wh = status.readiness.webhook;
-  if (wh.health === "healthy") {
-    return wh.lastVerifiedAt
-      ? `最近投递验证成功 · ${formatSafeTime(wh.lastVerifiedAt)}`
-      : "最近投递验证成功";
-  }
-  if (wh.health === "error") return "Webhook 校验异常";
-  return "未知 / 无近期投递";
-}
-
-function readinessPillTone(value: string): "ok" | "warn" | "bad" | "info" {
-  if (/已配置|已安装|满足|成功|健康|可 assign|允许/.test(value)) return "ok";
-  if (/缺失|不足|blocked|失败|不可/.test(value)) return "bad";
-  if (/未知|未检查|尚未|过期/.test(value)) return "warn";
-  return "warn";
-}
-
-function readinessPillLabel(value: string): string {
-  if (/成功|可 assign|健康|满足|已配置|已安装/.test(value) && !/不足|缺失/.test(value)) {
-    return "健康";
-  }
-  if (/未知|未检查|尚未|过期/.test(value)) return "未知";
-  if (/缺失|不足|blocked|失败|不可/.test(value)) return "需处理";
-  return "状态";
-}
-
-function modeLabel(mode: AutomationMode, paused: boolean): string {
-  if (paused) return "已暂停新任务";
-  if (mode === "off") return "关闭";
-  if (mode === "triage") return "仅 Triage";
-  return "低风险无人值守";
-}
-
-function checklistStateLabel(state: SetupItemState): {
-  tone: "ok" | "warn" | "bad" | "info";
+function checklistStateMeta(state: SetupItemState): {
+  tone: UiTone;
   label: string;
 } {
-  if (state === "ready") return { tone: "ok", label: "已就绪" };
+  if (state === "ready") return { tone: "ok", label: "就绪" };
   if (state === "needs_fix") return { tone: "bad", label: "需修复" };
-  if (state === "unknown") return { tone: "warn", label: "未知" };
-  return { tone: "warn", label: "待配置" };
+  if (state === "pending") return { tone: "warn", label: "待完成" };
+  return { tone: "info", label: "未知" };
 }
 
 function emptyDraft(): RepositoryDraft {
@@ -791,9 +615,7 @@ function emptyDraft(): RepositoryDraft {
     repositoryId: "",
     fullName: "",
     installationId: "",
-    baseRef: "main",
     projectId: "",
-    ownerActorIds: "",
   };
 }
 
@@ -801,857 +623,269 @@ function draftFromRepo(repo: RepositorySafeProjection): RepositoryDraft {
   return {
     repositoryId: String(repo.repositoryId),
     fullName: repo.fullName,
-    installationId: repo.installationId != null ? String(repo.installationId) : "",
-    baseRef: repo.baseRef || "main",
-    projectId: repo.projectId ?? "",
-    ownerActorIds: repo.ownerActorIds.join(", "),
+    installationId: repo.installationId > 0 ? String(repo.installationId) : "",
+    projectId: repo.projectId || "",
   };
-}
-
-function parseOwnerActorIds(raw: string): number[] | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return [];
-  const parts = trimmed.split(/[,\s]+/).filter(Boolean);
-  const ids: number[] = [];
-  const seen = new Set<number>();
-  for (const part of parts) {
-    if (!/^\d+$/.test(part)) return null;
-    const n = Number(part);
-    if (!Number.isSafeInteger(n) || n <= 0) return null;
-    if (seen.has(n)) continue;
-    seen.add(n);
-    ids.push(n);
-  }
-  return ids;
 }
 
 function repoToWireDraft(repo: RepositorySafeProjection): {
   repositoryId: number;
   fullName: string;
-  installationId: number | null;
-  projectId: string | null;
-  ownerActorIds: number[];
-  baseRef: string;
+  installationId: number;
+  projectId: string;
 } {
   return {
     repositoryId: repo.repositoryId,
     fullName: repo.fullName,
     installationId: repo.installationId,
     projectId: repo.projectId,
-    ownerActorIds: [...repo.ownerActorIds],
-    baseRef: repo.baseRef,
   };
 }
 
 function jobBlocksRepositoryDelete(job: JobSafeProjection): boolean {
-  if (
+  if (job.kind === "legacy_pipeline") return false;
+  if (job.status === "completed" || job.status === "cancelled") return false;
+  if (job.phase === "completed" || job.phase === "cancelled") return false;
+  return (
     job.status === "queued" ||
     job.status === "running" ||
     job.status === "retry_due" ||
-    job.status === "paused"
-  ) {
-    return true;
-  }
-  return (
-    job.phase === "implementing" ||
-    job.phase === "checking" ||
-    job.phase === "publishing" ||
-    job.phase === "planning" ||
-    job.phase === "policy_check" ||
-    job.phase === "final_policy" ||
-    job.phase === "triaging" ||
-    job.phase === "claim_readiness" ||
-    job.phase === "implementation_queued"
+    job.status === "blocked" ||
+    job.phase === "analyzing" ||
+    job.phase === "commenting" ||
+    job.phase === "closing" ||
+    job.phase === "result_ready" ||
+    job.phase === "received"
   );
 }
 
-function unattendedAvailable(status: StatusProjection): { ok: boolean; reason: string | null } {
-  const blockers = status.policy.capabilityBlockers.filter(
-    (b) => b !== "mode_not_unattended" && b !== "unattended_disabled",
-  );
-  if (!status.readiness.app.configured) {
-    return { ok: false, reason: "App 尚未配置" };
+function outcomePill(job: JobSafeProjection): { tone: UiTone; label: string } {
+  const outcome = job.outcome;
+  if (outcome === "completed_closed") {
+    return { tone: "ok", label: "completed-closed" };
   }
-  if (status.readiness.installation.readiness === "missing") {
-    return { ok: false, reason: "App 尚未安装到允许仓库" };
+  if (outcome === "completed_open") {
+    return { tone: "ok", label: "completed-open" };
   }
-  if (!status.readiness.permissions.p1Unattended) {
-    return { ok: false, reason: "P1 权限不足（需要 Pull requests / Contents）" };
+  if (outcome === "inconclusive") {
+    return { tone: "warn", label: "inconclusive" };
   }
-  if (status.readiness.assignee.readiness !== "ready") {
-    return { ok: false, reason: "本机 Assignee 不可用，认领无法完成" };
+  if (outcome === "retry_due") {
+    return { tone: "warn", label: "retry_due" };
   }
-  if (!status.readiness.allowlist.ready || status.readiness.allowlist.repositoryCount === 0) {
-    return { ok: false, reason: "尚未关联允许仓库" };
+  if (outcome === "blocked") {
+    return { tone: "bad", label: "blocked" };
   }
-  if (blockers.includes("assignee_not_ready")) {
-    return { ok: false, reason: "本机 Assignee 不可用，认领无法完成" };
+  if (outcome === "queued") {
+    return { tone: "info", label: "queued" };
   }
-  if (blockers.includes("p1_permissions_missing")) {
-    return { ok: false, reason: "P1 权限不足" };
+  if (
+    outcome === "running" ||
+    job.phase === "analyzing" ||
+    job.phase === "commenting" ||
+    job.phase === "closing" ||
+    job.phase === "result_ready"
+  ) {
+    const phase =
+      job.phase === "commenting"
+        ? "commenting"
+        : job.phase === "closing"
+          ? "closing"
+          : job.phase === "analyzing" || job.phase === "received"
+            ? "analyzing"
+            : "running";
+    return { tone: "info", label: phase };
   }
-  return { ok: true, reason: null };
+  return { tone: "muted", label: String(outcome || job.status || "unknown") };
+}
+
+function categoryLabel(category: AnalysisCategory | null): string {
+  if (!category) return "—";
+  return category;
+}
+
+function verdictLabel(verdict: TruthVerdict | null): string {
+  if (!verdict) return "—";
+  return verdict;
+}
+
+function effectLabel(
+  effect: EffectSafeProjection,
+  kind: "comment" | "close",
+): string {
+  if (!effect.status) {
+    return kind === "comment" ? "评论未写入" : "未关闭";
+  }
+  if (effect.status === "remote_confirmed") {
+    return kind === "comment" ? "评论已写入" : "已关闭";
+  }
+  if (effect.status === "reconcile_needed") {
+    return kind === "comment" ? "评论待回读" : "关闭待回读";
+  }
+  if (effect.status === "failed") {
+    return kind === "comment" ? "评论失败" : "关闭失败";
+  }
+  if (effect.status === "pending") {
+    return kind === "comment" ? "评论进行中" : "关闭进行中";
+  }
+  return effect.status;
+}
+
+function dispositionCopy(job: JobSafeProjection): string {
+  if (job.outcome === "completed_closed" || job.close.status === "remote_confirmed") {
+    return "已关闭";
+  }
+  if (job.outcome === "inconclusive" || job.verdict === "inconclusive") {
+    return "证据不足 · 保持打开";
+  }
+  if (job.verdict === "not_applicable") {
+    return "不适用缺陷真伪 · 保持打开";
+  }
+  if (job.verdict === "confirmed") {
+    return "保持打开";
+  }
+  if (job.verdict === "not_exists" && job.close.status !== "remote_confirmed") {
+    return "未自动关闭";
+  }
+  if (job.outcome === "completed_open") {
+    return "保持打开";
+  }
+  return "—";
+}
+
+function jobSummaryLine(job: JobSafeProjection): string {
+  const parts = [
+    categoryLabel(job.category),
+    verdictLabel(job.verdict),
+    effectLabel(job.comment, "comment"),
+    dispositionCopy(job),
+  ];
+  if (job.confidence) parts.splice(2, 0, job.confidence);
+  if (job.reasonCode && (job.outcome === "blocked" || job.outcome === "retry_due")) {
+    parts.push(job.reasonCode);
+  }
+  return parts.filter((p) => p && p !== "—").join(" · ");
+}
+
+function retryReasonLabel(reasonCode: string | null | undefined): string {
+  if (!reasonCode) return "当前不可重试";
+  switch (reasonCode) {
+    case "automation_disabled":
+      return "自动化已关闭";
+    case "legacy_pipeline_retired":
+      return "旧流水线已退役，不可重试";
+    case "not_analysis_job":
+      return "非分析任务";
+    case "job_completed":
+      return "已完成，无需重试";
+    case "job_cancelled":
+      return "已取消";
+    case "job_running":
+      return "任务运行中";
+    case "status_not_retryable":
+      return "当前状态不可重试";
+    default:
+      return reasonCode;
+  }
 }
 
 function primaryBanner(
+  loadState: LoadState,
   status: StatusProjection | null,
-  options: {
-    loadState: LoadState;
-    stale: boolean;
-    conflict: boolean;
-    saveError: string | null;
-    actionNotice: InlineNotice | null;
-  },
+  stale: boolean,
+  conflict: boolean,
 ): InlineNotice | null {
-  if (options.actionNotice) return options.actionNotice;
-  if (options.conflict) {
+  if (conflict) {
     return {
       tone: "warning",
-      title: "配置已被其他操作者更新（revision conflict）",
-      message: "当前草稿尚未保存；不会覆盖服务端配置。请重新读取后再改。",
+      title: "配置 revision 冲突",
+      message: "其他操作者已更新配置。请重新读取后再保存；mutation 已暂时禁用。",
     };
   }
-  if (options.saveError) {
+  if (stale) {
     return {
-      tone: "error",
-      title: "更改未保存",
-      message: options.saveError,
+      tone: "warning",
+      title: "状态可能过期",
+      message: "最近一次刷新失败。仍可浏览上次安全投影，但启用/暂停/仓库/重试已禁用。",
     };
   }
-  if (options.loadState === "error" && status) {
+  if (loadState === "error" && !status) {
     return {
       tone: "error",
-      title: "无法刷新自动化状态",
-      message: "保留上次安全摘要并标为可能过期；所有 mutation 已禁用。",
-    };
-  }
-  if (options.loadState === "error") {
-    return {
-      tone: "error",
-      title: "无法读取 GitHub 自动化状态",
-      message: "请稍后重试刷新。本页不会请求或显示任何 secret。",
+      title: "无法加载 GitHub 分析设置",
+      message: "请检查本机服务是否可用，然后重试。",
     };
   }
   if (!status) return null;
 
   if (!status.readiness.app.configured) {
     return {
-      tone: "error",
-      title: "尚未配置 GitHub App",
-      message:
-        "在下方「本机 GitHub App 凭据」卡保存 App ID、Webhook secret 与私钥 PEM。无需配置 shell 环境变量。",
+      tone: "warning",
+      title: "GitHub App 凭据未配置",
+      message: "请先在下方保存本机 App ID、私钥与 Webhook secret（或配置高级 env 覆盖）。",
     };
   }
-  if (status.repositories.length === 0) {
+  if (status.readiness.allowlist.repositoryCount === 0) {
+    return {
+      tone: "info",
+      title: "允许仓库为空",
+      message: "关联至少一个仓库与 Project Registry 本地项目后，才能分析新 Issue。",
+    };
+  }
+  if (!status.readiness.model.ready) {
     return {
       tone: "warning",
-      title: "尚未关联仓库",
-      message:
-        "allowlist 默认为空，不会预置 yolk-pi-web。请点击「关联仓库」绑定任意 owner/repo 与 Project Registry 项目。",
-    };
-  }
-  if (status.readiness.installation.readiness === "missing") {
-    return {
-      tone: "warning",
-      title: "App 已配置，但尚未安装",
-      message: "请将 GitHub App 安装到 allowlist 仓库后刷新状态。浏览器不能代替 operator 安装或授予权限。",
-    };
-  }
-  if (status.readiness.assignee.readiness !== "ready") {
-    return {
-      tone: "error",
-      title: "认领未完成：本机 Assignee 不可用",
-      message:
-        "没有 active gh/git credential，或该 login 无法被 assign。不会保留 ypi:claimed，也不会进入 owner 自动实现；请在机器上修复账号后重试。",
-    };
-  }
-  if (!status.readiness.permissions.p0Triage) {
-    return {
-      tone: "warning",
-      title: "安装权限不足",
-      message: "P0 需要 Metadata、Issues；启用无人值守还需要 Pull requests、Contents。请由仓库管理员升级 App 安装权限。",
+      title: "分析模型不可用",
+      message: "跟随 pi 主默认模型；模型未就绪时不会关闭 Issue，分析会降级为 inconclusive。",
     };
   }
   if (status.runtime.paused) {
     return {
-      tone: "warning",
-      title: "已暂停新任务",
-      message:
-        "当前 mode 保持不变；执行中的命令不会被强杀，会在下一个 checkpoint 停住。full agent 已产生的外部副作用不会自动回滚。",
+      tone: "info",
+      title: "全局已暂停",
+      message: "暂停不改变启用状态；恢复后继续未确认阶段，不会重放已确认评论/关闭。",
     };
   }
-  if (status.runtime.mode === "off" || !status.runtime.enabled) {
+  if (!status.runtime.enabled) {
     return {
       tone: "info",
-      title: "自动化已关闭",
-      message: "新 delivery 仍会完成签名验证并记录 paused/ignored；不会创建新 job，也不会删除既有审计记录。",
-    };
-  }
-  if (status.runtime.mode === "triage") {
-    const login = status.readiness.assignee.login
-      ? `@${status.readiness.assignee.login}`
-      : "@machine-login";
-    return {
-      tone: "info",
-      title: "仅 Triage 正在运行",
-      message: `成功认领必须同时有 ypi:claimed 与 ${login} Assignee；owner 采纳只记录等待自动化。`,
-    };
-  }
-  if (!status.policy.unattendedEnabled || !status.readiness.permissions.p1Unattended) {
-    return {
-      tone: "warning",
-      title: "无人值守默认关闭",
-      message:
-        "完整 label + assignee 认领、P1 capability 或文档 + 小 bugfix policy 尚未就绪；不能从本页绕过。",
-    };
-  }
-  if (status.readiness.webhook.health === "unknown") {
-    return {
-      tone: "warning",
-      title: "Webhook 状态未知",
-      message:
-        "尚未收到可验证的近期投递。该状态不是健康，也不显示 raw delivery；请检查公网 HTTPS ingress 后刷新。",
-    };
-  }
-  if (status.runtime.residualRiskWarningRequired) {
-    return {
-      tone: "warning",
-      title: "Full agent 风险已接受",
-      message:
-        "文档 + 小 bugfix 会使用完整 agent：可执行任意命令、联网并访问同 OS 用户可见文件。owner gate、WorkTree 和最终 diff gate 不是 sandbox。",
+      title: "新议题分析未启用",
+      message: "Webhook 仍可验签审计；开启后仅处理人类 issues.opened。",
     };
   }
   return null;
 }
 
-function jobActionAvailability(
-  job: JobSafeProjection,
-  action: "retry" | "pause" | "resume",
-): JobActionAvailability {
-  return (
-    job.actions.find((a) => a.action === action) ?? {
-      action,
-      available: false,
-      reasonCode: "unavailable",
-    }
-  );
-}
-
-function claimStatusLabel(claim: JobSafeProjection["claimStatus"]): string {
-  if (claim === "complete") return "claim 完整";
-  if (claim === "blocked_claim_assignee") return "认领未完成";
-  if (claim === "incomplete") return "claim 不完整";
-  return "claim 未知";
-}
-
-type UiTone = "ok" | "warn" | "bad" | "info" | "muted";
-
-type JobFilterKind =
-  | "all"
-  | "policy"
-  | "retry"
-  | "active"
-  | "release"
-  | "terminal";
-
-const JOB_RAIL_STEPS = [
-  "调度",
-  "策略",
-  "Session",
-  "实现",
-  "检查",
-  "发布",
-] as const;
-
-function shortTraceId(traceId: string): string {
-  if (traceId.length <= 12) return traceId;
-  return `${traceId.slice(0, 8)}…`;
-}
-
-function formatClockTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleTimeString("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-  } catch {
-    return "—";
-  }
-}
-
-function jobSchedulerState(job: JobSafeProjection): JobSchedulerState {
-  return job.schedulerState ?? "unknown";
-}
-
-function jobAgentExecutionState(job: JobSafeProjection): JobAgentExecutionState {
-  return job.agentExecutionState ?? "unknown";
-}
-
-function jobSessionAvailability(job: JobSafeProjection): JobSessionAvailability {
-  return job.sessionAvailability ?? "unknown_legacy";
-}
-
-function jobProgressCounts(job: JobSafeProjection): JobProgressCounts {
-  const schedulerRuns =
-    typeof job.counts?.schedulerRuns === "number"
-      ? job.counts.schedulerRuns
-      : Number.isFinite(job.attempt)
-        ? Math.max(0, Math.floor(job.attempt))
-        : 0;
-  return {
-    schedulerRuns,
-    agentRuns:
-      typeof job.counts?.agentRuns === "number" ? Math.max(0, job.counts.agentRuns) : 0,
-    noProgressRuns:
-      typeof job.counts?.noProgressRuns === "number"
-        ? Math.max(0, job.counts.noProgressRuns)
-        : 0,
-    meaningfulProgress:
-      typeof job.counts?.meaningfulProgress === "number"
-        ? Math.max(0, job.counts.meaningfulProgress)
-        : 0,
-  };
-}
-
-function isPolicyBlockedLayer(layer: JobBlockedLayer | null | undefined): boolean {
-  return layer === "policy_pre" || layer === "policy_plan" || layer === "policy_final";
-}
-
-function blockedLayerLabel(layer: JobBlockedLayer | null | undefined): string {
-  switch (layer) {
-    case "start_gate":
-      return "启动门禁";
-    case "worktree":
-      return "WorkTree";
-    case "studio_task":
-      return "Studio 任务";
-    case "policy_pre":
-      return "前置策略门禁";
-    case "policy_plan":
-      return "规划策略门禁";
-    case "session_bootstrap":
-      return "Session 启动";
-    case "agent":
-      return "Agent 执行";
-    case "validation":
-      return "验证";
-    case "policy_final":
-      return "最终策略门禁";
-    case "publisher":
-      return "发布";
-    case "lifecycle":
-      return "生命周期";
-    case "scheduler":
-      return "调度";
-    case "unknown":
-      return "未知层";
-    default:
-      return "—";
-  }
-}
-
-function sessionAvailabilityLabel(availability: JobSessionAvailability): {
-  primary: string;
-  secondary: string;
-  tone: UiTone;
-} {
-  switch (availability) {
-    case "none":
-      return {
-        primary: "尚未启动 Agent",
-        secondary: "Session 不存在",
-        tone: "warn",
-      };
-    case "creating":
-      return {
-        primary: "正在创建 Session",
-        secondary: "Session 启动中",
-        tone: "info",
-      };
-    case "active":
-      return {
-        primary: "Session 可用",
-        secondary: "Agent 可在获准工作区运行",
-        tone: "ok",
-      };
-    case "ended":
-      return {
-        primary: "Session 已结束",
-        secondary: "审计可查",
-        tone: "ok",
-      };
-    case "failed":
-      return {
-        primary: "Session 失败",
-        secondary: "启动或绑定失败",
-        tone: "bad",
-      };
-    case "unknown_legacy":
-    default:
-      return {
-        primary: "Session 状态未知",
-        secondary: "旧记录缺少可证字段",
-        tone: "muted",
-      };
-  }
-}
-
-function agentExecutionLabel(job: JobSafeProjection): {
-  label: string;
-  tone: UiTone;
-  help: string;
-} {
-  const agent = jobAgentExecutionState(job);
-  const session = jobSessionAvailability(job);
-  const sessionInfo = sessionAvailabilityLabel(session);
-  const layer = job.blockedAtLayer ?? null;
-  const counts = jobProgressCounts(job);
-
-  // Never invent Agent active from phase/status/attempt. Unknown stays conservative.
-  if (agent === "unknown") {
-    return {
-      label: "状态未知",
-      tone: "muted",
-      help: "尚无可证实 Agent 活动 · 不根据 phase/status 推断",
-    };
-  }
-
-  if (agent === "not_started") {
-    if (isPolicyBlockedLayer(layer) || job.status === "blocked" || job.phase === "blocked") {
-      return {
-        label: "策略阻塞",
-        tone: "warn",
-        help: `${sessionInfo.primary} · ${sessionInfo.secondary}`,
-      };
-    }
-    if (jobSchedulerState(job) === "backoff" || job.status === "retry_due") {
-      return {
-        label: "等待重试",
-        tone: "bad",
-        help: `${sessionInfo.primary} · ${sessionInfo.secondary}`,
-      };
-    }
-    return {
-      label: "尚未启动 Agent",
-      tone: "warn",
-      help: sessionInfo.secondary,
-    };
-  }
-
-  if (agent === "bootstrapping") {
-    return {
-      label: "启动 Session",
-      tone: "info",
-      help: sessionInfo.primary,
-    };
-  }
-  if (agent === "implementing") {
-    return {
-      label: "实现中",
-      tone: "info",
-      help: `${sessionInfo.primary}${job.lastMeaningfulProgress?.at ? ` · 最近进展 ${formatSafeTime(job.lastMeaningfulProgress.at)}` : ""}`,
-    };
-  }
-  if (agent === "checking") {
-    return {
-      label: "检查中",
-      tone: "info",
-      help: sessionInfo.primary,
-    };
-  }
-  if (agent === "publishing") {
-    return {
-      label: "发布中",
-      tone: "info",
-      help: sessionInfo.primary,
-    };
-  }
-  if (agent === "ended") {
-    const prBit =
-      job.prNumber != null
-        ? `PR #${job.prNumber} 已发布`
-        : job.hasPullRequest
-          ? "PR 已发布"
-          : "终态";
-    return {
-      label: "已完成",
-      tone: "ok",
-      help: prBit,
-    };
-  }
-  if (agent === "failed") {
-    return {
-      label: "失败",
-      tone: "bad",
-      help:
-        layer != null
-          ? `阻塞层：${blockedLayerLabel(layer)}`
-          : sessionInfo.primary,
-    };
-  }
-
-  // Exhaustive fallback — still never claim Agent active without evidence.
-  return {
-    label: "尚未启动 Agent",
-    tone: "warn",
-    help:
-      counts.agentRuns > 0
-        ? `Agent 启动 ${counts.agentRuns} · 当前无活动证据`
-        : sessionInfo.secondary,
-  };
-}
-
-function schedulerStateLabel(job: JobSafeProjection): {
-  label: string;
-  tone: UiTone;
-} {
-  const state = jobSchedulerState(job);
-  switch (state) {
-    case "queued":
-      return { label: "已领取 / 排队", tone: "info" };
-    case "leased":
-      return { label: "Lease 活跃", tone: "ok" };
-    case "backoff":
-      return {
-        label: job.nextRetryAt
-          ? `Backoff 至 ${formatClockTime(job.nextRetryAt)}`
-          : "Backoff 等待",
-        tone: "warn",
-      };
-    case "paused":
-      return { label: "已暂停", tone: "warn" };
-    case "idle":
-      return { label: "空闲", tone: "muted" };
-    case "terminal":
-      return { label: "终态 · 不再调度", tone: "ok" };
-    case "unknown":
-    default:
-      return { label: "调度状态未知", tone: "muted" };
-  }
-}
-
-function progressKindLabel(kind: JobSafeProgressKind | null | undefined): string {
-  switch (kind) {
-    case "checkpoint_advanced":
-      return "checkpoint 前进";
-    case "session_created":
-      return "Session 已创建";
-    case "child_run_terminal":
-      return "子运行结束";
-    case "validation_terminal":
-      return "验证结束";
-    case "policy_terminal":
-      return "策略判定结束";
-    case "publisher_terminal":
-      return "发布结束";
-    case "command_consumed":
-      return "命令已消费";
-    case "reconciled":
-      return "已 reconcile";
-    default:
-      return "尚无";
-  }
-}
-
-function retryabilityLabel(value: JobRetryability | null | undefined): string {
-  switch (value) {
-    case "automatic":
-      return "可自动重试";
-    case "operator_after_change":
-      return "条件变化后可重试";
-    case "operator":
-      return "需 operator 重试";
-    case "none":
-      return "不可重试";
-    default:
-      return "—";
-  }
-}
-
-function jobFilterKind(job: JobSafeProjection): JobFilterKind {
-  const agent = jobAgentExecutionState(job);
-  const scheduler = jobSchedulerState(job);
-  const layer = job.blockedAtLayer ?? null;
-
-  if (scheduler === "terminal" || agent === "ended") return "terminal";
-  if (agent === "checking" || agent === "publishing") return "release";
-  if (
-    agent === "implementing" ||
-    agent === "bootstrapping" ||
-    jobSessionAvailability(job) === "active"
-  ) {
-    return "active";
-  }
-  if (scheduler === "backoff" || job.status === "retry_due") return "retry";
-  if (
-    isPolicyBlockedLayer(layer) ||
-    job.status === "blocked" ||
-    job.phase === "blocked" ||
-    job.phase === "blocked_claim_assignee"
-  ) {
-    return "policy";
-  }
-  return "all";
-}
-
-function jobMatchesFilter(job: JobSafeProjection, filter: JobFilterKind): boolean {
-  if (filter === "all") return true;
-  return jobFilterKind(job) === filter;
-}
-
-type RailStepState = "pending" | "done" | "active" | "blocked";
-
-/**
- * Map server observability to the 6-step rail.
- * Conservative: never mark Session/实现 active without session evidence.
- */
-function jobRailStates(job: JobSafeProjection): RailStepState[] {
-  const agent = jobAgentExecutionState(job);
-  const session = jobSessionAvailability(job);
-  const scheduler = jobSchedulerState(job);
-  const layer = job.blockedAtLayer ?? null;
-  const states: RailStepState[] = [
-    "pending",
-    "pending",
-    "pending",
-    "pending",
-    "pending",
-    "pending",
-  ];
-
-  // 0 调度
-  if (scheduler === "terminal" || agent === "ended") {
-    states[0] = "done";
-  } else if (scheduler === "backoff" || scheduler === "paused") {
-    states[0] = "active";
-  } else if (scheduler === "leased" || scheduler === "queued" || scheduler === "idle") {
-    states[0] = "done";
-  } else {
-    states[0] = "active";
-  }
-
-  const policyBlocked = isPolicyBlockedLayer(layer);
-  const pastPolicy =
-    session === "active" ||
-    session === "creating" ||
-    session === "ended" ||
-    session === "failed" ||
-    agent === "bootstrapping" ||
-    agent === "implementing" ||
-    agent === "checking" ||
-    agent === "publishing" ||
-    agent === "ended" ||
-    agent === "failed";
-
-  // 1 策略
-  if (policyBlocked && !pastPolicy) {
-    states[1] = "blocked";
-  } else if (pastPolicy) {
-    states[1] = "done";
-  } else if (agent === "not_started" || agent === "unknown") {
-    states[1] = policyBlocked ? "blocked" : "active";
-  }
-
-  // 2 Session
-  if (layer === "session_bootstrap" || session === "failed") {
-    states[2] = "blocked";
-  } else if (session === "creating" || agent === "bootstrapping") {
-    states[2] = "active";
-  } else if (
-    session === "active" ||
-    session === "ended" ||
-    agent === "implementing" ||
-    agent === "checking" ||
-    agent === "publishing" ||
-    agent === "ended"
-  ) {
-    states[2] = "done";
-  }
-
-  // 3 实现 / 4 检查 / 5 发布 — only with real agent evidence
-  if (agent === "implementing") {
-    states[3] = "active";
-  } else if (
-    agent === "checking" ||
-    agent === "publishing" ||
-    agent === "ended"
-  ) {
-    states[3] = "done";
-  } else if (agent === "failed" && layer === "agent") {
-    states[3] = "blocked";
-  }
-
-  if (agent === "checking") {
-    states[4] = layer === "validation" ? "blocked" : "active";
-  } else if (agent === "publishing" || agent === "ended") {
-    states[4] = "done";
-  } else if (agent === "failed" && layer === "validation") {
-    states[4] = "blocked";
-  }
-
-  if (agent === "publishing") {
-    states[5] = layer === "publisher" || layer === "policy_final" ? "blocked" : "active";
-  } else if (agent === "ended") {
-    states[5] = "done";
-  } else if (
-    agent === "failed" &&
-    (layer === "publisher" || layer === "policy_final")
-  ) {
-    states[5] = "blocked";
-  }
-
-  return states;
-}
-
-function nextStepCopy(job: JobSafeProjection): { title: string; detail: string } {
-  const agent = jobAgentExecutionState(job);
-  const scheduler = jobSchedulerState(job);
-  const layer = job.blockedAtLayer ?? null;
-  const retryability = job.retryability ?? null;
-
-  if (scheduler === "terminal" || agent === "ended") {
-    return {
-      title: "下一步：无需操作",
-      detail: "终态保留安全审计摘要；不会显示绝对路径、Issue 正文或评论。",
-    };
-  }
-  if (scheduler === "paused" || job.status === "paused") {
-    return {
-      title: "下一步：可恢复到安全 checkpoint",
-      detail: "恢复不会跳过策略；从上次安全 checkpoint 继续。",
-    };
-  }
-  if (isPolicyBlockedLayer(layer)) {
-    return {
-      title: "下一步：按策略要求补齐规划条件，再重试",
-      detail:
-        "本页不能跳过策略；“重试”只重新唤醒同一 durable job，并从安全 checkpoint reconciliation。",
-    };
-  }
-  if (scheduler === "backoff" || job.status === "retry_due") {
-    return {
-      title: "下一步：可等待自动重试，或修复条件后手动重试",
-      detail:
-        retryability === "operator_after_change"
-          ? "条件未变化时手动重试不会绕过同一确定性 gate。"
-          : "手动重试仍执行同一 policy gate，不改变或绕过策略。",
-    };
-  }
-  if (agent === "bootstrapping" || jobSessionAvailability(job) === "creating") {
-    return {
-      title: "下一步：等待 parent Session 启动完成",
-      detail: "Session 启动失败会进入可见 blocker，不会假装 Agent active。",
-    };
-  }
-  if (agent === "implementing") {
-    return {
-      title: "下一步：等待实现到达检查 checkpoint",
-      detail: "暂停不会强杀执行中的 Git 命令，将在下一个安全 checkpoint 生效。",
-    };
-  }
-  if (agent === "checking") {
-    return {
-      title: "下一步：等待检查完成",
-      detail: "检查通过后才会进入发布；不会提前宣称 PR 已创建。",
-    };
-  }
-  if (agent === "publishing") {
-    return {
-      title: "下一步：等待发布完成",
-      detail: "暂停将在下一个安全 checkpoint 生效；已产生的外部副作用不会自动回滚。",
-    };
-  }
-  if (agent === "failed") {
-    return {
-      title: "下一步：查看阻塞层后决定是否重试",
-      detail: "确定性策略/绑定失败不会自动自旋；需条件变化或 operator 明确重试。",
-    };
-  }
-  return {
-    title: "下一步：等待调度推进或查看详情",
-    detail: "调度中不代表 Agent 已启动；以 Session 与 Agent 运行状态为准。",
-  };
-}
-
-function summarizeJobCounts(jobs: readonly JobSafeProjection[]): {
-  scheduling: number;
-  policyBlocked: number;
-  waitingRetry: number;
-  agentActive: number;
-  terminal: number;
-} {
-  let scheduling = 0;
-  let policyBlocked = 0;
-  let waitingRetry = 0;
-  let agentActive = 0;
-  let terminal = 0;
-  for (const job of jobs) {
-    const kind = jobFilterKind(job);
-    if (kind === "terminal") terminal += 1;
-    else if (kind === "policy") policyBlocked += 1;
-    else if (kind === "retry") waitingRetry += 1;
-    else if (kind === "active" || kind === "release") agentActive += 1;
-    else {
-      const scheduler = jobSchedulerState(job);
-      if (
-        scheduler === "queued" ||
-        scheduler === "leased" ||
-        scheduler === "idle" ||
-        scheduler === "paused"
-      ) {
-        scheduling += 1;
-      } else if (job.status === "queued" || job.status === "running") {
-        // Legacy fallback for raw queue counts only — still not Agent active.
-        scheduling += 1;
-      }
-    }
-  }
-  return { scheduling, policyBlocked, waitingRetry, agentActive, terminal };
-}
-
-async function copyEnvName(name: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(name);
-      return true;
-    }
-  } catch {
-    /* clipboard unavailable */
-  }
-  return false;
-}
-
-// ─── component ───────────────────────────────────────────────────────────────
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export function GithubAutomationConfig() {
   const prompt = usePrompt();
   const headingId = useId();
-  const modeReasonId = useId();
-  const residualRiskId = useId();
   const formHeadingId = useId();
   const fullNameId = useId();
   const repositoryIdFieldId = useId();
   const installationIdFieldId = useId();
-  const baseRefId = useId();
   const projectIdFieldId = useId();
-  const ownerActorIdsId = useId();
   const formErrorId = useId();
   const credentialAppIdFieldId = useId();
   const credentialWebhookFieldId = useId();
   const credentialPemFieldId = useId();
   const credentialFileFieldId = useId();
   const credentialLiveRegionId = useId();
+  const enableSwitchId = useId();
+  const pauseSwitchId = useId();
+  const concurrencyId = useId();
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [status, setStatus] = useState<StatusProjection | null>(null);
   const [config, setConfig] = useState<ConfigSafeProjection | null>(null);
   const [projectChoices, setProjectChoices] = useState<ProjectChoice[]>([]);
   const [checklist, setChecklist] = useState<SetupChecklistItem[]>(FALLBACK_CHECKLIST);
-  const [verifySummary, setVerifySummary] = useState<VerifyResult["summary"] | null>(null);
-  const [credentialStatus, setCredentialStatus] = useState<AppCredentialProjection | null>(null);
+  const [verifySummary, setVerifySummary] = useState<VerifyResult["summary"] | null>(
+    null,
+  );
+  const [credentialStatus, setCredentialStatus] =
+    useState<AppCredentialProjection | null>(null);
   const [stale, setStale] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -1666,8 +900,6 @@ export function GithubAutomationConfig() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<InlineNotice | null>(null);
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [jobFilter, setJobFilter] = useState<JobFilterKind>("all");
   const [expandedJobIds, setExpandedJobIds] = useState<Record<string, boolean>>({});
   const [formMode, setFormMode] = useState<FormMode>({ kind: "closed" });
   const [draft, setDraft] = useState<RepositoryDraft>(emptyDraft);
@@ -1688,6 +920,11 @@ export function GithubAutomationConfig() {
   const mountedRef = useRef(true);
   const formSectionRef = useRef<HTMLFormElement | null>(null);
   const privateKeyFileInputRef = useRef<HTMLInputElement | null>(null);
+  const statusRef = useRef<StatusProjection | null>(null);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const clearPoll = useCallback(() => {
     if (pollTimerRef.current) {
@@ -1714,9 +951,7 @@ export function GithubAutomationConfig() {
     if (!mountedRef.current) return;
     if (generation !== fetchGenerationRef.current) return;
     setStatus(next);
-    // Status readiness.app uses the same safe projection (sources/local additive).
     setCredentialStatus(next.readiness.app);
-    // Keep config revision aligned when status carries a fresher CAS token.
     setConfig((prev) => {
       if (!prev) return next.config;
       if (prev.revision === next.revision) {
@@ -1724,6 +959,7 @@ export function GithubAutomationConfig() {
           ...prev,
           ...next.config,
           repositories: next.config.repositories,
+          analysis: next.config.analysis,
         };
       }
       return next.config;
@@ -1743,21 +979,17 @@ export function GithubAutomationConfig() {
     }
   }, []);
 
-  const setPrivateKeyInputMode = useCallback(
-    (mode: PrivateKeyInputMode) => {
-      setPrivateKeyMode(mode);
-      // Mutual exclusion: switching input mode clears the other transient value.
-      if (mode === "paste") {
-        setPrivateKeyFile(null);
-        if (privateKeyFileInputRef.current) {
-          privateKeyFileInputRef.current.value = "";
-        }
-      } else {
-        setPrivateKeyPemDraft("");
+  const setPrivateKeyInputMode = useCallback((mode: PrivateKeyInputMode) => {
+    setPrivateKeyMode(mode);
+    if (mode === "paste") {
+      setPrivateKeyFile(null);
+      if (privateKeyFileInputRef.current) {
+        privateKeyFileInputRef.current.value = "";
       }
-    },
-    [],
-  );
+    } else {
+      setPrivateKeyPemDraft("");
+    }
+  }, []);
 
   const applyCredentialStatus = useCallback(
     (next: AppCredentialProjection, generation: number) => {
@@ -1826,26 +1058,29 @@ export function GithubAutomationConfig() {
     [applyCredentialStatus],
   );
 
-  const fetchConfig = useCallback(async (generation: number, signal: AbortSignal) => {
-    const res = await fetch("/api/github-automation/config", {
-      method: "GET",
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-      signal,
-    });
-    const data = (await res.json().catch(() => null)) as {
-      ok?: boolean;
-      config?: ConfigSafeProjection;
-      projectChoices?: ProjectChoice[];
-      code?: string;
-      message?: string;
-    } | null;
-    if (!res.ok || !data?.ok || !data.config) {
-      throw new Error(allowlistedMessage(data?.code, "无法读取配置"));
-    }
-    applyConfigBundle(data.config, data.projectChoices ?? [], generation);
-    return data.config;
-  }, [applyConfigBundle]);
+  const fetchConfig = useCallback(
+    async (generation: number, signal: AbortSignal) => {
+      const res = await fetch("/api/github-automation/config", {
+        method: "GET",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+        signal,
+      });
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        config?: ConfigSafeProjection;
+        projectChoices?: ProjectChoice[];
+        code?: string;
+        message?: string;
+      } | null;
+      if (!res.ok || !data?.ok || !data.config) {
+        throw new Error(allowlistedMessage(data?.code, "无法读取配置"));
+      }
+      applyConfigBundle(data.config, data.projectChoices ?? [], generation);
+      return data.config;
+    },
+    [applyConfigBundle],
+  );
 
   const fetchStatus = useCallback(
     async (options?: { silent?: boolean; reason?: string }) => {
@@ -1859,7 +1094,6 @@ export function GithubAutomationConfig() {
       }
 
       try {
-        // Parallel safe reads; neither enqueues work.
         const [statusRes] = await Promise.all([
           fetch("/api/github-automation/status", {
             method: "GET",
@@ -1880,13 +1114,16 @@ export function GithubAutomationConfig() {
         if (generation !== fetchGenerationRef.current) return;
 
         if (!statusRes.ok || !data?.ok || !data.status) {
-          if (status) {
+          if (statusRef.current) {
             setStale(true);
             setLoadState("error");
             setActionNotice({
               tone: "error",
-              title: "无法刷新自动化状态",
-              message: allowlistedMessage(data?.code, "状态可能已过期；mutation 已暂时禁用。"),
+              title: "无法刷新分析状态",
+              message: allowlistedMessage(
+                data?.code,
+                "状态可能已过期；mutation 已暂时禁用。",
+              ),
             });
           } else {
             setLoadState("error");
@@ -1906,7 +1143,7 @@ export function GithubAutomationConfig() {
       } catch (err) {
         if (isAbortError(err)) return;
         if (generation !== fetchGenerationRef.current) return;
-        if (status) {
+        if (statusRef.current) {
           setStale(true);
           setLoadState("error");
         } else {
@@ -1918,7 +1155,7 @@ export function GithubAutomationConfig() {
         }
       }
     },
-    [applyStatus, fetchConfig, status],
+    [applyStatus, fetchConfig],
   );
 
   useEffect(() => {
@@ -1933,7 +1170,6 @@ export function GithubAutomationConfig() {
       credentialAbortRef.current?.abort();
       clearPoll();
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-      // Never leave secret/PEM/File objects in component state after unmount.
       clearCredentialTransient();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only bootstrap
@@ -1946,7 +1182,7 @@ export function GithubAutomationConfig() {
 
     const counts = status.runtime.counts;
     const hasLive =
-      counts.queued > 0 || counts.running > 0 || counts.retry > 0 || counts.paused > 0;
+      counts.queued > 0 || counts.running > 0 || counts.retry > 0 || counts.blocked > 0;
     if (!hasLive) return;
 
     pollTimerRef.current = setTimeout(() => {
@@ -1963,13 +1199,13 @@ export function GithubAutomationConfig() {
         abortRef.current?.abort();
         return;
       }
-      if (status && !stale) {
+      if (statusRef.current && !stale) {
         void fetchStatus({ silent: true, reason: "visibility" });
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [clearPoll, fetchStatus, stale, status]);
+  }, [clearPoll, fetchStatus, stale]);
 
   const flashSaved = useCallback(() => {
     setSavedFlash(true);
@@ -1983,17 +1219,14 @@ export function GithubAutomationConfig() {
 
   const patchConfig = useCallback(
     async (patch: {
-      mode?: AutomationMode;
       enabled?: boolean;
       paused?: boolean;
-      unattended?: { enabled?: boolean };
+      analysis?: { maxConcurrency?: number };
       repositories?: Array<{
         repositoryId: number;
         fullName: string;
-        installationId: number | null;
-        projectId: string | null;
-        ownerActorIds: number[];
-        baseRef: string;
+        installationId: number;
+        projectId: string;
       }>;
     }): Promise<ConfigSafeProjection | null> => {
       if (!revision) return null;
@@ -2060,12 +1293,8 @@ export function GithubAutomationConfig() {
                 runtime: {
                   ...prev.runtime,
                   enabled: data.config!.enabled,
-                  mode: data.config!.mode,
                   paused: data.config!.paused,
-                },
-                policy: {
-                  ...prev.policy,
-                  unattendedEnabled: data.config!.unattended.enabled,
+                  analysisMaxConcurrency: data.config!.analysis.maxConcurrency,
                 },
                 readiness: {
                   ...prev.readiness,
@@ -2106,7 +1335,7 @@ export function GithubAutomationConfig() {
 
       const formData = new FormData();
       const appId = appIdDraft.trim();
-      const webhookSecret = webhookSecretDraft; // do not trim interior; only skip blank
+      const webhookSecret = webhookSecretDraft;
       if (appId) formData.set("appId", appId);
       if (webhookSecret.trim().length > 0) formData.set("webhookSecret", webhookSecret);
 
@@ -2134,8 +1363,6 @@ export function GithubAutomationConfig() {
         if (generation !== credentialGenerationRef.current || !mountedRef.current) return;
 
         if (!res.ok || !data?.ok || !data.status) {
-          // Keep transient inputs so the user can fix validation errors.
-          // Never put submitted secret/PEM content into toast or notice.
           const msg = allowlistedMessage(
             data?.code,
             "保存本机凭据失败，服务端配置未更新",
@@ -2167,7 +1394,6 @@ export function GithubAutomationConfig() {
         });
         prompt.toast({ message: "本机凭据已保存", tone: "success" });
         void fetchStatus({ silent: true, reason: "after-credentials" });
-        // Refresh checklist from verify without enqueue.
         void (async () => {
           try {
             const verifyRes = await fetch("/api/github-automation/verify", {
@@ -2233,7 +1459,7 @@ export function GithubAutomationConfig() {
     const ok = await prompt.confirm({
       title: "移除本机凭据？",
       message:
-        "只删除本机保存的 GitHub App 凭据。不会删除 GitHub App、installation、允许仓库、jobs，也不会修改环境变量。若 env 仍存在，当前进程可能继续显示已配置。",
+        "只删除本机保存的 GitHub App 凭据。不会删除 GitHub App、installation、允许仓库、分析任务，也不会修改环境变量。若 env 仍存在，当前进程可能继续显示已配置。",
       confirmLabel: "确认移除",
       intent: "danger",
     });
@@ -2285,7 +1511,7 @@ export function GithubAutomationConfig() {
         title: stillConfigured ? "本机凭据已移除（env 仍生效）" : "本机凭据已移除",
         message: stillConfigured
           ? "本机 fallback 已删除。当前进程仍由环境变量提供有效凭据。"
-          : "本机 fallback 已删除。在重新配置前 automation 将保持 fail closed。",
+          : "本机 fallback 已删除。在重新配置前分析将保持 fail closed。",
       });
       prompt.toast({
         message: stillConfigured ? "本机凭据已移除（env 仍生效）" : "本机凭据已移除",
@@ -2334,7 +1560,12 @@ export function GithubAutomationConfig() {
         | { ok?: false; code?: string; message?: string; checklist?: never }
         | null;
 
-      if (!res.ok || !data || data.ok !== true || !Array.isArray((data as VerifyResult).checklist)) {
+      if (
+        !res.ok ||
+        !data ||
+        data.ok !== true ||
+        !Array.isArray((data as VerifyResult).checklist)
+      ) {
         const msg = allowlistedMessage(
           data && "code" in data ? data.code : undefined,
           "验证失败，请稍后重试",
@@ -2349,9 +1580,7 @@ export function GithubAutomationConfig() {
       }
 
       const verified = data as VerifyResult;
-      setChecklist(
-        [...verified.checklist].sort((a, b) => a.order - b.order),
-      );
+      setChecklist([...verified.checklist].sort((a, b) => a.order - b.order));
       setVerifySummary(verified.summary);
       if (verified.summary?.app) {
         const generation = ++credentialGenerationRef.current;
@@ -2361,14 +1590,13 @@ export function GithubAutomationConfig() {
         tone: verified.allReady ? "success" : "warning",
         title: verified.allReady
           ? "配置验证通过"
-          : verified.p0Ready
-            ? "Triage 条件基本就绪，仍有待办"
+          : verified.analysisReady
+            ? "分析前提基本就绪，仍有待办"
             : "配置尚未就绪",
         message: verified.allReady
-          ? "固定 readiness 检查已通过；未启动 scheduler，也未创建 job。"
+          ? "固定 readiness 检查已通过；未启动 scheduler，也未创建分析任务。"
           : "请按 checklist 中的下一步完成缺失项后再次验证。验证不会写入 secret 或启动任务。",
       });
-      // Refresh status projection after verify (still no enqueue).
       void fetchStatus({ silent: true, reason: "after-verify" });
     } catch {
       setActionNotice({
@@ -2388,7 +1616,9 @@ export function GithubAutomationConfig() {
     setFormError(null);
     requestAnimationFrame(() => {
       formSectionRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      formSectionRef.current?.querySelector<HTMLElement>("input,select,button")?.focus();
+      formSectionRef.current
+        ?.querySelector<HTMLElement>("input,select,button")
+        ?.focus();
     });
   }, []);
 
@@ -2398,7 +1628,9 @@ export function GithubAutomationConfig() {
     setFormError(null);
     requestAnimationFrame(() => {
       formSectionRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      formSectionRef.current?.querySelector<HTMLElement>("input,select,button")?.focus();
+      formSectionRef.current
+        ?.querySelector<HTMLElement>("input,select,button")
+        ?.focus();
     });
   }, []);
 
@@ -2439,14 +1671,8 @@ export function GithubAutomationConfig() {
       setFormError("installation id 无效");
       return;
     }
-    const baseRef = draft.baseRef.trim() || "main";
     if (!draft.projectId.trim()) {
       setFormError("请选择已注册的 Project Registry 项目");
-      return;
-    }
-    const ownerActorIds = parseOwnerActorIds(draft.ownerActorIds);
-    if (ownerActorIds === null) {
-      setFormError("owner actor ids 需为逗号分隔的正整数（可留空）");
       return;
     }
 
@@ -2460,7 +1686,6 @@ export function GithubAutomationConfig() {
       return;
     }
 
-    // Full-list replacement: keep other repos, upsert this one.
     const nextList = repositoriesForEdit
       .filter((repo) => {
         if (formMode.kind === "edit") {
@@ -2470,7 +1695,6 @@ export function GithubAutomationConfig() {
       })
       .map(repoToWireDraft);
 
-    // Reject duplicate fullName against remaining list.
     if (nextList.some((repo) => repo.fullName.toLowerCase() === fullName.toLowerCase())) {
       setFormError("allowlist 中已存在相同 owner/repo");
       return;
@@ -2485,8 +1709,6 @@ export function GithubAutomationConfig() {
       fullName,
       installationId,
       projectId: draft.projectId.trim(),
-      ownerActorIds,
-      baseRef,
     });
 
     setRepoSaving(true);
@@ -2499,7 +1721,7 @@ export function GithubAutomationConfig() {
         tone: "success",
         title: formMode.kind === "edit" ? "仓库关联已更新" : "仓库已关联",
         message:
-          "服务器已核验 repository id/name，并完成 Project Registry 绑定。浏览器不会收到本地绝对路径。",
+          "服务器已核验 repository id/name，并完成 Project Registry 只读证据绑定。浏览器不会收到本地绝对路径。",
       });
     } else if (!conflict) {
       setFormError(saveError ?? "保存失败，请检查 installation / repository id");
@@ -2526,7 +1748,7 @@ export function GithubAutomationConfig() {
         setActionNotice({
           tone: "warning",
           title: "无法删除该仓库关联",
-          message: `仓库 ${repo.fullName} 仍有运行中/排队/暂停的 job（${blocking.length}）。请先完成或暂停处理后再移除 allowlist。`,
+          message: `仓库 ${repo.fullName} 仍有排队/运行/重试/阻塞的分析任务（${blocking.length}）。请先完成或等待后再移除 allowlist。`,
         });
         return;
       }
@@ -2565,154 +1787,89 @@ export function GithubAutomationConfig() {
     ],
   );
 
-  const onSelectMode = useCallback(
-    async (nextMode: AutomationMode) => {
-      if (!status || stale || saving || loadState === "loading") return;
+  const onToggleEnabled = useCallback(async () => {
+    if (!status || stale || conflict || saving || loadState === "loading") return;
+    const next = !status.runtime.enabled;
 
-      const currentMode: AutomationMode =
-        !status.runtime.enabled || status.runtime.mode === "off"
-          ? "off"
-          : status.runtime.mode;
-      if (nextMode === currentMode) return;
-
-      if (nextMode === "unattended") {
-        const gate = unattendedAvailable(status);
-        if (!gate.ok) {
-          setActionNotice({
-            tone: "warning",
-            title: "无法启用低风险无人值守",
-            message: gate.reason ?? "条件未满足",
-          });
-          return;
-        }
-      }
-
-      if (nextMode === "off") {
-        const ok = await prompt.confirm({
-          title: "确认切换运行模式",
-          message: "将关闭新 job 创建。",
-          confirmLabel: "确认关闭",
-          intent: "danger",
-        });
-        if (!ok) return;
-        await patchConfig({ mode: "off", enabled: false });
-        setActionNotice({
-          tone: "info",
-          title: "自动化已关闭",
-          message: "Webhook 仍会验签并记录 paused/ignored；不会删除 job 或中断已执行 Git 命令。",
-        });
-        return;
-      }
-
-      if (nextMode === "triage") {
-        if (
-          !status.readiness.app.configured ||
-          status.readiness.installation.readiness === "missing" ||
-          status.repositories.length === 0
-        ) {
-          setActionNotice({
-            tone: "warning",
-            title: "无法启用仅 Triage",
-            message: "需要已配置的 GitHub App、安装，以及至少一个已关联的允许仓库。",
-          });
-          return;
-        }
-        const ok = await prompt.confirm({
-          title: "确认切换运行模式",
-          message:
-            "将立即保存「仅 Triage」。owner 采纳只会记录等待自动化，不创建 WorkTree 或 PR。",
-          confirmLabel: "确认",
-        });
-        if (!ok) return;
-        await patchConfig({ mode: "triage", enabled: true });
-        return;
-      }
-
+    if (next) {
       const ok = await prompt.confirm({
-        title: "确认切换运行模式",
+        title: "启用新议题分析？",
         message:
-          "将启用「低风险无人值守」：仅文档 + 小 bugfix 可进入；将启动 full agent，其任意命令、网络、宿主文件访问风险不会被 WorkTree 或 diff gate 消除。",
+          "启用后仅处理人类新建的 issues.opened：分类、只读仓库证据分析、一条规范化评论。自动关闭仅在 bug + 高置信完整反证门禁全部通过时发生；证据不足保持打开。不会改代码、创建分支或 PR。",
         confirmLabel: "确认启用",
-        intent: "danger",
+        intent: "default",
       });
       if (!ok) return;
-      await patchConfig({
-        mode: "unattended",
-        enabled: true,
-        unattended: { enabled: true },
+      await patchConfig({ enabled: true });
+      setActionNotice({
+        tone: "success",
+        title: "已启用新议题分析",
+        message: "只读分析 + 规范化评论；自动关闭门禁保持严格。",
       });
-    },
-    [loadState, patchConfig, prompt, saving, stale, status],
-  );
-
-  const onToggleGlobalPause = useCallback(async () => {
-    if (!status || stale || saving) return;
-    if (status.runtime.mode === "off" || !status.runtime.enabled) return;
-
-    if (!status.runtime.paused) {
-      const ok = await prompt.confirm({
-        title: "暂停新任务？",
-        message:
-          "暂停会保留当前运行模式并阻止新 job 开始。正在执行的 Git 命令不会被强杀，会在下一个安全 checkpoint 停住。",
-        confirmLabel: "确认暂停",
-      });
-      if (!ok) return;
-      await patchConfig({ paused: true });
       return;
     }
 
     const ok = await prompt.confirm({
-      title: "恢复接收新任务？",
-      message:
-        "会恢复按当前模式接收后续已验证 delivery。已暂停的 job 仍需按自身状态和 policy gate 决定是否继续。",
-      confirmLabel: "确认恢复",
+      title: "关闭新议题分析？",
+      message: "将停止创建新的分析任务。已确认的评论/关闭不会回滚。",
+      confirmLabel: "确认关闭",
+      intent: "danger",
     });
     if (!ok) return;
+    await patchConfig({ enabled: false });
+    setActionNotice({
+      tone: "info",
+      title: "新议题分析已关闭",
+      message: "Webhook 仍可验签审计；不会删除历史任务或远端评论。",
+    });
+  }, [conflict, loadState, patchConfig, prompt, saving, stale, status]);
+
+  const onTogglePaused = useCallback(async () => {
+    if (!status || stale || conflict || saving || loadState === "loading") return;
+    const next = !status.runtime.paused;
+    if (next) {
+      await patchConfig({ paused: true });
+      setActionNotice({
+        tone: "info",
+        title: "已全局暂停",
+        message: "暂停不改变启用状态；新 Issue 仅审计，已确认副作用不会重放。",
+      });
+      return;
+    }
     await patchConfig({ paused: false });
-  }, [patchConfig, prompt, saving, stale, status]);
+    setActionNotice({
+      tone: "success",
+      title: "已恢复",
+      message: "将继续未确认阶段的分析任务；不会重跑已确认评论/关闭。",
+    });
+  }, [conflict, loadState, patchConfig, saving, stale, status]);
 
-  const runJobAction = useCallback(
-    async (job: JobSafeProjection, action: "retry" | "pause" | "resume") => {
-      if (stale || saving) return;
-      const gate = jobActionAvailability(job, action);
-      if (!gate.available) {
-        setActionNotice({
-          tone: "warning",
-          title: "操作不可用",
-          message: gate.reasonCode
-            ? `原因：${gate.reasonCode}`
-            : "当前 phase 不允许该操作",
-        });
-        return;
-      }
+  const onConcurrencyChange = useCallback(
+    async (value: number) => {
+      if (!status || stale || conflict || saving) return;
+      if (!Number.isInteger(value) || value < 1 || value > 8) return;
+      if (value === status.runtime.analysisMaxConcurrency) return;
+      await patchConfig({ analysis: { maxConcurrency: value } });
+    },
+    [conflict, patchConfig, saving, stale, status],
+  );
 
-      const target = `#${job.issueNumber} · ${job.traceId}`;
-      let confirmed = false;
-      if (action === "retry") {
-        confirmed = await prompt.confirm({
-          title: "重试此 job？",
-          message: `目标：${target}。会重新唤醒同一 durable job。已确认的 label/comment/worktree/PR 会先 reconciliation，不会保证重新创建。`,
-          confirmLabel: "确认重试",
-        });
-      } else if (action === "pause") {
-        confirmed = await prompt.confirm({
-          title: "暂停此 job？",
-          message: `目标：${target}。暂停请求会在安全 checkpoint 生效；不会强杀执行中的 Git 命令。`,
-          confirmLabel: "确认暂停",
-        });
-      } else {
-        confirmed = await prompt.confirm({
-          title: "恢复此 job？",
-          message: `目标：${target}。确认后重新入队到下一个安全 checkpoint。`,
-          confirmLabel: "确认恢复",
-        });
-      }
-      if (!confirmed) return;
+  const onJobRetry = useCallback(
+    async (job: JobSafeProjection) => {
+      const retry = job.actions.find((a) => a.action === "retry");
+      if (!retry?.available || stale || conflict || busyJobId) return;
+
+      const ok = await prompt.confirm({
+        title: "重试未确认阶段？",
+        message:
+          "只续跑第一个未确认的 checkpoint（分析/评论/关闭）。不会重复已 remote-confirmed 的评论或关闭，也不会重写模型结论（除非结果 sidecar 缺失并 fail closed）。",
+        confirmLabel: "仅重试未确认阶段",
+        intent: "default",
+      });
+      if (!ok) return;
 
       setBusyJobId(job.jobId);
-      setBusyAction(action);
       setActionNotice(null);
-
       try {
         const res = await fetch(
           `/api/github-automation/jobs/${encodeURIComponent(job.jobId)}`,
@@ -2723,7 +1880,7 @@ export function GithubAutomationConfig() {
               Accept: "application/json",
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ action }),
+            body: JSON.stringify({ action: "retry" }),
           },
         );
         const data = (await res.json().catch(() => null)) as {
@@ -2731,14 +1888,13 @@ export function GithubAutomationConfig() {
           code?: string;
           message?: string;
           job?: JobSafeProjection;
-          partial?: boolean;
         } | null;
 
         if (!res.ok || !data?.ok) {
-          const msg = allowlistedMessage(data?.code, "操作失败");
+          const msg = allowlistedMessage(data?.code, "重试未接受");
           setActionNotice({
             tone: "error",
-            title: "操作失败",
+            title: "重试失败",
             message: msg,
           });
           prompt.toast({ message: msg, tone: "error" });
@@ -2746,147 +1902,93 @@ export function GithubAutomationConfig() {
         }
 
         if (data.job) {
-          setStatus((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              jobs: prev.jobs.map((j) => (j.jobId === data.job!.jobId ? data.job! : j)),
-            };
-          });
+          setStatus((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  jobs: prev.jobs.map((j) => (j.jobId === data.job!.jobId ? data.job! : j)),
+                }
+              : prev,
+          );
         }
-
-        if (data.partial) {
-          setActionNotice({
-            tone: "warning",
-            title: "操作已受理，状态待刷新",
-            message: data.message || "请手动刷新以确认最新 phase。",
-          });
-          prompt.toast({ message: "操作已受理，状态待刷新", tone: "info" });
-        } else {
-          setActionNotice({
-            tone: "success",
-            title: "操作成功",
-            message: data.message || "状态已更新",
-          });
-          prompt.toast({ message: "操作成功", tone: "success" });
-        }
-
-        void fetchStatus({ silent: true, reason: "after-action" });
+        setActionNotice({
+          tone: "success",
+          title: "已接受重试",
+          message: "仅续跑未确认阶段；不会重复已确认评论/关闭。",
+        });
+        void fetchStatus({ silent: true, reason: "after-retry" });
       } catch {
         setActionNotice({
           tone: "error",
-          title: "操作失败",
+          title: "重试失败",
           message: "网络错误，请稍后重试",
         });
-        prompt.toast({ message: "网络错误", tone: "error" });
       } finally {
-        if (mountedRef.current) {
-          setBusyJobId(null);
-          setBusyAction(null);
-        }
+        if (mountedRef.current) setBusyJobId(null);
       }
     },
-    [fetchStatus, prompt, saving, stale],
+    [busyJobId, conflict, fetchStatus, prompt, stale],
   );
 
-  const banner = useMemo(
+  const toggleJobExpanded = useCallback((jobId: string) => {
+    setExpandedJobIds((prev) => ({ ...prev, [jobId]: !prev[jobId] }));
+  }, []);
+
+  const mutationsDisabled = stale || conflict || saving || loadState === "loading";
+  const app = credentialStatus ?? status?.readiness.app ?? null;
+  const credentialPill = overallCredentialPill(app, stale);
+  const banner = primaryBanner(loadState, status, stale, conflict);
+  const jobs = status?.jobs ?? [];
+  const repoStatusList = status?.repositories ?? [];
+  const concurrency = status?.runtime.analysisMaxConcurrency ?? config?.analysis.maxConcurrency ?? 2;
+  const enabled = status?.runtime.enabled ?? config?.enabled ?? false;
+  const paused = status?.runtime.paused ?? config?.paused ?? false;
+
+  const availableProjects = useMemo(
     () =>
-      primaryBanner(status, {
-        loadState,
-        stale,
-        conflict,
-        saveError,
-        actionNotice,
-      }),
-    [actionNotice, conflict, loadState, saveError, stale, status],
+      projectChoices.filter(
+        (p) => !p.archived && !p.missing && p.pathStatus === "ok",
+      ),
+    [projectChoices],
   );
-
-  const mode: AutomationMode = status
-    ? !status.runtime.enabled || status.runtime.mode === "off"
-      ? "off"
-      : status.runtime.mode
-    : "off";
-  const paused = status?.runtime.paused ?? false;
-  const unattendedGate = status ? unattendedAvailable(status) : { ok: false, reason: "尚未加载" };
-  const canMutate = Boolean(status) && !stale && !conflict && !saving && !repoSaving && loadState !== "loading";
-  const triageDisabled =
-    !status ||
-    stale ||
-    conflict ||
-    saving ||
-    !status.readiness.app.configured ||
-    status.readiness.installation.readiness === "missing" ||
-    status.repositories.length === 0;
-  const unattendedDisabled = !canMutate || !unattendedGate.ok;
-
-  const assignee = status?.readiness.assignee;
-  const residualSummary =
-    status?.policy.residualRiskSummary ||
-    status?.runtime.residualRiskSummary ||
-    "Full agent 不是沙箱：可任意命令、联网和读取同 OS 用户可见文件；diff gate 只限制发布，无法撤销执行期副作用。";
-
-  const selectableProjects = projectChoices.filter(
-    (p) => !p.archived && !p.missing && p.pathStatus === "ok",
-  );
-  const repoCards = status?.repositories ?? [];
-  const configRepos = repositoriesForEdit;
-
-  const displayChecklist = checklist.length > 0 ? checklist : FALLBACK_CHECKLIST;
-
-  const effectiveCredential = credentialStatus ?? status?.readiness.app ?? null;
-  const localSummary = effectiveCredential?.local ?? null;
-  const localPresent =
-    Boolean(localSummary?.configured) ||
-    Boolean(localSummary?.hasAppId) ||
-    Boolean(localSummary?.hasKey) ||
-    Boolean(localSummary?.hasWebhook) ||
-    localSummary?.readiness === "invalid" ||
-    localSummary?.readiness === "unsupported";
-  const localInvalid =
-    localSummary?.readiness === "invalid" || localSummary?.readiness === "unsupported";
-  const credentialBusy = credentialSaving || credentialDeleting;
-  const overallCredPill = overallCredentialPill(
-    effectiveCredential,
-    localSummary,
-    credentialSaving,
-  );
-  const appIdSource = credentialSourceOf(effectiveCredential, "appId");
-  const keySource = credentialSourceOf(effectiveCredential, "key");
-  const webhookSource = credentialSourceOf(effectiveCredential, "webhook");
-  const appIdConfigured = Boolean(effectiveCredential?.hasAppId);
-  const keyConfigured = effectiveCredential ? hasEffectivePrivateKey(effectiveCredential) : false;
-  const webhookConfigured = Boolean(effectiveCredential?.hasWebhookSecret);
-  const anyEnvOverride =
-    appIdSource === "env" || keySource === "env" || webhookSource === "env";
-  const firstSaveRequired = !localPresent;
 
   return (
     <div className="github-automation-page" aria-labelledby={headingId}>
       <header className="github-automation-page-head">
         <div>
-          <div className="github-automation-eyebrow">Repository automation</div>
-          <h3 id={headingId} className="github-automation-title">
-            GitHub 自动化
-          </h3>
+          <p className="github-automation-eyebrow">设置 / GitHub 自动化</p>
+          <h2 className="github-automation-title" id={headingId}>
+            新议题规范化分析
+          </h2>
           <p className="github-automation-lead">
-            先在本机安全保存你自己的 GitHub App 凭据，再安装 App、关联仓库并验证。关闭电脑或重启 ypi
-            后仍然保留。与 Links 账号连接完全隔离；点右侧「帮助」查看完整配置步骤。
+            只读分析新建 Issue，生成一条规范化 Markdown 评论；不会修改代码、创建分支或提交
+            PR。
           </p>
         </div>
         <div className="github-automation-page-head-actions">
+          {savedFlash ? (
+            <span className="github-automation-instant-badge" role="status">
+              已立即保存
+            </span>
+          ) : null}
           <a
             className="github-automation-button github-automation-button--help"
             href={GITHUB_AUTOMATION_HELP_HREF}
             target="_blank"
-            rel="noopener noreferrer"
-            aria-label="打开 GitHub 自动化配置帮助（新标签页）"
+            rel="noreferrer"
           >
-            <span aria-hidden="true">?</span>
-            帮助
+            <span aria-hidden="true">↗</span>
+            安装指南
           </a>
-          <span className="github-automation-instant-badge" aria-label="即时保存">
-            {savedFlash ? "已保存" : "即时保存 · 独立于全局设置"}
-          </span>
+          <button
+            type="button"
+            className="github-automation-button"
+            onClick={() => void fetchStatus({ reason: "manual" })}
+            disabled={refreshing}
+            aria-busy={refreshing}
+          >
+            {refreshing ? "刷新中…" : "刷新状态"}
+          </button>
         </div>
       </header>
 
@@ -2896,308 +1998,364 @@ export function GithubAutomationConfig() {
           role={banner.tone === "error" ? "alert" : "status"}
         >
           <span className="github-automation-notice__mark" aria-hidden="true">
-            {banner.tone === "info" || banner.tone === "success" ? "i" : "!"}
+            !
           </span>
-          <span>
+          <div>
             <strong>{banner.title}</strong>
-            <br />
-            {banner.message}
-          </span>
+            <div>{banner.message}</div>
+          </div>
         </div>
       ) : null}
 
-      {credentialNotice ? (
+      {actionNotice ? (
         <div
-          className={`github-automation-notice github-automation-notice--${credentialNotice.tone}`}
-          role={credentialNotice.tone === "error" ? "alert" : "status"}
-          id={credentialLiveRegionId}
+          className={`github-automation-notice github-automation-notice--${actionNotice.tone}`}
+          role={actionNotice.tone === "error" ? "alert" : "status"}
         >
           <span className="github-automation-notice__mark" aria-hidden="true">
-            {credentialNotice.tone === "info" || credentialNotice.tone === "success"
-              ? "i"
-              : "!"}
+            i
           </span>
-          <span>
-            <strong>{credentialNotice.title}</strong>
-            <br />
-            {credentialNotice.message}
-          </span>
+          <div>
+            <strong>{actionNotice.title}</strong>
+            <div>{actionNotice.message}</div>
+          </div>
         </div>
       ) : null}
 
-      {/* ── Local GitHub App credentials (primary, above checklist) ── */}
-      <section
-        className={`github-automation-card${credentialBusy ? " github-automation-card--busy" : ""}`}
-        aria-label="本机 GitHub App 凭据"
-        aria-busy={credentialBusy}
-      >
+      {loadState === "loading" && !status ? (
+        <section className="github-automation-card" aria-busy="true">
+          <div className="github-automation-card-body">
+            <p className="github-automation-empty">正在加载分析设置…</p>
+          </div>
+        </section>
+      ) : null}
+
+      {/* ── Runtime control ── */}
+      <section className="github-automation-card">
         <div className="github-automation-card-head">
           <div>
-            <h4 className="github-automation-card-title">本机 GitHub App 凭据</h4>
+            <h3 className="github-automation-card-title">运行控制</h3>
             <p className="github-automation-card-sub">
-              只写入运行 ypi 的本机 agent data dir（目录 0700 / 文件 0600）。已保存的 secret 与私钥永不回显。
+              单一启用开关 + 全局暂停；无 triage / unattended 模式分段。
             </p>
           </div>
           <span
-            className={`github-automation-pill github-automation-pill--${overallCredPill.tone}`}
+            className={`github-automation-pill github-automation-pill--${
+              enabled ? (paused ? "warn" : "ok") : "muted"
+            }`}
           >
-            {overallCredPill.label}
+            {enabled ? (paused ? "已启用 · 已暂停" : "已启用") : "未启用"}
           </span>
         </div>
         <div className="github-automation-card-body">
-          <div className="github-automation-cred-status-grid" aria-label="凭据状态">
+          <div className="github-automation-control-row">
+            <div>
+              <label className="github-automation-control-label" htmlFor={enableSwitchId}>
+                启用新议题分析
+              </label>
+              <div className="github-automation-control-help">
+                仅处理人工创建的 issues.opened 事件
+              </div>
+            </div>
+            <button
+              id={enableSwitchId}
+              type="button"
+              role="switch"
+              aria-checked={enabled}
+              className={`github-automation-switch${enabled ? " is-on" : ""}`}
+              disabled={mutationsDisabled}
+              onClick={() => void onToggleEnabled()}
+            >
+              <span className="github-automation-switch-knob" aria-hidden="true" />
+              <span className="sr-only">{enabled ? "已启用" : "已关闭"}</span>
+            </button>
+          </div>
+
+          <div className="github-automation-control-row">
+            <div>
+              <label className="github-automation-control-label" htmlFor={pauseSwitchId}>
+                全局暂停
+              </label>
+              <div className="github-automation-control-help">
+                暂停不改变启用状态，恢复后继续未完成阶段
+              </div>
+            </div>
+            <div className="github-automation-control-actions">
+              <span
+                className={`github-automation-pill github-automation-pill--${
+                  paused ? "warn" : "info"
+                }`}
+              >
+                {paused ? "已暂停" : "未暂停"}
+              </span>
+              <button
+                id={pauseSwitchId}
+                type="button"
+                className="github-automation-button"
+                disabled={mutationsDisabled || !enabled}
+                onClick={() => void onTogglePaused()}
+              >
+                {paused ? "恢复" : "暂停"}
+              </button>
+            </div>
+          </div>
+
+          <div className="github-automation-control-row">
+            <div>
+              <label className="github-automation-control-label" htmlFor={concurrencyId}>
+                分析并发
+              </label>
+              <div className="github-automation-control-help">
+                同时进行的 issue_analysis 任务数（1–8）
+              </div>
+            </div>
+            <select
+              id={concurrencyId}
+              className="github-automation-select"
+              value={concurrency}
+              disabled={mutationsDisabled}
+              onChange={(e) => void onConcurrencyChange(Number(e.target.value))}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="github-automation-warn-banner" role="note">
+            自动关闭仅适用于 bug 且有高置信度、完整且相互独立的反证；证据不足时保持开放。结论仅基于当前绑定的本地仓库静态快照，不能证明与远端默认分支完全同步。
+          </div>
+
+          {status ? (
+            <div className="github-automation-count-row" aria-label="任务计数">
+              <span className="github-automation-count">
+                排队 <b>{status.runtime.counts.queued}</b>
+              </span>
+              <span className="github-automation-count">
+                运行 <b>{status.runtime.counts.running}</b>
+              </span>
+              <span className="github-automation-count github-automation-count--retry">
+                重试 <b>{status.runtime.counts.retry}</b>
+              </span>
+              <span className="github-automation-count github-automation-count--blocked">
+                阻塞 <b>{status.runtime.counts.blocked}</b>
+              </span>
+              <span className="github-automation-count">
+                完成 <b>{status.runtime.counts.completed}</b>
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      {/* ── Local credentials ── */}
+      <section className="github-automation-card">
+        <div className="github-automation-card-head">
+          <div>
+            <h3 className="github-automation-card-title">本机 GitHub App 凭据</h3>
+            <p className="github-automation-card-sub">
+              保存到本机 agent data dir；页面永不回显 App ID 值、secret、PEM、路径或指纹。
+            </p>
+          </div>
+          <span
+            className={`github-automation-pill github-automation-pill--${credentialPill.tone}`}
+          >
+            {credentialPill.label}
+          </span>
+        </div>
+        <div className="github-automation-card-body">
+          <div className="github-automation-cred-status-grid">
             <div className="github-automation-cred-status-item">
               <small>App ID</small>
               <div className="github-automation-cred-status-line">
                 <strong>
-                  {fieldConfiguredLabel(appIdConfigured, {
-                    unavailable: localInvalid && appIdSource !== "env" && !appIdConfigured,
-                  })}
+                  {fieldConfiguredLabel(
+                    Boolean(app?.hasAppId),
+                    credentialSourceOf(app, "appId"),
+                  )}
                 </strong>
                 <span
-                  className={`github-automation-pill github-automation-pill--${sourcePillTone(appIdSource)}`}
+                  className={`github-automation-pill github-automation-pill--${sourcePillTone(
+                    credentialSourceOf(app, "appId"),
+                  )}`}
                 >
-                  {sourceLabel(appIdSource)}
+                  {sourceLabel(credentialSourceOf(app, "appId"))}
                 </span>
-              </div>
-              <div className="github-automation-cred-source">
-                来源：<b>{sourceDetailText(appIdSource, localInvalid)}</b>
               </div>
             </div>
             <div className="github-automation-cred-status-item">
-              <small>Private key</small>
+              <small>私钥</small>
               <div className="github-automation-cred-status-line">
                 <strong>
-                  {fieldConfiguredLabel(keyConfigured, {
-                    unavailable:
-                      !keyConfigured &&
-                      (effectiveCredential?.readiness === "private_key_invalid" ||
-                        effectiveCredential?.readiness === "private_key_unreadable" ||
-                        (localInvalid && keySource !== "env")),
-                  })}
+                  {fieldConfiguredLabel(
+                    Boolean(app && hasEffectivePrivateKey(app)),
+                    credentialSourceOf(app, "key"),
+                  )}
                 </strong>
                 <span
-                  className={`github-automation-pill github-automation-pill--${sourcePillTone(keySource)}`}
+                  className={`github-automation-pill github-automation-pill--${sourcePillTone(
+                    credentialSourceOf(app, "key"),
+                  )}`}
                 >
-                  {sourceLabel(keySource)}
+                  {sourceLabel(credentialSourceOf(app, "key"))}
                 </span>
-              </div>
-              <div className="github-automation-cred-source">
-                来源：<b>{sourceDetailText(keySource, localInvalid)}</b>
               </div>
             </div>
             <div className="github-automation-cred-status-item">
               <small>Webhook secret</small>
               <div className="github-automation-cred-status-line">
-                <strong>{fieldConfiguredLabel(webhookConfigured)}</strong>
+                <strong>
+                  {fieldConfiguredLabel(
+                    Boolean(app?.hasWebhookSecret),
+                    credentialSourceOf(app, "webhook"),
+                  )}
+                </strong>
                 <span
-                  className={`github-automation-pill github-automation-pill--${sourcePillTone(webhookSource)}`}
+                  className={`github-automation-pill github-automation-pill--${sourcePillTone(
+                    credentialSourceOf(app, "webhook"),
+                  )}`}
                 >
-                  {sourceLabel(webhookSource)}
+                  {sourceLabel(credentialSourceOf(app, "webhook"))}
                 </span>
               </div>
-              <div className="github-automation-cred-source">
-                来源：<b>{sourceDetailText(webhookSource, localInvalid)}</b>
+            </div>
+            <div className="github-automation-cred-status-item">
+              <small>权限（目标）</small>
+              <div className="github-automation-cred-status-line">
+                <strong>{permissionsText(status)}</strong>
               </div>
             </div>
           </div>
 
-          {anyEnvOverride ? (
-            <div
-              className="github-automation-notice github-automation-notice--info"
-              role="note"
-            >
-              <span className="github-automation-notice__mark" aria-hidden="true">
-                i
-              </span>
-              <span>
-                当前进程优先使用环境变量覆盖的字段。下方保存只更新本机 fallback；移除 env
-                后自动回落。请确保 env 与本机 fallback 属于同一个 GitHub App。
-              </span>
-            </div>
-          ) : null}
-
-          {localInvalid ? (
-            <div
-              className="github-automation-notice github-automation-notice--error"
-              role="alert"
-            >
-              <span className="github-automation-notice__mark" aria-hidden="true">
-                !
-              </span>
-              <span>
-                <strong>本机凭据不可用</strong>
-                <br />
-                metadata、私钥文件或指纹不一致。系统已 fail closed；请移除损坏的本机凭据后重新提交完整三项。不会显示损坏内容。
-              </span>
-            </div>
-          ) : null}
-
-          <form
-            className="github-automation-cred-form"
-            onSubmit={(event) => void onSaveCredentials(event)}
-            aria-describedby={credentialError ? credentialLiveRegionId : undefined}
-          >
+          <form className="github-automation-cred-form" onSubmit={onSaveCredentials}>
             <div className="github-automation-form-grid">
               <label className="github-automation-field" htmlFor={credentialAppIdFieldId}>
                 App ID
                 <input
                   id={credentialAppIdFieldId}
-                  name="appId"
+                  type="text"
                   inputMode="numeric"
                   autoComplete="off"
                   spellCheck={false}
-                  disabled={credentialBusy}
+                  placeholder={app?.hasAppId ? "已配置 · 留空保留" : "例如 123456"}
                   value={appIdDraft}
-                  onChange={(event) => setAppIdDraft(event.target.value)}
-                  placeholder={
-                    appIdConfigured || localPresent
-                      ? "留空则保留已配置 App ID"
-                      : "例如 123456"
-                  }
+                  disabled={credentialSaving || credentialDeleting}
+                  onChange={(e) => setAppIdDraft(e.target.value)}
                 />
-                <span className="github-automation-field-hint">
-                  在 GitHub App 设置页查看数字 App ID。已配置时不回显原值。
-                </span>
               </label>
-
               <label className="github-automation-field" htmlFor={credentialWebhookFieldId}>
                 Webhook secret
                 <input
                   id={credentialWebhookFieldId}
-                  name="webhookSecret"
                   type="password"
                   autoComplete="new-password"
-                  disabled={credentialBusy}
-                  value={webhookSecretDraft}
-                  onChange={(event) => setWebhookSecretDraft(event.target.value)}
                   placeholder={
-                    webhookConfigured || localPresent
-                      ? "留空则保留已配置 secret"
-                      : "输入你在 GitHub App 中设置的 secret"
+                    app?.hasWebhookSecret ? "已配置 · 留空保留" : "与 GitHub App 一致"
                   }
+                  value={webhookSecretDraft}
+                  disabled={credentialSaving || credentialDeleting}
+                  onChange={(e) => setWebhookSecretDraft(e.target.value)}
                 />
-                <span className="github-automation-field-hint">
-                  保存后清空；不会显示历史值或 masked 片段。
-                </span>
               </label>
-
-              <div className="github-automation-field github-automation-field--full">
-                <span id={`${credentialPemFieldId}-label`}>Private key PEM</span>
-                <div
-                  className="github-automation-cred-seg"
-                  role="group"
-                  aria-labelledby={`${credentialPemFieldId}-label`}
-                >
-                  <button
-                    type="button"
-                    className={
-                      privateKeyMode === "paste"
-                        ? "github-automation-cred-seg-btn is-selected"
-                        : "github-automation-cred-seg-btn"
-                    }
-                    aria-pressed={privateKeyMode === "paste"}
-                    disabled={credentialBusy}
-                    onClick={() => setPrivateKeyInputMode("paste")}
-                  >
-                    粘贴 PEM
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      privateKeyMode === "file"
-                        ? "github-automation-cred-seg-btn is-selected"
-                        : "github-automation-cred-seg-btn"
-                    }
-                    aria-pressed={privateKeyMode === "file"}
-                    disabled={credentialBusy}
-                    onClick={() => setPrivateKeyInputMode("file")}
-                  >
-                    选择本机文件
-                  </button>
-                </div>
-              </div>
-
-              {privateKeyMode === "paste" ? (
-                <label
-                  className="github-automation-field github-automation-field--full"
-                  htmlFor={credentialPemFieldId}
-                >
-                  粘贴本次私钥
-                  <textarea
-                    id={credentialPemFieldId}
-                    name="privateKeyPem"
-                    className="github-automation-cred-pem"
-                    spellCheck={false}
-                    autoComplete="off"
-                    disabled={credentialBusy}
-                    value={privateKeyPemDraft}
-                    onChange={(event) => setPrivateKeyPemDraft(event.target.value)}
-                    placeholder={
-                      keyConfigured || localPresent
-                        ? "留空则保留已配置 private key"
-                        : "-----BEGIN RSA PRIVATE KEY-----\n…\n-----END RSA PRIVATE KEY-----"
-                    }
-                    rows={6}
-                  />
-                  <span className="github-automation-field-hint">
-                    仅本次输入；保存成功、离开页面或切换方式后清空。不会下载或回显已保存 PEM。
-                  </span>
-                </label>
-              ) : (
-                <label
-                  className="github-automation-field github-automation-field--full"
-                  htmlFor={credentialFileFieldId}
-                >
-                  选择 GitHub App .pem 文件
-                  <div className="github-automation-cred-filebox">
-                    <input
-                      id={credentialFileFieldId}
-                      ref={privateKeyFileInputRef}
-                      name="privateKeyFile"
-                      type="file"
-                      accept=".pem,text/plain,application/x-pem-file"
-                      disabled={credentialBusy}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0] ?? null;
-                        setPrivateKeyFile(file);
-                        setPrivateKeyPemDraft("");
-                      }}
-                    />
-                    <p>
-                      {privateKeyFile
-                        ? "已选择文件（仅本次提交；文件名与原路径不会保存）。"
-                        : "文件内容直接提交给本机 ypi 服务端；文件名和原路径不会保存。"}
-                    </p>
-                  </div>
-                  <span className="github-automation-field-hint">
-                    不接受服务端绝对路径。已保存私钥不可下载或恢复到输入框。
-                  </span>
-                </label>
-              )}
             </div>
 
+            <div className="github-automation-cred-seg" role="group" aria-label="私钥输入方式">
+              <button
+                type="button"
+                className={`github-automation-cred-seg-btn${
+                  privateKeyMode === "paste" ? " is-selected" : ""
+                }`}
+                disabled={credentialSaving || credentialDeleting}
+                onClick={() => setPrivateKeyInputMode("paste")}
+              >
+                粘贴 PEM
+              </button>
+              <button
+                type="button"
+                className={`github-automation-cred-seg-btn${
+                  privateKeyMode === "file" ? " is-selected" : ""
+                }`}
+                disabled={credentialSaving || credentialDeleting}
+                onClick={() => setPrivateKeyInputMode("file")}
+              >
+                选择 .pem 文件
+              </button>
+            </div>
+
+            {privateKeyMode === "paste" ? (
+              <label className="github-automation-field github-automation-field--full" htmlFor={credentialPemFieldId}>
+                私钥 PEM
+                <textarea
+                  id={credentialPemFieldId}
+                  className="github-automation-cred-pem"
+                  rows={5}
+                  spellCheck={false}
+                  autoComplete="off"
+                  placeholder={
+                    app && hasEffectivePrivateKey(app)
+                      ? "已配置 · 留空保留；粘贴完整 RSA PEM 以轮换"
+                      : "-----BEGIN RSA PRIVATE KEY-----"
+                  }
+                  value={privateKeyPemDraft}
+                  disabled={credentialSaving || credentialDeleting}
+                  onChange={(e) => setPrivateKeyPemDraft(e.target.value)}
+                />
+              </label>
+            ) : (
+              <div className="github-automation-cred-filebox">
+                <label htmlFor={credentialFileFieldId}>私钥文件（.pem）</label>
+                <input
+                  id={credentialFileFieldId}
+                  ref={privateKeyFileInputRef}
+                  type="file"
+                  accept=".pem,application/x-pem-file,application/octet-stream,text/plain"
+                  disabled={credentialSaving || credentialDeleting}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setPrivateKeyFile(file);
+                  }}
+                />
+                <p>
+                  {privateKeyFile
+                    ? `已选择：${privateKeyFile.name}（仅本次上传，成功后清空）`
+                    : app && hasEffectivePrivateKey(app)
+                      ? "已配置私钥 · 不选择则保留"
+                      : "未选择文件"}
+                </p>
+              </div>
+            )}
+
             <div className="github-automation-cred-form-actions">
-              <span className="github-automation-field-hint">
-                {firstSaveRequired
-                  ? "首次保存需要三项完整；以后留空表示保留已配置值。"
-                  : "轮换时只填写变更项；空白字段保留已保存本机值，不会从 env 导入。"}
-              </span>
+              <button
+                type="button"
+                className="github-automation-button github-automation-button--danger"
+                disabled={
+                  credentialSaving ||
+                  credentialDeleting ||
+                  !(app?.local?.configured || app?.local?.hasAppId)
+                }
+                onClick={() => void onDeleteLocalCredentials()}
+              >
+                {credentialDeleting ? "移除中…" : "移除本机凭据"}
+              </button>
               <div className="github-automation-cred-form-actions-right">
-                {localPresent ? (
-                  <button
-                    type="button"
-                    className="github-automation-button github-automation-button--danger"
-                    disabled={credentialBusy}
-                    onClick={() => void onDeleteLocalCredentials()}
-                  >
-                    {credentialDeleting ? "移除中…" : "移除本机凭据"}
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  className="github-automation-button"
+                  disabled={credentialSaving || credentialDeleting}
+                  onClick={() => {
+                    clearCredentialTransient();
+                    setCredentialError(null);
+                  }}
+                >
+                  清空输入
+                </button>
                 <button
                   type="submit"
                   className="github-automation-button github-automation-button--primary"
-                  disabled={credentialBusy}
+                  disabled={credentialSaving || credentialDeleting}
                   aria-busy={credentialSaving}
                 >
                   {credentialSaving ? "保存中…" : "保存到本机"}
@@ -3205,117 +2363,123 @@ export function GithubAutomationConfig() {
               </div>
             </div>
 
+            <div id={credentialLiveRegionId} className="sr-only" aria-live="polite">
+              {credentialNotice?.title ?? ""}
+            </div>
             {credentialError ? (
               <p className="github-automation-cred-error" role="alert">
                 {credentialError}
               </p>
             ) : null}
+            {credentialNotice ? (
+              <div
+                className={`github-automation-notice github-automation-notice--${credentialNotice.tone}`}
+                role="status"
+              >
+                <strong>{credentialNotice.title}</strong>
+                <div>{credentialNotice.message}</div>
+              </div>
+            ) : null}
           </form>
+
+          <details
+            className="github-automation-env-details"
+            open={envGuideOpen}
+            onToggle={(e) => setEnvGuideOpen((e.target as HTMLDetailsElement).open)}
+          >
+            <summary>高级：环境变量覆盖（仅显示名称，不显示值）</summary>
+            <ul className="github-automation-env-guide">
+              <li>
+                <code className="github-automation-inline-code">{ENV_APP_ID}</code>
+                <span>App ID · 优先于本机</span>
+              </li>
+              <li>
+                <code className="github-automation-inline-code">{ENV_PRIVATE_KEY_FILE}</code>
+                <span>服务器 PEM 路径（0600）· 页面不输入路径</span>
+              </li>
+              <li>
+                <code className="github-automation-inline-code">{ENV_WEBHOOK_SECRET}</code>
+                <span>Webhook secret · 优先于本机</span>
+              </li>
+              <li>
+                <code className="github-automation-inline-code">{ENV_APP_SLUG}</code>
+                <span>可选 App slug</span>
+              </li>
+            </ul>
+            <p className="github-automation-field-hint">
+              生效优先级：env → 本机 fallback → missing。适合 CI/容器；日常请用上方本机保存。
+            </p>
+          </details>
         </div>
       </section>
 
-      {/* ── Setup checklist (above status / jobs) ── */}
-      <section className="github-automation-card" aria-label="Setup checklist">
+      {/* ── Setup checklist ── */}
+      <section className="github-automation-card">
         <div className="github-automation-card-head">
           <div>
-            <h4 className="github-automation-card-title">Setup checklist</h4>
+            <h3 className="github-automation-card-title">Setup checklist</h3>
             <p className="github-automation-card-sub">
-              缺失项提供操作步骤；「验证配置」只读取安全状态，不会启动 job 或 enqueue 任务。
+              验证不会 enqueue job、唤醒 scheduler 或调用 GitHub mutation。
             </p>
           </div>
-          <button
-            type="button"
-            className="github-automation-button github-automation-button--primary"
-            disabled={verifying || loadState === "loading"}
-            aria-busy={verifying}
-            onClick={() => void onVerify()}
-          >
-            {verifying ? "验证中…" : "验证配置"}
-          </button>
+          <div className="github-automation-card-actions">
+            <button
+              type="button"
+              className="github-automation-button github-automation-button--primary"
+              onClick={() => void onVerify()}
+              disabled={verifying || loadState === "loading"}
+              aria-busy={verifying}
+            >
+              {verifying ? "验证中…" : "验证配置"}
+            </button>
+          </div>
         </div>
         <div className="github-automation-card-body">
           <div className="github-automation-check" role="list">
-            {displayChecklist.map((item) => {
-              const pill = checklistStateLabel(item.state);
+            {checklist.map((item, index) => {
+              const meta = checklistStateMeta(item.state);
               return (
-                <div className="github-automation-check-row" role="listitem" key={item.code}>
+                <div
+                  key={item.code}
+                  className="github-automation-check-row"
+                  role="listitem"
+                >
                   <span
-                    className={`github-automation-check-index github-automation-check-index--${pill.tone}`}
+                    className={`github-automation-check-index github-automation-check-index--${
+                      meta.tone === "ok"
+                        ? "ok"
+                        : meta.tone === "bad"
+                          ? "bad"
+                          : "warn"
+                    }`}
                     aria-hidden="true"
                   >
-                    {item.order}
+                    {index + 1}
                   </span>
                   <div className="github-automation-check-body">
                     <div className="github-automation-check-title-row">
                       <strong>{item.title}</strong>
-                      <span className={`github-automation-pill github-automation-pill--${pill.tone}`}>
-                        {pill.label}
+                      <span
+                        className={`github-automation-pill github-automation-pill--${meta.tone}`}
+                      >
+                        {meta.label}
                       </span>
                     </div>
                     {item.nextStep ? (
                       <p className="github-automation-check-steps">{item.nextStep}</p>
                     ) : (
-                      <p className="github-automation-check-steps">已通过固定 readiness 检查。</p>
+                      <p className="github-automation-check-steps">就绪</p>
                     )}
                     {item.envNames.length > 0 ? (
                       <div className="github-automation-env-row">
-                        {item.envNames.map((envName) => (
-                          <button
-                            key={envName}
-                            type="button"
-                            className="github-automation-env-chip"
-                            onClick={() => {
-                              void copyEnvName(envName).then((ok) => {
-                                prompt.toast({
-                                  message: ok ? `已复制 ${envName}` : "无法复制，请手动选择 env 名",
-                                  tone: ok ? "success" : "error",
-                                });
-                              });
-                            }}
-                            aria-label={`复制环境变量名 ${envName}`}
-                            title="只复制 env 名，不复制任何 secret 值"
-                          >
-                            {envName}
-                          </button>
+                        {item.envNames.map((name) => (
+                          <code key={name} className="github-automation-env-chip">
+                            {name}
+                          </code>
                         ))}
                       </div>
                     ) : null}
                   </div>
-                  {item.code === "installation" || item.code === "allowlist" || item.code === "project_binding" ? (
-                    <button
-                      type="button"
-                      className="github-automation-button"
-                      onClick={openAddForm}
-                      disabled={!canMutate && loadState !== "ready"}
-                    >
-                      添加仓库
-                    </button>
-                  ) : item.code === "app_id" ||
-                    item.code === "private_key_file" ||
-                    item.code === "webhook_secret" ? (
-                    <button
-                      type="button"
-                      className="github-automation-button"
-                      onClick={() => {
-                        document
-                          .getElementById(credentialAppIdFieldId)
-                          ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-                        document.getElementById(credentialAppIdFieldId)?.focus();
-                      }}
-                    >
-                      配置本机凭据
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="github-automation-button"
-                      disabled={verifying}
-                      aria-busy={verifying}
-                      onClick={() => void onVerify()}
-                    >
-                      验证
-                    </button>
-                  )}
                 </div>
               );
             })}
@@ -3324,421 +2488,219 @@ export function GithubAutomationConfig() {
             <p className="github-automation-verify-meta" role="status">
               最近验证 · {formatSafeTime(verifySummary.app.checkedAt)} · allowlist{" "}
               {verifySummary.allowlist.repositoryCount} · 已绑定项目{" "}
-              {verifySummary.allowlist.boundProjectCount}
-              {" · "}
-              无 side effect
+              {verifySummary.allowlist.boundProjectCount} · 模型{" "}
+              {verifySummary.model.ready ? "可用" : "不可用"}
             </p>
-          ) : null}
+          ) : (
+            <p className="github-automation-verify-meta">
+              模型 readiness：{modelText(status)} · Installation：
+              {status?.readiness.installation.readiness ?? "—"}
+            </p>
+          )}
         </div>
       </section>
 
-      {/* ── Advanced: env override (collapsed by default) ── */}
-      <section className="github-automation-card" aria-label="高级：环境变量覆盖">
+      {/* ── Repositories ── */}
+      <section className="github-automation-card">
         <div className="github-automation-card-head">
           <div>
-            <h4 className="github-automation-card-title">高级：环境变量覆盖</h4>
+            <h3 className="github-automation-card-title">允许仓库与本地证据</h3>
             <p className="github-automation-card-sub">
-              仅用于 CI、容器和专业部署。非空 env 按字段覆盖本机值（env &gt; 本机 &gt; 未配置）；普通本机用户无需设置。
+              绑定 owner/repo、repository id、installation id 与 Project Registry
+              项目。本地项目仅供只读证据分析，不会改代码。
             </p>
           </div>
           <div className="github-automation-card-actions">
-            <span className="github-automation-pill github-automation-pill--info">env &gt; 本机</span>
-            <button
-              type="button"
-              className="github-automation-button"
-              aria-expanded={envGuideOpen}
-              onClick={() => setEnvGuideOpen((v) => !v)}
-            >
-              {envGuideOpen ? "收起" : "展开"}
-            </button>
-          </div>
-        </div>
-        {envGuideOpen ? (
-          <div className="github-automation-card-body">
-            <div className="github-automation-notice github-automation-notice--info" role="note">
-              <span className="github-automation-notice__mark" aria-hidden="true">
-                i
-              </span>
-              <span>
-                环境变量不会写回本机凭据。若只覆盖部分字段，请确保 env 与本机 fallback 属于同一个 GitHub
-                App。页面不显示 env 值。
-              </span>
-            </div>
-            <ul className="github-automation-env-guide">
-              <li>
-                <code>{ENV_APP_ID}</code>
-                <span>覆盖 App ID（数字字符串）。</span>
-                <button
-                  type="button"
-                  className="github-automation-button"
-                  onClick={() => {
-                    void copyEnvName(ENV_APP_ID).then((ok) => {
-                      prompt.toast({
-                        message: ok ? `已复制 ${ENV_APP_ID}` : "无法复制",
-                        tone: ok ? "success" : "error",
-                      });
-                    });
-                  }}
-                >
-                  复制 env 名
-                </button>
-              </li>
-              <li>
-                <code>{ENV_PRIVATE_KEY_FILE}</code>
-                <span>覆盖私钥：值为部署环境中的 0600 PEM 路径（不在页面输入路径）。</span>
-                <button
-                  type="button"
-                  className="github-automation-button"
-                  onClick={() => {
-                    void copyEnvName(ENV_PRIVATE_KEY_FILE).then((ok) => {
-                      prompt.toast({
-                        message: ok ? `已复制 ${ENV_PRIVATE_KEY_FILE}` : "无法复制",
-                        tone: ok ? "success" : "error",
-                      });
-                    });
-                  }}
-                >
-                  复制 env 名
-                </button>
-              </li>
-              <li>
-                <code>{ENV_WEBHOOK_SECRET}</code>
-                <span>
-                  覆盖 Webhook HMAC secret；公网 HTTPS 仍指向{" "}
-                  <code className="github-automation-inline-code">
-                    POST /api/github-automation/webhook
-                  </code>
-                  。
-                </span>
-                <button
-                  type="button"
-                  className="github-automation-button"
-                  onClick={() => {
-                    void copyEnvName(ENV_WEBHOOK_SECRET).then((ok) => {
-                      prompt.toast({
-                        message: ok ? `已复制 ${ENV_WEBHOOK_SECRET}` : "无法复制",
-                        tone: ok ? "success" : "error",
-                      });
-                    });
-                  }}
-                >
-                  复制 env 名
-                </button>
-              </li>
-              <li>
-                <code>{ENV_APP_SLUG}</code>
-                <span>可选展示 slug（非 secret）。</span>
-                <button
-                  type="button"
-                  className="github-automation-button"
-                  onClick={() => {
-                    void copyEnvName(ENV_APP_SLUG).then((ok) => {
-                      prompt.toast({
-                        message: ok ? `已复制 ${ENV_APP_SLUG}` : "无法复制",
-                        tone: ok ? "success" : "error",
-                      });
-                    });
-                  }}
-                >
-                  复制 env 名
-                </button>
-              </li>
-            </ul>
-          </div>
-        ) : null}
-      </section>
-
-      {/* ── 允许仓库 ── */}
-      <section className="github-automation-card" aria-label="允许仓库">
-        <div className="github-automation-card-head">
-          <div>
-            <h4 className="github-automation-card-title">允许仓库</h4>
-            <p className="github-automation-card-sub">
-              allowlist 从空开始。每个仓库由 immutable repository id 标识，并绑定一个已注册的本地项目。
-            </p>
-          </div>
-          <div className="github-automation-card-actions">
-            <span className="github-automation-pill github-automation-pill--info">
-              {configRepos.length} 个
-            </span>
             <button
               type="button"
               className="github-automation-button github-automation-button--primary"
-              disabled={!canMutate && loadState !== "ready"}
               onClick={openAddForm}
+              disabled={mutationsDisabled || formMode.kind !== "closed"}
             >
-              关联仓库
+              添加仓库
             </button>
           </div>
         </div>
         <div className="github-automation-card-body">
-          {loadState === "loading" && !status ? (
-            <>
-              <div className="github-automation-skeleton github-automation-skeleton--card" />
-              <p className="github-automation-loading-copy">正在读取允许仓库…</p>
-            </>
-          ) : configRepos.length === 0 ? (
+          {repositoriesForEdit.length === 0 && formMode.kind === "closed" ? (
             <div className="github-automation-empty github-automation-empty--action">
-              <div className="github-automation-empty-icon" aria-hidden="true">
-                ◌
-              </div>
-              <strong>尚未关联仓库</strong>
-              <p>添加任意 GitHub owner/repo；不会默认填入 yolk-pi-web。</p>
+              <p>尚未关联允许仓库。分析只在 allowlist 内、且 installation id 精确匹配时运行。</p>
               <button
                 type="button"
                 className="github-automation-button github-automation-button--primary"
-                disabled={!canMutate && loadState !== "ready"}
                 onClick={openAddForm}
+                disabled={mutationsDisabled}
               >
-                添加第一个仓库
+                关联第一个仓库
               </button>
             </div>
-          ) : (
-            configRepos.map((repo) => {
-              const live = repoCards.find((r) => r.repositoryId === repo.repositoryId);
-              const projectLabel =
-                live?.projectDisplayName ||
-                projectChoices.find((p) => p.projectId === repo.projectId)?.displayName ||
-                (repo.projectId ? `项目 ${repo.projectId.slice(0, 8)}…` : "未绑定项目");
-              const blockingJobs = (status?.jobs ?? []).filter(
-                (job) =>
-                  job.repositoryId === repo.repositoryId && jobBlocksRepositoryDelete(job),
-              );
-              const deleteBlocked = blockingJobs.length > 0;
-              return (
-                <article key={repo.repositoryId} className="github-automation-repo-card">
-                  <div className="github-automation-repo-card-main">
-                    <div className="github-automation-repo-name" title={repo.fullName}>
-                      {repo.fullName}
-                      {repo.legacySeeded ? (
-                        <span className="github-automation-pill github-automation-pill--warn">
-                          历史默认项
-                        </span>
+          ) : null}
+
+          {repositoriesForEdit.map((repo) => {
+            const live = repoStatusList.find((r) => r.repositoryId === repo.repositoryId);
+            const projectLabel =
+              live?.projectDisplayName ||
+              projectChoices.find((p) => p.projectId === repo.projectId)?.displayName ||
+              (repo.projectId ? repo.projectId : "未绑定");
+            return (
+              <div key={repo.repositoryId} className="github-automation-repo-card">
+                <div className="github-automation-repo-card-main">
+                  <div className="github-automation-repo-name">{repo.fullName}</div>
+                  <div className="github-automation-meta">
+                    <span>
+                      repo id <code>{repo.repositoryId}</code>
+                    </span>
+                    <span>
+                      installation <code>{repo.installationId || "—"}</code>
+                    </span>
+                    {repo.legacySeeded ? (
+                      <span className="github-automation-pill github-automation-pill--warn">
+                        历史 seed
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="github-automation-repo-grid">
+                    <div className="github-automation-repo-cell">
+                      <span>本地证据项目</span>
+                      {projectLabel}
+                      {!repo.projectRootConfigured ? (
+                        <div className="github-automation-field-hint">未完成绑定</div>
                       ) : null}
                     </div>
-                    <div className="github-automation-meta">
-                      <span>
-                        repository id · <code>{repo.repositoryId}</code>
-                      </span>
-                      <span>
-                        installation ·{" "}
-                        <code>{repo.installationId ?? "未绑定"}</code>
-                      </span>
-                      <span>
-                        base · <code>{repo.baseRef}</code>
-                      </span>
-                      <span
-                        className={`github-automation-pill github-automation-pill--${
-                          repo.hasInstallationId || live?.installationBound ? "ok" : "warn"
-                        }`}
-                      >
-                        {repo.hasInstallationId || live?.installationBound
-                          ? "安装已填"
-                          : "缺少 installation"}
-                      </span>
-                    </div>
-                    <div className="github-automation-repo-grid">
-                      <div className="github-automation-repo-cell">
-                        <span>GitHub repository</span>
-                        {repo.fullName}
-                      </div>
-                      <div className="github-automation-repo-cell">
-                        <span>关联本地项目</span>
-                        {projectLabel}
-                        {!repo.projectId ? " · 未绑定" : repo.projectRootConfigured ? "" : " · 待验证"}
-                      </div>
-                      <div className="github-automation-repo-cell">
-                        <span>App installation / base ref</span>
-                        <code>{repo.installationId ?? "—"}</code> · <code>{repo.baseRef}</code>
-                      </div>
-                      <div className="github-automation-repo-cell">
-                        <span>Assignee / 认领</span>
-                        {live?.assignee ? (
-                          <>
-                            <code>{assigneeLoginLabel(live.assignee)}</code>
-                            {" · "}
-                            {identitySourceLabel(live.assignee.identitySource)}
-                          </>
-                        ) : (
-                          "机器 active credential"
-                        )}
-                      </div>
+                    <div className="github-automation-repo-cell">
+                      <span>Installation</span>
+                      {live?.installationBound === false
+                        ? "未绑定 / 不匹配"
+                        : "已配置 installation id"}
                     </div>
                   </div>
-                  <div className="github-automation-repo-card-actions">
-                    <button
-                      type="button"
-                      className="github-automation-button"
-                      disabled={!canMutate}
-                      onClick={() => openEditForm(repo)}
-                    >
-                      编辑
-                    </button>
-                    <button
-                      type="button"
-                      className="github-automation-button github-automation-button--danger"
-                      disabled={!canMutate || deleteBlocked}
-                      title={
-                        deleteBlocked
-                          ? "仍有运行中/排队 job，禁止删除"
-                          : `移除 ${repo.fullName}`
-                      }
-                      onClick={() => void onDeleteRepository(repo)}
-                    >
-                      删除
-                    </button>
-                  </div>
-                </article>
-              );
-            })
-          )}
+                </div>
+                <div className="github-automation-repo-card-actions">
+                  <button
+                    type="button"
+                    className="github-automation-button"
+                    disabled={mutationsDisabled}
+                    onClick={() => openEditForm(repo)}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    type="button"
+                    className="github-automation-button github-automation-button--danger"
+                    disabled={mutationsDisabled}
+                    onClick={() => void onDeleteRepository(repo)}
+                  >
+                    移除
+                  </button>
+                </div>
+              </div>
+            );
+          })}
 
           {formMode.kind !== "closed" ? (
             <form
               ref={formSectionRef}
               className="github-automation-repo-form"
-              aria-labelledby={formHeadingId}
               onSubmit={(e) => {
                 e.preventDefault();
                 void onSaveRepository();
               }}
+              aria-labelledby={formHeadingId}
             >
-              <h5 id={formHeadingId} className="github-automation-form-title">
-                {formMode.kind === "edit" ? "编辑仓库关联" : "关联仓库"}
-              </h5>
-              <p className="github-automation-card-sub">
-                保存时服务器会核验 repository id/name，并在服务器端将项目关联为 canonical root；浏览器不会收到本地绝对路径。
-              </p>
+              <h4 className="github-automation-form-title" id={formHeadingId}>
+                {formMode.kind === "edit" ? "编辑仓库关联" : "添加允许仓库"}
+              </h4>
               <div className="github-automation-form-grid">
                 <label className="github-automation-field" htmlFor={fullNameId}>
-                  GitHub 仓库（owner/repo）
+                  owner/repo
                   <input
                     id={fullNameId}
-                    name="fullName"
+                    value={draft.fullName}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, fullName: e.target.value }))
+                    }
+                    placeholder="acme/docs-site"
                     autoComplete="off"
                     spellCheck={false}
-                    placeholder="acme/docs-site"
-                    value={draft.fullName}
-                    onChange={(e) => setDraft((d) => ({ ...d, fullName: e.target.value }))}
                     disabled={repoSaving}
                     required
                   />
                 </label>
-                <label className="github-automation-field" htmlFor={projectIdFieldId}>
-                  关联本地项目（Project Registry）
-                  <select
-                    id={projectIdFieldId}
-                    name="projectId"
-                    value={draft.projectId}
-                    onChange={(e) => setDraft((d) => ({ ...d, projectId: e.target.value }))}
-                    disabled={repoSaving}
-                    required
-                  >
-                    <option value="">选择已注册项目…</option>
-                    {selectableProjects.map((p) => (
-                      <option key={p.projectId} value={p.projectId}>
-                        {p.displayName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <label className="github-automation-field" htmlFor={repositoryIdFieldId}>
-                  Repository id（immutable）
+                  repository id
                   <input
                     id={repositoryIdFieldId}
-                    name="repositoryId"
+                    value={draft.repositoryId}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, repositoryId: e.target.value }))
+                    }
+                    placeholder="GitHub 数字 id"
                     inputMode="numeric"
                     autoComplete="off"
-                    placeholder="GitHub repository id"
-                    value={draft.repositoryId}
-                    onChange={(e) => setDraft((d) => ({ ...d, repositoryId: e.target.value }))}
                     disabled={repoSaving || formMode.kind === "edit"}
                     required
                   />
                 </label>
                 <label className="github-automation-field" htmlFor={installationIdFieldId}>
-                  Installation ID
+                  installation id
                   <input
                     id={installationIdFieldId}
-                    name="installationId"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    placeholder="GitHub App installation id"
                     value={draft.installationId}
                     onChange={(e) =>
                       setDraft((d) => ({ ...d, installationId: e.target.value }))
                     }
+                    placeholder="App installation 数字 id"
+                    inputMode="numeric"
+                    autoComplete="off"
                     disabled={repoSaving}
                     required
                   />
                 </label>
-                <label className="github-automation-field" htmlFor={baseRefId}>
-                  Base ref
-                  <input
-                    id={baseRefId}
-                    name="baseRef"
-                    autoComplete="off"
-                    spellCheck={false}
-                    value={draft.baseRef}
-                    onChange={(e) => setDraft((d) => ({ ...d, baseRef: e.target.value }))}
-                    disabled={repoSaving}
-                    required
-                  />
-                </label>
-                <label className="github-automation-field" htmlFor={ownerActorIdsId}>
-                  Owner actor ids（组织仓库可选）
-                  <input
-                    id={ownerActorIdsId}
-                    name="ownerActorIds"
-                    autoComplete="off"
-                    placeholder="逗号分隔的 GitHub user id"
-                    value={draft.ownerActorIds}
+                <label className="github-automation-field" htmlFor={projectIdFieldId}>
+                  本地证据项目（Project Registry）
+                  <select
+                    id={projectIdFieldId}
+                    value={draft.projectId}
                     onChange={(e) =>
-                      setDraft((d) => ({ ...d, ownerActorIds: e.target.value }))
+                      setDraft((d) => ({ ...d, projectId: e.target.value }))
                     }
-                    disabled={repoSaving}
-                  />
+                    disabled={repoSaving || availableProjects.length === 0}
+                    required
+                  >
+                    <option value="">选择项目…</option>
+                    {availableProjects.map((p) => (
+                      <option key={p.projectId} value={p.projectId}>
+                        {p.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="github-automation-field-hint">
+                    仅只读证据；服务端解析 canonical root，浏览器不传绝对路径。无 base
+                    ref / owner actor ids。
+                  </span>
                 </label>
               </div>
-              {selectableProjects.length === 0 ? (
-                <div className="github-automation-notice github-automation-notice--warning" role="status">
-                  <span className="github-automation-notice__mark" aria-hidden="true">
-                    !
-                  </span>
-                  <span>
-                    没有可用的 Project Registry 项目。请先在侧边栏「添加项目」注册本地仓库，再回到此页关联。
-                  </span>
-                </div>
-              ) : null}
               {formError ? (
-                <div
-                  id={formErrorId}
-                  className="github-automation-notice github-automation-notice--error"
-                  role="alert"
-                >
-                  <span className="github-automation-notice__mark" aria-hidden="true">
-                    !
-                  </span>
-                  <span>{formError}</span>
-                </div>
+                <p className="github-automation-cred-error" id={formErrorId} role="alert">
+                  {formError}
+                </p>
               ) : null}
               <div className="github-automation-form-footer">
                 <button
                   type="button"
                   className="github-automation-button"
-                  disabled={repoSaving}
                   onClick={closeForm}
+                  disabled={repoSaving}
                 >
                   取消
                 </button>
                 <button
                   type="submit"
                   className="github-automation-button github-automation-button--primary"
-                  disabled={repoSaving || !canMutate || selectableProjects.length === 0}
+                  disabled={repoSaving || mutationsDisabled}
                   aria-busy={repoSaving}
-                  aria-describedby={formError ? formErrorId : undefined}
                 >
-                  {repoSaving ? "保存中…" : "验证并保存关联"}
+                  {repoSaving ? "保存中…" : "保存关联"}
                 </button>
               </div>
             </form>
@@ -3746,787 +2708,177 @@ export function GithubAutomationConfig() {
         </div>
       </section>
 
-      {/* ── 执行边界 / residual risk (always visible, non-dismissible) ── */}
-      <section className="github-automation-card" aria-label="执行边界">
-        <div className="github-automation-card-body">
-          <div
-            id={residualRiskId}
-            className="github-automation-notice github-automation-notice--warning github-automation-residual-risk"
-            role="status"
-            data-residual-risk-required="true"
-          >
-            <span className="github-automation-notice__mark" aria-hidden="true">
-              !
-            </span>
-            <span>
-              <strong>Full agent 不是 sandbox。</strong> {residualSummary} WorkTree
-              与最终 diff gate 仅限制发布；它们不能撤销执行期副作用。此警告不可关闭。
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 运行控制 ── */}
-      <section className="github-automation-card" aria-label="运行控制">
-        <div className="github-automation-mode">
-          <div className="github-automation-mode-top">
-            <div>
-              <h4 className="github-automation-card-title">运行控制</h4>
-              <p className="github-automation-card-sub">
-                运行模式是独立即时保存的非敏感策略；暂停不会修改 mode。checklist / 仓库未就绪时 unattended 保持禁用。
-              </p>
-            </div>
-            <span
-              className={`github-automation-pill github-automation-pill--${
-                paused ? "warn" : mode === "off" ? "info" : "info"
-              }`}
-            >
-              {modeLabel(mode, paused)}
-            </span>
-          </div>
-
-          <div
-            className="github-automation-segmented"
-            role="radiogroup"
-            aria-label="运行模式"
-            aria-describedby={modeReasonId}
-          >
-            <button
-              type="button"
-              role="radio"
-              className={`github-automation-segment${mode === "off" ? " is-selected" : ""}`}
-              aria-checked={mode === "off"}
-              disabled={!canMutate && mode !== "off"}
-              onClick={() => void onSelectMode("off")}
-            >
-              关闭
-            </button>
-            <button
-              type="button"
-              role="radio"
-              className={`github-automation-segment${mode === "triage" ? " is-selected" : ""}`}
-              aria-checked={mode === "triage"}
-              disabled={triageDisabled && mode !== "triage"}
-              onClick={() => void onSelectMode("triage")}
-            >
-              仅 Triage
-            </button>
-            <button
-              type="button"
-              role="radio"
-              className={`github-automation-segment${mode === "unattended" ? " is-selected" : ""}`}
-              aria-checked={mode === "unattended"}
-              disabled={unattendedDisabled && mode !== "unattended"}
-              aria-describedby={!unattendedGate.ok ? modeReasonId : undefined}
-              title={!unattendedGate.ok ? unattendedGate.reason ?? undefined : undefined}
-              onClick={() => void onSelectMode("unattended")}
-            >
-              低风险无人值守
-            </button>
-          </div>
-
-          <div className="github-automation-mode-foot">
-            <div className="github-automation-mode-copy" id={modeReasonId}>
-              {mode === "off"
-                ? "关闭：停止新 job；webhook 仍验签并记录。"
-                : mode === "triage"
-                  ? "仅 Triage：owner 采纳只会进入等待自动化，不创建 WorkTree 或 PR。"
-                  : paused
-                    ? "已暂停：现有执行将在安全 checkpoint 停住。"
-                    : unattendedGate.ok
-                      ? "首批允许文档 + 小 bugfix，使用 full agent；UI/高风险仍转人工。full agent 可任意命令、联网和访问同 OS 用户可见文件。"
-                      : unattendedGate.reason ??
-                        "无人值守条件未满足，不能从本页绕过。"}
-            </div>
-            <button
-              type="button"
-              className={`github-automation-button${paused ? " github-automation-button--primary" : ""}`}
-              disabled={!canMutate || mode === "off"}
-              onClick={() => void onToggleGlobalPause()}
-            >
-              {paused ? "恢复接收新任务" : "暂停新任务"}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Readiness ── */}
-      <section className="github-automation-card" aria-label="App、Assignee 与 webhook readiness">
+      {/* ── Recent analyses ── */}
+      <section className="github-automation-card">
         <div className="github-automation-card-head">
           <div>
-            <h4 className="github-automation-card-title">App、Assignee 与 webhook readiness</h4>
+            <h3 className="github-automation-card-title">最近分析</h3>
             <p className="github-automation-card-sub">
-              只显示 safe login/readiness；App secret 与本机 credential 永不进入浏览器。认领必须同时有
-              label 和 assignee。
+              分类、真实性、评论/关闭状态与安全 reason。不显示 Session / Agent / WorkTree /
+              PR。
             </p>
           </div>
-          <button
-            type="button"
-            className="github-automation-button"
-            disabled={refreshing || loadState === "loading"}
-            aria-busy={refreshing}
-            onClick={() => void fetchStatus({ reason: "manual" })}
-          >
-            {refreshing ? "刷新中…" : "↻ 刷新状态"}
-          </button>
         </div>
-
-        {loadState === "loading" && !status ? (
-          <div className="github-automation-card-body" aria-busy="true">
-            <div className="github-automation-skeleton" />
-            <div className="github-automation-skeleton github-automation-skeleton--short" />
-            <div className="github-automation-skeleton github-automation-skeleton--card" />
-            <p className="github-automation-loading-copy">正在读取 GitHub 自动化状态…</p>
-          </div>
-        ) : status && assignee ? (
-          <div className="github-automation-readiness">
-            {(
-              [
-                ["App 凭据", appCredentialText(status.readiness.app)],
-                ["安装", installationText(status)],
-                ["权限", permissionsText(status)],
-                ["本机 Assignee", assigneeValueText(assignee, stale)],
-                ["Webhook", webhookText(status, stale)],
-                [
-                  "Allowlist",
-                  status.readiness.allowlist.ready
-                    ? `${status.readiness.allowlist.repositoryCount} 个允许仓库`
-                    : "尚未关联仓库",
-                ],
-              ] as const
-            ).map(([label, value]) => {
-              const pill =
-                label === "本机 Assignee"
-                  ? assigneePill(assignee, stale)
-                  : {
-                      tone: readinessPillTone(value),
-                      label: readinessPillLabel(value),
-                    };
-              return (
-                <div className="github-automation-readiness-row" key={label}>
-                  <span className="github-automation-readiness-label">{label}</span>
-                  <span className="github-automation-readiness-value" title={value}>
-                    {value}
-                  </span>
-                  <span className={`github-automation-pill github-automation-pill--${pill.tone}`}>
-                    {pill.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="github-automation-card-body">
-            <div className="github-automation-notice github-automation-notice--error" role="alert">
-              <span className="github-automation-notice__mark" aria-hidden="true">
-                !
-              </span>
-              <span>
-                <strong>无法读取状态</strong>
-                <br />
-                请使用「刷新状态」重试。不会显示任何 secret 或本地路径。
-              </span>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ── Policy ── */}
-      {status ? (
-        <section className="github-automation-card" aria-label="Policy 与执行模型">
-          <div className="github-automation-card-head">
-            <div>
-              <h4 className="github-automation-card-title">Policy 与执行模型</h4>
-              <p className="github-automation-card-sub">
-                {status.policy.unattendedEnabled && status.readiness.permissions.p1Unattended
-                  ? "文档 + 小 bugfix；发布仍需 checker 与 final diff gate。"
-                  : "当前只读：无人值守尚未可用。"}
-              </p>
-            </div>
-            <span
-              className={`github-automation-pill github-automation-pill--${
-                status.policy.unattendedEnabled && status.readiness.permissions.p1Unattended
-                  ? "ok"
-                  : "warn"
-              }`}
-            >
-              {status.policy.unattendedEnabled && status.readiness.permissions.p1Unattended
-                ? "docs + small bugfix"
-                : "默认关闭"}
-            </span>
-          </div>
-          <div className="github-automation-card-body">
-            <div className="github-automation-policy-list">
-              <div className="github-automation-policy-row">
-                <span>Policy</span>
-                <strong>
-                  {status.policy.policyId}-v{status.policy.policyVersion}
-                </strong>
-              </div>
-              <div className="github-automation-policy-row">
-                <span>执行</span>
-                <strong>Full agent</strong>
-              </div>
-              <div className="github-automation-policy-row">
-                <span>并发 / Diff</span>
-                <strong>
-                  {status.policy.maxConcurrency} · {status.policy.maxFiles} 文件 /{" "}
-                  {status.policy.maxChangedLines} 行
-                </strong>
-              </div>
-              <div>
-                <div className="github-automation-chips-label">一律转人工</div>
-                <div className="github-automation-chips">
-                  {ALWAYS_MANUAL_CHIPS.map((chip) => (
-                    <span className="github-automation-chip" key={chip}>
-                      {chip}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ── Jobs (GHA-CLOSE-06 dual-layer observability) ── */}
-      <section className="github-automation-card" aria-label="Jobs 运行实况">
-        <div className="github-automation-card-head">
-          <div>
-            <h4 className="github-automation-card-title">Jobs 运行实况</h4>
-            <p className="github-automation-card-sub">
-              “调度状态”和“Agent 运行状态”独立显示；调度尝试次数不等于 Agent 执行次数。刷新只读取安全摘要，不会唤醒 scheduler 或创建 job。
-            </p>
-          </div>
-          <button
-            type="button"
-            className="github-automation-button"
-            disabled={refreshing || loadState === "loading"}
-            aria-busy={refreshing}
-            onClick={() => void fetchStatus({ reason: "manual" })}
-          >
-            {refreshing ? "刷新中…" : "↻ 刷新状态"}
-          </button>
-        </div>
-        <div className="github-automation-card-body">
-          {loadState === "loading" && !status ? (
-            <div className="github-automation-jobs-loading" role="status" aria-live="polite">
-              <p className="github-automation-loading-copy">
-                正在读取 scheduler 与 Agent 安全 projection…
-              </p>
-              <div className="github-automation-skeleton github-automation-skeleton--card" />
-              <div className="github-automation-skeleton github-automation-skeleton--card" />
-            </div>
-          ) : status ? (
-            <>
-              <div className="github-automation-truth-note">
-                <span className="github-automation-truth-mark" aria-hidden="true">
-                  i
-                </span>
-                <div>
-                  <strong>状态口径：</strong>
-                  “调度中”只代表 durable job 被 scheduler 处理；只有出现“Session 可用”时，才表示 Agent
-                  已开始在获准工作区运行。
-                </div>
-              </div>
-
-              {stale ? (
-                <div className="github-automation-stale-note" role="alert">
-                  <strong>无法刷新状态。</strong> 以下为{" "}
-                  {formatClockTime(status.generatedAt)} 的最后安全快照，已标记“可能过期”；重试 /
-                  暂停 / 恢复暂不可用。
-                </div>
-              ) : null}
-
-              {(() => {
-                const truthCounts = summarizeJobCounts(status.jobs);
-                return (
-                  <div className="github-automation-count-row" aria-label="按真实性拆分的队列计数">
-                    <span className="github-automation-count">
-                      <b>{truthCounts.scheduling}</b>调度中
-                    </span>
-                    <span className="github-automation-count github-automation-count--blocked">
-                      <b>{truthCounts.policyBlocked}</b>策略阻塞
-                    </span>
-                    <span className="github-automation-count github-automation-count--retry">
-                      <b>{truthCounts.waitingRetry}</b>等待重试
-                    </span>
-                    <span className="github-automation-count github-automation-count--agent">
-                      <b>{truthCounts.agentActive}</b>Agent active
-                    </span>
-                    <span className="github-automation-count">
-                      <b>{truthCounts.terminal}</b>终态
-                    </span>
-                  </div>
-                );
-              })()}
-
-              {status.runtimeProvenance ? (
-                <p className="github-automation-runtime-provenance" role="status">
-                  运行版本 {status.runtimeProvenance.packageVersion} · build{" "}
-                  {status.runtimeProvenance.buildId || "—"} · policy{" "}
-                  {status.runtimeProvenance.policyVersion} · 进程启动{" "}
-                  {formatSafeTime(status.runtimeProvenance.processStartedAt)}
-                </p>
-              ) : null}
-
-              {status.jobs.length > 0 ? (
-                <nav className="github-automation-job-filters" aria-label="筛选 jobs">
-                  {(
-                    [
-                      ["all", "全部"],
-                      ["policy", "策略阻塞"],
-                      ["retry", "等待重试"],
-                      ["active", "Agent active"],
-                      ["release", "检查 / 发布"],
-                      ["terminal", "终态"],
-                    ] as const
-                  ).map(([key, label]) => {
-                    const count =
-                      key === "all"
-                        ? status.jobs.length
-                        : status.jobs.filter((j) => jobMatchesFilter(j, key)).length;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        className="github-automation-filter-button"
-                        aria-pressed={jobFilter === key}
-                        onClick={() => setJobFilter(key)}
-                      >
-                        {label}
-                        {key === "all" ? ` ${count}` : count > 0 ? ` ${count}` : ""}
-                      </button>
-                    );
-                  })}
-                </nav>
-              ) : null}
-
-              {status.jobs.length === 0 ? (
-                <div className="github-automation-empty">
-                  <div className="github-automation-empty-icon" aria-hidden="true">
-                    ◌
-                  </div>
-                  <strong>当前没有 job</strong>
-                  <br />
-                  启用后只处理新的已验证 delivery；不会自动回扫历史 Issue。
-                </div>
-              ) : (
-                <div
-                  className={`github-automation-jobs${stale ? " github-automation-jobs--stale" : ""}`}
-                >
-                  {status.jobs.filter((job) => jobMatchesFilter(job, jobFilter)).length === 0 ? (
-                    <div className="github-automation-empty">
-                      <strong>当前筛选下没有 job</strong>
-                      <br />
-                      切换筛选或刷新安全 projection；不会 enqueue。
-                    </div>
-                  ) : null}
-                  {status.jobs
-                    .filter((job) => jobMatchesFilter(job, jobFilter))
-                    .map((job) => {
-                      const retry = jobActionAvailability(job, "retry");
-                      const pause = jobActionAvailability(job, "pause");
-                      const resume = jobActionAvailability(job, "resume");
-                      const busy = busyJobId === job.jobId;
-                      const issueHref = `https://github.com/${job.repositoryFullName}/issues/${job.issueNumber}`;
-                      const prHref =
-                        job.prNumber != null
-                          ? `https://github.com/${job.repositoryFullName}/pull/${job.prNumber}`
-                          : null;
-                      const title =
-                        job.issueTitlePreview?.trim() ||
-                        `${job.repositoryFullName}#${job.issueNumber}`;
-                      const agentUi = agentExecutionLabel(job);
-                      const schedulerUi = schedulerStateLabel(job);
-                      const sessionUi = sessionAvailabilityLabel(jobSessionAvailability(job));
-                      const counts = jobProgressCounts(job);
-                      const layer = job.blockedAtLayer ?? null;
-                      const expanded = Boolean(expandedJobIds[job.jobId]);
-                      const detailId = `github-automation-job-detail-${job.jobId}`;
-                      const rail = jobRailStates(job);
-                      const next = nextStepCopy(job);
-                      const filterKind = jobFilterKind(job);
-                      const cardMod =
-                        filterKind === "policy"
-                          ? " github-automation-job-card--policy"
-                          : filterKind === "retry"
-                            ? " github-automation-job-card--retry"
-                            : "";
-                      const progress = job.lastMeaningfulProgress;
-                      const progressText =
-                        progress?.at || progress?.kind
-                          ? `${progressKindLabel(progress?.kind)}${
-                              progress?.at ? ` · ${formatSafeTime(progress.at)}` : ""
-                            }`
-                          : "尚无";
-                      const sessionFact =
-                        jobSessionAvailability(job) === "none"
-                          ? "不存在 · 尚未启动 Agent"
-                          : jobSessionAvailability(job) === "active"
-                            ? `可用${job.sessionIdShort ? ` · ${job.sessionIdShort}` : ""}`
-                            : jobSessionAvailability(job) === "ended"
-                              ? `审计可用${job.sessionIdShort ? ` · ${job.sessionIdShort}` : ""}`
-                              : sessionUi.primary;
-                      const nextRetryText =
-                        job.nextRetryAt != null
-                          ? `${formatSafeTime(job.nextRetryAt)} · ${retryabilityLabel(job.retryability)}`
-                          : schedulerUi.label.includes("终态")
-                            ? "— · 终态"
-                            : isPolicyBlockedLayer(layer)
-                              ? "无自动重试 · 等待 operator"
-                              : retryabilityLabel(job.retryability);
-
-                      const pills: Array<{ tone: UiTone; label: string }> = [];
-                      if (layer) {
-                        pills.push({
-                          tone: "warn",
-                          label: `阻塞层：${blockedLayerLabel(layer)}`,
-                        });
-                      }
-                      if (counts.noProgressRuns > 0 && jobAgentExecutionState(job) !== "ended") {
-                        pills.push({
-                          tone: "bad",
-                          label: `无有效进展 ×${counts.noProgressRuns}`,
-                        });
-                      }
-                      if (counts.agentRuns > 0) {
-                        pills.push({
-                          tone: "info",
-                          label: `Agent 启动 ${counts.agentRuns}`,
-                        });
-                      }
-                      pills.push({
-                        tone: "muted",
-                        label: `调度尝试 ${counts.schedulerRuns}`,
-                      });
-                      if (job.prNumber != null) {
-                        pills.push({ tone: "ok", label: `PR #${job.prNumber}` });
-                      }
-
-                      const actionButtons = (
-                        <>
-                          {resume.available ? (
-                            <button
-                              type="button"
-                              className="github-automation-button github-automation-button--primary"
-                              disabled={!canMutate || busy}
-                              title={resume.reasonCode ?? undefined}
-                              aria-busy={busy && busyAction === "resume"}
-                              onClick={() => void runJobAction(job, "resume")}
-                            >
-                              {busy && busyAction === "resume" ? "处理中…" : "恢复"}
-                            </button>
-                          ) : null}
-                          {pause.available ? (
-                            <button
-                              type="button"
-                              className="github-automation-button"
-                              disabled={!canMutate || busy}
-                              title={pause.reasonCode ?? undefined}
-                              aria-busy={busy && busyAction === "pause"}
-                              onClick={() => void runJobAction(job, "pause")}
-                            >
-                              {busy && busyAction === "pause" ? "处理中…" : "暂停"}
-                            </button>
-                          ) : null}
-                          {retry.available ? (
-                            <button
-                              type="button"
-                              className="github-automation-button github-automation-button--danger"
-                              disabled={!canMutate || busy}
-                              title={retry.reasonCode ?? undefined}
-                              aria-busy={busy && busyAction === "retry"}
-                              onClick={() => void runJobAction(job, "retry")}
-                            >
-                              {busy && busyAction === "retry" ? "处理中…" : "重试"}
-                            </button>
-                          ) : null}
-                          {prHref && !retry.available && !pause.available && !resume.available ? (
-                            <a
-                              className="github-automation-button"
-                              href={prHref}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              查看 PR #{job.prNumber}
-                            </a>
-                          ) : null}
-                          {!retry.available &&
-                          !pause.available &&
-                          !resume.available &&
-                          !prHref ? (
-                            <span className="github-automation-job-no-action">
-                              {retry.reasonCode
-                                ? `不可用：${retry.reasonCode}`
-                                : "无可用操作"}
-                            </span>
-                          ) : null}
-                        </>
-                      );
-
-                      return (
-                        <article
-                          className={`github-automation-job-card${cardMod}`}
-                          key={job.jobId}
-                          aria-labelledby={`github-automation-job-title-${job.jobId}`}
-                        >
-                          {stale ? (
-                            <span className="github-automation-job-stale-badge">可能过期</span>
-                          ) : null}
-                          <div className="github-automation-job-summary">
-                            <div className="github-automation-job-identity">
-                              <div
-                                className="github-automation-job-title"
-                                id={`github-automation-job-title-${job.jobId}`}
-                              >
-                                <a
-                                  href={issueHref}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  aria-label={`打开 Issue #${job.issueNumber}`}
-                                >
-                                  #{job.issueNumber}
-                                </a>
-                                <span
-                                  className="github-automation-truncate"
-                                  title={title}
-                                >
-                                  {title}
-                                </span>
-                              </div>
-                              <div className="github-automation-job-meta">
-                                {job.repositoryFullName} · trace {shortTraceId(job.traceId)} ·
-                                更新于 {formatClockTime(job.updatedAt)} ·{" "}
-                                {claimStatusLabel(job.claimStatus)}
-                              </div>
-                            </div>
-
-                            <div className="github-automation-status-block">
-                              <span className="github-automation-status-label">
-                                Agent 运行状态
-                              </span>
-                              <div className="github-automation-status-value">
-                                <span
-                                  className={`github-automation-dot github-automation-dot--${agentUi.tone}`}
-                                  aria-hidden="true"
-                                />
-                                <span>{agentUi.label}</span>
-                              </div>
-                              <div className="github-automation-status-help">
-                                <strong>
-                                  {jobSessionAvailability(job) === "none"
-                                    ? "尚未启动 Agent"
-                                    : sessionUi.primary}
-                                </strong>
-                                {" · "}
-                                {agentUi.help}
-                              </div>
-                            </div>
-
-                            <div className="github-automation-status-block">
-                              <span className="github-automation-status-label">调度状态</span>
-                              <div className="github-automation-status-value">
-                                <span
-                                  className={`github-automation-dot github-automation-dot--${schedulerUi.tone}`}
-                                  aria-hidden="true"
-                                />
-                                <span>{schedulerUi.label}</span>
-                              </div>
-                              <div className="github-automation-job-pills">
-                                {pills.map((pill) => (
-                                  <span
-                                    key={`${job.jobId}-${pill.label}`}
-                                    className={`github-automation-pill github-automation-pill--${pill.tone === "muted" ? "info" : pill.tone}`}
-                                  >
-                                    {pill.label}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              className="github-automation-button github-automation-details-toggle"
-                              aria-expanded={expanded}
-                              aria-controls={detailId}
-                              onClick={() =>
-                                setExpandedJobIds((prev) => ({
-                                  ...prev,
-                                  [job.jobId]: !prev[job.jobId],
-                                }))
-                              }
-                            >
-                              {expanded ? "收起详情" : "查看详情"}
-                            </button>
-                          </div>
-
-                          {expanded ? (
-                            <div className="github-automation-job-detail" id={detailId}>
-                              <div
-                                className="github-automation-job-rail"
-                                aria-label="Job 阶段轨道"
-                              >
-                                {JOB_RAIL_STEPS.map((stepLabel, index) => {
-                                  const stepState = rail[index] ?? "pending";
-                                  const symbol =
-                                    stepState === "done"
-                                      ? "✓"
-                                      : stepState === "blocked"
-                                        ? "!"
-                                        : "•";
-                                  return (
-                                    <div
-                                      key={stepLabel}
-                                      className={`github-automation-rail-step github-automation-rail-step--${stepState}`}
-                                    >
-                                      <span
-                                        className="github-automation-rail-dot"
-                                        aria-hidden="true"
-                                      >
-                                        {symbol}
-                                      </span>
-                                      <span>{stepLabel}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-
-                              <dl className="github-automation-job-facts">
-                                <div className="github-automation-job-fact">
-                                  <dt>CHECKPOINT</dt>
-                                  <dd>
-                                    {job.checkpoint ? (
-                                      <code>{job.checkpoint}</code>
-                                    ) : (
-                                      "—"
-                                    )}
-                                  </dd>
-                                </div>
-                                <div className="github-automation-job-fact">
-                                  <dt>BLOCKED AT LAYER</dt>
-                                  <dd
-                                    className={
-                                      layer
-                                        ? "github-automation-job-fact--emphasis"
-                                        : undefined
-                                    }
-                                  >
-                                    {blockedLayerLabel(layer)}
-                                  </dd>
-                                </div>
-                                <div className="github-automation-job-fact">
-                                  <dt>REASON</dt>
-                                  <dd>{job.reasonCode ?? "—"}</dd>
-                                </div>
-                                <div className="github-automation-job-fact">
-                                  <dt>SESSION AVAILABILITY</dt>
-                                  <dd
-                                    className={
-                                      jobSessionAvailability(job) === "none" ||
-                                      jobSessionAvailability(job) === "failed"
-                                        ? "github-automation-job-fact--emphasis"
-                                        : jobSessionAvailability(job) === "active" ||
-                                            jobSessionAvailability(job) === "ended"
-                                          ? "github-automation-job-fact--good"
-                                          : undefined
-                                    }
-                                  >
-                                    {sessionFact}
-                                  </dd>
-                                </div>
-                                <div className="github-automation-job-fact">
-                                  <dt>LAST MEANINGFUL PROGRESS</dt>
-                                  <dd>{progressText}</dd>
-                                </div>
-                                <div className="github-automation-job-fact">
-                                  <dt>NEXT RETRY</dt>
-                                  <dd>{nextRetryText}</dd>
-                                </div>
-                                <div className="github-automation-job-fact">
-                                  <dt>RETRY PROGRESS</dt>
-                                  <dd>
-                                    有效进展 {counts.meaningfulProgress} · 无进展重试{" "}
-                                    {counts.noProgressRuns} · Agent 启动 {counts.agentRuns}
-                                  </dd>
-                                </div>
-                                <div className="github-automation-job-fact">
-                                  <dt>WORKSPACE LABEL</dt>
-                                  <dd>
-                                    {job.workspaceLabel?.trim() ||
-                                      (jobSessionAvailability(job) === "none"
-                                        ? "未分配（无 Session）"
-                                        : "—")}
-                                  </dd>
-                                </div>
-                                {job.evaluatedProvenance ? (
-                                  <div className="github-automation-job-fact">
-                                    <dt>EVALUATED PROVENANCE</dt>
-                                    <dd>
-                                      code {job.evaluatedProvenance.codeRevision} · policy{" "}
-                                      {job.evaluatedProvenance.policyVersion}
-                                    </dd>
-                                  </div>
-                                ) : null}
-                                {status.runtimeProvenance ? (
-                                  <div className="github-automation-job-fact">
-                                    <dt>RUNTIME PROVENANCE</dt>
-                                    <dd>
-                                      {status.runtimeProvenance.packageVersion} /{" "}
-                                      {status.runtimeProvenance.buildId || "—"} /{" "}
-                                      {status.runtimeProvenance.policyVersion}
-                                    </dd>
-                                  </div>
-                                ) : null}
-                              </dl>
-
-                              <div className="github-automation-job-next">
-                                <div className="github-automation-job-next-copy">
-                                  <strong>{next.title}</strong>
-                                  <span>{next.detail}</span>
-                                </div>
-                                <div className="github-automation-job-actions">{actionButtons}</div>
-                              </div>
-
-                              <div className="github-automation-job-diagnostic">
-                                诊断原始态（次级）：status={job.status} · phase={job.phase} ·
-                                attempt={job.attempt}（=调度尝试，不是 Agent 执行次数）· gen=
-                                {job.generation}
-                                {prHref ? (
-                                  <>
-                                    {" · "}
-                                    <a
-                                      href={prHref}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      PR #{job.prNumber}
-                                    </a>
-                                    {" · Fixes #"}
-                                    {job.issueNumber}
-                                  </>
-                                ) : null}
-                                。不可将其直接翻译为“Agent 正在运行 / 第 N 次执行”。
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="github-automation-job-summary-actions">
-                              {actionButtons}
-                            </div>
-                          )}
-                        </article>
-                      );
-                    })}
-                </div>
-              )}
-            </>
+        <div
+          className={`github-automation-card-body${stale ? " github-automation-jobs--stale" : ""}`}
+        >
+          {jobs.length === 0 ? (
+            <p className="github-automation-empty">暂无分析任务。启用后，新 Issue 会显示在这里。</p>
           ) : (
-            <div className="github-automation-empty" role="alert">
-              <strong>无法加载 job 列表</strong>
-              <br />
-              这不是空队列。请重试刷新安全 projection。
+            <div className="github-automation-jobs">
+              {jobs.map((job) => {
+                const pill = outcomePill(job);
+                const expanded = Boolean(expandedJobIds[job.jobId]);
+                const retry = job.actions.find((a) => a.action === "retry");
+                const title =
+                  job.issueTitlePreview?.trim() ||
+                  `${job.repositoryFullName}#${job.issueNumber}`;
+                return (
+                  <article
+                    key={job.jobId}
+                    className={`github-automation-job-card${
+                      job.outcome === "blocked"
+                        ? " github-automation-job-card--policy"
+                        : job.outcome === "retry_due"
+                          ? " github-automation-job-card--retry"
+                          : ""
+                    }`}
+                  >
+                    {stale ? (
+                      <span className="github-automation-job-stale-badge">可能过期</span>
+                    ) : null}
+                    <div className="github-automation-analysis-row">
+                      <div className="github-automation-job-identity">
+                        <div className="github-automation-job-title">
+                          <span className="github-automation-truncate">
+                            #{job.issueNumber} {title}
+                          </span>
+                        </div>
+                        <div className="github-automation-job-meta">
+                          {job.repositoryFullName} · {jobSummaryLine(job)}
+                        </div>
+                      </div>
+                      <span
+                        className={`github-automation-pill github-automation-pill--${pill.tone}`}
+                      >
+                        {pill.label}
+                      </span>
+                      <div className="github-automation-job-summary-actions">
+                        <button
+                          type="button"
+                          className="github-automation-button"
+                          onClick={() => toggleJobExpanded(job.jobId)}
+                          aria-expanded={expanded}
+                        >
+                          {expanded ? "收起" : "详情"}
+                        </button>
+                        <button
+                          type="button"
+                          className="github-automation-button github-automation-button--primary"
+                          disabled={
+                            !retry?.available ||
+                            mutationsDisabled ||
+                            busyJobId === job.jobId ||
+                            job.kind === "legacy_pipeline"
+                          }
+                          title={
+                            retry?.available
+                              ? "仅重试未确认阶段"
+                              : retryReasonLabel(retry?.reasonCode)
+                          }
+                          onClick={() => void onJobRetry(job)}
+                        >
+                          {busyJobId === job.jobId
+                            ? "提交中…"
+                            : "仅重试未确认阶段"}
+                        </button>
+                      </div>
+                    </div>
+                    {expanded ? (
+                      <div className="github-automation-job-detail">
+                        <div className="github-automation-job-facts">
+                          <div>
+                            <span className="github-automation-status-label">分类</span>
+                            <div>{categoryLabel(job.category)}</div>
+                          </div>
+                          <div>
+                            <span className="github-automation-status-label">真实性</span>
+                            <div>
+                              {verdictLabel(job.verdict)}
+                              {job.confidence ? ` · ${job.confidence}` : ""}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="github-automation-status-label">评论</span>
+                            <div>{effectLabel(job.comment, "comment")}</div>
+                          </div>
+                          <div>
+                            <span className="github-automation-status-label">关闭</span>
+                            <div>{effectLabel(job.close, "close")}</div>
+                          </div>
+                          <div>
+                            <span className="github-automation-status-label">阶段</span>
+                            <div>
+                              {job.phase} / {job.status}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="github-automation-status-label">调度尝试</span>
+                            <div>{job.attempt}</div>
+                          </div>
+                          <div>
+                            <span className="github-automation-status-label">reason</span>
+                            <div>{job.reasonCode || "—"}</div>
+                          </div>
+                          <div>
+                            <span className="github-automation-status-label">更新时间</span>
+                            <div>{formatSafeTime(job.updatedAt)}</div>
+                          </div>
+                        </div>
+                        {job.kind === "legacy_pipeline" ? (
+                          <p className="github-automation-field-hint">
+                            旧闭环任务已退役（只读），不可 lease / 重试执行。
+                          </p>
+                        ) : null}
+                        {job.nextRetryAt ? (
+                          <p className="github-automation-field-hint">
+                            下次自动重试：{formatSafeTime(job.nextRetryAt)}
+                          </p>
+                        ) : null}
+                        <p className="github-automation-field-hint">
+                          展开内容不含 Issue body、证据原文、prompt、绝对路径或模型原始输出。
+                        </p>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* ── Safety boundary ── */}
+      <section className="github-automation-card">
+        <div className="github-automation-card-head">
+          <div>
+            <h3 className="github-automation-card-title">安全边界</h3>
+          </div>
+        </div>
+        <div className="github-automation-card-body">
+          <p className="github-automation-boundary-copy">
+            分析只读取绑定项目中的受限文件证据，不执行代码、不访问网络、不读取凭据，不保存
+            Issue 原文或模型原始输出。结果分为{" "}
+            <code>confirmed</code>、<code>not_exists</code>、<code>inconclusive</code>、
+            <code>not_applicable</code>。不会创建 Assignee / WorkTree / Studio Task / Session /
+            PR。
+          </p>
+          {status?.runtimeProvenance ? (
+            <p className="github-automation-runtime-provenance">
+              runtime · code {status.runtimeProvenance.codeRevision} · policy{" "}
+              {status.runtimeProvenance.policyVersion}
+            </p>
+          ) : null}
         </div>
       </section>
     </div>

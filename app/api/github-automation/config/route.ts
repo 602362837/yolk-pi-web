@@ -1,10 +1,10 @@
 /**
  * GET/PATCH /api/github-automation/config
  *
- * Non-secret config projection + revision CAS patch (GHA-09 / IMP-001).
+ * Non-secret analysis config projection + revision CAS patch (GIA-04).
  * - Cache-Control: no-store
- * - Cannot change credential source to user-supplied token
- * - Cannot disable residual-risk warning / rewrite executionProfile
+ * - Wire surface: enabled, paused, analysis.maxConcurrency, repositories, revision
+ * - Rejects legacy mode/unattended/baseRef/owner ids/secrets/paths
  * - repositories: full-list replacement with GitHub identity cross-check,
  *   Project Registry projectId → projectRoot binding, and active-job delete gate
  * - Client cannot set absolute projectRoot / secrets / tokens
@@ -22,7 +22,6 @@ import {
   isGithubAutomationError,
   safeGithubAutomationErrorMessage,
 } from "@/lib/github-automation-errors";
-import { toGithubFullAgentProfileSafeProjection } from "@/lib/github-full-agent-profile";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,22 +30,9 @@ const NO_STORE_HEADERS = {
   "Cache-Control": "no-store",
 } as const;
 
-function residualRiskInvariant() {
-  const profile = toGithubFullAgentProfileSafeProjection();
-  return {
-    residualRiskWarningRequired: true as const,
-    residualRiskCodes: profile.residualRiskCodes,
-    residualRiskSummary: profile.residualRiskSummary,
-    executionProfile: "full-agent" as const,
-    riskProfile: "docs-and-small-bugfix" as const,
-    sandboxed: false as const,
-  };
-}
-
 export async function GET(): Promise<NextResponse> {
   try {
     const { config, projectChoices } = await buildGithubAutomationConfigGetPayload();
-    const residual = residualRiskInvariant();
     assertGithubAutomationProjectionSafe(config);
     assertGithubAutomationProjectionSafe(projectChoices);
     return NextResponse.json(
@@ -54,7 +40,6 @@ export async function GET(): Promise<NextResponse> {
         ok: true,
         config,
         projectChoices,
-        residualRisk: residual,
       },
       { status: 200, headers: NO_STORE_HEADERS },
     );
@@ -102,14 +87,12 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const { projection } = await applyGithubAutomationConfigWirePatch(body, {
       requireProjectId: true,
     });
-    const residual = residualRiskInvariant();
     assertGithubAutomationProjectionSafe(projection);
 
     return NextResponse.json(
       {
         ok: true,
         config: projection,
-        residualRisk: residual,
       },
       { status: 200, headers: NO_STORE_HEADERS },
     );

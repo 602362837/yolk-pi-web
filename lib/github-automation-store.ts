@@ -4,6 +4,7 @@
  * Layout under getAgentDir()/github-automation:
  *   deliveries/YYYY-MM-DD/<deliveryId>.json
  *   jobs/<jobId>.json
+ *   results/<resultId>.json  (v2 analysis result sidecars — no body/prompt/excerpts)
  *   repositories/<repoId>/state.json
  *   repositories/<repoId>/issues/<n>.json
  *   events/YYYY-MM-DD.jsonl
@@ -35,7 +36,20 @@ import { dirname, join } from "node:path";
 import { getGithubAutomationRootDir } from "./github-automation-config";
 import { GithubAutomationError } from "./github-automation-errors";
 import {
+  isLegacyGithubAutomationJobRecord,
+  isSchedulableGithubIssueAnalysisJob,
+  readGithubAutomationJobRetirementSidecar,
+} from "./github-automation-migration";
+import {
+  GITHUB_AUTOMATION_JOB_KIND_ISSUE_ANALYSIS,
+  GITHUB_AUTOMATION_LEGACY_PIPELINE_RETIRED_REASON,
   readGithubAutomationTerminalDisposition,
+  type GithubAutomationJobKind,
+  type GithubIssueAnalysisCategory,
+  type GithubIssueAnalysisConfidence,
+  type GithubIssueAnalysisPhase,
+  type GithubIssueAnalysisStatus,
+  type GithubIssueAnalysisTruthVerdict,
   type GithubAutomationTerminalDisposition,
   type GithubAutomationTerminalDispositionReadResult,
 } from "./github-automation-types";
@@ -54,7 +68,11 @@ const LOCK_MAX_WAIT_MS = 10_000;
 const TITLE_MAX_CHARS = 120;
 const TRACE_ID_BYTES = 8;
 
-export const GITHUB_AUTOMATION_STORE_SCHEMA_VERSION = 1 as const;
+/** Live durable store schema for issue_analysis jobs (GIA-01+). */
+export const GITHUB_AUTOMATION_STORE_SCHEMA_VERSION = 2 as const;
+
+/** Historical closed-loop job/delivery schema (read-only / retirement). */
+export const GITHUB_AUTOMATION_STORE_SCHEMA_VERSION_V1 = 1 as const;
 
 /** Process-local epoch for fencing (recreated when the module reloads). */
 const PROCESS_EPOCH =
@@ -93,7 +111,11 @@ export type GithubAutomationDeliveryIgnoreReason =
   /** Human event observed but does not authorize new generation/job. */
   | "lifecycle_only"
   /** Comment deleted — audit/supersede only. */
-  | "comment_deleted";
+  | "comment_deleted"
+  /** Same repo/issue already has an opened analysis lifecycle. */
+  | "analysis_already_exists"
+  /** Legacy closed-loop delivery/job retired. */
+  | "legacy_pipeline_retired";
 
 /** Safe actor source classification for webhook deliveries (LOOP-01). */
 export type GithubAutomationActorSource =
@@ -112,8 +134,14 @@ export type GithubAutomationWebhookEventName =
   | "ping"
   | "other";
 
+/**
+ * Job phase union.
+ * Live v2 analysis uses GithubIssueAnalysisPhase values.
+ * Closed-loop phase names remain only so legacy records can still be listed/read.
+ */
 export type GithubAutomationJobPhase =
-  | "received"
+  | GithubIssueAnalysisPhase
+  // ── legacy closed-loop phases (read-only; never newly written by v2 paths) ──
   | "claim_readiness"
   | "triaging"
   | "awaiting_owner"
@@ -126,7 +154,6 @@ export type GithubAutomationJobPhase =
   | "final_policy"
   | "publishing"
   | "pr_open"
-  | "completed"
   | "blocked_claim_assignee"
   | "blocked"
   | "cancelled"
@@ -135,16 +162,18 @@ export type GithubAutomationJobPhase =
   | "paused";
 
 export type GithubAutomationJobStatus =
-  | "queued"
-  | "running"
-  | "retry_due"
+  | GithubIssueAnalysisStatus
+  // legacy-only statuses still readable from disk
   | "paused"
-  | "blocked"
-  | "completed"
   | "cancelled"
   | "ignored";
 
 export type GithubAutomationEffectName =
+  // v2 analysis effects
+  | "issue_analysis_comment"
+  | "issue_analysis_label"
+  | "issue_analysis_close"
+  // legacy closed-loop effects (read-only)
   | "claim_assignee"
   | "claim_label"
   | "triage_comment"
@@ -210,12 +239,19 @@ export interface GithubAutomationEffectMarker {
 }
 
 export interface GithubAutomationJobRecord {
-  schemaVersion: typeof GITHUB_AUTOMATION_STORE_SCHEMA_VERSION;
+  schemaVersion:
+    | typeof GITHUB_AUTOMATION_STORE_SCHEMA_VERSION
+    | typeof GITHUB_AUTOMATION_STORE_SCHEMA_VERSION_V1;
   jobId: string;
   repositoryId: number;
   repositoryFullName: string;
   issueNumber: number;
   installationId: number | null;
+  /**
+   * v2: always `issue_analysis`.
+   * Missing / other values on schema v1 are treated as legacy_pipeline.
+   */
+  kind?: GithubAutomationJobKind;
   phase: GithubAutomationJobPhase;
   status: GithubAutomationJobStatus;
   generation: number;
@@ -227,6 +263,22 @@ export interface GithubAutomationJobRecord {
   deliveryId: string | null;
   /** Safe truncated title. */
   issueTitlePreview: string | null;
+  /**
+   * Opaque hash of Issue title+body used as analysis input (never the body).
+   * Present on v2 analysis jobs only.
+   */
+  issueContentHash?: string | null;
+  /** Issue updated_at baseline used for close gates (ISO). */
+  issueUpdatedAt?: string | null;
+  /** Opaque result sidecar id/hash — never raw model output. */
+  resultId?: string | null;
+  resultHash?: string | null;
+  category?: GithubIssueAnalysisCategory | null;
+  verdict?: GithubIssueAnalysisTruthVerdict | null;
+  confidence?: GithubIssueAnalysisConfidence | null;
+  /** complete | truncated | budget_exhausted | incomplete */
+  completeness?: string | null;
+  budgetExceeded?: boolean | null;
   traceId: string;
   createdAt: string;
   updatedAt: string;
@@ -293,12 +345,23 @@ export interface GithubAutomationPendingCommand {
 }
 
 export interface GithubAutomationIssueStateRecord {
-  schemaVersion: typeof GITHUB_AUTOMATION_STORE_SCHEMA_VERSION;
+  schemaVersion:
+    | typeof GITHUB_AUTOMATION_STORE_SCHEMA_VERSION
+    | typeof GITHUB_AUTOMATION_STORE_SCHEMA_VERSION_V1;
   repositoryId: number;
   issueNumber: number;
+  /**
+   * One opened analysis lifecycle key is repositoryId+issueNumber+kind.
+   * generation remains for legacy records; v2 analysis keeps generation=1.
+   */
   generation: number;
   activeJobId: string | null;
+  /**
+   * @deprecated Closed-loop claim status. Absent/null on v2 analysis issue state.
+   */
   claimStatus: "incomplete" | "complete" | "blocked_claim_assignee" | null;
+  /** Active analysis job kind when set (v2). */
+  activeJobKind?: GithubAutomationJobKind | null;
   updatedAt: string;
   lastDeliveryId: string | null;
   effects: GithubAutomationEffectMarker[];
@@ -369,6 +432,17 @@ export function getGithubAutomationJobPath(jobId: string): string {
 
 export function getGithubAutomationJobsDir(): string {
   return join(rootDir(), "jobs");
+}
+
+export function getGithubAutomationResultsDir(): string {
+  return join(rootDir(), "results");
+}
+
+export function getGithubAutomationResultPath(resultId: string): string {
+  return join(
+    getGithubAutomationResultsDir(),
+    `${sanitizePathSegment(resultId)}.json`,
+  );
 }
 
 export function getGithubAutomationIssueStatePath(
@@ -847,9 +921,17 @@ export async function writeGithubAutomationJob(
       { status: 409, details: { reason: "automation_state_inconsistent" } },
     );
   }
+  // Preserve schemaVersion for legacy records; only force v2 on analysis writes.
+  const schemaVersion =
+    job.schemaVersion === GITHUB_AUTOMATION_STORE_SCHEMA_VERSION_V1
+      ? GITHUB_AUTOMATION_STORE_SCHEMA_VERSION_V1
+      : job.kind === GITHUB_AUTOMATION_JOB_KIND_ISSUE_ANALYSIS ||
+          job.schemaVersion === GITHUB_AUTOMATION_STORE_SCHEMA_VERSION
+        ? GITHUB_AUTOMATION_STORE_SCHEMA_VERSION
+        : job.schemaVersion;
   const next: GithubAutomationJobRecord = {
     ...job,
-    schemaVersion: GITHUB_AUTOMATION_STORE_SCHEMA_VERSION,
+    schemaVersion,
     updatedAt: job.updatedAt || new Date().toISOString(),
   };
   await atomicWriteJson(getGithubAutomationJobPath(next.jobId), next);
@@ -862,7 +944,11 @@ export async function readGithubAutomationJob(
   return readJsonFile<GithubAutomationJobRecord>(getGithubAutomationJobPath(jobId));
 }
 
-export async function listGithubAutomationJobs(): Promise<GithubAutomationJobRecord[]> {
+/**
+ * List raw job JSON objects from disk (including malformed-but-readable).
+ * Used by migration/retirement; prefer listGithubAutomationJobs for business code.
+ */
+export async function listGithubAutomationJobsRaw(): Promise<Record<string, unknown>[]> {
   const dir = getGithubAutomationJobsDir();
   let names: string[];
   try {
@@ -871,22 +957,69 @@ export async function listGithubAutomationJobs(): Promise<GithubAutomationJobRec
     if (isNodeError(err) && err.code === "ENOENT") return [];
     throw err;
   }
-  const jobs: GithubAutomationJobRecord[] = [];
+  const jobs: Record<string, unknown>[] = [];
   for (const name of names) {
-    // Job records are `<jobId>.json` only. Full-agent sidecars are
-    // `<jobId>.runner.json` and must never be treated as job records
-    // (missing `effects` would crash status projection).
-    if (!name.endsWith(".json") || name.startsWith(".") || name.endsWith(".runner.json")) {
+    // Job records are `<jobId>.json` only. Sidecars:
+    // `<jobId>.runner.json`, `<jobId>.retirement.json` must never be treated as jobs.
+    if (
+      !name.endsWith(".json") ||
+      name.startsWith(".") ||
+      name.endsWith(".runner.json") ||
+      name.endsWith(".retirement.json")
+    ) {
       continue;
     }
-    const job = await readJsonFile<GithubAutomationJobRecord>(join(dir, name));
-    if (job && typeof job.jobId === "string" && Array.isArray(job.effects)) {
+    const job = await readJsonFile<Record<string, unknown>>(join(dir, name));
+    if (job && typeof job.jobId === "string") {
       jobs.push(job);
     }
   }
   return jobs;
 }
 
+export async function listGithubAutomationJobs(): Promise<GithubAutomationJobRecord[]> {
+  const raw = await listGithubAutomationJobsRaw();
+  const jobs: GithubAutomationJobRecord[] = [];
+  for (const job of raw) {
+    if (Array.isArray(job.effects) && typeof job.jobId === "string") {
+      jobs.push(job as unknown as GithubAutomationJobRecord);
+    }
+  }
+  return jobs;
+}
+
+/**
+ * Hard gate: only schema v2 kind=issue_analysis jobs may be leased by the
+ * analysis scheduler. Legacy/v1/retired jobs always return false.
+ */
+export function isGithubIssueAnalysisJobSchedulable(
+  job: Pick<GithubAutomationJobRecord, "schemaVersion" | "kind" | "jobId" | "status"> | Record<string, unknown>,
+): boolean {
+  if (!isSchedulableGithubIssueAnalysisJob(job)) return false;
+  // Terminal statuses are not schedulable even if kind matches.
+  const status = (job as { status?: unknown }).status;
+  if (
+    status === "completed" ||
+    status === "cancelled" ||
+    status === "ignored" ||
+    status === "blocked"
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** True when a job is legacy closed-loop (must never acquire analysis lease). */
+export function isLegacyGithubAutomationJob(
+  job: Pick<GithubAutomationJobRecord, "schemaVersion" | "kind"> | Record<string, unknown>,
+): boolean {
+  return isLegacyGithubAutomationJobRecord(job);
+}
+
+/**
+ * Create a schema v2 issue_analysis job. One lifecycle per repositoryId+issueNumber.
+ * generation remains 1; reopen no longer creates new generations.
+ */
 export async function createQueuedGithubAutomationJob(input: {
   repositoryId: number;
   repositoryFullName: string;
@@ -896,11 +1029,15 @@ export async function createQueuedGithubAutomationJob(input: {
   issueTitlePreview: string | null;
   generation?: number;
   phase?: GithubAutomationJobPhase;
+  issueContentHash?: string | null;
+  issueUpdatedAt?: string | null;
 }): Promise<GithubAutomationJobRecord> {
   const now = new Date().toISOString();
-  const generation = input.generation ?? 1;
+  // v2 analysis lifecycle does not use reopen generations; keep 1 for id stability.
+  const generation = 1;
   const job: GithubAutomationJobRecord = {
     schemaVersion: GITHUB_AUTOMATION_STORE_SCHEMA_VERSION,
+    kind: GITHUB_AUTOMATION_JOB_KIND_ISSUE_ANALYSIS,
     jobId: createGithubAutomationJobId({
       repositoryId: input.repositoryId,
       issueNumber: input.issueNumber,
@@ -910,12 +1047,21 @@ export async function createQueuedGithubAutomationJob(input: {
     repositoryFullName: input.repositoryFullName,
     issueNumber: input.issueNumber,
     installationId: input.installationId,
-    phase: input.phase ?? "received",
+    phase: (input.phase as GithubIssueAnalysisPhase | undefined) ?? "received",
     status: "queued",
     generation,
     attempt: 0,
     deliveryId: input.deliveryId,
     issueTitlePreview: input.issueTitlePreview,
+    issueContentHash: input.issueContentHash ?? null,
+    issueUpdatedAt: input.issueUpdatedAt ?? null,
+    resultId: null,
+    resultHash: null,
+    category: null,
+    verdict: null,
+    confidence: null,
+    completeness: null,
+    budgetExceeded: null,
     traceId: createGithubAutomationTraceId(),
     createdAt: now,
     updatedAt: now,
@@ -928,6 +1074,44 @@ export async function createQueuedGithubAutomationJob(input: {
   };
   await writeGithubAutomationJob(job);
   return job;
+}
+
+/**
+ * Find any issue_analysis job for one Issue lifecycle (including completed).
+ * Used by opened ingress to enforce one lifecycle per repositoryId+issueNumber.
+ */
+export async function findActiveGithubIssueAnalysisJob(input: {
+  repositoryId: number;
+  issueNumber: number;
+}): Promise<GithubAutomationJobRecord | null> {
+  const jobs = await listGithubAutomationJobs();
+  const matches = jobs
+    .filter(
+      (job) =>
+        job.repositoryId === input.repositoryId &&
+        job.issueNumber === input.issueNumber &&
+        isSchedulableGithubIssueAnalysisJob(job),
+    )
+    .sort((a, b) => {
+      const ac = Date.parse(a.createdAt) || 0;
+      const bc = Date.parse(b.createdAt) || 0;
+      if (ac !== bc) return ac - bc;
+      return a.jobId.localeCompare(b.jobId);
+    });
+  return matches[0] ?? null;
+}
+
+/**
+ * Read retirement sidecar if present (never mutates the original job file).
+ */
+export async function getGithubAutomationJobRetirement(
+  jobId: string,
+): Promise<Awaited<ReturnType<typeof readGithubAutomationJobRetirementSidecar>>> {
+  return readGithubAutomationJobRetirementSidecar(jobId);
+}
+
+export function isGithubAutomationJobRetiredReason(reasonCode: string | null | undefined): boolean {
+  return reasonCode === GITHUB_AUTOMATION_LEGACY_PIPELINE_RETIRED_REASON;
 }
 
 /**
@@ -988,6 +1172,7 @@ export async function upsertGithubAutomationIssueState(input: {
   claimStatus?: GithubAutomationIssueStateRecord["claimStatus"];
   generation?: number;
   effects?: GithubAutomationEffectMarker[];
+  activeJobKind?: GithubAutomationJobKind | null;
 }): Promise<GithubAutomationIssueStateRecord> {
   const existing = await readGithubAutomationIssueState(
     input.repositoryId,
@@ -1006,6 +1191,10 @@ export async function upsertGithubAutomationIssueState(input: {
       input.activeJobId !== undefined
         ? input.activeJobId
         : (existing?.activeJobId ?? null),
+    activeJobKind:
+      input.activeJobKind !== undefined
+        ? input.activeJobKind
+        : (existing?.activeJobKind ?? null),
     claimStatus:
       input.claimStatus !== undefined
         ? input.claimStatus
@@ -1414,9 +1603,89 @@ export async function ensureGithubAutomationStoreLayout(): Promise<void> {
   await ensureDir(rootDir());
   await ensureDir(join(rootDir(), "deliveries"));
   await ensureDir(join(rootDir(), "jobs"));
+  await ensureDir(join(rootDir(), "results"));
   await ensureDir(join(rootDir(), "repositories"));
   await ensureDir(join(rootDir(), "events"));
   await ensureDir(join(rootDir(), ".locks"));
   await ensureDir(join(rootDir(), ".locks", "issues"));
   await ensureDir(join(rootDir(), ".locks", "jobs"));
+}
+
+// ─── Analysis result sidecars (GIA-03) ───────────────────────────────────────
+
+/**
+ * Durable analysis result sidecar. Must never store Issue body, prompt,
+ * transcript, raw model output, absolute paths, or evidence excerpts.
+ */
+export interface GithubIssueAnalysisResultSidecar {
+  schemaVersion: typeof GITHUB_AUTOMATION_STORE_SCHEMA_VERSION;
+  resultId: string;
+  jobId: string;
+  repositoryId: number;
+  issueNumber: number;
+  issueContentHash: string;
+  issueUpdatedAt: string | null;
+  category: GithubIssueAnalysisCategory;
+  verdict: GithubIssueAnalysisTruthVerdict;
+  confidence: GithubIssueAnalysisConfidence;
+  coverage: string;
+  complete: boolean;
+  truncatedInput: boolean;
+  budgetExhausted: boolean;
+  mayClose: boolean;
+  reasonCode: string;
+  reasonSummary: string;
+  directionSummary: string;
+  evidence: Array<{
+    evidenceId: string;
+    relation: string;
+    relativePath: string;
+    lineStart: number | null;
+    lineEnd: number | null;
+    note: string;
+  }>;
+  resultHash: string;
+  createdAt: string;
+}
+
+export function createGithubAutomationResultId(jobId: string): string {
+  const prefix = sanitizePathSegment(jobId).slice(0, 80);
+  return `res_${prefix}_${randomUUID().slice(0, 12)}`;
+}
+
+export async function writeGithubIssueAnalysisResultSidecar(
+  record: GithubIssueAnalysisResultSidecar,
+): Promise<GithubIssueAnalysisResultSidecar> {
+  await atomicWriteJson(getGithubAutomationResultPath(record.resultId), record);
+  return record;
+}
+
+export async function readGithubIssueAnalysisResultSidecar(
+  resultId: string,
+): Promise<GithubIssueAnalysisResultSidecar | null> {
+  if (typeof resultId !== "string" || !resultId.trim()) return null;
+  return readJsonFile<GithubIssueAnalysisResultSidecar>(
+    getGithubAutomationResultPath(resultId),
+  );
+}
+
+/**
+ * Validate a result sidecar has the minimum safe fields and matching hash.
+ * Missing/invalid sidecars fail closed (caller must not re-guess analysis).
+ */
+export function isValidGithubIssueAnalysisResultSidecar(
+  raw: unknown,
+): raw is GithubIssueAnalysisResultSidecar {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
+  const r = raw as Record<string, unknown>;
+  if (r.schemaVersion !== GITHUB_AUTOMATION_STORE_SCHEMA_VERSION) return false;
+  if (typeof r.resultId !== "string" || !r.resultId) return false;
+  if (typeof r.jobId !== "string" || !r.jobId) return false;
+  if (typeof r.issueContentHash !== "string" || !r.issueContentHash) return false;
+  if (typeof r.category !== "string" || !r.category) return false;
+  if (typeof r.verdict !== "string" || !r.verdict) return false;
+  if (typeof r.confidence !== "string" || !r.confidence) return false;
+  if (typeof r.resultHash !== "string" || !r.resultHash) return false;
+  if (!Array.isArray(r.evidence)) return false;
+  return true;
 }

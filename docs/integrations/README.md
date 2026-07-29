@@ -39,7 +39,7 @@ YPI Studio subagents support an in-process SDK runner selected by `studio.subage
 
 SDK excludes builtin shell/filesystem tools and injects only contained file tools plus `worktree_check_exec` and `submit_check_report`. CLI must launch with `--no-builtin-tools --no-extensions --no-skills --no-prompt-templates --no-context-files`, load only `lib/worktree-check-cli-extension.ts` through `-e`, and use the explicit tool allowlist. The extension checks the server policy handshake and writes only a safe controller result for parent reconciliation. `auto` can fall back only to this equivalent restricted CLI profile; failure to load/preflight it is `check_runner_policy_unavailable`, never an unrestricted CLI fallback.
 
-These are application-level controls, not sandboxing: repository wrappers or lifecycle scripts can still have network and same-user side effects. Production unattended use therefore needs OS/container isolation and a low-privilege account. CLI extension source/assets are release artifacts: packaging validation must ensure the server-owned extension resolves in the published application; do not resolve it from the checked WorkTree or task data.
+These are application-level controls, not sandboxing: repository wrappers or lifecycle scripts can still have network and same-user side effects. Production Studio checker deployments that execute repository commands therefore need OS/container isolation and a low-privilege account. CLI extension source/assets are release artifacts: packaging validation must ensure the server-owned extension resolves in the published application; do not resolve it from the checked WorkTree or task data.
 
 ## Web Auth / ModelRuntime Adapter (0.80.10)
 
@@ -385,80 +385,66 @@ All responses: `Cache-Control: no-store` (SSE: `no-cache, no-store`). Never retu
 3. Pending authorizations are memory-only; restart clears them.
 4. Remote GitHub grants must be manually revoked at GitHub Settings → Applications → Authorized OAuth Apps.
 
-## GitHub App automation (P0 triage)
+## GitHub App issue analysis (opened-only)
 
-**Customer/operator setup guide (create your own GitHub App):** [`docs/integrations/github-app-automation-setup.md`](./github-app-automation-setup.md). Each deployment creates and installs its own App; the product does not host a shared cloud App. **Default path:** Settings → GitHub 自动化 → 本机凭据 (paste/select App ID, Webhook secret, RSA PEM once; restart without env still works). Env is advanced override only.
+**Customer/operator setup guide:** [`docs/integrations/github-app-automation-setup.md`](./github-app-automation-setup.md). Each deployment creates and installs its own App; the product does not host a shared cloud App. **Default path:** Settings → GitHub 自动化 → 本机凭据 (paste/select App ID, Webhook secret, RSA PEM once; restart without env still works). Env is advanced override only.
 
-Repository Issue automation is a **separate domain** from Links OAuth connections and from LLM auth.
+Repository Issue analysis is a **separate domain** from Links OAuth connections and from LLM auth. It is also separate from Studio WorkTree Check.
 
 ### Design
 
-- **App Bot identity**: GitHub App installation performs webhook verification, labels, comments, and assignment API calls. Later P1 also owns push/PR publishing. Never falls back to Links tokens, personal PAT, or `gh auth` for those mutations. App/Bot-authored webhook events are **audit-only** (zero job/wake/mutation) so self-edited triage/receipt/status comments cannot re-enter claim/triage.
-- **Machine assignee identity**: the host’s active `gh` login (else fixed `github.com` git credential + canonical `GET /user`) is added as the Issue **Assignee** for human-visible ownership. Credential material is resolver-only and never stored in automation config/jobs/task/session. `@machine-assignee` is **not** an automation command target (avoids hijacking ordinary human @-mentions).
-- **Local App credentials**: server-only store under `github-automation/credentials.v1.json` + generation PEM (`0700`/`0600`, atomic pointer, lock). Runtime resolves each field **env → local → missing**. Safe APIs project booleans/sources only (no values/paths/fingerprints). Successful local save/delete clears installation token cache.
-- **Ingress matrix**: verified safe envelope classifies `self_app` (performed-via App ID), `bot_actor`, `human_actor`, `unknown`. Action matrix allows human `issues.opened` (first generation), `reopened` (lifecycle/new generation), restricted `edited` re-triage, `closed` fail-closed park (`issue_closed`, keep WorkTree), and human exact `issue_comment` commands; `assigned`/`labeled` and self/Bot comments are ignored for business effects. Generation is not a delivery counter.
-- **Canonical comments**: stable v2 markers (`kind`+`repo`+`issue`; receipts also bind `commentId`); semantic body equality ⇒ zero PATCH; unknown outcomes re-list by marker before retry.
-- **Owner command protocol**: human Owner comments targeting `@AppBot` or leading `/ypi` with Phase 1 enums `状态` / `重新评估` / `采纳` / `暂停` / `继续` (legacy bare adoption while awaiting owner). Worker GETs the delivery’s exact comment id/version only; durable command key + receipt/status comments; free text never becomes agent/validation/branch/remote/publisher input and cannot clear global `paused`. Per-job pause/continue ≠ global kill switch.
-- **Successful claim**: `ypi:claimed` **and** Issue read-back assignees contain the machine login (plus local lease + marker comment). Assign HTTP 2xx without read-back is **not** success.
-- **Claim blocked**: missing/invalid/unassignable credentials or read-back failure → `blocked_claim_assignee`; do not keep a false `ypi:claimed`; optional `ypi:claim-blocked` + safe App comment; retry after operator fix.
-- **P0 stop condition**: owner affirmative adoption records `accepted_waiting_automation` only when unattended is off.
-- **P1 unattended (default-off)**: with `mode=unattended` and `unattended.enabled=true`, complete claim + owner actor + affirmative intent may start durable WorkTree + Studio + **full agent** (`executionProfile=full-agent`, `riskProfile=docs-and-small-bugfix`), then server App publisher opens one `Fixes #N` PR (never auto-merge). Full agent is **not sandboxed**: arbitrary commands, network, and same-OS-user filesystem reads remain residual risk; only product-owned App/machine secrets (and non-injection of Issue/comment free text as agent commands) are guaranteed not to be deliberately injected into agent context. Prefer a dedicated low-privilege OS account/container. Pause/retry resume the same job; `unattended.enabled=false` rolls back to P0 adoption parking.
-
-### P1 observability, disposition, and recovery (GHA-CLOSE)
-
-- **Scheduler ≠ Agent.** Settings Jobs is dual-layer: `agentExecutionState` + `schedulerState` + `sessionAvailability` + `blockedAtLayer` from server safe projection. No Session ⇒ 「尚未启动 Agent」; legacy `attempt` is **调度尝试** (lease runs), not Agent runs.
-- **Disposition contract.** Each lease ends as `progressed` / `waiting` / `retry_due` / `blocked` / `terminal`. No-progress must not park as immediately runnable `queued` (prevents #22-class spin).
-- **Command once.** Audit `deliveryId` ≠ pending command work item. After `remote_confirmed` adoption, active jobs continue the unattended runner instead of replaying the same comment side effect.
-- **Session binding.** WorkTree ensure/reuse persists `projectId+spaceId`; parent Session bootstrap requires both and writes the WorkTree space index (not main). Bootstrap failure is a visible blocker.
-- **Env.** Child full-agent runs receive a scrubbed **env copy**; shared Next `process.env` is never deleted for isolation. Server App publisher keeps effective credentials in the parent process.
-- **Lease.** Heartbeat + fencing token; stale reconcile skips process-local `inFlight`; lost lease rejects old-owner writes.
-- **Provenance.** Status projects `runtimeProvenance` (package/build/code/process/policy). After a fix, **fully restart** `ypi` before reconcile/retry; compare runtime vs evaluated stamps.
-- **#22 recovery.** Pause → deploy/restart → idempotent legacy reconcile (consume old command, repair `spaceId`, same generation/WorkTree) → single operator retry. No skip-policy, no g2, no history delete. See `docs/operations/troubleshooting.md` and `docs/architecture/overview.md` P1 section.
-- **UI.** `components/GithubAutomationConfig.tsx` Jobs section only consumes projection/`actions[]` (retry/pause/resume). Stale snapshots stay readable but disable mutation.
+- **Purpose**: on human `issues.opened` only, classify the Issue, run contained read-only local repository evidence analysis, post **one** canonical v3 Markdown comment, and optionally close only high-confidence statically disproven bugs.
+- **App Bot identity**: GitHub App installation verifies webhooks and performs Issues read/write (comment, optional type label, optional close). Never falls back to Links tokens, personal PAT, or `gh auth` for mutations. Self/Bot/unknown webhook actors are **audit-only** (zero job/wake/mutation).
+- **No claim / Assignee / Owner commands**: live product does not set Assignees, does not require host `gh`, does not consume Issue comments as automation commands, and does not create `ypi:claimed` lifecycle labels.
+- **No implementation pipeline**: does not create WorkTree, Studio Task/Session, AgentSession, checker→validation, branch/push, or PR. Historical closed-loop modules are removed.
+- **Local App credentials**: server-only store under `github-automation/credentials.v1.json` + generation PEM (`0700`/`0600`). Runtime resolves each field **env → local → missing**. Safe APIs project booleans/sources only.
+- **Ingress**: body cap → HMAC → safe envelope → actor/action matrix. Only human `issues.opened` under enabled + unpaused + allowlisted `repository.id` + exact installation may enqueue one `kind=issue_analysis` job. All other actions/events are bounded audit.
+- **Analysis**: Project Registry `projectId` → server `projectRoot`; controller-owned list/find/grep/read with path/symlink/secret/binary/budget gates; `ModelRuntime.completeSimple` strict JSON rounds; ledger-validated category/verdict; “grep miss ≠ not_exists”.
+- **Comment / close**: v3 marker `kind=issue_analysis + repositoryId + issueNumber`; semantic no-op PATCH; unknown write read-back; close only for `bug` + `not_exists` + `high` + complete evidence + comment confirmed + content hash stable + fence + enabled/not paused. Pre-close `updated_at` baseline is taken after comment effects. Residual TOCTOU and local-checkout freshness risks are documented honestly.
+- **Config v2**: `enabled`/`paused`/`repositories`/`analysis.maxConcurrency` only; v1 migrates disabled with retirement backup; unknown schema fail closed.
+- **Scheduler**: leases only schema-v2 `issue_analysis`; v1 non-terminal jobs get `legacy_pipeline_retired` sidecars and zero business lease; explicit dispositions prevent spin.
 
 ### Configuration
 
 | Path | Purpose |
 | --- | --- |
-| Settings **本机 GitHub App 凭据** / `GET\|PUT\|DELETE /api/github-automation/credentials` | Default product path: persist App ID + webhook secret + RSA PEM; blank-preserve rotation; delete local only |
-| `github-automation/credentials.v1.json` + `private-key.<generation>.pem` | Server-only local secret store (`0600`); not in git / Links / `pi-web.json` |
-| Advanced env `YPI_GITHUB_APP_ID` / `YPI_GITHUB_APP_PRIVATE_KEY_FILE` / `YPI_GITHUB_APP_WEBHOOK_SECRET` / optional `YPI_GITHUB_APP_SLUG` | Per-field non-empty env overrides local; blank env falls back; never written back to disk |
+| Settings **本机 GitHub App 凭据** / `GET|PUT|DELETE /api/github-automation/credentials` | Persist App ID + webhook secret + RSA PEM; blank-preserve rotation; delete local only |
+| `github-automation/credentials.v1.json` + `private-key.<generation>.pem` | Server-only local secret store (`0600`) |
+| Advanced env `YPI_GITHUB_APP_ID` / `YPI_GITHUB_APP_PRIVATE_KEY_FILE` / `YPI_GITHUB_APP_WEBHOOK_SECRET` / optional `YPI_GITHUB_APP_SLUG` | Per-field non-empty env overrides local |
+| `github-automation/config.json` | Non-secret v2 CAS: default `enabled=false`, `paused=false`, `repositories: []`, `analysis.maxConcurrency=2` |
 
-Non-secret policy lives under `~/.pi/agent/github-automation/config.json` (default `enabled=false`, `mode=off`, unattended disabled, **`repositories: []`**). Operators manage the allowlist in Settings (or CAS PATCH): any `owner/repo` keyed by immutable GitHub `repositoryId`, bound to a Project Registry `projectId` (server resolves `projectRoot`). Historical yolk-pi-web id is recognition-only for legacy seeds — not a product default hard lock. Settings **验证配置** uses `POST /api/github-automation/verify` for a fixed readiness checklist and never starts jobs or accepts secret bodies. Operator must expose **only** `POST /api/github-automation/webhook` on a **public HTTPS** ingress; keep Settings/credentials/config management on loopback/VPN/controlled access. The product does not provide a cloud relay.
+Allowlist is user-managed by immutable GitHub `repositoryId`, bound to Project Registry `projectId` (server resolves root; never project absolute path). Settings **验证配置** (`POST /api/github-automation/verify`) checks App, installation, Issues permissions, allowlist, project readability, analysis model readiness, webhook health — zero jobs/mutations. Public HTTPS must expose **only** `POST /api/github-automation/webhook`.
 
-### Permissions / events (P0)
+### Permissions / events
 
-- Permissions: Metadata read, Issues read/write. Contents/PR permissions are **not** required for P0 readiness.
-- Events: `issues`, `issue_comment` (installation lifecycle recorded for later binding). **Not every action enqueues work** — self/Bot and label/assign mutations are audit-only; only human lifecycle/command paths bind jobs under the generation gate (see architecture overview).
+- Permissions: **Metadata read**, **Issues read/write**. Contents / Pull requests are **not** required.
+- Events: **Issues** (installation lifecycle optional). Issue comment / Pull request events are not required for the live path; if received they are audit-only.
 
 ### Key modules
 
-`lib/github-automation-*` (including `github-automation-handler-runtime.ts` readiness authority, `github-automation-setup-verify.ts`, runtime action matrix, store envelope/effects, comments markers/receipts, `github-automation-projection.ts`, `github-automation-provenance.ts`, scheduler disposition/lease, runner reconcile), `lib/agent-session-bootstrap-errors.ts` (typed bootstrap codes/stages before sanitization), `lib/github-app-*` (including `github-app-credential-store.ts`, `github-app-credentials.ts`), `lib/github-machine-assignee.ts`, `lib/github-webhook-verify.ts`, `lib/github-issue-triage-runner.ts`, `lib/github-owner-intent.ts`, `lib/github-full-agent-profile.ts`, `lib/github-automation-runner.ts`, `lib/github-automation-session.ts`, `lib/github-automation-worktree.ts`, `lib/github-git-publisher.ts`, `lib/github-risk-policy.ts`, `lib/github-diff-policy.ts`, `lib/github-pr-contract.ts`, routes under `app/api/github-automation/` (`webhook`, `credentials`, `status`, `config`, `verify`, `jobs`), UI `components/GithubAutomationConfig.tsx` (existing dual-layer Jobs fields only — no UI redesign for handler/bootstrap observability).
+`lib/github-automation-types.ts`, `lib/github-automation-config.ts`, `lib/github-automation-migration.ts`, `lib/github-automation-store.ts`, `lib/github-automation-scheduler.ts`, `lib/github-automation-runtime.ts`, `lib/github-automation-projection.ts`, `lib/github-automation-provenance.ts`, `lib/github-automation-setup-verify.ts`, `lib/github-automation-comments.ts`, `lib/github-automation-labels.ts`, `lib/github-automation-errors.ts`, `lib/github-issue-analysis-types.ts`, `lib/github-issue-analysis-evidence.ts`, `lib/github-issue-analysis-model.ts`, `lib/github-issue-analysis-runner.ts`, `lib/github-issue-analysis-close.ts`, `lib/github-app-credential-store.ts`, `lib/github-app-credentials.ts`, `lib/github-app-client.ts`, `lib/github-webhook-verify.ts`, routes under `app/api/github-automation/` (`webhook`, `credentials`, `status`, `config`, `verify`, `jobs`), UI `components/GithubAutomationConfig.tsx`.
+
+**Not part of the live GitHub graph (removed):** machine-assignee, owner-intent, full-agent profile, handler-runtime, unattended runner/session/worktree, git publisher, PR lifecycle/contract, risk/diff policy, validation broker, 30142 harness.
+
+**Still separate and retained:** Studio WorkTree Check (`lib/worktree-check-*`), YPI Studio runners, generic `agent-session-bootstrap` / `agent-session-bootstrap-errors`, Project Registry.
 
 ### Tests
 
 ```bash
 npm run test:github-automation
-npm run test:github-unattended
-npm run test:github-unattended-runner
-npm run test:github-publish-policy
-npm run test:github-handler-runtime
-npm run test:github-session-bootstrap
 ```
 
-Uses temporary `PI_CODING_AGENT_DIR`, generated App keys, mocked GitHub HTTP, and mocked credential executables — never real operator credentials or live GitHub network. `test:github-automation` covers self-loop/action matrix/generation, stable markers/no-op PATCH, exact-comment commands/receipts, disposition/no-spin/lease fencing, and safe projection forbidden-key/sentinel cases. `test:github-unattended` covers owner/claim gates, residual-risk non-injection sentinels, high-risk/final-diff blocks, restart/pause, 429/permission/uninstall, legacy/#22 reconcile, and one mocked docs → PR path. `test:github-unattended-runner` covers runner checkpoints, Session `projectId+spaceId` binding, and env-copy isolation. `test:github-handler-runtime` covers cold Settings retry without webhook, concurrent ensure, and load/register/verify faults → `handler_not_ready` without lease/attempt/`runner_no_progress`. `test:github-session-bootstrap` covers typed bootstrap catch → explicit disposition preservation, success Session event/counters, and #22-shaped finite-tick control flow. Sentinel scans prove **non-injection**, not host sandboxing.
-
-**Offline green is not enough** to claim the historical Settings-retry empty-run / no-Session class fixed. That regression still requires a direct-port same-generation Session proof (operator convention **30142**): `npm run verify:github-automation-30142` (default read-only; single mutation only with explicit `--confirm-single-retry`). See `docs/operations/troubleshooting.md` and `docs/architecture/overview.md`.
+Temporary `PI_CODING_AGENT_DIR`, temp repos, fake ModelRuntime, mocked GitHub HTTP — never real operator credentials or live GitHub/provider network. Covers ingress matrix, evidence containment, model downgrade, comment/close idempotency, migration/retirement, privacy scans, and no-spin. **Live test-App UAT** remains a release blocker for real comment/close behavior; mock green does not replace it.
 
 ### Rollback / stop-bleed
 
-1. Set `paused=true` (operator kill switch) and/or `enabled=false` / `mode=off` in automation config (stops new jobs; keeps verified delivery audit). **Issue comments cannot clear `paused`.**
-2. Set `unattended.enabled=false` to keep triage but park owner adoption at `accepted_waiting_automation` (no new WorkTree/PR).
-3. Keep self/Bot audit-only filter + generation gate even if command dispatch is disabled; stop receipt/status updates without deleting history.
-4. Layered product rollback without history rewrite: hide additive Jobs UI detail while keeping dual-layer truth copy; disable automatic `retry_due` into operator-visible block (never re-enable queued spin); stop unattended Agent while retaining reconcile/command-consume/fencing; never restore shared `process.env` deletion as “isolation”.
-5. Do not delete Issue labels/comments/assignees, jobs, worktrees, branches, PRs, or multi-generation audit (e.g. historical storms) automatically.
-6. Never fall back to App-bot-as-assignee or personal-PAT Bot when machine credentials fail.
+1. `paused=true` and/or `enabled=false` (Issue text cannot clear `paused`).
+2. Keep self/Bot audit-only filter even if analysis is off.
+3. Do not bulk-delete historical deliveries/jobs/events or remote historical side effects.
+4. Code rollback must fail closed on schema v2 rather than overwrite as empty config.
+5. Never reintroduce claim/unattended/publisher paths as “compat shims” that still execute.
 
+## Skills and Commands
 ## Skills and Commands
 
 Skill search/install/list routes live under `app/api/skills/`; slash-command discovery lives under `app/api/commands/`. Use `lib/npx.ts` for cross-platform `npx` execution.

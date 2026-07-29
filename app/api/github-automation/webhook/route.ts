@@ -1,11 +1,12 @@
 /**
  * POST /api/github-automation/webhook
  *
- * GitHub App webhook ingestion (GHA-02):
+ * GitHub App webhook ingestion (GIA-03 / GHA-02 base):
  * - Cap raw body bytes
  * - Verify X-Hub-Signature-256 with timingSafeEqual before JSON parse
+ * - Only human issues.opened enqueues a v2 issue_analysis job
  * - Exclusive delivery create + durable enqueue
- * - Respond 202 quickly; never run LLM/Git on the request thread
+ * - Respond 202 quickly; never run LLM/Git/GitHub mutation on the request thread
  *
  * Cache-Control: no-store
  * Never logs raw body, signature, or secrets.

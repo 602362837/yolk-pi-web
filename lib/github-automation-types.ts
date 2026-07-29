@@ -22,20 +22,92 @@
 
 // ─── Schema / modes ──────────────────────────────────────────────────────────
 
-export const GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION = 1 as const;
+/**
+ * Live on-disk / runtime config schema for Issue Analysis (GIA-01+).
+ * Schema v1 remains a legacy parse/migration input only.
+ */
+export const GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION = 2 as const;
+
+/** Historical closed-loop config schema (read-only migration input). */
+export const GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION_V1 = 1 as const;
 
 export type GithubAutomationConfigSchemaVersion =
   typeof GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION;
 
-/** Runtime kill-switch modes. */
+export type GithubAutomationConfigSchemaVersionV1 =
+  typeof GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION_V1;
+
+/**
+ * @deprecated Closed-loop runtime modes. Not present on schema v2.
+ * Kept only for legacy on-disk parse and pre-retirement modules.
+ */
 export type GithubAutomationMode = "off" | "triage" | "unattended";
 
+/** @deprecated Closed-loop execution profile; removed from schema v2. */
 export type GithubAutomationExecutionProfile = "full-agent";
 
+/** @deprecated Closed-loop risk profile; removed from schema v2. */
 export type GithubAutomationRiskProfile = "docs-and-small-bugfix";
 
-/** How the machine assignee login was discovered. */
+/** How the machine assignee login was discovered (legacy closed-loop only). */
 export type GithubMachineAssigneeIdentitySource = "gh" | "git-credential";
+
+/** Durable job kind. v2 scheduler only leases `issue_analysis`. */
+export type GithubAutomationJobKind = "issue_analysis" | "legacy_pipeline";
+
+export const GITHUB_AUTOMATION_JOB_KIND_ISSUE_ANALYSIS =
+  "issue_analysis" as const;
+
+export const GITHUB_AUTOMATION_JOB_KIND_LEGACY_PIPELINE =
+  "legacy_pipeline" as const;
+
+/** Fixed retirement reason for non-terminal v1 closed-loop jobs. */
+export const GITHUB_AUTOMATION_LEGACY_PIPELINE_RETIRED_REASON =
+  "legacy_pipeline_retired" as const;
+
+// ─── Issue Analysis product vocabulary (GIA-01 contracts) ────────────────────
+
+export type GithubIssueAnalysisCategory =
+  | "bug"
+  | "feature"
+  | "docs"
+  | "question"
+  | "other";
+
+export type GithubIssueAnalysisTruthVerdict =
+  | "confirmed"
+  | "not_exists"
+  | "inconclusive"
+  | "not_applicable";
+
+export type GithubIssueAnalysisConfidence = "high" | "medium" | "low";
+
+/** Minimal analysis phase machine (durable job.phase for schema v2). */
+export type GithubIssueAnalysisPhase =
+  | "received"
+  | "analyzing"
+  | "result_ready"
+  | "commenting"
+  | "closing"
+  | "completed";
+
+/** Scheduler-visible job status for schema v2 analysis jobs. */
+export type GithubIssueAnalysisStatus =
+  | "queued"
+  | "running"
+  | "retry_due"
+  | "blocked"
+  | "completed";
+
+/** Safe terminal outcome semantics projected from phase/status + close effect. */
+export type GithubIssueAnalysisOutcome =
+  | "completed_open"
+  | "completed_closed"
+  | "inconclusive"
+  | "blocked"
+  | "retry_due"
+  | "running"
+  | "queued";
 
 // ─── Legacy seeded allowlist (compat only; never re-seed as user config) ────
 
@@ -152,39 +224,56 @@ export interface GithubIssueClaimState {
 
 // ─── Config (disk; may contain server-only paths, never secrets) ─────────────
 
+/**
+ * Live repository allowlist entry (schema v2).
+ * installationId + projectId are required for analysis; projectRoot is server-only.
+ */
 export interface GithubAutomationRepositoryConfig {
   /** Immutable GitHub repository.id — primary key. */
   repositoryId: number;
   /** Display full_name; may lag renames until refresh. */
   fullName: string;
-  /** Installation id when known; null until installation events bind it. */
-  installationId: number | null;
+  /** Installation id — required positive integer on schema v2. */
+  installationId: number;
   /**
    * Project Registry project id (`prj_…`) chosen by the operator.
    * Safe to project on the wire; server resolves it to `projectRoot`.
-   * Null when unbound or only a legacy absolute path is present on disk.
    */
-  projectId: string | null;
+  projectId: string;
   /**
    * Canonical Project Registry root on the server.
    * Server-only: never projected to browser wire APIs.
    * Derived from `projectId` via Project Registry on write/bind paths.
    */
   projectRoot: string;
-  /**
-   * Explicit owner actor ids for org-owned repos.
-   * User-owned repos may leave this empty and compare to repository.owner.id.
-   */
+}
+
+/**
+ * @deprecated Legacy closed-loop repository shape (schema v1 on-disk only).
+ * Never written by live config paths after GIA-01.
+ */
+export interface GithubAutomationRepositoryConfigV1 {
+  repositoryId: number;
+  fullName: string;
+  installationId: number | null;
+  projectId: string | null;
+  projectRoot: string;
   ownerActorIds: number[];
-  /** Always machine-active-credential for this product decision. */
   assigneeIdentitySource: "machine-active-credential";
   baseRef: string;
 }
 
+export interface GithubAutomationAnalysisConfig {
+  /** Concurrent analysis leases (default 2, clamp 1..8). */
+  maxConcurrency: number;
+}
+
+/** @deprecated Schema v1 triage concurrency; migrated into analysis.maxConcurrency. */
 export interface GithubAutomationTriageConfig {
   maxConcurrency: number;
 }
 
+/** @deprecated Schema v1 unattended closed-loop settings. */
 export interface GithubAutomationUnattendedConfig {
   enabled: boolean;
   executionProfile: GithubAutomationExecutionProfile;
@@ -192,37 +281,78 @@ export interface GithubAutomationUnattendedConfig {
   maxConcurrency: number;
   maxFiles: number;
   maxChangedLines: number;
-  /** Operator-owned validation commands; Issue text cannot override these. */
   validationCommands: string[];
 }
 
 /**
- * Non-secret automation config stored under
+ * Live non-secret automation config (schema v2) stored under
  * `~/.pi/agent/github-automation/config.json` (or PI_CODING_AGENT_DIR override).
  *
- * App ID / private key / webhook secret never live here. Local secret material is
- * stored separately under `credentials.v1.json` + generation PEM files; process
- * env may override those values at runtime (see github-app-credentials).
+ * App ID / private key / webhook secret never live here.
+ * Closed-loop fields (mode/unattended/baseRef/ownerActorIds/assignee) are absent.
  */
-export interface GithubAutomationConfigV1 {
+export interface GithubAutomationConfigV2 {
   schemaVersion: GithubAutomationConfigSchemaVersion;
+  /** Fresh installs and v1 migrations always start false. */
   enabled: boolean;
-  mode: GithubAutomationMode;
-  /** Global pause of new work; independent of mode. */
+  /** Operator stop-bleed; independent of enabled. */
   paused: boolean;
   repositories: GithubAutomationRepositoryConfig[];
-  triage: GithubAutomationTriageConfig;
-  unattended: GithubAutomationUnattendedConfig;
+  analysis: GithubAutomationAnalysisConfig;
   /** Opaque revision for CAS (sha256 prefix of canonical JSON). */
   revision: string;
   updatedAt: string;
 }
 
-/** Default validation commands for unattended profile. */
+/** Live config alias — schema v2 only. */
+export type GithubAutomationConfig = GithubAutomationConfigV2;
+
+/**
+ * Temporary structural bridge for closed-loop modules still present until GIA-06.
+ * Live durable config is always GithubAutomationConfigV2; these fields are never
+ * persisted by config I/O after GIA-01 and must not be written to disk.
+ */
+export type GithubAutomationConfigCompat = GithubAutomationConfigV2 & {
+  /** Always treated as off for closed-loop paths after GIA-01. */
+  mode?: GithubAutomationMode;
+  triage?: GithubAutomationTriageConfig;
+  unattended?: GithubAutomationUnattendedConfig;
+};
+
+/** Temporary repo bridge for residual closed-loop readers until GIA-06. */
+export type GithubAutomationRepositoryConfigCompat = GithubAutomationRepositoryConfig & {
+  ownerActorIds?: number[];
+  assigneeIdentitySource?: "machine-active-credential";
+  baseRef?: string;
+};
+
+
+/**
+ * @deprecated Historical closed-loop config (schema v1). Migration input only.
+ * Never written by live config APIs after GIA-01.
+ */
+export interface GithubAutomationConfigV1 {
+  schemaVersion: GithubAutomationConfigSchemaVersionV1;
+  enabled: boolean;
+  mode: GithubAutomationMode;
+  paused: boolean;
+  repositories: GithubAutomationRepositoryConfigV1[];
+  triage: GithubAutomationTriageConfig;
+  unattended: GithubAutomationUnattendedConfig;
+  revision: string;
+  updatedAt: string;
+}
+
+/**
+ * @deprecated Closed-loop validation defaults. Retained only for legacy parse helpers.
+ */
 export const GITHUB_AUTOMATION_DEFAULT_VALIDATION_COMMANDS: readonly string[] = [
   "npm run lint",
   "node_modules/.bin/tsc --noEmit",
 ] as const;
+
+export const GITHUB_AUTOMATION_ANALYSIS_DEFAULT_MAX_CONCURRENCY = 2 as const;
+export const GITHUB_AUTOMATION_ANALYSIS_MAX_CONCURRENCY_LIMIT = 8 as const;
 
 // ─── App credential readiness (safe) ─────────────────────────────────────────
 

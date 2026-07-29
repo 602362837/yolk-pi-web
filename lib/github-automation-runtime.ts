@@ -1,13 +1,17 @@
 /**
- * github-automation-runtime — webhook accept path orchestration (GHA-02).
+ * github-automation-runtime — webhook accept path for Issue Analysis (GIA-03).
  *
  * Flow:
  *   capped raw body → HMAC verify → JSON parse → allowlisted envelope
- *   → config/allowlist/mode checks → exclusive delivery create → enqueue job
+ *   → config/allowlist checks → exclusive delivery create → enqueue analysis job
  *   → async scheduler wake → 202
+ *
+ * Only human `issues.opened` may create a business job. All other events/actions/
+ * actors are bounded audit-only with zero job / zero scheduler wake / zero mutation.
  *
  * Never runs LLM/Git/GitHub mutation work on the request thread beyond durable enqueue.
  * Never persists raw body, signature, credentials, or Issue/comment full text.
+ * Does not load analysis handler, model, or installation tokens before HMAC verify.
  */
 
 import {
@@ -19,13 +23,14 @@ import {
   isGithubAutomationError,
   safeGithubAutomationErrorMessage,
 } from "./github-automation-errors";
-import type { GithubAutomationConfigV1 } from "./github-automation-types";
+import type { GithubAutomationConfigV2 as GithubAutomationConfigV1 } from "./github-automation-types";
 import { loadGithubAppWebhookSecret } from "./github-app-credentials";
 import {
   appendGithubAutomationSafeEvent,
   createGithubAutomationDelivery,
   createQueuedGithubAutomationJob,
   ensureGithubAutomationStoreLayout,
+  findActiveGithubIssueAnalysisJob,
   hashWebhookBodyPrefix,
   parseGithubWebhookEnvelope,
   readGithubAutomationIssueState,
@@ -33,7 +38,6 @@ import {
   upsertGithubAutomationIssueState,
   withGithubAutomationIssueLease,
   writeGithubAutomationDelivery,
-  writeGithubAutomationJob,
   type GithubAutomationActorSource,
   type GithubAutomationDeliveryIgnoreReason,
   type GithubAutomationDeliveryRecord,
@@ -44,6 +48,7 @@ import {
   ensureGithubAutomationScheduler,
   wakeGithubAutomationScheduler,
   _testSetGithubAutomationProductionHandlerReadinessDisabled,
+  _testResetGithubAutomationHandlerRegistry,
 } from "./github-automation-scheduler";
 import {
   assertValidGithubWebhookSignature,
@@ -51,33 +56,23 @@ import {
   readCappedWebhookRawBody,
 } from "./github-webhook-verify";
 import { loadGithubAppCredentials } from "./github-app-credentials";
-import {
-  ensureGithubAutomationJobHandlerReady,
-  _testResetGithubAutomationHandlerRuntime,
-  _testSetGithubAutomationHandlerAutoRegisterDisabled,
-} from "./github-automation-handler-runtime";
-import { reconcileGithubPullRequestEvent } from "./github-pr-lifecycle";
 
 /**
- * Test helper: reset readiness control after scheduler handler reset.
- * Does not trust a private module boolean as production authority (GHR-01).
+ * Test helper: reset analysis handler registration / readiness isolation flags.
  */
 export function _testResetGithubIssueTriageHandlerRegistration(): void {
-  _testResetGithubAutomationHandlerRuntime();
+  _testResetGithubAutomationHandlerRegistry();
 }
 
 /**
- * Test helper: disable auto-register so GHA-02 default handler tests stay isolated.
- * Also disables the production readiness gate on the scheduler so defaultJobHandler
- * can still exercise pure "received" jobs without loading the full triage graph.
+ * Test helper: disable production handler auto-register for isolated ingress tests.
+ * Analysis handler registration is lazy on scheduler wake; this keeps default handler
+ * available when tests intentionally disable auto-register.
  */
 export function _testSetGithubIssueTriageAutoRegisterDisabled(
   disabled: boolean,
 ): void {
-  // Reset first so subsequent disable/enable flags are not wiped by a full
-  // control-state rebuild (GHR-01 isolation for default-handler tests).
-  _testResetGithubAutomationHandlerRuntime();
-  _testSetGithubAutomationHandlerAutoRegisterDisabled(disabled);
+  _testResetGithubAutomationHandlerRegistry();
   _testSetGithubAutomationProductionHandlerReadinessDisabled(disabled);
 }
 
@@ -136,16 +131,12 @@ export function getGithubWebhookSignatureHeader(
 
 // ─── Disposition policy (LOOP-01: actor/source + action matrix + generation) ─
 
-export type GithubAutomationLifecycleKind =
-  | "none"
-  | "issue_closed"
-  | "issue_reopened"
-  | "pull_request";
+export type GithubAutomationLifecycleKind = "none" | "audit_only";
 
 export interface GithubAutomationIngressClassification {
   actorSource: GithubAutomationActorSource;
   ignoreReason: GithubAutomationDeliveryIgnoreReason | null;
-  /** True when this delivery may create/bind an Issue job (subject to paused + generation). */
+  /** True only for human issues.opened under allowlist (still subject to paused). */
   enqueueEligible: boolean;
   lifecycle: GithubAutomationLifecycleKind;
 }
@@ -204,28 +195,19 @@ export function classifyGithubWebhookActorSource(
   return "unknown_actor";
 }
 
-function isTerminalJobStatus(status: GithubAutomationJobRecord["status"]): boolean {
-  return (
-    status === "completed" || status === "cancelled" || status === "ignored"
-  );
-}
-
 /**
- * Events that may open a new Issue automation generation.
- * Comment/label/assign/closed/status must never bump generation alone.
+ * @deprecated Generation no longer advances for analysis jobs.
+ * Kept for call-site compatibility; only human issues.opened is eligible.
  */
 export function isGithubAutomationGenerationEligible(
   envelope: Pick<GithubWebhookEnvelope, "eventName" | "action">,
 ): boolean {
-  if (envelope.eventName === "issues") {
-    return envelope.action === "opened" || envelope.action === "reopened";
-  }
-  return false;
+  return envelope.eventName === "issues" && envelope.action === "opened";
 }
 
 /**
- * Human issue/issue_comment actions that may bind or create job work.
- * Self/Bot are filtered before this matrix applies.
+ * Opened-only action matrix (GIA-03).
+ * Self/Bot/unknown are filtered before this applies.
  */
 function classifyIssueActionMatrix(
   envelope: GithubWebhookEnvelope,
@@ -234,116 +216,67 @@ function classifyIssueActionMatrix(
   GithubAutomationIngressClassification,
   "ignoreReason" | "enqueueEligible" | "lifecycle"
 > {
-  // Self / Bot / unknown: audit-only, zero job/wake (even for opened).
   if (actorSource === "self_app") {
     return {
       ignoreReason: "self_app_event",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
     };
   }
   if (actorSource === "bot_actor") {
     return {
       ignoreReason: "bot_actor_event",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
     };
   }
   if (actorSource === "unknown_actor") {
     return {
       ignoreReason: "unknown_actor",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
     };
   }
 
-  // human_actor
   if (envelope.eventName === "issues") {
-    const action = envelope.action ?? "";
-    switch (action) {
-      case "opened":
-        return {
-          ignoreReason: null,
-          enqueueEligible: true,
-          lifecycle: "none",
-        };
-      case "reopened":
-        return {
-          ignoreReason: null,
-          enqueueEligible: true,
-          lifecycle: "issue_reopened",
-        };
-      case "edited":
-        // Restricted re-triage only against existing non-terminal work (no free gen++).
-        return {
-          ignoreReason: null,
-          enqueueEligible: true,
-          lifecycle: "none",
-        };
-      case "closed":
-        return {
-          ignoreReason: "lifecycle_only",
-          enqueueEligible: false,
-          lifecycle: "issue_closed",
-        };
-      case "assigned":
-      case "unassigned":
-      case "labeled":
-      case "unlabeled":
-      case "milestoned":
-      case "demilestoned":
-      case "pinned":
-      case "unpinned":
-      case "locked":
-      case "unlocked":
-      case "transferred":
-      case "deleted":
-        return {
-          ignoreReason: "non_actionable_action",
-          enqueueEligible: false,
-          lifecycle: "none",
-        };
-      default:
-        return {
-          ignoreReason: "non_actionable_action",
-          enqueueEligible: false,
-          lifecycle: "none",
-        };
-    }
-  }
-
-  if (envelope.eventName === "issue_comment") {
-    const action = envelope.action ?? "";
-    if (action === "created" || action === "edited") {
+    if (envelope.action === "opened") {
       return {
         ignoreReason: null,
         enqueueEligible: true,
         lifecycle: "none",
       };
     }
-    if (action === "deleted") {
-      return {
-        ignoreReason: "comment_deleted",
-        enqueueEligible: false,
-        lifecycle: "none",
-      };
-    }
+    // reopened/edited/closed/labeled/assigned/... — audit only, never enqueue.
     return {
-      ignoreReason: "non_actionable_action",
+      ignoreReason:
+        envelope.action === "closed"
+          ? "lifecycle_only"
+          : "non_actionable_action",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
+    };
+  }
+
+  if (envelope.eventName === "issue_comment") {
+    return {
+      ignoreReason:
+        envelope.action === "deleted"
+          ? "comment_deleted"
+          : "non_actionable_action",
+      enqueueEligible: false,
+      lifecycle: "audit_only",
     };
   }
 
   return {
     ignoreReason: "unknown_event",
     enqueueEligible: false,
-    lifecycle: "none",
+    lifecycle: "audit_only",
   };
 }
 
 /**
- * Full ingress classification: config allowlist → actor source → action matrix.
+ * Full ingress classification: config allowlist → actor source → opened-only matrix.
  * Global paused is applied after this (delivery disposition paused, still no enqueue).
  */
 export function classifyGithubAutomationIngress(
@@ -358,7 +291,7 @@ export function classifyGithubAutomationIngress(
       actorSource,
       ignoreReason: "unknown_event",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
     };
   }
   if (!envelope.knownEvent) {
@@ -366,7 +299,7 @@ export function classifyGithubAutomationIngress(
       actorSource,
       ignoreReason: "unknown_event",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
     };
   }
   if (
@@ -377,16 +310,16 @@ export function classifyGithubAutomationIngress(
       actorSource,
       ignoreReason: "unknown_event",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
     };
   }
 
-  if (!config.enabled || config.mode === "off") {
+  if (!config.enabled) {
     return {
       actorSource,
-      ignoreReason: config.enabled ? "mode_off" : "automation_disabled",
+      ignoreReason: "automation_disabled",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
     };
   }
 
@@ -395,7 +328,7 @@ export function classifyGithubAutomationIngress(
       actorSource,
       ignoreReason: "malformed_envelope",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
     };
   }
 
@@ -404,17 +337,16 @@ export function classifyGithubAutomationIngress(
       actorSource,
       ignoreReason: "repository_not_allowlisted",
       enqueueEligible: false,
-      lifecycle: "none",
+      lifecycle: "audit_only",
     };
   }
 
   if (envelope.eventName === "pull_request") {
-    // PR path never creates Issue jobs; reconcile on non-enqueue path.
     return {
       actorSource,
-      ignoreReason: null,
+      ignoreReason: "non_actionable_action",
       enqueueEligible: false,
-      lifecycle: "pull_request",
+      lifecycle: "audit_only",
     };
   }
 
@@ -427,13 +359,15 @@ export function classifyGithubAutomationIngress(
         actorSource,
         ignoreReason: "missing_issue",
         enqueueEligible: false,
-        lifecycle: "none",
+        lifecycle: "audit_only",
       };
     }
     const repo = findRepositoryConfigById(config, envelope.repositoryId);
+    // v2 requires exact installation match when both sides are present.
     if (
-      repo?.installationId !== null &&
-      repo?.installationId !== undefined &&
+      repo &&
+      typeof repo.installationId === "number" &&
+      repo.installationId > 0 &&
       envelope.installationId !== null &&
       repo.installationId !== envelope.installationId
     ) {
@@ -441,7 +375,21 @@ export function classifyGithubAutomationIngress(
         actorSource,
         ignoreReason: "installation_mismatch",
         enqueueEligible: false,
-        lifecycle: "none",
+        lifecycle: "audit_only",
+      };
+    }
+    // v2 also requires positive installation on the allowlist entry for enqueue.
+    if (
+      envelope.eventName === "issues" &&
+      envelope.action === "opened" &&
+      repo &&
+      (!(typeof repo.installationId === "number") || repo.installationId <= 0)
+    ) {
+      return {
+        actorSource,
+        ignoreReason: "installation_mismatch",
+        enqueueEligible: false,
+        lifecycle: "audit_only",
       };
     }
 
@@ -458,11 +406,11 @@ export function classifyGithubAutomationIngress(
     actorSource,
     ignoreReason: "unknown_event",
     enqueueEligible: false,
-    lifecycle: "none",
+    lifecycle: "audit_only",
   };
 }
 
-function shouldEnqueueIssueJob(
+function shouldEnqueueIssueAnalysisJob(
   envelope: GithubWebhookEnvelope,
   classification: GithubAutomationIngressClassification,
   config: GithubAutomationConfigV1,
@@ -470,7 +418,7 @@ function shouldEnqueueIssueJob(
   if (!classification.enqueueEligible) return false;
   if (classification.ignoreReason) return false;
   if (config.paused) return false;
-  if (envelope.eventName !== "issues" && envelope.eventName !== "issue_comment") {
+  if (envelope.eventName !== "issues" || envelope.action !== "opened") {
     return false;
   }
   return (
@@ -478,52 +426,6 @@ function shouldEnqueueIssueJob(
     envelope.issueNumber !== null &&
     envelope.repositoryFullName !== null
   );
-}
-
-/**
- * Fail-closed closed-Issue reconciliation: park active non-terminal work.
- * Does not claim, triage, rewrite comments, bump generation, or delete WorkTree.
- */
-async function reconcileIssueClosedLifecycle(options: {
-  repositoryId: number;
-  issueNumber: number;
-  deliveryId: string;
-}): Promise<{ jobId: string | null; reasonCode: string }> {
-  const issueState = await readGithubAutomationIssueState(
-    options.repositoryId,
-    options.issueNumber,
-  );
-  if (!issueState?.activeJobId) {
-    return { jobId: null, reasonCode: "issue_closed_no_active_job" };
-  }
-
-  const job = await readGithubAutomationJob(issueState.activeJobId);
-  if (!job) {
-    return { jobId: null, reasonCode: "issue_closed_missing_job" };
-  }
-  if (isTerminalJobStatus(job.status)) {
-    return { jobId: job.jobId, reasonCode: "issue_closed_already_terminal" };
-  }
-
-  const now = new Date().toISOString();
-  const next: GithubAutomationJobRecord = {
-    ...job,
-    status: "blocked",
-    phase: job.phase === "received" ? "blocked" : job.phase,
-    reasonCode: "issue_closed",
-    nextRetryAt: null,
-    updatedAt: now,
-    deliveryId: options.deliveryId,
-  };
-  await writeGithubAutomationJob(next);
-  await upsertGithubAutomationIssueState({
-    repositoryId: options.repositoryId,
-    issueNumber: options.issueNumber,
-    activeJobId: next.jobId,
-    lastDeliveryId: options.deliveryId,
-    generation: next.generation,
-  });
-  return { jobId: next.jobId, reasonCode: "issue_closed" };
 }
 
 // ─── Core accept ─────────────────────────────────────────────────────────────
@@ -558,9 +460,7 @@ export async function acceptGithubAutomationWebhook(
 
   try {
     await ensureGithubAutomationStoreLayout();
-    // GHR-01: single readiness authority (registry kind/generation). Never rely
-    // on a private module boolean after HMR/reset.
-    await ensureGithubAutomationJobHandlerReady();
+    // GIA-03: do NOT load analysis handler / model / installation tokens before HMAC.
 
     // 1) Capped raw body
     const rawBody = await readCappedWebhookRawBody(
@@ -630,11 +530,15 @@ export async function acceptGithubAutomationWebhook(
       effectiveAppId,
     );
     const ignoreReason = classification.ignoreReason;
-    // Global paused remains authoritative after action matrix; comments cannot clear it.
+    // Global paused remains authoritative after action matrix.
     const paused = config.paused && classification.enqueueEligible;
-    const enqueue = shouldEnqueueIssueJob(envelope, classification, config);
+    const enqueue = shouldEnqueueIssueAnalysisJob(
+      envelope,
+      classification,
+      config,
+    );
 
-    // 4) Exclusive delivery + optional job under issue lease when enqueueing
+    // 4) Exclusive delivery + optional analysis job under issue lease
     let job: GithubAutomationJobRecord | null = null;
     let delivery: GithubAutomationDeliveryRecord;
     let created: boolean;
@@ -643,7 +547,6 @@ export async function acceptGithubAutomationWebhook(
       const repoId = envelope.repositoryId;
       const issueNumber = envelope.issueNumber;
       const fullName = envelope.repositoryFullName ?? `repo-${repoId}`;
-      const generationEligible = isGithubAutomationGenerationEligible(envelope);
 
       const leased = await withGithubAutomationIssueLease(
         repoId,
@@ -671,106 +574,32 @@ export async function acceptGithubAutomationWebhook(
               job: null as GithubAutomationJobRecord | null,
               recovered: false,
               bound: true as boolean,
+              alreadyExists: false as boolean,
             };
           }
 
-          const issueState = await readGithubAutomationIssueState(repoId, issueNumber);
-          let activeJob: GithubAutomationJobRecord | null = null;
-          if (issueState?.activeJobId) {
-            activeJob = await readGithubAutomationJob(issueState.activeJobId);
-          }
-
-          const terminal =
-            activeJob !== null && isTerminalJobStatus(activeJob.status);
-
-          // CMD-03: terminal jobs that still own the Issue may accept exact owner
-          // commands (status / re-evaluate / continue) without a new generation.
-          const commandableTerminalPhase =
-            activeJob !== null &&
-            (activeJob.phase === "not_adopted" ||
-              activeJob.phase === "accepted_waiting_automation" ||
-              activeJob.phase === "completed" ||
-              activeJob.phase === "pr_open" ||
-              activeJob.phase === "cancelled");
-          const reuseForOwnerCommand =
-            terminal &&
-            commandableTerminalPhase &&
-            envelope.eventName === "issue_comment";
-
-          let jobRecord: GithubAutomationJobRecord | null = null;
-
-          if (activeJob && (!terminal || reuseForOwnerCommand)) {
-            // Reuse in-flight/queued job; bind latest delivery id.
-            // Wake parked jobs on human issue_comment so exact owner commands can run.
-            // Includes awaiting_owner and per-job paused/blocked unattended phases (CMD-03).
-            const wakeOnComment = envelope.eventName === "issue_comment";
-            const wakeAwaitingOwner =
-              wakeOnComment && activeJob.phase === "awaiting_owner";
-            const wakeBlockedClaim =
-              activeJob.phase === "blocked_claim_assignee" &&
-              activeJob.status === "blocked";
-            const wakeCommandable =
-              wakeOnComment &&
-              (reuseForOwnerCommand ||
-                activeJob.status === "paused" ||
-                activeJob.status === "blocked" ||
-                activeJob.status === "retry_due" ||
-                activeJob.phase === "accepted_waiting_automation" ||
-                activeJob.phase === "not_adopted" ||
-                activeJob.phase === "implementation_queued" ||
-                activeJob.phase === "planning" ||
-                activeJob.phase === "policy_check" ||
-                activeJob.phase === "implementing" ||
-                activeJob.phase === "checking" ||
-                activeJob.phase === "final_policy" ||
-                activeJob.phase === "publishing" ||
-                activeJob.phase === "pr_open" ||
-                activeJob.phase === "paused" ||
-                activeJob.phase === "retry_due" ||
-                activeJob.phase === "blocked");
-            jobRecord = {
-              ...activeJob,
-              deliveryId: envelope.deliveryId,
-              issueTitlePreview:
-                envelope.issueTitlePreview ?? activeJob.issueTitlePreview,
-              updatedAt: new Date().toISOString(),
-              ...(wakeAwaitingOwner || wakeBlockedClaim || wakeCommandable
-                ? {
-                    status: "queued" as const,
-                    nextRetryAt: null,
-                    // Keep phase; clear only parking reason so scheduler can run.
-                    reasonCode: wakeAwaitingOwner
-                      ? "owner_comment_wake"
-                      : wakeBlockedClaim
-                        ? "claim_retry_wake"
-                        : "owner_command_wake",
-                  }
-                : {}),
-            };
-            await writeGithubAutomationJob(jobRecord);
-          } else if (generationEligible) {
-            // New generation only for opened/reopened (or explicit operator restart later).
-            const nextGeneration = terminal
-              ? (issueState?.generation ?? 0) + 1
-              : (issueState?.generation ?? 1);
-            jobRecord = await createQueuedGithubAutomationJob({
+          // One opened analysis lifecycle per repositoryId+issueNumber.
+          const existing =
+            (await findActiveGithubIssueAnalysisJob({
               repositoryId: repoId,
-              repositoryFullName: fullName,
               issueNumber,
-              installationId: envelope.installationId,
-              deliveryId: envelope.deliveryId,
-              issueTitlePreview: envelope.issueTitlePreview,
-              generation: Math.max(1, nextGeneration),
-              phase: "received",
-            });
-          } else {
-            // Terminal / missing job + non-generation event (e.g. edited/comment):
-            // durable audit only — do not create a new generation.
+            })) ??
+            (await (async () => {
+              const issueState = await readGithubAutomationIssueState(
+                repoId,
+                issueNumber,
+              );
+              if (!issueState?.activeJobId) return null;
+              return readGithubAutomationJob(issueState.activeJobId);
+            })());
+
+          if (existing) {
+            // Distinct opened delivery for the same Issue: audit only, zero second job.
             const deliveryIgnored: GithubAutomationDeliveryRecord = {
               ...deliveryResult.record,
               disposition: "ignored",
-              ignoreReason: "lifecycle_only",
-              jobId: activeJob?.jobId ?? null,
+              ignoreReason: "analysis_already_exists",
+              jobId: existing.jobId,
               actorSource: classification.actorSource,
             };
             await writeGithubAutomationDelivery(deliveryIgnored);
@@ -782,10 +611,20 @@ export async function acceptGithubAutomationWebhook(
               job: null as GithubAutomationJobRecord | null,
               recovered: false,
               bound: false as boolean,
+              alreadyExists: true as boolean,
             };
           }
 
-          // Patch delivery with jobId (atomic rewrite; exclusive create already won).
+          const jobRecord = await createQueuedGithubAutomationJob({
+            repositoryId: repoId,
+            repositoryFullName: fullName,
+            issueNumber,
+            installationId: envelope.installationId,
+            deliveryId: envelope.deliveryId,
+            issueTitlePreview: envelope.issueTitlePreview,
+            phase: "received",
+          });
+
           const deliveryWithJob: GithubAutomationDeliveryRecord = {
             ...deliveryResult.record,
             disposition: "enqueued",
@@ -800,6 +639,7 @@ export async function acceptGithubAutomationWebhook(
             activeJobId: jobRecord.jobId,
             lastDeliveryId: envelope.deliveryId,
             generation: jobRecord.generation,
+            activeJobKind: "issue_analysis",
           });
 
           return {
@@ -810,6 +650,7 @@ export async function acceptGithubAutomationWebhook(
             job: jobRecord,
             recovered: !deliveryResult.created,
             bound: true as boolean,
+            alreadyExists: false as boolean,
           };
         },
       );
@@ -821,7 +662,6 @@ export async function acceptGithubAutomationWebhook(
       const bound = leased.bound !== false;
 
       if (!created && !recoveredIncomplete) {
-        // Duplicate delivery with existing job link — zero new business effects.
         await appendGithubAutomationSafeEvent({
           at: new Date().toISOString(),
           kind: "delivery_duplicate",
@@ -853,7 +693,7 @@ export async function acceptGithubAutomationWebhook(
           jobId: delivery.jobId,
           deliveryId: envelope.deliveryId,
           phase: null,
-          reasonCode: delivery.ignoreReason ?? "lifecycle_only",
+          reasonCode: delivery.ignoreReason ?? "analysis_already_exists",
           traceId: null,
           meta: {
             eventName: String(envelope.eventName),
@@ -864,11 +704,11 @@ export async function acceptGithubAutomationWebhook(
         return {
           httpStatus: 202,
           code: "ignored",
-          message: "Delivery ignored without new generation",
+          message: "Analysis lifecycle already exists for this issue",
           deliveryId: envelope.deliveryId,
           jobId: delivery.jobId,
           disposition: "ignored",
-          ignoreReason: delivery.ignoreReason ?? "lifecycle_only",
+          ignoreReason: delivery.ignoreReason ?? "analysis_already_exists",
         };
       }
 
@@ -886,6 +726,7 @@ export async function acceptGithubAutomationWebhook(
           eventName: String(envelope.eventName),
           action: envelope.action,
           actorSource: classification.actorSource,
+          kind: "issue_analysis",
         },
       });
 
@@ -907,27 +748,8 @@ export async function acceptGithubAutomationWebhook(
       };
     }
 
-    // Non-enqueue path: still exclusive-create delivery for audit/idempotency.
-    // GHA-09: pull_request events reconcile known jobs without enqueueing Issue work.
-    // LOOP-01: closed Issue lifecycle parks active jobs without claim/triage/generation.
-    const isPullRequest =
-      classification.lifecycle === "pull_request" &&
-      !ignoreReason &&
-      !config.paused &&
-      config.enabled &&
-      config.mode !== "off";
-    const isIssueClosed =
-      classification.lifecycle === "issue_closed" &&
-      !config.paused &&
-      config.enabled &&
-      config.mode !== "off" &&
-      envelope.repositoryId !== null &&
-      envelope.issueNumber !== null;
-
-    // paused disposition only when an otherwise-actionable event is held by kill switch.
-    const disposition = paused
-      ? "paused"
-      : "ignored";
+    // Non-enqueue path: exclusive audit delivery only. Zero job, zero wake, zero mutation.
+    const disposition = paused ? "paused" : "ignored";
     const deliveryResult = await createGithubAutomationDelivery({
       envelope,
       disposition,
@@ -951,86 +773,16 @@ export async function acceptGithubAutomationWebhook(
       };
     }
 
-    let sideJobId: string | null = null;
-    let sideReason: string | null = paused
+    const sideReason: string | null = paused
       ? "paused"
       : (ignoreReason ?? "ignored");
 
-    if (isPullRequest) {
-      // Reconcile only — never create a new Issue job or wake implementer by default.
-      try {
-        const prResult = await reconcileGithubPullRequestEvent({
-          config,
-          payload,
-          deliveryId: envelope.deliveryId,
-        });
-        sideJobId = prResult.jobId;
-        sideReason = prResult.reasonCode;
-        if (prResult.jobId && delivery.jobId !== prResult.jobId) {
-          delivery = await writeGithubAutomationDelivery({
-            ...delivery,
-            jobId: prResult.jobId,
-          });
-        }
-      } catch (prErr) {
-        sideReason = isGithubAutomationError(prErr)
-          ? prErr.code
-          : "pr_lifecycle_error";
-        await appendGithubAutomationSafeEvent({
-          at: new Date().toISOString(),
-          kind: "pr_lifecycle_error",
-          repositoryId: envelope.repositoryId,
-          issueNumber: envelope.issueNumber,
-          jobId: null,
-          deliveryId: envelope.deliveryId,
-          phase: null,
-          reasonCode: sideReason,
-          traceId: null,
-          meta: {
-            eventName: "pull_request",
-            action: envelope.action,
-          },
-        });
-      }
-    } else if (isIssueClosed) {
-      try {
-        const closed = await withGithubAutomationIssueLease(
-          envelope.repositoryId!,
-          envelope.issueNumber!,
-          async () =>
-            reconcileIssueClosedLifecycle({
-              repositoryId: envelope.repositoryId!,
-              issueNumber: envelope.issueNumber!,
-              deliveryId: envelope.deliveryId,
-            }),
-        );
-        sideJobId = closed.jobId;
-        sideReason = closed.reasonCode;
-        if (closed.jobId && delivery.jobId !== closed.jobId) {
-          delivery = await writeGithubAutomationDelivery({
-            ...delivery,
-            jobId: closed.jobId,
-          });
-        }
-      } catch (closedErr) {
-        sideReason = isGithubAutomationError(closedErr)
-          ? closedErr.code
-          : "issue_closed_reconcile_error";
-      }
-    }
-
     await appendGithubAutomationSafeEvent({
       at: new Date().toISOString(),
-      kind: paused
-        ? "delivery_paused"
-        : isPullRequest
-          ? "delivery_pull_request"
-          : isIssueClosed
-            ? "delivery_issue_closed"
-            : "delivery_ignored",
+      kind: paused ? "delivery_paused" : "delivery_ignored",
       repositoryId: envelope.repositoryId,
       issueNumber: envelope.issueNumber,
-      jobId: sideJobId,
+      jobId: null,
       deliveryId: envelope.deliveryId,
       phase: null,
       reasonCode: sideReason,
@@ -1042,20 +794,14 @@ export async function acceptGithubAutomationWebhook(
       },
     });
 
-    // Invalid signature never reaches here. Self/Bot/non-allowlist have zero job effects.
-    // pull_request / closed reconciliation must not enqueue Issue jobs via scheduler.
     return {
       httpStatus: 202,
       code: paused ? "paused" : "ignored",
       message: paused
         ? "Delivery recorded while automation is paused"
-        : isPullRequest
-          ? "Pull request delivery reconciled"
-          : isIssueClosed
-            ? "Issue closed lifecycle reconciled"
-            : "Delivery ignored",
+        : "Delivery ignored",
       deliveryId: envelope.deliveryId,
-      jobId: sideJobId,
+      jobId: null,
       disposition,
       ignoreReason: paused ? null : ignoreReason,
     };

@@ -1,15 +1,16 @@
 /**
- * github-automation-setup-verify — fixed readiness checklist for Settings (IMP-001 / IMP-03 / GHCRED-04).
+ * github-automation-setup-verify — fixed readiness checklist for Settings (GIA-04).
  *
  * ## Contract
  *
  * - Read-only: never enqueues jobs, never wakes the scheduler/runner, never mutates GitHub
- *   beyond App JWT read calls (installation capability lookup), never writes credential store.
+ *   beyond App JWT read calls (installation capability lookup), never writes credential store,
+ *   never runs a model turn.
  * - Safe projection only: no private key material, webhook secret, absolute projectRoot,
  *   raw webhook bodies, tokens, PEM contents, key paths, or fingerprints.
- * - First three checklist items default to Settings local credential card guidance;
- *   env names remain advanced override hints only (never values).
- * - Invalid/unsupported local fallback is actionable without blocking full env-configured deploys.
+ * - Analysis-only checklist: App credentials, installation, Metadata+Issues permissions,
+ *   allowlist, local project readable, analysis model readiness, webhook health.
+ * - No machine assignee, Contents/PR (P1), unattended, or full-agent residual risk.
  * - Every non-ready item includes an actionable Chinese next-step (not only an error code).
  */
 
@@ -32,21 +33,29 @@ import {
   isGithubAutomationError,
   safeGithubAutomationErrorMessage,
 } from "./github-automation-errors";
-import { assertGithubAutomationProjectionSafe } from "./github-automation-projection";
+import {
+  assertGithubAutomationProjectionSafe,
+  toGithubAutomationAnalysisModelProjection,
+  toGithubAutomationAnalysisPermissionProjection,
+  type GithubAutomationAnalysisModelProjection,
+  type GithubAutomationAnalysisPermissionProjection,
+} from "./github-automation-projection";
 import {
   getGithubAutomationDeliveriesDir,
   type GithubAutomationDeliveryRecord,
 } from "./github-automation-store";
-import { getMachineGithubAssigneeSafeProjection } from "./github-machine-assignee";
 import {
   deriveGithubAppCapability,
   emptyPermissionSnapshot,
   type GithubAppCapabilitySnapshot,
   type GithubAppCredentialReadinessCode,
   type GithubAppCredentialSafeProjection,
-  type GithubAutomationConfigV1,
-  type GithubMachineAssigneeSafeProjection,
+  type GithubAutomationConfig,
 } from "./github-automation-types";
+import {
+  resolveIssueAnalysisModelReadiness,
+  type IssueAnalysisModelReadiness,
+} from "./github-issue-analysis-model";
 
 // ─── Checklist codes / states ────────────────────────────────────────────────
 
@@ -60,9 +69,9 @@ export type GithubAutomationSetupChecklistCode =
   | "webhook_secret"
   | "installation"
   | "permissions"
-  | "assignee"
   | "allowlist"
   | "project_binding"
+  | "analysis_model"
   | "webhook_health";
 
 export type GithubAutomationSetupItemState =
@@ -95,14 +104,14 @@ export interface GithubAutomationSetupVerifyResult {
   ok: true;
   generatedAt: string;
   revision: string;
-  /** True when every required checklist item is ready. */
+  /** True when every required checklist item is ready (including webhook health). */
   allReady: boolean;
-  /** True when P0 triage prerequisites are ready (App + install + issues perms + assignee + allowlist + project). */
-  p0Ready: boolean;
-  /** True when P0 ready and Contents/PR write permissions are present. */
-  p1Ready: boolean;
-  /** Unattended remains fail-closed until allReady && p1Ready (UI still requires mode/policy). */
-  unattendedEligible: boolean;
+  /**
+   * True when analysis prerequisites are ready:
+   * App + install + Issues permissions + allowlist + project readable + model.
+   * Webhook health is reported separately and required for allReady only.
+   */
+  analysisReady: boolean;
   checklist: GithubAutomationSetupChecklistItem[];
   summary: {
     app: Pick<
@@ -123,19 +132,8 @@ export interface GithubAutomationSetupVerifyResult {
       installationIdCount: number;
       readiness: "ready" | "missing" | "partial";
     };
-    permissions: {
-      p0Triage: boolean;
-      p1Unattended: boolean;
-      missingForP0: string[];
-      missingForP1: string[];
-    };
-    assignee: {
-      readiness: GithubMachineAssigneeSafeProjection["readiness"];
-      login: string | null;
-      assignable: boolean | null;
-      identitySource: GithubMachineAssigneeSafeProjection["identitySource"];
-      checkedAt: string;
-    };
+    permissions: GithubAutomationAnalysisPermissionProjection;
+    model: GithubAutomationAnalysisModelProjection;
     allowlist: {
       repositoryCount: number;
       ready: boolean;
@@ -180,18 +178,16 @@ const NEXT_STEPS = {
     "在 GitHub 上将 App 安装到目标 owner/repo，并在「允许仓库」中填写对应 installation id 后保存，再验证。",
   installation_partial:
     "部分允许仓库尚未绑定 installation id。编辑每个仓库卡片，填写该仓库上的 GitHub App installation id 后保存。",
-  permissions_p0:
-    "在 GitHub App 安装设置中授予至少：Metadata (read) 与 Issues (read & write)。保存后重新验证。",
-  permissions_p1:
-    "Triage 权限已就绪；若要启用 unattended，还需 Pull requests (write) 与 Contents (write)。缺失权限时 unattended 保持关闭。",
-  assignee_not_ready:
-    "在运行 ypi 的服务器上用 gh auth login（github.com）登录可被 assign 的机器账号，或配置可用的 git-credential。验证只解析 login，不会把 token 返回浏览器。",
+  permissions_analysis:
+    "在 GitHub App 安装设置中授予至少：Metadata (read) 与 Issues (read & write)。本产品不需要 Contents 或 Pull requests 写权限。保存后重新验证。",
   allowlist_empty:
-    "允许仓库列表为空。点击「关联仓库」，选择 Project Registry 项目并填写 owner/repo 与 installation id。默认不会预置 yolk-pi-web。",
+    "允许仓库列表为空。点击「关联仓库」，选择 Project Registry 项目并填写 owner/repo 与 installation id。默认不会预置 yolk-pi-web。本地项目仅用于只读证据分析。",
   project_unbound:
-    "至少一个允许仓库未绑定可用的 Project Registry 项目。编辑仓库，选择未归档且路径存在的本地项目后保存（浏览器不会看到绝对路径）。",
+    "至少一个允许仓库未绑定可用的 Project Registry 项目。编辑仓库，选择未归档且路径存在的本地项目后保存（浏览器不会看到绝对路径；本地项目仅作只读证据）。",
   project_invalid:
     "已绑定的 Project Registry 项目不可用（未知、已归档或本机路径缺失）。请重新选择有效项目或先在项目注册表中修复该项目。",
+  model_unavailable:
+    "分析模型不可用。请在 Yolk Pi 设置中配置可用的默认模型（跟随主默认模型），并确认对应提供商凭据已就绪。验证不会调用模型完成一次分析。",
   webhook_unknown:
     "尚无已验证的 webhook 投递记录。确认公网 HTTPS 已指向 POST /api/github-automation/webhook，并在 GitHub App 中配置同一 webhook secret 后发送 ping。",
   webhook_error:
@@ -298,7 +294,7 @@ function appCredentialItemStates(
   return { appId, privateKey, webhookSecret };
 }
 
-function installationSummary(config: GithubAutomationConfigV1): {
+function installationSummary(config: GithubAutomationConfig): {
   present: boolean;
   installationIdCount: number;
   readiness: "ready" | "missing" | "partial";
@@ -359,7 +355,7 @@ async function resolveCapability(
 }
 
 async function inspectProjectBindings(
-  config: GithubAutomationConfigV1,
+  config: GithubAutomationConfig,
   options?: { resolveLive?: boolean },
 ): Promise<{
   boundProjectCount: number;
@@ -529,28 +525,13 @@ export async function inspectGithubAutomationWebhookHealth(options?: {
   return { health: "unknown", lastVerifiedAt, recentDeliveryCount };
 }
 
-function assigneeItem(
-  assignee: GithubMachineAssigneeSafeProjection,
-): GithubAutomationSetupChecklistItem {
-  const ready = assignee.readiness === "ready";
-  return {
-    code: "assignee",
-    order: 6,
-    state: ready ? "ready" : "needs_fix",
-    title: "机器 Assignee 就绪",
-    reasonCode: ready ? null : assignee.readiness,
-    nextStep: ready ? null : NEXT_STEPS.assignee_not_ready,
-    envNames: [],
-  };
-}
-
 export interface RunGithubAutomationSetupVerifyOptions {
-  config?: GithubAutomationConfigV1;
+  config?: GithubAutomationConfig;
   /** Default true. Tests may inject projections and set false to skip live I/O. */
   resolveLive?: boolean;
   appProjection?: GithubAppCredentialSafeProjection;
-  assigneeProjection?: GithubMachineAssigneeSafeProjection;
   capability?: GithubAppCapabilitySnapshot | null;
+  modelReadiness?: IssueAnalysisModelReadiness | null;
   webhookHealth?: GithubAutomationWebhookHealthCode;
   webhookLastVerifiedAt?: string | null;
   webhookRecentDeliveryCount?: number;
@@ -558,7 +539,8 @@ export interface RunGithubAutomationSetupVerifyOptions {
 
 /**
  * Run the fixed setup readiness checklist.
- * Side-effect free w.r.t. jobs/scheduler; may perform read-only App API calls.
+ * Side-effect free w.r.t. jobs/scheduler; may perform read-only App API calls
+ * and presence-only model readiness (no completeSimple / no mutation).
  */
 export async function runGithubAutomationSetupVerify(
   options: RunGithubAutomationSetupVerifyOptions = {},
@@ -570,17 +552,31 @@ export async function runGithubAutomationSetupVerify(
   const app =
     options.appProjection ?? (await getGithubAppCredentialSafeProjection(generatedAt));
 
-  const assignee =
-    options.assigneeProjection ??
-    (await getMachineGithubAssigneeSafeProjection());
-
   const install = installationSummary(config);
   const capability = await resolveCapability(app.configured, install.uniqueIds, {
     capability: options.capability ?? undefined,
     resolveLive,
   });
+  const permissionProjection =
+    toGithubAutomationAnalysisPermissionProjection(capability);
 
   const projects = await inspectProjectBindings(config, { resolveLive });
+
+  let modelReadiness: IssueAnalysisModelReadiness | null =
+    options.modelReadiness ?? null;
+  if (options.modelReadiness === undefined && resolveLive) {
+    try {
+      // Presence-only readiness — never runs a model turn or network refresh of provider keys.
+      modelReadiness = await resolveIssueAnalysisModelReadiness();
+    } catch {
+      modelReadiness = {
+        ready: false,
+        reasonCode: "model_unavailable",
+        model: null,
+      };
+    }
+  }
+  const modelProjection = toGithubAutomationAnalysisModelProjection(modelReadiness);
 
   let webhookHealth: GithubAutomationWebhookHealthCode =
     options.webhookHealth ?? "unknown";
@@ -630,22 +626,17 @@ export async function runGithubAutomationSetupVerify(
     permissionsState = "pending";
     permissionsReason = "installation_missing";
     permissionsStep = NEXT_STEPS.installation_missing;
-  } else if (!capability.p0Triage) {
+  } else if (!permissionProjection.analysisReady) {
     permissionsState = "needs_fix";
-    permissionsReason = "permissions_p0";
-    permissionsStep = NEXT_STEPS.permissions_p0;
-  } else if (!capability.p1Unattended) {
-    // P0 ok, P1 missing — still "ready" for triage setup but surface next step for unattended.
-    permissionsState = "ready";
-    permissionsReason = "permissions_p1_optional";
-    permissionsStep = NEXT_STEPS.permissions_p1;
+    permissionsReason = "permissions_analysis";
+    permissionsStep = NEXT_STEPS.permissions_analysis;
   }
 
   const permissionsItem: GithubAutomationSetupChecklistItem = {
     code: "permissions",
     order: 5,
     state: permissionsState,
-    title: "App 权限（P0 / P1）",
+    title: "App 权限（Metadata + Issues）",
     reasonCode: permissionsReason,
     nextStep: permissionsStep,
     envNames: [],
@@ -654,7 +645,7 @@ export async function runGithubAutomationSetupVerify(
   const allowlistReady = config.repositories.length > 0;
   const allowlistItem: GithubAutomationSetupChecklistItem = {
     code: "allowlist",
-    order: 7,
+    order: 6,
     state: allowlistReady ? "ready" : "pending",
     title: "允许仓库非空",
     reasonCode: allowlistReady ? null : "allowlist_empty",
@@ -664,11 +655,22 @@ export async function runGithubAutomationSetupVerify(
 
   const projectItem: GithubAutomationSetupChecklistItem = {
     code: "project_binding",
-    order: 8,
+    order: 7,
     state: projects.state,
-    title: "本地项目关联",
+    title: "本地项目只读证据绑定",
     reasonCode: projects.reasonCode,
     nextStep: projects.nextStep,
+    envNames: [],
+  };
+
+  const modelReady = modelProjection.ready === true;
+  const modelItem: GithubAutomationSetupChecklistItem = {
+    code: "analysis_model",
+    order: 8,
+    state: modelReady ? "ready" : "needs_fix",
+    title: "分析模型可用",
+    reasonCode: modelReady ? null : modelProjection.reasonCode || "model_unavailable",
+    nextStep: modelReady ? null : NEXT_STEPS.model_unavailable,
     envNames: [],
   };
 
@@ -705,36 +707,30 @@ export async function runGithubAutomationSetupVerify(
     credItems.webhookSecret,
     installationItem,
     permissionsItem,
-    assigneeItem(assignee),
     allowlistItem,
     projectItem,
+    modelItem,
     webhookItem,
   ].sort((a, b) => a.order - b.order);
 
-  // Required for "allReady": exclude optional P1-only notice and treat webhook unknown as not blocking triage setup?
-  // PRD: checklist includes webhook health if known. Unattended/publish gate should fail closed on missing items.
-  // allReady = every item ready OR (webhook unknown is soft? Design says unattended blocked by any checklist blocker).
-  // Treat webhook "unknown" as blocker for allReady so operator is pushed to send a ping; p0Ready can still be true without webhook.
   const requiredCodes = new Set<GithubAutomationSetupChecklistCode>([
     "app_id",
     "private_key_file",
     "webhook_secret",
     "installation",
     "permissions",
-    "assignee",
     "allowlist",
     "project_binding",
+    "analysis_model",
   ]);
 
-  const p0Ready =
+  const analysisReady =
     app.configured &&
     install.readiness === "ready" &&
-    capability.p0Triage &&
-    assignee.readiness === "ready" &&
+    permissionProjection.analysisReady &&
     allowlistReady &&
-    projects.ready;
-
-  const p1Ready = p0Ready && capability.p1Unattended;
+    projects.ready &&
+    modelReady;
 
   const requiredReady = checklist
     .filter((item) => requiredCodes.has(item.code))
@@ -747,9 +743,7 @@ export async function runGithubAutomationSetupVerify(
     generatedAt,
     revision: config.revision,
     allReady,
-    p0Ready,
-    p1Ready,
-    unattendedEligible: p1Ready && allReady,
+    analysisReady,
     checklist,
     summary: {
       app: {
@@ -770,19 +764,8 @@ export async function runGithubAutomationSetupVerify(
         installationIdCount: install.installationIdCount,
         readiness: install.readiness,
       },
-      permissions: {
-        p0Triage: capability.p0Triage,
-        p1Unattended: capability.p1Unattended,
-        missingForP0: [...capability.missingForP0],
-        missingForP1: [...capability.missingForP1],
-      },
-      assignee: {
-        readiness: assignee.readiness,
-        login: assignee.login,
-        assignable: assignee.assignable,
-        identitySource: assignee.identitySource,
-        checkedAt: assignee.checkedAt,
-      },
+      permissions: permissionProjection,
+      model: modelProjection,
       allowlist: {
         repositoryCount: config.repositories.length,
         ready: allowlistReady,

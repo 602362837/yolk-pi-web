@@ -1,13 +1,14 @@
 /**
- * github-automation-config — non-secret config for GitHub App automation.
+ * github-automation-config — non-secret config for GitHub App Issue Analysis.
  *
  * Storage: `~/.pi/agent/github-automation/config.json` (via getAgentDir()).
  *
  * Rules:
- * - Schema v1 only.
+ * - Live schema is v2 (enabled/paused/repositories/analysis only).
+ * - Schema v1 is read only for migration: backup + force enabled=false + drop
+ *   closed-loop fields. Unknown/future schema fails closed without overwrite.
  * - Repositories keyed by immutable repositoryId; fresh default allowlist is [].
- * - Legacy seeded yolk-pi-web entry may be read for migration/compat only;
- *   never auto-written or presented as operator-configured.
+ * - v2 repositories require positive installationId + Project Registry projectId.
  * - Never stores App private key, JWT, installation token, webhook secret,
  *   or machine personal tokens.
  * - projectId is the operator-facing Project Registry binding; projectRoot is
@@ -33,17 +34,19 @@ import type {
   GithubAutomationJobStatus,
 } from "./github-automation-store";
 import {
+  GITHUB_AUTOMATION_ANALYSIS_DEFAULT_MAX_CONCURRENCY,
+  GITHUB_AUTOMATION_ANALYSIS_MAX_CONCURRENCY_LIMIT,
   GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION,
-  GITHUB_AUTOMATION_DEFAULT_VALIDATION_COMMANDS,
   GITHUB_AUTOMATION_LEGACY_SEEDED_REPOSITORY_FULL_NAME,
   GITHUB_AUTOMATION_LEGACY_SEEDED_REPOSITORY_ID,
-  isGithubAutomationMode,
-  type GithubAutomationConfigV1,
-  type GithubAutomationMode,
+  type GithubAutomationAnalysisConfig,
+  type GithubAutomationConfigV2,
   type GithubAutomationRepositoryConfig,
-  type GithubAutomationTriageConfig,
-  type GithubAutomationUnattendedConfig,
+  type GithubAutomationRepositoryConfigV1,
 } from "./github-automation-types";
+
+/** Live config type alias (schema v2). */
+export type GithubAutomationConfig = GithubAutomationConfigV2;
 import {
   canonicalizeProjectPath,
   getProject,
@@ -76,22 +79,16 @@ export function getGithubAutomationConfigPath(): string {
 export function createEmptyGithubAutomationRepository(input?: {
   repositoryId?: number;
   fullName?: string;
-  installationId?: number | null;
-  projectId?: string | null;
+  installationId?: number;
+  projectId?: string;
   projectRoot?: string;
-  ownerActorIds?: number[];
-  baseRef?: string;
 }): GithubAutomationRepositoryConfig {
   return {
     repositoryId: input?.repositoryId ?? 0,
     fullName: input?.fullName ?? "",
-    installationId:
-      input?.installationId === undefined ? null : input.installationId,
-    projectId: input?.projectId === undefined ? null : input.projectId,
+    installationId: input?.installationId ?? 0,
+    projectId: input?.projectId ?? "",
     projectRoot: input?.projectRoot ?? "",
-    ownerActorIds: input?.ownerActorIds ? [...input.ownerActorIds] : [],
-    assigneeIdentitySource: "machine-active-credential",
-    baseRef: input?.baseRef?.trim() || "main",
   };
 }
 
@@ -104,34 +101,27 @@ export function createDefaultGithubAutomationRepository(): GithubAutomationRepos
   return createEmptyGithubAutomationRepository();
 }
 
-export function createDefaultTriageConfig(): GithubAutomationTriageConfig {
-  return { maxConcurrency: 2 };
+export function createDefaultAnalysisConfig(): GithubAutomationAnalysisConfig {
+  return {
+    maxConcurrency: GITHUB_AUTOMATION_ANALYSIS_DEFAULT_MAX_CONCURRENCY,
+  };
 }
 
-export function createDefaultUnattendedConfig(): GithubAutomationUnattendedConfig {
-  return {
-    enabled: false,
-    executionProfile: "full-agent",
-    riskProfile: "docs-and-small-bugfix",
-    maxConcurrency: 1,
-    maxFiles: 12,
-    maxChangedLines: 500,
-    validationCommands: [...GITHUB_AUTOMATION_DEFAULT_VALIDATION_COMMANDS],
-  };
+/** @deprecated Schema v1 triage alias; use createDefaultAnalysisConfig(). */
+export function createDefaultTriageConfig(): GithubAutomationAnalysisConfig {
+  return createDefaultAnalysisConfig();
 }
 
 export function createDefaultGithubAutomationConfig(
   now: string = new Date().toISOString(),
-): GithubAutomationConfigV1 {
+): GithubAutomationConfigV2 {
   const body = {
     schemaVersion: GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION,
     enabled: false,
-    mode: "off" as GithubAutomationMode,
     paused: false,
     // Fresh installs start with zero allowlisted repositories.
     repositories: [] as GithubAutomationRepositoryConfig[],
-    triage: createDefaultTriageConfig(),
-    unattended: createDefaultUnattendedConfig(),
+    analysis: createDefaultAnalysisConfig(),
     updatedAt: now,
   };
   return {
@@ -147,7 +137,7 @@ export function createDefaultGithubAutomationConfig(
  */
 export function isLegacySeededGithubAutomationRepository(
   repo: Pick<
-    GithubAutomationRepositoryConfig,
+    GithubAutomationRepositoryConfig | GithubAutomationRepositoryConfigV1,
     "repositoryId" | "fullName" | "projectId" | "projectRoot" | "installationId"
   >,
 ): boolean {
@@ -158,12 +148,15 @@ export function isLegacySeededGithubAutomationRepository(
     typeof repo.projectId === "string" ? repo.projectId.trim() : "";
   const projectRoot =
     typeof repo.projectRoot === "string" ? repo.projectRoot.trim() : "";
+  const installationId = repo.installationId;
   return (
     repo.repositoryId === GITHUB_AUTOMATION_LEGACY_SEEDED_REPOSITORY_ID &&
     fullName === legacyName &&
     !projectId &&
     !projectRoot &&
-    (repo.installationId === null || repo.installationId === undefined)
+    (installationId === null ||
+      installationId === undefined ||
+      installationId === 0)
   );
 }
 
@@ -193,7 +186,7 @@ export function stableStringify(value: unknown): string {
 
 /** Body used for revision: everything except the revision field itself. */
 export type GithubAutomationConfigRevisionBody = Omit<
-  GithubAutomationConfigV1,
+  GithubAutomationConfigV2,
   "revision"
 >;
 
@@ -314,72 +307,6 @@ function normalizeProjectIdField(
   return trimmed;
 }
 
-function normalizeBaseRef(raw: unknown, index: number): string {
-  if (raw === undefined || raw === null || raw === "") return "main";
-  if (typeof raw !== "string") {
-    throw new GithubAutomationError(
-      "invalid_config",
-      `Invalid repositories[${index}].baseRef`,
-      { status: 400 },
-    );
-  }
-  const trimmed = raw.trim();
-  if (!trimmed || trimmed.length > 255) {
-    throw new GithubAutomationError(
-      "invalid_config",
-      `Invalid repositories[${index}].baseRef`,
-      { status: 400 },
-    );
-  }
-  // Reject path traversal / absolute refs / shell-ish characters.
-  if (
-    trimmed.includes("..") ||
-    trimmed.includes("\\") ||
-    trimmed.includes("\0") ||
-    trimmed.startsWith("/") ||
-    /[\s~^:?*\[\\]/.test(trimmed) ||
-    trimmed.endsWith(".lock") ||
-    trimmed.endsWith("/")
-  ) {
-    throw new GithubAutomationError(
-      "invalid_config",
-      `Invalid repositories[${index}].baseRef`,
-      { status: 400, details: { reason: "invalid_base_ref" } },
-    );
-  }
-  return trimmed;
-}
-
-function normalizeOwnerActorIds(raw: unknown, index: number): number[] {
-  if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw)) {
-    throw new GithubAutomationError(
-      "invalid_config",
-      `Invalid repositories[${index}].ownerActorIds`,
-      { status: 400 },
-    );
-  }
-  const ownerActorIds: number[] = [];
-  const seen = new Set<number>();
-  for (let i = 0; i < raw.length; i++) {
-    const id = asPositiveInt(
-      raw[i],
-      `repositories[${index}].ownerActorIds[${i}]`,
-    );
-    if (seen.has(id)) continue;
-    seen.add(id);
-    ownerActorIds.push(id);
-  }
-  if (ownerActorIds.length > 64) {
-    throw new GithubAutomationError(
-      "invalid_config",
-      `Invalid repositories[${index}].ownerActorIds`,
-      { status: 400, details: { reason: "too_many_owner_actor_ids" } },
-    );
-  }
-  return ownerActorIds;
-}
-
 function normalizeRepository(
   raw: unknown,
   index: number,
@@ -391,36 +318,47 @@ function normalizeRepository(
       { status: 400 },
     );
   }
-  const repositoryId = asPositiveInt(raw.repositoryId, `repositories[${index}].repositoryId`);
+
+  // Reject closed-loop fields on live schema v2.
+  for (const banned of [
+    "baseRef",
+    "ownerActorIds",
+    "assigneeIdentitySource",
+    "mode",
+    "unattended",
+    "triage",
+  ] as const) {
+    if (raw[banned] !== undefined) {
+      throw new GithubAutomationError(
+        "invalid_config",
+        `repositories[${index}] contains retired field ${banned}`,
+        { status: 400, details: { field: banned, index } },
+      );
+    }
+  }
+
+  const repositoryId = asPositiveInt(
+    raw.repositoryId,
+    `repositories[${index}].repositoryId`,
+  );
   const fullNameRaw = asString(raw.fullName, `repositories[${index}].fullName`);
   const parsedName = parseGithubRepositoryFullName(fullNameRaw);
 
-  let installationId: number | null = null;
-  if (raw.installationId !== null && raw.installationId !== undefined) {
-    installationId = asPositiveInt(
-      raw.installationId,
-      `repositories[${index}].installationId`,
-    );
-  }
+  const installationId = asPositiveInt(
+    raw.installationId,
+    `repositories[${index}].installationId`,
+  );
 
   // Disk may still carry projectRoot (server-only). Browser wire never supplies it;
   // higher-level bind helpers recompute root from projectId.
   const projectRoot =
     typeof raw.projectRoot === "string" ? raw.projectRoot : "";
   const projectId = normalizeProjectIdField(raw.projectId, index);
-  const ownerActorIds = normalizeOwnerActorIds(raw.ownerActorIds, index);
-  const baseRef = normalizeBaseRef(raw.baseRef, index);
-
-  // Product decision: assignee identity is always machine-active-credential.
-  // Reject any attempt to switch to user-supplied token sources via config.
-  if (
-    raw.assigneeIdentitySource !== undefined &&
-    raw.assigneeIdentitySource !== "machine-active-credential"
-  ) {
+  if (!projectId) {
     throw new GithubAutomationError(
       "invalid_config",
-      "assigneeIdentitySource must be machine-active-credential",
-      { status: 400 },
+      `repositories[${index}].projectId is required`,
+      { status: 400, details: { reason: "project_id_required", index } },
     );
   }
 
@@ -430,114 +368,37 @@ function normalizeRepository(
     installationId,
     projectId,
     projectRoot,
-    ownerActorIds,
-    assigneeIdentitySource: "machine-active-credential",
-    baseRef,
   };
 }
 
-function normalizeTriage(raw: unknown): GithubAutomationTriageConfig {
-  if (raw === undefined || raw === null) return createDefaultTriageConfig();
+function normalizeAnalysis(raw: unknown): GithubAutomationAnalysisConfig {
+  if (raw === undefined || raw === null) return createDefaultAnalysisConfig();
   if (!isRecord(raw)) {
-    throw new GithubAutomationError("invalid_config", "Invalid triage", {
+    throw new GithubAutomationError("invalid_config", "Invalid analysis", {
       status: 400,
     });
   }
   const maxConcurrency =
     raw.maxConcurrency === undefined
-      ? 2
-      : asPositiveInt(raw.maxConcurrency, "triage.maxConcurrency");
-  return { maxConcurrency: Math.min(maxConcurrency, 8) };
-}
-
-function normalizeUnattended(raw: unknown): GithubAutomationUnattendedConfig {
-  const defaults = createDefaultUnattendedConfig();
-  if (raw === undefined || raw === null) return defaults;
-  if (!isRecord(raw)) {
-    throw new GithubAutomationError("invalid_config", "Invalid unattended", {
-      status: 400,
-    });
-  }
-
-  const enabled = raw.enabled === true;
-
-  // executionProfile is fixed to full-agent for this product decision.
-  if (
-    raw.executionProfile !== undefined &&
-    raw.executionProfile !== "full-agent"
-  ) {
-    throw new GithubAutomationError(
-      "invalid_config",
-      "executionProfile must be full-agent",
-      { status: 400 },
-    );
-  }
-
-  // riskProfile is fixed to docs-and-small-bugfix.
-  if (
-    raw.riskProfile !== undefined &&
-    raw.riskProfile !== "docs-and-small-bugfix"
-  ) {
-    throw new GithubAutomationError(
-      "invalid_config",
-      "riskProfile must be docs-and-small-bugfix",
-      { status: 400 },
-    );
-  }
-
-  const maxConcurrency =
-    raw.maxConcurrency === undefined
-      ? defaults.maxConcurrency
-      : asPositiveInt(raw.maxConcurrency, "unattended.maxConcurrency");
-  const maxFiles =
-    raw.maxFiles === undefined
-      ? defaults.maxFiles
-      : asPositiveInt(raw.maxFiles, "unattended.maxFiles");
-  const maxChangedLines =
-    raw.maxChangedLines === undefined
-      ? defaults.maxChangedLines
-      : asPositiveInt(raw.maxChangedLines, "unattended.maxChangedLines");
-
-  let validationCommands = [...defaults.validationCommands];
-  if (raw.validationCommands !== undefined) {
-    if (!Array.isArray(raw.validationCommands)) {
-      throw new GithubAutomationError(
-        "invalid_config",
-        "Invalid unattended.validationCommands",
-        { status: 400 },
-      );
-    }
-    validationCommands = raw.validationCommands.map((cmd, i) => {
-      if (typeof cmd !== "string" || !cmd.trim()) {
-        throw new GithubAutomationError(
-          "invalid_config",
-          `Invalid unattended.validationCommands[${i}]`,
-          { status: 400 },
-        );
-      }
-      return cmd.trim();
-    });
-  }
-
+      ? GITHUB_AUTOMATION_ANALYSIS_DEFAULT_MAX_CONCURRENCY
+      : asPositiveInt(raw.maxConcurrency, "analysis.maxConcurrency");
   return {
-    enabled,
-    executionProfile: "full-agent",
-    riskProfile: "docs-and-small-bugfix",
-    maxConcurrency: Math.min(maxConcurrency, 2),
-    maxFiles,
-    maxChangedLines,
-    validationCommands,
+    maxConcurrency: Math.min(
+      maxConcurrency,
+      GITHUB_AUTOMATION_ANALYSIS_MAX_CONCURRENCY_LIMIT,
+    ),
   };
 }
 
 /**
- * Parse and normalize unknown JSON into GithubAutomationConfigV1.
+ * Parse and normalize unknown JSON into live GithubAutomationConfigV2.
  * Recomputes revision from body (disk revision is ignored if present).
+ * Does NOT migrate schema v1 — use readGithubAutomationConfig / migration helpers.
  */
 export function normalizeGithubAutomationConfig(
   raw: unknown,
   options?: { updatedAt?: string },
-): GithubAutomationConfigV1 {
+): GithubAutomationConfigV2 {
   if (!isRecord(raw)) {
     throw new GithubAutomationError("invalid_config", "Config must be an object", {
       status: 400,
@@ -549,22 +410,35 @@ export function normalizeGithubAutomationConfig(
     throw new GithubAutomationError(
       "invalid_config",
       "Unsupported github-automation config schemaVersion",
-      { status: 400 },
+      {
+        status: 400,
+        details: {
+          reason: "unknown_schema_version",
+          schemaVersion: String(schemaVersion),
+        },
+      },
     );
+  }
+
+  // Reject closed-loop top-level fields on live v2 writes/normalize.
+  for (const banned of [
+    "mode",
+    "unattended",
+    "triage",
+    "executionProfile",
+    "riskProfile",
+  ] as const) {
+    if (raw[banned] !== undefined) {
+      throw new GithubAutomationError(
+        "invalid_config",
+        `Config contains retired field ${banned}`,
+        { status: 400, details: { field: banned } },
+      );
+    }
   }
 
   const enabled = raw.enabled === true;
   const paused = raw.paused === true;
-
-  let mode: GithubAutomationMode = "off";
-  if (raw.mode !== undefined) {
-    if (!isGithubAutomationMode(raw.mode)) {
-      throw new GithubAutomationError("invalid_config", "Invalid mode", {
-        status: 400,
-      });
-    }
-    mode = raw.mode;
-  }
 
   if (!Array.isArray(raw.repositories)) {
     throw new GithubAutomationError(
@@ -575,7 +449,9 @@ export function normalizeGithubAutomationConfig(
   }
 
   // Empty allowlist is valid (fresh install / operator cleared all repos).
-  const repositories = raw.repositories.map((repo, i) => normalizeRepository(repo, i));
+  const repositories = raw.repositories.map((repo, i) =>
+    normalizeRepository(repo, i),
+  );
   const seenIds = new Set<number>();
   const seenNames = new Set<string>();
   for (const repo of repositories) {
@@ -598,8 +474,7 @@ export function normalizeGithubAutomationConfig(
     seenNames.add(nameKey);
   }
 
-  const triage = normalizeTriage(raw.triage);
-  const unattended = normalizeUnattended(raw.unattended);
+  const analysis = normalizeAnalysis(raw.analysis);
 
   const updatedAt =
     typeof options?.updatedAt === "string" && options.updatedAt
@@ -611,11 +486,9 @@ export function normalizeGithubAutomationConfig(
   const body: GithubAutomationConfigRevisionBody = {
     schemaVersion: GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION,
     enabled,
-    mode,
     paused,
     repositories,
-    triage,
-    unattended,
+    analysis,
     updatedAt,
   };
 
@@ -753,27 +626,29 @@ export async function bindGithubAutomationRepositoryProject(
   const projectId =
     typeof repo.projectId === "string" && repo.projectId.trim()
       ? repo.projectId.trim()
-      : null;
+      : "";
 
   if (!projectId) {
-    if (options?.requireProjectId) {
+    // Schema v2 always requires projectId for durable repositories.
+    if (options?.requireProjectId !== false) {
       throw new GithubAutomationError(
         "invalid_config",
         "projectId is required",
         { status: 400, details: { repositoryId: repo.repositoryId } },
       );
     }
-    // Keep any legacy server-only projectRoot already on disk; wire cannot set it.
-    return {
-      ...repo,
-      projectId: null,
-      projectRoot: typeof repo.projectRoot === "string" ? repo.projectRoot : "",
-    };
+    throw new GithubAutomationError(
+      "invalid_config",
+      "projectId is required",
+      { status: 400, details: { repositoryId: repo.repositoryId } },
+    );
   }
 
   const binding = await resolveGithubAutomationProjectBinding(projectId);
   return {
-    ...repo,
+    repositoryId: repo.repositoryId,
+    fullName: repo.fullName,
+    installationId: repo.installationId,
     projectId: binding.projectId,
     projectRoot: binding.projectRoot,
   };
@@ -785,10 +660,8 @@ export async function bindGithubAutomationRepositoryProject(
 export interface GithubAutomationRepositoryWireDraft {
   repositoryId: number;
   fullName: string;
-  installationId: number | null;
-  projectId: string | null;
-  ownerActorIds: number[];
-  baseRef: string;
+  installationId: number;
+  projectId: string;
 }
 
 /**
@@ -817,13 +690,18 @@ export function parseGithubAutomationRepositoryWireDraft(
       lower === "realpath" ||
       lower === "path" ||
       lower === "rootpath" ||
+      lower === "baseref" ||
+      lower === "owneractorids" ||
       lower.includes("token") ||
       lower.includes("secret") ||
       lower.includes("password") ||
       lower.includes("private") ||
       lower.includes("credential") ||
       lower === "assigneeidentitysource" ||
-      lower === "validationcommands"
+      lower === "validationcommands" ||
+      lower === "mode" ||
+      lower === "unattended" ||
+      lower === "triage"
     ) {
       throw new GithubAutomationError(
         "invalid_config",
@@ -868,8 +746,6 @@ export function parseGithubAutomationRepositoryWireDraft(
     fullName: normalized.fullName,
     installationId: normalized.installationId,
     projectId: normalized.projectId,
-    ownerActorIds: normalized.ownerActorIds,
-    baseRef: normalized.baseRef,
   };
 }
 
@@ -938,7 +814,11 @@ export async function verifyGithubAutomationRepositoryIdentity(
     return draft;
   }
 
-  if (draft.installationId === null) {
+  if (
+    typeof draft.installationId !== "number" ||
+    !Number.isInteger(draft.installationId) ||
+    draft.installationId <= 0
+  ) {
     throw new GithubAutomationError(
       "installation_missing",
       "installationId is required to verify repository identity",
@@ -1014,8 +894,13 @@ export function isGithubAutomationJobBlockingRepositoryDelete(
   job: Pick<GithubAutomationJobRecord, "status" | "phase">,
 ): boolean {
   if (REPOSITORY_DELETE_BLOCKING_STATUSES.has(job.status)) return true;
-  // Defensive: running-like phases even if status drifted.
+  // Analysis phases + any residual closed-loop phase names still block delete.
   if (
+    job.phase === "analyzing" ||
+    job.phase === "result_ready" ||
+    job.phase === "commenting" ||
+    job.phase === "closing" ||
+    job.phase === "received" ||
     job.phase === "implementing" ||
     job.phase === "checking" ||
     job.phase === "publishing" ||
@@ -1075,7 +960,7 @@ export function findGithubAutomationRepositoryDeleteBlocks(
  * Does not enqueue jobs or wake the scheduler.
  */
 export async function assertGithubAutomationRepositoriesDeletable(
-  current: GithubAutomationConfigV1,
+  current: GithubAutomationConfigV2,
   nextRepositoryIds: readonly number[],
   options?: { jobs?: readonly GithubAutomationJobRecord[] },
 ): Promise<void> {
@@ -1124,7 +1009,7 @@ export async function assertGithubAutomationRepositoriesDeletable(
  */
 export async function resolveGithubAutomationRepositoryWireDrafts(
   drafts: readonly GithubAutomationRepositoryWireDraft[],
-  current: GithubAutomationConfigV1,
+  current: GithubAutomationConfigV2,
   options?: {
     signal?: AbortSignal;
     /** Tests only: skip fixed-host GitHub lookup. */
@@ -1154,9 +1039,6 @@ export async function resolveGithubAutomationRepositoryWireDrafts(
         projectId: verified.projectId,
         // Never take projectRoot from the wire draft.
         projectRoot: previous?.projectRoot ?? "",
-        ownerActorIds: verified.ownerActorIds,
-        assigneeIdentitySource: "machine-active-credential",
-        baseRef: verified.baseRef,
       },
       { requireProjectId },
     );
@@ -1194,15 +1076,11 @@ export async function listGithubAutomationProjectChoices(): Promise<
 export interface GithubAutomationRepositorySafeProjection {
   repositoryId: number;
   fullName: string;
-  /** Installation id when bound (non-secret integer). */
-  installationId: number | null;
+  /** Installation id (required positive integer on v2). */
+  installationId: number;
   hasInstallationId: boolean;
-  baseRef: string;
-  assigneeIdentitySource: "machine-active-credential";
-  ownerActorIds: number[];
-  ownerActorIdCount: number;
   /** Project Registry id when bound; never an absolute path. */
-  projectId: string | null;
+  projectId: string;
   /** Whether a non-empty projectRoot is configured (not the path itself). */
   projectRootConfigured: boolean;
   /**
@@ -1215,21 +1093,11 @@ export interface GithubAutomationRepositorySafeProjection {
 export interface GithubAutomationConfigSafeProjection {
   schemaVersion: typeof GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION;
   enabled: boolean;
-  mode: GithubAutomationMode;
   paused: boolean;
   revision: string;
   updatedAt: string;
   repositories: GithubAutomationRepositorySafeProjection[];
-  triage: GithubAutomationTriageConfig;
-  unattended: {
-    enabled: boolean;
-    executionProfile: "full-agent";
-    riskProfile: "docs-and-small-bugfix";
-    maxConcurrency: number;
-    maxFiles: number;
-    maxChangedLines: number;
-    validationCommandCount: number;
-  };
+  analysis: GithubAutomationAnalysisConfig;
 }
 
 export function toGithubAutomationRepositorySafeProjection(
@@ -1238,54 +1106,41 @@ export function toGithubAutomationRepositorySafeProjection(
   const projectId =
     typeof repo.projectId === "string" && repo.projectId.trim()
       ? repo.projectId.trim()
-      : null;
+      : "";
   const projectRootConfigured =
     typeof repo.projectRoot === "string" && repo.projectRoot.trim().length > 0;
   return {
     repositoryId: repo.repositoryId,
     fullName: repo.fullName,
     installationId: repo.installationId,
-    hasInstallationId: repo.installationId !== null,
-    baseRef: repo.baseRef,
-    assigneeIdentitySource: "machine-active-credential",
-    ownerActorIds: [...repo.ownerActorIds],
-    ownerActorIdCount: repo.ownerActorIds.length,
+    hasInstallationId:
+      typeof repo.installationId === "number" && repo.installationId > 0,
     projectId,
-    projectRootConfigured: projectRootConfigured || projectId !== null,
+    projectRootConfigured: projectRootConfigured || projectId.length > 0,
     legacySeeded: isLegacySeededGithubAutomationRepository(repo),
   };
 }
 
 export function toGithubAutomationConfigSafeProjection(
-  config: GithubAutomationConfigV1,
+  config: GithubAutomationConfigV2,
 ): GithubAutomationConfigSafeProjection {
   return {
     schemaVersion: config.schemaVersion,
     enabled: config.enabled,
-    mode: config.mode,
     paused: config.paused,
     revision: config.revision,
     updatedAt: config.updatedAt,
     repositories: config.repositories.map((repo) =>
       toGithubAutomationRepositorySafeProjection(repo),
     ),
-    triage: { ...config.triage },
-    unattended: {
-      enabled: config.unattended.enabled,
-      executionProfile: "full-agent",
-      riskProfile: "docs-and-small-bugfix",
-      maxConcurrency: config.unattended.maxConcurrency,
-      maxFiles: config.unattended.maxFiles,
-      maxChangedLines: config.unattended.maxChangedLines,
-      validationCommandCount: config.unattended.validationCommands.length,
-    },
+    analysis: { ...config.analysis },
   };
 }
 
 // ─── Lookups ─────────────────────────────────────────────────────────────────
 
 export function findRepositoryConfigById(
-  config: GithubAutomationConfigV1,
+  config: GithubAutomationConfigV2,
   repositoryId: number,
 ): GithubAutomationRepositoryConfig | null {
   return (
@@ -1295,7 +1150,7 @@ export function findRepositoryConfigById(
 }
 
 export function isRepositoryAllowlisted(
-  config: GithubAutomationConfigV1,
+  config: GithubAutomationConfigV2,
   repositoryId: number,
 ): boolean {
   return findRepositoryConfigById(config, repositoryId) !== null;
@@ -1342,11 +1197,13 @@ async function atomicWriteFile(path: string, contents: string): Promise<void> {
 
 /**
  * Read config from disk. Missing file returns defaults (not an error).
+ * Schema v1 is migrated under-process (backup + force enabled=false).
+ * Unknown/future schema fails closed without overwrite.
  * Corrupt JSON throws GithubAutomationError(invalid_config).
  */
-export async function readGithubAutomationConfig(): Promise<GithubAutomationConfigV1> {
+export async function readGithubAutomationConfig(): Promise<GithubAutomationConfigV2> {
   const path = getGithubAutomationConfigPath();
-  let rawText: string;
+  let rawText: string | null = null;
   try {
     rawText = await readFile(path, "utf8");
   } catch (err: unknown) {
@@ -1364,18 +1221,14 @@ export async function readGithubAutomationConfig(): Promise<GithubAutomationConf
     );
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawText) as unknown;
-  } catch {
-    throw new GithubAutomationError(
-      "invalid_config",
-      "github-automation config is not valid JSON",
-      { status: 400 },
-    );
-  }
-
-  return normalizeGithubAutomationConfig(parsed);
+  // Dynamic import avoids a static cycle with migration ↔ store retirement.
+  const { migrateGithubAutomationConfigFromRaw } = await import(
+    "./github-automation-migration"
+  );
+  const migrated = await migrateGithubAutomationConfigFromRaw(rawText, {
+    persist: true,
+  });
+  return migrated.config;
 }
 
 /**
@@ -1383,8 +1236,8 @@ export async function readGithubAutomationConfig(): Promise<GithubAutomationConf
  * Does not perform CAS — use patchGithubAutomationConfig for revision checks.
  */
 export async function writeGithubAutomationConfig(
-  config: GithubAutomationConfigV1 | GithubAutomationConfigRevisionBody,
-): Promise<GithubAutomationConfigV1> {
+  config: GithubAutomationConfigV2 | GithubAutomationConfigRevisionBody,
+): Promise<GithubAutomationConfigV2> {
   const normalized = normalizeGithubAutomationConfig(
     {
       ...config,
@@ -1400,7 +1253,6 @@ export async function writeGithubAutomationConfig(
 export interface GithubAutomationConfigPatch {
   revision: string;
   enabled?: boolean;
-  mode?: GithubAutomationMode;
   paused?: boolean;
   /**
    * Full repository list replacement when provided.
@@ -1408,13 +1260,7 @@ export interface GithubAutomationConfigPatch {
    * resolveGithubAutomationRepositoryWireDrafts first (server-side roots only).
    */
   repositories?: GithubAutomationRepositoryConfig[];
-  triage?: Partial<GithubAutomationTriageConfig>;
-  unattended?: Partial<
-    Omit<GithubAutomationUnattendedConfig, "executionProfile" | "riskProfile">
-  > & {
-    executionProfile?: "full-agent";
-    riskProfile?: "docs-and-small-bugfix";
-  };
+  analysis?: Partial<GithubAutomationAnalysisConfig>;
   /**
    * When true (default), refuse to drop repositories that still have active jobs.
    * Pure config write — never enqueues jobs.
@@ -1430,7 +1276,7 @@ export interface GithubAutomationConfigPatch {
  */
 export async function patchGithubAutomationConfig(
   patch: GithubAutomationConfigPatch,
-): Promise<GithubAutomationConfigV1> {
+): Promise<GithubAutomationConfigV2> {
   const current = await readGithubAutomationConfig();
   if (patch.revision !== current.revision) {
     throw new GithubAutomationError(
@@ -1446,6 +1292,18 @@ export async function patchGithubAutomationConfig(
     );
   }
 
+  // Reject any attempt to reintroduce closed-loop fields via untyped casts.
+  const patchRecord = patch as unknown as Record<string, unknown>;
+  for (const banned of ["mode", "unattended", "triage"] as const) {
+    if (patchRecord[banned] !== undefined) {
+      throw new GithubAutomationError(
+        "invalid_config",
+        `Config patch contains retired field ${banned}`,
+        { status: 400, details: { field: banned } },
+      );
+    }
+  }
+
   const nextRepositories = patch.repositories ?? current.repositories;
 
   if (patch.repositories !== undefined && patch.enforceDeleteGate !== false) {
@@ -1457,20 +1315,13 @@ export async function patchGithubAutomationConfig(
   }
 
   const nextRaw: Record<string, unknown> = {
-    schemaVersion: current.schemaVersion,
+    schemaVersion: GITHUB_AUTOMATION_CONFIG_SCHEMA_VERSION,
     enabled: patch.enabled ?? current.enabled,
-    mode: patch.mode ?? current.mode,
     paused: patch.paused ?? current.paused,
     repositories: nextRepositories,
-    triage: {
-      ...current.triage,
-      ...(patch.triage ?? {}),
-    },
-    unattended: {
-      ...current.unattended,
-      ...(patch.unattended ?? {}),
-      executionProfile: "full-agent",
-      riskProfile: "docs-and-small-bugfix",
+    analysis: {
+      ...current.analysis,
+      ...(patch.analysis ?? {}),
     },
   };
 

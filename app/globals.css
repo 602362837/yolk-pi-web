@@ -7005,8 +7005,154 @@ a.github-automation-button--help > span[aria-hidden="true"] {
   background: color-mix(in srgb, var(--success, #22c55e) 14%, transparent);
 }
 .github-automation-residual-risk {
-  /* Non-dismissible product warning — no close control is rendered. */
+  /* Legacy class retained for safety; GIA-05 uses warn-banner instead. */
   margin-top: 2px;
+}
+.github-automation-control-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  padding: 14px 0;
+}
+.github-automation-control-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.github-automation-control-label {
+  display: block;
+  font-weight: 750;
+  color: var(--text);
+  font-size: 13px;
+}
+.github-automation-control-help {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.github-automation-control-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.github-automation-switch {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex: none;
+  border: 0;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--text-muted) 35%, var(--bg-subtle, var(--bg)));
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+.github-automation-switch.is-on {
+  background: var(--accent, #3d8bfd);
+}
+.github-automation-switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.github-automation-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.github-automation-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 25%, transparent);
+  transition: transform 0.15s ease;
+}
+.github-automation-switch.is-on .github-automation-switch-knob {
+  transform: translateX(18px);
+}
+.github-automation-select {
+  min-height: 34px;
+  min-width: 72px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.github-automation-select:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+.github-automation-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.github-automation-warn-banner {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--warning, #b45309) 40%, var(--border));
+  background: color-mix(in srgb, var(--warning, #f59e0b) 12%, var(--bg));
+  color: color-mix(in srgb, var(--warning, #b45309) 70%, var(--text));
+  font-size: 12px;
+  line-height: 1.5;
+}
+.github-automation-analysis-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px;
+  min-width: 0;
+}
+.github-automation-boundary-copy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.github-automation-boundary-copy code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 11px;
+  color: var(--text);
+}
+.github-automation-env-details {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.github-automation-env-details > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  list-style: none;
+}
+.github-automation-env-details > summary::-webkit-details-marker {
+  display: none;
+}
+.github-automation-env-details > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.github-automation-page .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .github-automation-check {
   display: flex;
@@ -7467,6 +7613,11 @@ a.github-automation-button--help > span[aria-hidden="true"] {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
   background: color-mix(in srgb, var(--accent) 9%, var(--bg));
+}
+.github-automation-pill--muted {
+  color: var(--text-dim);
+  border-color: var(--border);
+  background: var(--bg-subtle, var(--bg));
 }
 .github-automation-button {
   min-height: 34px;
@@ -8209,6 +8360,18 @@ a.github-automation-button--help > span[aria-hidden="true"] {
   }
   .github-automation-instant-badge {
     margin-top: 0;
+  }
+  .github-automation-control-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .github-automation-control-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .github-automation-analysis-row {
+    grid-template-columns: 1fr;
+    gap: 9px;
   }
   .github-automation-split,
   .github-automation-readiness,

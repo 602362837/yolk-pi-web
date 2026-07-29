@@ -161,7 +161,7 @@ PI_CODING_AGENT_DIR=/path/to/pi-agent-data ypi
 | `chatgpt-usage-refresh.lock` | Backend ChatGPT usage auto-refresh lock file; stale locks can be repaired from the ChatGPT panel fault handler. |
 | `auth-api-key-accounts/` | Managed API-key account storage for multi-account providers (`opencode-go/`, `xai/`). Contains per-provider `accounts.json` (metadata with active account, disabled state, masked previews) and per-account `<accountId>.json` secret files (mode 0600). Old metadata without `disabled` fields is treated as enabled — no migration required. Automatic failover remains OpenCode Go–only; xAI uses manual key activation only. |
 | `links/` | Links GitHub OAuth connection storage. Contains `registry.json` (metadata only — connected + disconnected), `.locks/` (cross-process mkdir locks), and `github/<id>.json` (OAuth secret, mode 0600). `device_code` never reaches disk; access tokens only in secret files. Fully isolated from LLM auth (`auth.json`, `auth-accounts/`, `auth-api-key-accounts/`). |
-| `github-automation/` | GitHub App automation state (P0+). **Non-secret:** `config.json` (mode/allowlist/policy), `deliveries/`, `jobs/`, `repositories/<repoId>/issues/`, `events/`, `.locks/`. **Local App secrets (product default path):** `credentials.v1.json` (0600 metadata + secret fields + generation key pointer) and `private-key.<generation>.pem` (0600 RSA private key); credentials write lock under `.locks/credentials.lock/`. Directories `0700`, files `0600`. Do not commit this tree. Raw webhook bodies, signatures, Issue/comment text, App JWT/installation tokens, and machine personal credentials must never be stored in audit/job records. Isolated from Links and LLM auth. Backup of this directory includes App identity material — treat like other host secrets. |
+| `github-automation/` | GitHub App **issue analysis** state. **Non-secret:** schema-v2 `config.json` (`enabled`/`paused`/allowlist/`analysis.maxConcurrency`), `deliveries/`, `jobs/`, `repositories/<repoId>/issues/`, `events/`, optional v1 retirement sidecars/backups, `.locks/`. **Local App secrets (product default path):** `credentials.v1.json` (0600) + `private-key.<generation>.pem` (0600); credentials write lock under `.locks/credentials.lock/`. Directories `0700`, files `0600`. Do not commit this tree. Raw webhook bodies, signatures, Issue text, App JWT/installation tokens must never be stored in audit/job records. Isolated from Links and LLM auth. Backup includes App identity material — treat like host secrets. |
 | `appearance/` | Background-skin domain only (not `pi-web.json`). Contains `index.json` (schema-v1 metadata/revision, mode 0600; optional `kind`, missing ⇒ image), `skins/<opaque-id>.webp` (image full), `skins/<opaque-id>.mp4` (video full, original validated bytes), shared `skins/<opaque-id>.thumb.webp` (image thumb or video poster), plus `.tmp/`, `.trash/`, and `.mutation.lock/`. Video posters may require packaged `ffmpeg-static` at runtime. Missing directory equals default pure-color UI; do not treat generic `/api/files/upload` as the skin store. Backup this whole tree (including `.mp4`) if users rely on custom backgrounds; never rewrite session/models/auth data when restoring appearance. |
 
 Session path format:
@@ -291,17 +291,17 @@ This value is server-only and never exposed to the browser, `NEXT_PUBLIC_*`, Rea
 
 Normal production without env is **configured** (`GET /api/links` reports GitHub authorization configured). The stable `503 github_authorization_not_configured` code and the existing Settings “not configured” UI remain as defensive / test-only fail-closed surfaces (for example focused-test forced null, or an unexpected resolver fault). There is **no PAT fallback** and no empty-env production disable.
 
-## GitHub App automation setup
+## GitHub App issue analysis setup
 
-Issue triage automation is **default-off** and independent of Links OAuth. **P1 unattended full-agent implementation + App PR publishing is also default-off** (`unattended.enabled=false`).
+Issue analysis is **default-off** and independent of Links OAuth. It analyzes human `issues.opened` only: classification + contained read-only local evidence + one canonical comment + optional strict close. It does **not** claim Issues, run full agent, or open PRs.
 
 **逐步自建 GitHub App（客户/运维完整指南）：** [`docs/integrations/github-app-automation-setup.md`](../integrations/github-app-automation-setup.md)。每位部署方需自行创建 App、在 **设置 → GitHub 自动化 → 本机凭据** 保存 App ID / Webhook secret / 私钥 PEM、安装到目标仓库并关联 allowlist；产品不提供托管 App。环境变量仅作 CI/容器高级覆盖。
 
 ### Prerequisites
 
-1. A GitHub App installed on the allowlisted repository with **Metadata: read** and **Issues: read/write** for P0. P1 also requires **Pull requests** and **Contents** read/write for the server publisher.
-2. Webhook events: at least `issues` and `issue_comment` (installation lifecycle optional for later binding; P2 may add `pull_request`).
-3. Operator-provided **public HTTPS** reverse proxy/tunnel to **only** `POST /api/github-automation/webhook` on the ypi host. Do **not** expose Settings / `/api/github-automation/credentials` / config / status / verify unauthenticated on the public internet — those write or reveal management state. The product does not host a cloud relay.
+1. A GitHub App installed on the allowlisted repository with **Metadata: read** and **Issues: read/write** only. Contents / Pull requests are **not** required.
+2. Webhook events: **Issues** (installation lifecycle optional). Issue comment / Pull request events are not required; if delivered they are audit-only.
+3. Operator-provided **public HTTPS** reverse proxy/tunnel to **only** `POST /api/github-automation/webhook`. Do **not** expose Settings / credentials / config / status / verify unauthenticated on the public internet.
 4. App identity material via **local credentials (default)** and/or advanced env overlay:
 
 | Source | Purpose |
@@ -314,56 +314,37 @@ Issue triage automation is **default-off** and independent of Links OAuth. **P1 
 
 Resolver: non-empty env → local → missing per field. Never put secrets in `pi-web.json`, Links, Session/Task, or agent context.
 
-5. Machine assignee readiness: host has an **active** `gh` GitHub.com login that is assignable on the repo, **or** a fixed `github.com` git credential whose canonical `/user` login is assignable. Multi-account without an active account, expired credentials, non-github.com hosts, or unassignable logins block claim (`blocked_claim_assignee`) — they never fall back to App-bot assignee or personal PAT Bot identity.
-6. **Host risk acceptance for P1**: full agent is the default execution profile and is **not sandboxed**. It can run arbitrary commands, use the network, and read files visible to the same OS user (including outside the WorkTree). Final diff gates only control what may be published. Prefer a **dedicated low-privilege OS account or container**, minimal host credentials, and tight network policy. App/machine secrets are scrubbed from child env by product code but the agent can still discover other host-readable secrets on its own.
-
-### Claim semantics operators must know
-
-Successful claim on GitHub means **both**:
-
-- label `ypi:claimed`, and
-- Assignees contains the machine credential user `@login` (App assigns, then **read-back** confirms).
-
-If claim is incomplete, automation must not present success; `ypi:claimed` is not retained (may show `ypi:claim-blocked`). Fix credentials/permissions and retry the same durable job. Incomplete claims never start full agent / WorkTree.
+5. Each allowlisted repo binds a Project Registry `projectId` whose local root is **readable** for static evidence. Local checkout freshness vs remote default branch is a residual risk (Issues-only App cannot prove sync).
+6. Analysis model readiness follows the pi main default model; no dedicated GitHub model secret store.
 
 ### Settings setup checklist (recommended)
 
 Use **Settings → GitHub 自动化**:
 
-1. **本机 GitHub App 凭据**: enter App ID + Webhook secret, paste or choose RSA PEM, click **保存到本机** (`PUT /api/github-automation/credentials`). First save must be complete; later blank fields preserve local. Saved values are never re-shown. Optional advanced env still overrides per field for CI/containers.
-2. Install the GitHub App on target owner/repos with required permissions and public HTTPS **webhook-only** to `POST /api/github-automation/webhook`.
-3. Click **关联仓库**: pick a Project Registry project, enter `owner/repo` + immutable repository id + installation id + base ref. Default allowlist is **empty** (`repositories: []`) — the product does **not** hard-lock or prefill `602362837/yolk-pi-web`.
-4. Click **验证配置** (`POST /api/github-automation/verify`) for the fixed readiness checklist. Verify never starts the scheduler or enqueues jobs, never mutates credentials, and never returns secrets/absolute paths.
-5. Optionally stop and restart `ypi` with no `YPI_GITHUB_APP_*` env and confirm status still shows App credentials configured.
-6. Enable triage only after checklist blockers are clear; unattended stays fail-closed until App/install/permissions/assignee/allowlist/project/webhook readiness pass.
+1. **本机 GitHub App 凭据**: enter App ID + Webhook secret, paste or choose RSA PEM, click **保存到本机**. First save must be complete; later blank fields preserve local. Saved secrets are never re-shown.
+2. Install the GitHub App on target owner/repos with Metadata + Issues and public HTTPS **webhook-only** to `POST /api/github-automation/webhook`.
+3. **关联仓库**: Project Registry project + `owner/repo` + immutable repository id + installation id (no base ref / owner actor ids). Default allowlist is **empty**.
+4. **验证配置** (`POST /api/github-automation/verify`): App, installation, Issues permission, allowlist, project readable, model readiness, webhook health. Verify never starts jobs or mutates credentials.
+5. Optionally restart `ypi` with no `YPI_GITHUB_APP_*` env and confirm credentials still configured from local store.
+6. Enable only after checklist blockers are clear. v1 upgrades force `enabled=false` until re-verified.
 
-### Enable triage (P0)
+### Enable analysis
 
-Via Settings CAS (`GET|PATCH /api/github-automation/config`) or non-secret `~/.pi/agent/github-automation/config.json`: set `enabled=true`, `mode="triage"`, and a user-managed repository allowlist keyed by immutable `repositoryId` (plus installation id and Project Registry `projectId`). Fresh installs start with `repositories: []`. Keep `unattended.enabled=false` for pure P0.
-
-### Enable unattended (P1, optional)
-
-Only after accepting residual risk and completing live test-App UAT:
-
-1. Ensure each allowlisted repo is bound to a registered Project Registry project (server resolves `projectId → projectRoot`; never from Issue text or browser path input).
-2. App installation has Contents + Pull requests write.
-3. Set `mode="unattended"` and `unattended.enabled=true` with `executionProfile="full-agent"`, `riskProfile="docs-and-small-bugfix"`, operator validation commands, and file/line limits.
-4. Keep global unattended concurrency at 1; use pause/resume/retry on durable jobs rather than re-commenting shell commands.
+Via Settings CAS (`GET|PATCH /api/github-automation/config`) or non-secret `~/.pi/agent/github-automation/config.json` schema v2: set `enabled=true`, keep `paused=false` when ready, configure `analysis.maxConcurrency` (1–8, default 2), and a user-managed repository allowlist. Fresh installs start with `repositories: []` and `enabled=false`.
 
 ### Disable / rollback
 
-- `enabled=false` or `mode=off` stops new jobs; signed webhooks still verify and record ignored/paused audit deliveries.
-- `unattended.enabled=false` (or `mode=triage`) keeps P0 triage; owner adoption parks at `accepted_waiting_automation` without new WorkTree/PR.
-- Does not auto-delete Issue comments, labels, assignees, jobs, worktrees, branches, PRs, or events.
-- Machine credential logout does not rewrite historical jobs into false `claimStatus=complete` and does not fall back to App-bot assignee or personal PAT Bot.
+- `enabled=false` and/or `paused=true` stop new analysis; signed webhooks still verify and record audit deliveries.
+- Does not auto-delete Issue comments, labels, historical assignees, jobs, events, or leftover historical WorkTrees/PRs from the retired pipeline.
+- Code rollback must not let an old binary overwrite schema-v2 config as empty.
 
 Focused validation:
 
 ```bash
 npm run test:github-automation
-npm run test:github-unattended
-npm run test:github-publish-policy
 ```
+
+Live dedicated test-App UAT remains a release blocker for real comment/close behavior.
 
 ## Repository Remotes
 
