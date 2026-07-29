@@ -648,6 +648,36 @@ If a close was wrong: reopen manually; set `paused=true` while investigating loc
 
 Settings job **retry** only resumes the first unconfirmed checkpoint (result/comment/close). It must not re-run a validated analysis or re-POST a confirmed comment/close. Rate-limited; does not clear global `paused`.
 
+### `handler_not_ready` / overdue “下次自动重试” never fires
+
+**Pre-HNR (0.8.10) root cause:** production Webpack wrapped the analysis runner as an async module; the scheduler cold-loaded it with a synchronous `require`, fell through to a parking default handler, wrote `received/retry_due/handler_not_ready` after consuming `attempt`, then a later fixed poll timer cleared the 5s retry deadline so the job sat overdue forever. Server startup also did not ensure the scheduler, so restarts did not self-heal.
+
+**Post-HNR expected behavior:**
+
+1. Production scheduler **statically binds** `githubIssueAnalysisJobHandler` — ordinary ticks never select the parking default / `handler_not_ready` path.
+2. Handler readiness is resolved **before** business lease: bootstrap isolation failures do not write `job_started` or increment `attempt`.
+3. Timers follow durable `nextRetryAt` / queue deadlines; early ticks re-arm future work instead of going idle.
+4. Node `instrumentation.ts` fire-and-forget `ensureGithubAutomationScheduler()` on server start recovers overdue `queued` / `retry_due` / stale-running v2 jobs without a second webhook or manual Retry.
+5. `GET /status` and `POST /verify` remain non-waking; page polling cannot substitute for the durable scheduler.
+
+**Operator checklist when a job looks stuck:**
+
+1. Confirm package/build includes the HNR scheduler + root `instrumentation.ts` (not an old 0.8.10 binary without those fixes).
+2. Read the job file under `~/.pi/agent/github-automation/jobs/` (or `PI_CODING_AGENT_DIR`): note `status`, `reasonCode`, `attempt`, `nextRetryAt`, `updatedAt`.
+3. If `reasonCode=handler_not_ready` and `updatedAt` is frozen past `nextRetryAt` on an old binary: upgrade, then let **startup reconcile** continue the job — do **not** hand-edit the job JSON. Optional: set `paused=true` before upgrade if you must prevent an immediate remote comment.
+4. If still stuck on a new binary: check `enabled`/`paused`, allowlist/`installationId`, model readiness, and events JSONL for `job_started` vs `analysis_handler_initialization_failed` (fixed safe codes only).
+5. Manual Settings **Retry** remains valid for first-unconfirmed-checkpoint resume; it is no longer required solely to re-arm a lost timer after HNR.
+
+**Release verification:**
+
+```bash
+npm run test:github-automation
+npm run build
+npm run test:github-automation-production-runtime
+```
+
+The production smoke must load the real `.next` jobs route under a temp agentDir; jiti source green alone does not prove the Webpack cold-load fix.
+
 ### Model readiness false
 
 Analysis follows the pi main default model. Restore provider credentials / default model in Models settings. Status/verify never accept model secrets in the GitHub automation API.
@@ -682,6 +712,15 @@ npm run test:github-automation
 ```
 
 Uses temporary `PI_CODING_AGENT_DIR` and mocks only — never real operator agent dir or live GitHub/provider network. Mock green does **not** replace dedicated test-App UAT for live comment `updated_at` / close behavior.
+
+After a production build (release / HNR gate):
+
+```bash
+npm run build
+npm run test:github-automation-production-runtime
+```
+
+Loads the built `.next` jobs Retry route with a deterministic pre-network fixture and asserts no `handler_not_ready` / default fallback on the first production lease.
 
 ## Memory Diagnostic Snapshots
 

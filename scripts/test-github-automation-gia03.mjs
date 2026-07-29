@@ -11,7 +11,7 @@
 
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -634,14 +634,90 @@ await test("runner closes only when all gates pass for not_exists", async () => 
   runner._testSetGithubIssueAnalysisRunnerDeps(null);
 });
 
-await test("scheduler registers analysis handler without triage graph", () => {
+await test("scheduler statically binds production analysis handler without reverse register", () => {
   scheduler._testResetGithubAutomationHandlerRegistry();
-  scheduler.registerGithubIssueAnalysisJobHandler(
+  // No manual register / set: production path must already select the real handler.
+  assert.equal(scheduler.isGithubAutomationProductionHandlerReady(), true);
+  const handler = scheduler.getGithubAutomationJobHandler();
+  assert.equal(handler, runner.githubIssueAnalysisJobHandler);
+  const reg = scheduler.getGithubAutomationJobHandlerRegistration();
+  assert.equal(reg.kind, "production");
+  assert.equal(reg.handler, runner.githubIssueAnalysisJobHandler);
+});
+
+await test("explicit test override still works; reset restores production handler", () => {
+  scheduler._testResetGithubAutomationHandlerRegistry();
+  const stub = async (job) => ({ job, wakeAgain: false });
+  scheduler.setGithubAutomationJobHandler(stub);
+  assert.equal(scheduler.getGithubAutomationJobHandler(), stub);
+  assert.equal(
+    scheduler.getGithubAutomationJobHandlerRegistration().kind,
+    "custom",
+  );
+
+  scheduler._testResetGithubAutomationHandlerRegistry();
+  assert.equal(scheduler.isGithubAutomationProductionHandlerReady(), true);
+  assert.equal(
+    scheduler.getGithubAutomationJobHandler(),
     runner.githubIssueAnalysisJobHandler,
   );
-  const reg = scheduler.getGithubAutomationJobHandlerRegistration();
-  assert.equal(reg.kind, "custom");
-  assert.equal(typeof reg.handler, "function");
+});
+
+await test("readiness disabled refuses lease and does not increment attempt", async () => {
+  const cfg = await writeEnabledConfig();
+  scheduler._testResetGithubAutomationScheduler();
+  scheduler._testSetGithubAutomationSchedulerAuto(false);
+  scheduler._testResetGithubAutomationHandlerRegistry();
+  scheduler._testSetGithubAutomationProductionHandlerReadinessDisabled(true);
+
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: REPO_ID,
+    repositoryFullName: "acme/demo",
+    issueNumber: 2501,
+    installationId: INSTALL_ID,
+    deliveryId: "del-hnr-ready-1",
+    issueTitlePreview: "readiness gate",
+  });
+  assert.equal(job.attempt, 0);
+  assert.equal(job.status, "queued");
+
+  const tick = await scheduler.tickGithubAutomationScheduler();
+  assert.equal(tick.started, 0);
+
+  const after = await store.readGithubAutomationJob(job.jobId);
+  assert.ok(after);
+  assert.equal(after.attempt, 0);
+  assert.equal(after.status, "queued");
+  assert.equal(after.leaseOwner, null);
+  assert.notEqual(after.reasonCode, "handler_not_ready");
+
+  // No job_started / default fallback events for this job.
+  const eventsRoot = join(agentDir, "github-automation", "events");
+  let eventBlob = "";
+  try {
+    const days = await readdir(eventsRoot);
+    for (const day of days) {
+      if (!day.endsWith(".jsonl")) continue;
+      eventBlob += await readFile(join(eventsRoot, day), "utf8");
+    }
+  } catch {
+    eventBlob = "";
+  }
+  assert.equal(eventBlob.includes(job.jobId), false);
+  assert.equal(eventBlob.includes("job_started"), false);
+  assert.equal(eventBlob.includes("handler_not_ready"), false);
+  assert.equal(eventBlob.includes("default_handler_defensive_fallback"), false);
+
+  // Restore readiness and ensure the real handler is selected without re-register.
+  scheduler._testSetGithubAutomationProductionHandlerReadinessDisabled(false);
+  assert.equal(scheduler.isGithubAutomationProductionHandlerReady(), true);
+  assert.equal(
+    scheduler.getGithubAutomationJobHandler(),
+    runner.githubIssueAnalysisJobHandler,
+  );
+
+  // Keep config reference used so writeEnabledConfig is not tree-shaken by linters.
+  assert.equal(cfg.enabled, true);
 });
 
 console.log(`\nGIA-03 focused tests passed: ${passed}`);

@@ -19,7 +19,8 @@ import { randomUUID } from "node:crypto";
 import { readGithubAutomationConfig } from "./github-automation-config";
 import type {
   GithubAutomationConfigV2,
-  GithubAutomationJobDisposition,
+  GithubAutomationJobHandler,
+  GithubAutomationJobHandlerResult,
 } from "./github-automation-types";
 import {
   classifyGithubAutomationRetryability,
@@ -39,51 +40,31 @@ import {
   writeGithubAutomationJobWithFencing,
   type GithubAutomationJobRecord,
   type GithubAutomationJobStatus,
-  type GithubAutomationLeaseHandle,
 } from "./github-automation-store";
+import { githubIssueAnalysisJobHandler } from "./github-issue-analysis-runner";
 
 /** @deprecated Alias for live schema v2 config. */
 type GithubAutomationConfigV1 = GithubAutomationConfigV2;
 
-// ─── Handler registry ────────────────────────────────────────────────────────
+// Re-export leaf handler contract so existing importers keep working.
+export type {
+  GithubAutomationJobHandler,
+  GithubAutomationJobHandlerResult,
+} from "./github-automation-types";
 
-export type GithubAutomationJobHandlerResult = {
-  job: GithubAutomationJobRecord;
-  /**
-   * When true, scheduler will re-check queue soon (e.g. more work available).
-   * Default false. singleStep may set this only after real checkpoint progress.
-   */
-  wakeAgain?: boolean;
-  /**
-   * Explicit lease disposition (GHA-CLOSE-02). When absent, scheduler derives a
-   * conservative disposition from job status/progressRevision change.
-   */
-  disposition?: GithubAutomationJobDisposition;
-};
+// ─── Handler registry (test override only) ───────────────────────────────────
 
 /**
- * Job handler runs under job lease. GHA-02 default is a no-op advance to a safe
- * waiting checkpoint so webhook→enqueue→scheduler path is testable without GHA-03.
- *
- * Context includes the active lease handle so long handlers can heartbeat / fence.
- */
-export type GithubAutomationJobHandler = (
-  job: GithubAutomationJobRecord,
-  context: {
-    config: GithubAutomationConfigV1;
-    ownerId: string;
-    lease?: GithubAutomationLeaseHandle;
-  },
-) => Promise<GithubAutomationJobHandlerResult>;
-
-/**
- * Live registry kind. Analysis production registers as `custom` (or explicit `default`
- * for isolation tests). The retired `github_issue_triage` kind is no longer accepted.
+ * Live registry kind.
+ * - `production`: static binding of the single analysis handler (default).
+ * - `custom`: explicit test override via set/register helpers.
+ * - `default` / `none`: test-only isolation; never selected by production ticks.
  */
 export type GithubAutomationHandlerKind =
   | "none"
   | "default"
-  | "custom";
+  | "custom"
+  | "production";
 
 export type GithubAutomationHandlerRegistration =
   | { kind: "none"; generation: 0; handler: null }
@@ -96,6 +77,11 @@ export type GithubAutomationHandlerRegistration =
       kind: "custom";
       generation: number;
       handler: GithubAutomationJobHandler;
+    }
+  | {
+      kind: "production";
+      generation: number;
+      handler: GithubAutomationJobHandler;
     };
 
 interface HandlerRegistryState {
@@ -103,8 +89,8 @@ interface HandlerRegistryState {
   /** Monotonic generation bumped on every set (including null restore). */
   generationCounter: number;
   /**
-   * When true, tick/ensure will NOT auto-load the full triage handler.
-   * Used only by explicit GHA-02 isolation tests that exercise defaultJobHandler.
+   * When true, production path will not select the real analysis handler and
+   * will refuse business leases. Used only by focused isolation tests.
    */
   productionReadinessDisabled: boolean;
 }
@@ -116,7 +102,11 @@ declare global {
 function getHandlerRegistry(): HandlerRegistryState {
   if (!globalThis.__piGithubAutomationHandlerRegistry) {
     globalThis.__piGithubAutomationHandlerRegistry = {
-      registration: { kind: "none", generation: 0, handler: null },
+      registration: {
+        kind: "production",
+        generation: 0,
+        handler: githubIssueAnalysisJobHandler,
+      },
       generationCounter: 0,
       productionReadinessDisabled: false,
     };
@@ -124,35 +114,54 @@ function getHandlerRegistry(): HandlerRegistryState {
   return globalThis.__piGithubAutomationHandlerRegistry;
 }
 
-/** Live registry snapshot (authoritative for readiness). */
+function isProductionAnalysisHandler(
+  handler: GithubAutomationJobHandler | null | undefined,
+): boolean {
+  return typeof handler === "function" && handler === githubIssueAnalysisJobHandler;
+}
+
+/** Live registry snapshot (authoritative for readiness / test override state). */
 export function getGithubAutomationJobHandlerRegistration(): GithubAutomationHandlerRegistration {
   return getHandlerRegistry().registration;
 }
 
+/**
+ * Production readiness: real analysis handler is statically bound and isolation
+ * tests have not disabled it. Explicit custom overrides count as ready for tests.
+ */
 export function isGithubAutomationProductionHandlerReady(): boolean {
-  // Analysis production registers as custom; default is only for isolation tests.
-  const kind = getHandlerRegistry().registration.kind;
-  return kind === "custom" || kind === "default";
+  const registry = getHandlerRegistry();
+  if (registry.productionReadinessDisabled) return false;
+  const reg = registry.registration;
+  if (reg.kind === "custom" && typeof reg.handler === "function") return true;
+  if (reg.kind === "production" && isProductionAnalysisHandler(reg.handler)) {
+    return true;
+  }
+  // After registry reset / null restore, production default is still ready unless disabled.
+  if (reg.kind === "none" || reg.kind === "default") {
+    return isProductionAnalysisHandler(githubIssueAnalysisJobHandler);
+  }
+  return isProductionAnalysisHandler(reg.handler);
 }
 
 /**
- * Register the durable job handler.
- * - Production: `registerGithubIssueAnalysisJobHandler()` (kind `custom`).
- * - Focused tests may pass a custom function (kind becomes `custom`).
- * - Pass null to restore the default parking handler (isolated tests only).
+ * Explicit handler injection for focused tests only.
+ * - Pass a function to override the production analysis handler (kind `custom`).
+ * - Pass null to clear the override; production ticks return to the static handler.
+ * - `{ kind: "default" }` keeps a parking stub reachable only when readiness is disabled.
  */
 export function setGithubAutomationJobHandler(
   handler: GithubAutomationJobHandler | null,
-  options?: { kind?: Exclude<GithubAutomationHandlerKind, "none"> },
+  options?: { kind?: Exclude<GithubAutomationHandlerKind, "none" | "production"> },
 ): void {
   const registry = getHandlerRegistry();
   registry.generationCounter += 1;
   const generation = registry.generationCounter;
   if (!handler) {
     registry.registration = {
-      kind: "default",
+      kind: "production",
       generation,
-      handler: defaultJobHandler,
+      handler: githubIssueAnalysisJobHandler,
     };
     return;
   }
@@ -173,7 +182,9 @@ export function setGithubAutomationJobHandler(
 }
 
 /**
- * Production registration for the single-purpose issue analysis handler.
+ * Explicit test/tooling registration for the analysis handler.
+ * Production no longer needs this: the scheduler statically binds the handler.
+ * When called with no args, rebinds the static production handler.
  */
 export function registerGithubIssueAnalysisJobHandler(
   handler?: GithubAutomationJobHandler,
@@ -182,32 +193,42 @@ export function registerGithubIssueAnalysisJobHandler(
     setGithubAutomationJobHandler(handler, { kind: "custom" });
     return;
   }
-  // Lazy load analysis runner without static import of model/evidence graph at module top.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require("./github-issue-analysis-runner") as {
-      githubIssueAnalysisJobHandler?: GithubAutomationJobHandler;
-      handleGithubIssueAnalysisJob?: GithubAutomationJobHandler;
-    };
-    const h =
-      mod.githubIssueAnalysisJobHandler ?? mod.handleGithubIssueAnalysisJob;
-    if (h) {
-      setGithubAutomationJobHandler(h, { kind: "custom" });
-    }
-  } catch {
-    // Tick will keep default handler; analysis jobs may retry.
-  }
-}
-
-export function getGithubAutomationJobHandler(): GithubAutomationJobHandler {
-  const reg = getHandlerRegistry().registration;
-  if (reg.handler) return reg.handler;
-  return defaultJobHandler;
+  setGithubAutomationJobHandler(githubIssueAnalysisJobHandler, {
+    kind: "custom",
+  });
+  // Normalize kind back to production when binding the real export.
+  const registry = getHandlerRegistry();
+  registry.registration = {
+    kind: "production",
+    generation: registry.generationCounter,
+    handler: githubIssueAnalysisJobHandler,
+  };
 }
 
 /**
- * Test-only: allow defaultJobHandler isolation without production readiness gate.
- * Production must never disable readiness.
+ * Resolve the handler for the next lease-run.
+ * Production path always returns the statically bound analysis handler unless
+ * an explicit test override is active. The parking default is never selected
+ * by ordinary production ticks.
+ */
+export function getGithubAutomationJobHandler(): GithubAutomationJobHandler {
+  const registry = getHandlerRegistry();
+  if (registry.productionReadinessDisabled) {
+    const reg = registry.registration;
+    if (reg.kind === "custom" && reg.handler) return reg.handler;
+    if (reg.kind === "default" && reg.handler) return reg.handler;
+    return defaultJobHandler;
+  }
+  const reg = registry.registration;
+  if (reg.kind === "custom" && typeof reg.handler === "function") {
+    return reg.handler;
+  }
+  return githubIssueAnalysisJobHandler;
+}
+
+/**
+ * Test-only: disable the production analysis handler so isolation suites can
+ * exercise zero-lease readiness behavior. Production must never call this.
  */
 export function _testSetGithubAutomationProductionHandlerReadinessDisabled(
   disabled: boolean,
@@ -225,68 +246,54 @@ export function _testResetGithubAutomationHandlerRegistry(): void {
 }
 
 /**
- * Default parking handler used only when analysis registration has not yet
- * loaded (or isolation tests disable auto-register). Never advances claim /
- * unattended phases — analysis jobs stay at received until the analysis
- * handler is registered.
+ * Parking stub retained only for isolation tests that disable production
+ * readiness. Ordinary production ticks never select this handler; readiness is
+ * resolved before any business lease so attempt is not consumed.
  */
-async function defaultJobHandler(
-  job: GithubAutomationJobRecord,
-): Promise<GithubAutomationJobHandlerResult> {
-  const now = new Date().toISOString();
-
+const defaultJobHandler: GithubAutomationJobHandler = async (job) => {
   // Isolation tests may leave the job untouched so they can assert registry state.
   if (getHandlerRegistry().productionReadinessDisabled) {
     return { job, wakeAgain: false };
   }
 
-  // Defensive: production analysis jobs must not return unchanged
-  // (scheduler would classify as runner_no_progress).
-  const nextRetryAt = new Date(Date.now() + 5_000).toISOString();
-  const next: GithubAutomationJobRecord = {
-    ...job,
-    status: "retry_due",
-    reasonCode: "handler_not_ready",
-    blockedAtLayer: "scheduler",
-    retryability: "automatic",
-    nextRetryAt,
-    updatedAt: now,
-  };
-  await writeGithubAutomationJob(next);
-  await appendGithubAutomationSafeEvent({
-    at: now,
-    kind: "github_automation_handler_not_ready",
-    repositoryId: next.repositoryId,
-    issueNumber: next.issueNumber,
-    jobId: next.jobId,
-    deliveryId: next.deliveryId,
-    phase: next.phase,
-    reasonCode: "handler_not_ready",
-    traceId: next.traceId,
-    meta: {
-      stage: "verify",
-      retryability: "automatic",
-      handlerKindExpected: "custom",
-      diagnosticCode: "default_handler_defensive_fallback",
-    },
-  });
+  // Should be unreachable on the production path after HNR-01. Keep a safe
+  // no-op return without writing handler_not_ready / consuming another attempt
+  // if a future regression reaches here under lease.
   return {
-    job: next,
+    job,
     wakeAgain: false,
     disposition: {
-      kind: "retry_due",
-      reasonCode: "handler_not_ready",
-      nextRetryAt,
-      retryClass: "runtime",
+      kind: "waiting",
+      wakeOn: "timer",
     },
   };
-}
+};
 
 // ─── Runtime state (process-local) ───────────────────────────────────────────
 
+/**
+ * Injectable clock/timer boundary for durable scheduling.
+ * Production uses real Date/timers; focused tests inject a fake clock.
+ */
+export interface GithubAutomationSchedulerClock {
+  now(): number;
+  setTimeout(fn: () => void, ms: number): unknown;
+  clearTimeout(handle: unknown): void;
+}
+
+const defaultSchedulerClock: GithubAutomationSchedulerClock = {
+  now: () => Date.now(),
+  setTimeout: (fn, ms) => setTimeout(fn, ms),
+  clearTimeout: (handle) => {
+    if (handle != null) clearTimeout(handle as ReturnType<typeof setTimeout>);
+  },
+};
+
 interface SchedulerState {
   ownerId: string;
-  timer: ReturnType<typeof setTimeout> | null;
+  timer: unknown | null;
+  /** Absolute epoch ms for the currently armed wake; null when idle. */
+  nextWakeAtMs: number | null;
   running: boolean;
   /** jobIds currently executing in this process */
   inFlight: Set<string>;
@@ -297,6 +304,14 @@ interface SchedulerState {
   /** Test hook: disable auto-timer */
   autoSchedule: boolean;
   pollIntervalMs: number;
+  /**
+   * When config is paused/disabled but non-terminal analysis jobs remain,
+   * arm a low-frequency config recheck (never a business lease interval).
+   */
+  configRecheckIntervalMs: number;
+  clock: GithubAutomationSchedulerClock;
+  /** Coalesce concurrent durable-queue rescans. */
+  rescheduleInFlight: Promise<void> | null;
 }
 
 declare global {
@@ -304,6 +319,8 @@ declare global {
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
+/** Low-frequency config recheck while paused/disabled with pending jobs (HNR-03). */
+const DEFAULT_CONFIG_RECHECK_INTERVAL_MS = 30_000;
 const STALE_RUNNING_MS = 5 * 60_000;
 /** Cap for consecutive no-progress lease runs before stable operator block. */
 const NO_PROGRESS_BLOCK_THRESHOLD = 8;
@@ -337,6 +354,7 @@ function getState(): SchedulerState {
     globalThis.__piGithubAutomationScheduler = {
       ownerId: `gha-sched-${process.pid}-${randomUUID().slice(0, 8)}`,
       timer: null,
+      nextWakeAtMs: null,
       running: false,
       inFlight: new Set(),
       wakeGeneration: 0,
@@ -345,9 +363,24 @@ function getState(): SchedulerState {
       started: false,
       autoSchedule: true,
       pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
+      configRecheckIntervalMs: DEFAULT_CONFIG_RECHECK_INTERVAL_MS,
+      clock: defaultSchedulerClock,
+      rescheduleInFlight: null,
     };
   }
   return globalThis.__piGithubAutomationScheduler;
+}
+
+function schedulerNowMs(): number {
+  return getState().clock.now();
+}
+
+function clearArmedTimer(state: SchedulerState = getState()): void {
+  if (state.timer != null) {
+    state.clock.clearTimeout(state.timer);
+    state.timer = null;
+  }
+  state.nextWakeAtMs = null;
 }
 
 /** Test-only controls. */
@@ -355,12 +388,26 @@ export function _testGetGithubAutomationSchedulerState(): SchedulerState {
   return getState();
 }
 
+/** Absolute armed wake deadline (ms epoch), or null when no timer is armed. */
+export function _testGetGithubAutomationSchedulerNextWakeAtMs(): number | null {
+  return getState().nextWakeAtMs;
+}
+
+/**
+ * Inject a fake clock/timer for focused scheduler tests. Pass null to restore
+ * the production Date/setTimeout boundary.
+ */
+export function _testSetGithubAutomationSchedulerClock(
+  clock: GithubAutomationSchedulerClock | null,
+): void {
+  const state = getState();
+  clearArmedTimer(state);
+  state.clock = clock ?? defaultSchedulerClock;
+}
+
 export function _testResetGithubAutomationScheduler(): void {
   const state = getState();
-  if (state.timer) {
-    clearTimeout(state.timer);
-    state.timer = null;
-  }
+  clearArmedTimer(state);
   state.running = false;
   state.inFlight.clear();
   state.wakeGeneration = 0;
@@ -369,6 +416,9 @@ export function _testResetGithubAutomationScheduler(): void {
   state.started = false;
   state.autoSchedule = true;
   state.pollIntervalMs = DEFAULT_POLL_INTERVAL_MS;
+  state.configRecheckIntervalMs = DEFAULT_CONFIG_RECHECK_INTERVAL_MS;
+  state.clock = defaultSchedulerClock;
+  state.rescheduleInFlight = null;
   // Drop global so next getState recreates clean owner id if desired.
   globalThis.__piGithubAutomationScheduler = undefined;
   // Handler registry is independent; tests that need a clean registry call
@@ -376,15 +426,22 @@ export function _testResetGithubAutomationScheduler(): void {
 }
 
 export function _testSetGithubAutomationSchedulerAuto(auto: boolean): void {
-  getState().autoSchedule = auto;
-  if (!auto && getState().timer) {
-    clearTimeout(getState().timer!);
-    getState().timer = null;
+  const state = getState();
+  state.autoSchedule = auto;
+  if (!auto) {
+    clearArmedTimer(state);
   }
 }
 
 export function _testSetGithubAutomationSchedulerPollIntervalMs(ms: number): void {
   getState().pollIntervalMs = Math.max(10, ms);
+}
+
+/** Test-only: bound the paused/disabled config recheck interval. */
+export function _testSetGithubAutomationSchedulerConfigRecheckIntervalMs(
+  ms: number,
+): void {
+  getState().configRecheckIntervalMs = Math.max(10, ms);
 }
 
 // ─── Selection helpers ───────────────────────────────────────────────────────
@@ -444,19 +501,21 @@ async function markStaleRunningAsRetry(
   if (inFlight.has(job.jobId)) return job;
 
   const updated = Date.parse(job.updatedAt);
-  if (!Number.isFinite(updated) || Date.now() - updated < STALE_RUNNING_MS) {
+  const nowMs = schedulerNowMs();
+  if (!Number.isFinite(updated) || nowMs - updated < STALE_RUNNING_MS) {
     return job;
   }
+  const nowIso = new Date(nowMs).toISOString();
   const next: GithubAutomationJobRecord = {
     ...job,
     status: "retry_due",
-    nextRetryAt: new Date().toISOString(),
+    nextRetryAt: nowIso,
     reasonCode: "stale_running_reconcile",
     leaseOwner: null,
     leaseExpiresAt: null,
     leaseFencingToken: null,
     leaseHeartbeatAt: null,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowIso,
   };
   await writeGithubAutomationJob(next);
   await appendGithubAutomationSafeEvent({
@@ -522,7 +581,9 @@ async function applyHandlerDisposition(input: {
       disposition = {
         kind: "retry_due",
         reasonCode: after.reasonCode ?? "retry_due",
-        nextRetryAt: after.nextRetryAt ?? new Date(Date.now() + 15_000).toISOString(),
+        nextRetryAt:
+          after.nextRetryAt ??
+          new Date(schedulerNowMs() + 15_000).toISOString(),
         retryClass: "unknown",
       };
     } else if (after.status === "paused") {
@@ -595,7 +656,7 @@ async function applyHandlerDisposition(input: {
     }
 
     const delayMs = computeNoProgressBackoffMs(noProgress);
-    const nextRetryAt = new Date(Date.now() + delayMs).toISOString();
+    const nextRetryAt = new Date(schedulerNowMs() + delayMs).toISOString();
     const retrying: GithubAutomationJobRecord = {
       ...after,
       status: "retry_due",
@@ -689,7 +750,9 @@ async function applyHandlerDisposition(input: {
         nextRetryAt:
           disposition.wakeOn === "timer"
             ? after.nextRetryAt ??
-              new Date(Date.now() + DEFAULT_POLL_INTERVAL_MS * 5).toISOString()
+              new Date(
+                schedulerNowMs() + DEFAULT_POLL_INTERVAL_MS * 5,
+              ).toISOString()
             : after.nextRetryAt,
         leaseOwner: null,
         leaseExpiresAt: null,
@@ -716,7 +779,10 @@ async function applyHandlerDisposition(input: {
         updatedAt: now,
       };
       after = await writeFenced(next);
-      const delay = Math.max(0, Date.parse(disposition.nextRetryAt) - Date.now());
+      const delay = Math.max(
+        0,
+        Date.parse(disposition.nextRetryAt) - schedulerNowMs(),
+      );
       return {
         job: after,
         wakeAgain: false,
@@ -774,6 +840,198 @@ export interface GithubAutomationSchedulerTickResult {
   skipped: number;
   errors: number;
   inFlight: number;
+  /** Absolute epoch ms of the earliest pending durable deadline after this tick. */
+  nextWakeAtMs: number | null;
+}
+
+/**
+ * Compute the next absolute wake deadline from durable job truth.
+ * - queued (or due retry / stale running): now
+ * - future retry_due: nextRetryAt
+ * - active running (not process-local inFlight): stale threshold
+ * - terminal / paused / non-schedulable: ignored
+ */
+function computeJobWakeDeadlineMs(
+  job: GithubAutomationJobRecord,
+  nowMs: number,
+  inFlight: Set<string>,
+): number | null {
+  if (isLegacyGithubAutomationJob(job) || !isGithubIssueAnalysisJobSchedulable(job)) {
+    return null;
+  }
+  if (isTerminalStatus(job.status) || job.status === "paused") {
+    return null;
+  }
+
+  // Process-local inFlight: the lease is owned by this process. Settlement will
+  // rescan. Honor only a durable future/past nextRetryAt already written under
+  // the lease (handler finished writing before finally()); never treat the
+  // pre-lease queued snapshot as immediately due while still inFlight — that
+  // armed a now-timer which raced with the real retry deadline.
+  if (inFlight.has(job.jobId)) {
+    if (job.status === "retry_due" && job.nextRetryAt) {
+      const t = Date.parse(job.nextRetryAt);
+      if (Number.isFinite(t)) return Math.max(nowMs, t);
+    }
+    return null;
+  }
+
+  if (job.status === "queued") {
+    return nowMs;
+  }
+
+  if (job.status === "retry_due") {
+    if (!job.nextRetryAt) return nowMs;
+    const t = Date.parse(job.nextRetryAt);
+    if (!Number.isFinite(t)) return nowMs;
+    return Math.max(nowMs, t);
+  }
+
+  if (job.status === "running") {
+    const updated = Date.parse(job.updatedAt);
+    if (!Number.isFinite(updated)) return nowMs;
+    const staleAt = updated + STALE_RUNNING_MS;
+    return Math.max(nowMs, staleAt);
+  }
+
+  return null;
+}
+
+function earliestWakeDeadlineMs(
+  jobs: GithubAutomationJobRecord[],
+  nowMs: number,
+  inFlight: Set<string>,
+): number | null {
+  let earliest: number | null = null;
+  for (const job of jobs) {
+    const deadline = computeJobWakeDeadlineMs(job, nowMs, inFlight);
+    if (deadline == null) continue;
+    if (earliest == null || deadline < earliest) {
+      earliest = deadline;
+    }
+  }
+  return earliest;
+}
+
+/**
+ * True when a durable schema-v2 analysis job is non-terminal and may still need
+ * scheduling after config recovery (queued / retry_due / running / job-level paused).
+ * Terminal statuses and legacy jobs do not keep the process alive.
+ */
+function isPendingAnalysisJob(job: GithubAutomationJobRecord): boolean {
+  if (isLegacyGithubAutomationJob(job) || !isGithubIssueAnalysisJobSchedulable(job)) {
+    return false;
+  }
+  if (isTerminalStatus(job.status)) return false;
+  // Job-level "paused" is still a non-terminal durable state for startup recheck.
+  return (
+    job.status === "queued" ||
+    job.status === "retry_due" ||
+    job.status === "running" ||
+    job.status === "paused"
+  );
+}
+
+function hasPendingAnalysisJobs(jobs: GithubAutomationJobRecord[]): boolean {
+  for (const job of jobs) {
+    if (isPendingAnalysisJob(job)) return true;
+  }
+  return false;
+}
+
+/**
+ * Arm a low-frequency config recheck when automation is paused/disabled but
+ * durable pending jobs remain. Never leases work; only re-reads config.
+ */
+function armPausedConfigRecheck(nowMs: number): void {
+  const state = getState();
+  if (!state.autoSchedule) {
+    clearArmedTimer(state);
+    return;
+  }
+  armDeadline(nowMs + state.configRecheckIntervalMs, { force: true });
+}
+
+/**
+ * Rescan durable jobs and arm the earliest pending deadline.
+ * Used after every tick and after each job settlement so disposition/finally
+ * never own competing timers that can drop a future retry.
+ */
+async function rescheduleFromDurableQueue(reason: string): Promise<void> {
+  const state = getState();
+  if (!state.autoSchedule) return;
+
+  // Chain behind any in-flight rescan so the latest settlement always wins.
+  // (A plain "await previous; return" would drop the newer wake request.)
+  const previous = state.rescheduleInFlight;
+  const run = (async () => {
+    if (previous) {
+      try {
+        await previous;
+      } catch {
+        // ignore prior failure; this pass rescans from disk
+      }
+    }
+    try {
+      const config = await readGithubAutomationConfig();
+      const jobs = await listGithubAutomationJobs();
+      const nowMs = schedulerNowMs();
+
+      // HNR-03: paused/disabled never leases, but pending durable jobs keep a
+      // bounded low-frequency config recheck so recovery does not require a
+      // webhook or status/verify GET side effect.
+      if (!config.enabled || config.paused) {
+        if (hasPendingAnalysisJobs(jobs) || state.inFlight.size > 0) {
+          armPausedConfigRecheck(nowMs);
+        } else {
+          clearArmedTimer(state);
+        }
+        return;
+      }
+
+      let next = earliestWakeDeadlineMs(jobs, nowMs, state.inFlight);
+      // Concurrency-saturated due work: avoid busy spin; settlement will rescan.
+      if (
+        next != null &&
+        next <= nowMs &&
+        state.inFlight.size > 0
+      ) {
+        const maxConcurrency = Math.max(
+          1,
+          Math.min(8, config.analysis?.maxConcurrency ?? 2),
+        );
+        if (state.inFlight.size >= maxConcurrency) {
+          next = nowMs + state.pollIntervalMs;
+        }
+      }
+      if (next == null) {
+        if (state.inFlight.size > 0) {
+          // Still executing; do not wipe a deadline another rescan may have armed.
+          // Arm a short fallback only when nothing is scheduled.
+          if (state.timer == null) {
+            armDeadline(nowMs + state.pollIntervalMs, { force: true });
+          }
+          return;
+        }
+        clearArmedTimer(state);
+        return;
+      }
+      armDeadline(next, { force: true });
+    } catch {
+      // Best-effort: fall back to a short poll so durable work is not abandoned.
+      armDeadline(schedulerNowMs() + state.pollIntervalMs, { force: false });
+      void reason;
+    }
+  })();
+
+  state.rescheduleInFlight = run;
+  try {
+    await run;
+  } finally {
+    if (state.rescheduleInFlight === run) {
+      state.rescheduleInFlight = null;
+    }
+  }
 }
 
 /**
@@ -783,6 +1041,9 @@ export interface GithubAutomationSchedulerTickResult {
  * Final defensive gate (GHR-01): ensure full triage handler readiness BEFORE
  * any business lease/attempt. When not ready, never process production jobs
  * through defaultJobHandler (that became runner_no_progress on #22).
+ *
+ * HNR-02: after every tick, recompute the next wake from durable queue truth
+ * so early ticks cannot drop a future retry_due deadline.
  */
 export async function tickGithubAutomationScheduler(): Promise<GithubAutomationSchedulerTickResult> {
   const state = getState();
@@ -793,6 +1054,7 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
       skipped: 0,
       errors: 0,
       inFlight: state.inFlight.size,
+      nextWakeAtMs: state.nextWakeAtMs,
     };
   }
   state.running = true;
@@ -801,18 +1063,29 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
   let started = 0;
   let skipped = 0;
   let errors = 0;
+  let nextWakeAtMs: number | null = state.nextWakeAtMs;
 
   try {
     const config = await readGithubAutomationConfig();
     // Schema v2: enabled + paused only (no mode/unattended).
+    // HNR-03: paused/disabled takes zero business leases. If durable pending
+    // jobs remain, keep a low-frequency config recheck; otherwise stop timer.
     if (!config.enabled || config.paused) {
-      state.lastTickAt = new Date().toISOString();
+      state.lastTickAt = new Date(schedulerNowMs()).toISOString();
+      if (state.autoSchedule) {
+        await rescheduleFromDurableQueue("tick_paused");
+        nextWakeAtMs = state.nextWakeAtMs;
+      } else {
+        clearArmedTimer(state);
+        nextWakeAtMs = null;
+      }
       return {
         scanned: 0,
         started: 0,
         skipped: 0,
         errors: 0,
         inFlight: state.inFlight.size,
+        nextWakeAtMs,
       };
     }
 
@@ -827,10 +1100,27 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
       // Additive retirement must not block analysis scheduling.
     }
 
-    // GIA-01: handler registry readiness for closed-loop triage is no longer a
-    // lease prerequisite. Analysis runner registration lands in GIA-03; until
-    // then only schema/kind-gated jobs are candidates and default handler may
-    // park them safely without claiming legacy work.
+    // HNR-01: production analysis handler readiness is resolved BEFORE any
+    // business lease or attempt increment. Isolation tests that disable
+    // readiness get zero leases; ordinary production always uses the static
+    // analysis handler (never default_handler_defensive_fallback).
+    if (!isGithubAutomationProductionHandlerReady()) {
+      state.lastTickAt = new Date(schedulerNowMs()).toISOString();
+      state.lastError = "analysis_handler_initialization_failed";
+      // Do not burn attempts; keep a short recheck so readiness recovery can continue.
+      if (state.autoSchedule) {
+        armDeadline(schedulerNowMs() + state.pollIntervalMs, { force: true });
+        nextWakeAtMs = state.nextWakeAtMs;
+      }
+      return {
+        scanned: 0,
+        started: 0,
+        skipped: 0,
+        errors: 0,
+        inFlight: state.inFlight.size,
+        nextWakeAtMs,
+      };
+    }
 
     const maxConcurrency = Math.max(
       1,
@@ -838,7 +1128,7 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
     );
     const jobs = await listGithubAutomationJobs();
     scanned = jobs.length;
-    const nowMs = Date.now();
+    const nowMs = schedulerNowMs();
 
     // Reconcile stale running first (skip process-local inFlight — GHA-CLOSE-02).
     // Only touch schedulable analysis jobs; never rewrite legacy records.
@@ -867,6 +1157,12 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
     skipped = Math.max(0, candidates.length - toStart.length);
 
     for (const job of toStart) {
+      // Re-check readiness immediately before each lease start so a mid-tick
+      // isolation flip cannot consume an attempt through the parking stub.
+      if (!isGithubAutomationProductionHandlerReady()) {
+        skipped += 1;
+        continue;
+      }
       started += 1;
       state.inFlight.add(job.jobId);
       // Fire-and-forget per job; errors captured in job/event trail.
@@ -876,7 +1172,7 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
           state.lastError = "job_handler_error";
           try {
             await appendGithubAutomationSafeEvent({
-              at: new Date().toISOString(),
+              at: new Date(schedulerNowMs()).toISOString(),
               kind: "job_handler_error",
               repositoryId: job.repositoryId,
               issueNumber: job.issueNumber,
@@ -898,22 +1194,45 @@ export async function tickGithubAutomationScheduler(): Promise<GithubAutomationS
         })
         .finally(() => {
           state.inFlight.delete(job.jobId);
-          // Schedule follow-up if auto.
-          scheduleGithubAutomationScheduler(state.pollIntervalMs);
+          // HNR-02: settlement always rescans durable queue; never a fixed poll
+          // that can overwrite a longer retry deadline.
+          void rescheduleFromDurableQueue("job_settled");
         });
     }
 
-    state.lastTickAt = new Date().toISOString();
+    // HNR-02: always re-read durable queue truth for the next wake.
+    // Never arm from the pre-lease `reconciled` snapshot — a job may already
+    // have settled to future retry_due while this tick was still finishing,
+    // and using stale "queued" memory would overwrite the real deadline with now.
+    if (state.autoSchedule) {
+      await rescheduleFromDurableQueue("tick_complete");
+      nextWakeAtMs = state.nextWakeAtMs;
+    } else {
+      // Manual ticks (tests with autoSchedule=false) still report the computed deadline.
+      const freshJobs = await listGithubAutomationJobs();
+      nextWakeAtMs = earliestWakeDeadlineMs(freshJobs, schedulerNowMs(), state.inFlight);
+      if (
+        nextWakeAtMs != null &&
+        nextWakeAtMs <= schedulerNowMs() &&
+        availableSlots === 0 &&
+        state.inFlight.size > 0
+      ) {
+        nextWakeAtMs = schedulerNowMs() + state.pollIntervalMs;
+      }
+    }
+
+    state.lastTickAt = new Date(schedulerNowMs()).toISOString();
     return {
       scanned,
       started,
       skipped,
       errors,
       inFlight: state.inFlight.size,
+      nextWakeAtMs,
     };
   } catch (err) {
     state.lastError = "tick_error";
-    state.lastTickAt = new Date().toISOString();
+    state.lastTickAt = new Date(schedulerNowMs()).toISOString();
     throw err;
   } finally {
     state.running = false;
@@ -925,7 +1244,22 @@ async function runJobUnderLease(
   config: GithubAutomationConfigV1,
   ownerId: string,
 ): Promise<void> {
+  // HNR-01: resolve production handler BEFORE acquiring a business lease so
+  // bootstrap/isolation failure cannot write job_started or increment attempt.
+  if (!isGithubAutomationProductionHandlerReady()) {
+    return;
+  }
+  const handler = getGithubAutomationJobHandler();
+  if (handler === defaultJobHandler) {
+    // Production ticks must never run the parking stub under lease.
+    return;
+  }
+
   await withGithubAutomationJobLease(jobId, async (lease) => {
+    // Re-check after waiting for the filesystem lease.
+    if (!isGithubAutomationProductionHandlerReady()) {
+      return;
+    }
     const current = await readGithubAutomationJob(jobId);
     if (!current) return;
     if (isTerminalStatus(current.status) || current.status === "paused") {
@@ -943,7 +1277,7 @@ async function runJobUnderLease(
         : Date.parse(current.updatedAt);
       if (
         Number.isFinite(heartbeatAt) &&
-        Date.now() - heartbeatAt < STALE_RUNNING_MS
+        schedulerNowMs() - heartbeatAt < STALE_RUNNING_MS
       ) {
         return;
       }
@@ -958,7 +1292,8 @@ async function runJobUnderLease(
       return;
     }
 
-    const now = new Date().toISOString();
+    const nowMs = schedulerNowMs();
+    const now = new Date(nowMs).toISOString();
     const beforeSnapshot: GithubAutomationJobRecord = { ...current };
     const runningJob: GithubAutomationJobRecord = {
       ...current,
@@ -967,7 +1302,7 @@ async function runJobUnderLease(
       attempt: current.attempt + 1,
       leaseOwner: lease.ownerId,
       leaseExpiresAt: new Date(
-        Date.now() + Math.max(STALE_RUNNING_MS, GITHUB_AUTOMATION_LEASE_HEARTBEAT_MS * 4),
+        nowMs + Math.max(STALE_RUNNING_MS, GITHUB_AUTOMATION_LEASE_HEARTBEAT_MS * 4),
       ).toISOString(),
       leaseFencingToken: lease.fencingToken,
       leaseHeartbeatAt: now,
@@ -999,6 +1334,8 @@ async function runJobUnderLease(
     });
 
     // Heartbeat loop for long Agent runs (GHA-CLOSE-02).
+    // Heartbeats use real timers (not the durable schedule clock) so lease
+    // keep-alive stays independent of fake-clock tests for retry deadlines.
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     const armHeartbeat = () => {
       if (heartbeatTimer) return;
@@ -1009,13 +1346,14 @@ async function runJobUnderLease(
           try {
             const latest = await readGithubAutomationJob(jobId);
             if (!latest || latest.leaseFencingToken !== lease.fencingToken) return;
-            const hbAt = new Date().toISOString();
+            const hbNow = schedulerNowMs();
+            const hbAt = new Date(hbNow).toISOString();
             await writeGithubAutomationJobWithFencing(
               {
                 ...latest,
                 leaseHeartbeatAt: hbAt,
                 leaseExpiresAt: new Date(
-                  Date.now() +
+                  hbNow +
                     Math.max(STALE_RUNNING_MS, GITHUB_AUTOMATION_LEASE_HEARTBEAT_MS * 4),
                 ).toISOString(),
                 // Heartbeat is NOT meaningful progress — do not touch progress fields.
@@ -1046,17 +1384,23 @@ async function runJobUnderLease(
     armHeartbeat();
 
     try {
-      const handler = getGithubAutomationJobHandler();
-      const result = await handler(runningJob, {
+      // Prefer the handler resolved before lease; re-resolve only for explicit test overrides.
+      const activeHandler = getGithubAutomationJobHandler();
+      if (activeHandler === defaultJobHandler) {
+        return;
+      }
+      const result = await activeHandler(runningJob, {
         config,
         ownerId,
         lease,
       });
 
       // Prefer disk state after handler writes; fall back to result.job.
-      const afterDisk = (await readGithubAutomationJob(jobId)) ?? result.job;
+      const afterDisk =
+        (await readGithubAutomationJob(jobId)) ??
+        (result.job as unknown as GithubAutomationJobRecord);
 
-      const applied = await applyHandlerDisposition({
+      await applyHandlerDisposition({
         jobId,
         before: beforeSnapshot,
         after: afterDisk,
@@ -1064,14 +1408,8 @@ async function runJobUnderLease(
         fencingToken: lease.fencingToken,
         ownerId: lease.ownerId,
       });
-
-      if (applied.wakeAgain) {
-        wakeGithubAutomationScheduler();
-      } else if (applied.delayMs != null && applied.delayMs >= 0) {
-        scheduleGithubAutomationScheduler(
-          Math.min(applied.delayMs, NO_PROGRESS_BACKOFF_CAP_MS),
-        );
-      }
+      // HNR-02: durable queue is the only timer authority after settlement.
+      // Disposition delayMs is retained on the job record; rescan arms nextWakeAt.
     } finally {
       if (heartbeatTimer) {
         clearInterval(heartbeatTimer);
@@ -1083,19 +1421,49 @@ async function runJobUnderLease(
 
 // ─── Wake / ensure ───────────────────────────────────────────────────────────
 
-function armTimer(delayMs: number): void {
+/**
+ * Arm a single deadline-aware timer.
+ * - Later requests never replace an earlier armed deadline.
+ * - Explicit force/immediate wake may pull the deadline forward.
+ * - Timer fire clears handle + deadline atomically before running the tick.
+ */
+function armDeadline(
+  absoluteMs: number,
+  options?: { force?: boolean },
+): void {
   const state = getState();
   if (!state.autoSchedule) return;
-  if (state.timer) {
-    clearTimeout(state.timer);
+
+  const nowMs = schedulerNowMs();
+  const target = Math.max(nowMs, absoluteMs);
+  const force = options?.force === true;
+
+  if (
+    !force &&
+    state.nextWakeAtMs != null &&
+    state.timer != null &&
+    state.nextWakeAtMs <= target
+  ) {
+    // Keep the earlier wake; later schedule requests must not overwrite it.
+    return;
+  }
+
+  if (state.timer != null) {
+    state.clock.clearTimeout(state.timer);
     state.timer = null;
   }
-  state.timer = setTimeout(() => {
+
+  const delayMs = Math.max(0, target - nowMs);
+  state.nextWakeAtMs = target;
+  state.timer = state.clock.setTimeout(() => {
+    // Atomic clear on fire so concurrent schedule calls can re-arm cleanly.
     state.timer = null;
+    state.nextWakeAtMs = null;
     void tickGithubAutomationScheduler().catch(() => {
       // lastError already set inside tick when possible
     });
-  }, Math.max(0, delayMs));
+  }, delayMs);
+
   // Do not keep the process alive solely for the scheduler in tests/CLI.
   if (typeof state.timer === "object" && state.timer && "unref" in state.timer) {
     try {
@@ -1106,53 +1474,55 @@ function armTimer(delayMs: number): void {
   }
 }
 
+function armTimer(delayMs: number, options?: { force?: boolean }): void {
+  armDeadline(schedulerNowMs() + Math.max(0, delayMs), options);
+}
+
 /**
- * Schedule a future tick (debounced). Does not run work synchronously.
+ * Schedule a future tick with earliest-deadline semantics.
+ * A later request never replaces an earlier armed wake; use wake() to force ASAP.
  */
 export function scheduleGithubAutomationScheduler(delayMs?: number): void {
   const state = getState();
   state.started = true;
-  armTimer(delayMs ?? state.pollIntervalMs);
-}
-
-/**
- * Best-effort pre-warm of the analysis handler.
- * Never loads the retired claim/unattended graph. Never throws into the caller.
- */
-function prewarmGithubAutomationHandlerReadiness(): void {
-  const registry = getHandlerRegistry();
-  if (registry.productionReadinessDisabled) return;
-  if (registry.registration.kind === "custom") return;
-  try {
-    registerGithubIssueAnalysisJobHandler();
-  } catch {
-    // Tick falls back to default handler disposition.
-  }
+  armTimer(delayMs ?? state.pollIntervalMs, { force: false });
 }
 
 /**
  * Immediate wake: schedule tick ASAP. Safe from webhook after enqueue.
  * Does not block; does not run model/Git in the caller stack beyond a microtask tick.
- * Also pre-warms analysis handler registration so cold Settings retry does not depend on a webhook.
+ * Production analysis handler is statically bound — no sync require prewarm.
  */
 export function wakeGithubAutomationScheduler(): void {
   const state = getState();
   state.wakeGeneration += 1;
   state.started = true;
-  prewarmGithubAutomationHandlerReadiness();
-  armTimer(0);
+  armTimer(0, { force: true });
 }
 
 /**
- * Lazy ensure: start background polling if not already started.
- * Reconciles queue without requiring an inbound webhook.
+ * Lazy ensure: start background reconciliation if not already armed.
+ * Reconciles durable queued / overdue retry_due / stale-running analysis jobs
+ * without requiring an inbound webhook, status/verify GET, or manual Retry.
+ *
+ * Safe to call from Node server startup (instrumentation) and webhook enqueue.
+ * Multi-process: each process may ensure; filesystem job lease + fencing keeps
+ * handler side effects single-owner.
  */
 export function ensureGithubAutomationScheduler(): void {
   const state = getState();
-  prewarmGithubAutomationHandlerReadiness();
-  if (state.started && state.timer) return;
+  // Already armed: nothing to do. If started but idle (no timer), re-scan so a
+  // later-arriving overdue job or config unpause can recover without a webhook.
+  if (state.started && state.timer != null) return;
   state.started = true;
-  armTimer(0);
+  // Prefer durable-queue rescan so overdue/future/paused-pending jobs arm correctly.
+  void rescheduleFromDurableQueue("ensure").then(() => {
+    // If the queue still has no timer (enabled + due work that needs a tick,
+    // or rescan raced), force an immediate tick once.
+    if (state.timer == null && state.autoSchedule) {
+      armTimer(0, { force: true });
+    }
+  });
 }
 
 export function getGithubAutomationSchedulerSnapshot(): {
@@ -1163,6 +1533,7 @@ export function getGithubAutomationSchedulerSnapshot(): {
   lastTickAt: string | null;
   lastError: string | null;
   wakeGeneration: number;
+  nextWakeAtMs: number | null;
 } {
   const state = getState();
   return {
@@ -1173,5 +1544,6 @@ export function getGithubAutomationSchedulerSnapshot(): {
     lastTickAt: state.lastTickAt,
     lastError: state.lastError,
     wakeGeneration: state.wakeGeneration,
+    nextWakeAtMs: state.nextWakeAtMs,
   };
 }

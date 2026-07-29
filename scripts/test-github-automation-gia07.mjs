@@ -11,11 +11,13 @@
  */
 
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { createHmac } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
   existsSync,
@@ -27,8 +29,16 @@ import { fileURLToPath } from "node:url";
 import { createJiti } from "jiti";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const thisScript = fileURLToPath(import.meta.url);
+const WORKER_MODE = process.argv.includes("--hnr-start-07-worker");
 const jiti = createJiti(join(root, "package.json"), { interopDefault: true });
-const agentDir = await mkdtemp(join(tmpdir(), "ypi-gia07-"));
+// Workers must share the parent durable store; never create a fresh agentDir.
+const agentDir = WORKER_MODE
+  ? process.env.PI_CODING_AGENT_DIR
+  : await mkdtemp(join(tmpdir(), "ypi-gia07-"));
+if (!agentDir) {
+  throw new Error("HNR-START-07 worker missing PI_CODING_AGENT_DIR");
+}
 process.env.PI_CODING_AGENT_DIR = agentDir;
 
 const runtime = jiti(join(root, "lib/github-automation-runtime.ts"));
@@ -46,6 +56,116 @@ const modelMod = jiti(join(root, "lib/github-issue-analysis-model.ts"));
 const appClient = jiti(join(root, "lib/github-app-client.ts"));
 const webhookVerify = jiti(join(root, "lib/github-webhook-verify.ts"));
 const errors = jiti(join(root, "lib/github-automation-errors.ts"));
+
+/**
+ * Multi-process HNR-START-07 worker: independent scheduler owner + shared
+ * durable store. Handler side effects are recorded under HNR_START07_SIDE_DIR.
+ * Parent releases the hold gate via `release` so only filesystem lease/fence
+ * (not process-local inFlight) can prevent a duplicate handler run.
+ */
+async function runHnrStart07Worker() {
+  const sideDir = process.env.HNR_START07_SIDE_DIR;
+  const jobId = process.env.HNR_START07_JOB_ID;
+  if (!sideDir || !jobId) {
+    throw new Error("HNR-START-07 worker missing sideDir/jobId env");
+  }
+
+  await store.ensureGithubAutomationStoreLayout();
+  scheduler._testSetGithubAutomationSchedulerAuto(false);
+
+  scheduler.setGithubAutomationJobHandler(async (job, ctx) => {
+    const lease = ctx?.lease;
+    const ownerId = lease?.ownerId ?? ctx?.ownerId ?? `pid-${process.pid}`;
+    const fencingToken = lease?.fencingToken ?? null;
+    // Exclusive per-pid marker: two processes creating markers proves double side effect.
+    const markerDir = join(sideDir, "entered", String(process.pid));
+    await mkdir(markerDir, { recursive: false, mode: 0o700 });
+    await writeFile(
+      join(markerDir, "meta.json"),
+      JSON.stringify(
+        {
+          pid: process.pid,
+          ownerId,
+          fencingToken,
+          jobId: job.jobId,
+          at: new Date().toISOString(),
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
+    // Hold the filesystem lease until the parent writes the release gate so the
+    // peer process has a chance to race the same durable job.
+    const releasePath = join(sideDir, "release");
+    const holdStarted = Date.now();
+    while (!existsSync(releasePath)) {
+      if (Date.now() - holdStarted > 15_000) {
+        throw new Error("HNR-START-07 worker release gate timeout");
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    const completed = {
+      ...job,
+      status: "completed",
+      phase: "completed",
+      updatedAt: new Date().toISOString(),
+    };
+    if (fencingToken && lease?.ownerId) {
+      await store.writeGithubAutomationJobWithFencing(completed, {
+        fencingToken,
+        ownerId: lease.ownerId,
+      });
+    } else {
+      await store.writeGithubAutomationJob(completed);
+    }
+    return {
+      job: completed,
+      disposition: { kind: "terminal", status: "completed" },
+    };
+  });
+
+  // Each worker is a separate process owner; ensure + tick race the shared job.
+  scheduler.ensureGithubAutomationScheduler();
+  const tick = await scheduler.tickGithubAutomationScheduler();
+
+  // Wait for process-local inFlight settlement (lease wait + handler hold).
+  const settleStarted = Date.now();
+  while (scheduler._testGetGithubAutomationSchedulerState().inFlight.size > 0) {
+    if (Date.now() - settleStarted > 20_000) {
+      throw new Error("HNR-START-07 worker inFlight settle timeout");
+    }
+    await new Promise((r) => setTimeout(r, 25));
+  }
+
+  await mkdir(join(sideDir, "done"), { recursive: true, mode: 0o700 });
+  await writeFile(
+    join(sideDir, "done", String(process.pid)),
+    JSON.stringify(
+      {
+        pid: process.pid,
+        jobId,
+        tick,
+        ownerId: scheduler.getGithubAutomationSchedulerSnapshot().ownerId,
+      },
+      null,
+      2,
+    ) + "\n",
+    "utf8",
+  );
+}
+
+if (WORKER_MODE) {
+  try {
+    await runHnrStart07Worker();
+    process.exit(0);
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
+}
 
 let passed = 0;
 let failed = 0;
@@ -1667,6 +1787,704 @@ await test("webhook verify helpers: signature + body cap unit paths", () => {
     webhookVerify.parseGithubWebhookSignatureHeader("sha1=dead"),
     null,
   );
+});
+
+// ─── HNR-02: durable deadline / earliest-timer semantics ─────────────────────
+
+function createFakeSchedulerClock(startMs = 1_000_000) {
+  let now = startMs;
+  /** @type {Map<number, { due: number, fn: () => void }>} */
+  const timers = new Map();
+  let nextId = 1;
+
+  return {
+    now: () => now,
+    setTimeout(fn, ms) {
+      const id = nextId++;
+      timers.set(id, { due: now + Math.max(0, ms), fn });
+      return id;
+    },
+    clearTimeout(handle) {
+      timers.delete(handle);
+    },
+    advance(ms) {
+      const target = now + Math.max(0, ms);
+      // Fire timers in order; allow re-arm during callbacks.
+      while (true) {
+        /** @type {{ id: number, due: number, fn: () => void } | null} */
+        let next = null;
+        for (const [id, t] of timers) {
+          if (t.due > target) continue;
+          if (!next || t.due < next.due || (t.due === next.due && id < next.id)) {
+            next = { id, due: t.due, fn: t.fn };
+          }
+        }
+        if (!next) {
+          now = target;
+          return;
+        }
+        now = next.due;
+        timers.delete(next.id);
+        next.fn();
+      }
+    },
+    async advanceAndFlush(ms, flush) {
+      this.advance(ms);
+      if (flush) await flush();
+    },
+    pendingCount() {
+      return timers.size;
+    },
+  };
+}
+
+async function waitFor(predicate, { attempts = 80, delayMs = 5 } = {}) {
+  for (let i = 0; i < attempts; i++) {
+    if (await predicate()) return;
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  throw new Error("waitFor timeout");
+}
+
+async function resetSchedulerJobs() {
+  const jobsDir = store.getGithubAutomationJobsDir();
+  rmSync(jobsDir, { recursive: true, force: true });
+  mkdirSync(jobsDir, { recursive: true, mode: 0o700 });
+  scheduler._testResetGithubAutomationScheduler();
+  scheduler._testResetGithubAutomationHandlerRegistry();
+}
+
+await test("HNR-TIMER-04: later schedule keeps earlier deadline", async () => {
+  await resetSchedulerJobs();
+  const clock = createFakeSchedulerClock(5_000_000);
+  scheduler._testSetGithubAutomationSchedulerClock(clock);
+  scheduler._testSetGithubAutomationSchedulerAuto(true);
+
+  scheduler.scheduleGithubAutomationScheduler(5_000);
+  const first = scheduler._testGetGithubAutomationSchedulerNextWakeAtMs();
+  assert.equal(first, 5_000_000 + 5_000);
+
+  // A later (farther) deadline request must not replace the earlier wake.
+  scheduler.scheduleGithubAutomationScheduler(20_000);
+  assert.equal(
+    scheduler._testGetGithubAutomationSchedulerNextWakeAtMs(),
+    first,
+  );
+
+  // Immediate wake may pull deadline forward.
+  scheduler.wakeGithubAutomationScheduler();
+  const wakeAt = scheduler._testGetGithubAutomationSchedulerNextWakeAtMs();
+  assert.equal(wakeAt, clock.now());
+
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("HNR-IDLE-05: future-only retry keeps timer until due", async () => {
+  await resetSchedulerJobs();
+  const cfg = await writeEnabledConfig({ enabled: true, paused: false });
+  await configMod.writeGithubAutomationConfig(cfg);
+
+  const clock = createFakeSchedulerClock(10_000_000);
+  scheduler._testSetGithubAutomationSchedulerClock(clock);
+  scheduler._testSetGithubAutomationSchedulerAuto(true);
+
+  const job = await store.createQueuedGithubAutomationJob({
+    repositoryId: REPO_ID,
+    repositoryFullName: "acme/gia07",
+    issueNumber: 905,
+    installationId: INSTALL_ID,
+    deliveryId: "d-idle-future",
+    issueTitlePreview: "future retry",
+  });
+  const dueAt = clock.now() + 5_000;
+  const nextRetryAt = new Date(dueAt).toISOString();
+  await store.writeGithubAutomationJob({
+    ...job,
+    status: "retry_due",
+    reasonCode: "infra_retry",
+    nextRetryAt,
+    updatedAt: new Date(clock.now()).toISOString(),
+  });
+
+  const tick = await scheduler.tickGithubAutomationScheduler();
+  assert.equal(tick.started, 0);
+  assert.ok(tick.nextWakeAtMs != null);
+  assert.equal(tick.nextWakeAtMs, dueAt);
+  assert.equal(scheduler._testGetGithubAutomationSchedulerNextWakeAtMs(), dueAt);
+  assert.equal(clock.pendingCount(), 1);
+
+  // An earlier relative schedule may pull the timer forward, but the early tick
+  // must re-arm the remaining durable deadline instead of going idle.
+  scheduler.scheduleGithubAutomationScheduler(2_000);
+  assert.equal(
+    scheduler._testGetGithubAutomationSchedulerNextWakeAtMs(),
+    clock.now() + 2_000,
+  );
+
+  clock.advance(2_000);
+  await waitFor(async () => {
+    const wake = scheduler._testGetGithubAutomationSchedulerNextWakeAtMs();
+    return wake === dueAt;
+  });
+  assert.equal(scheduler._testGetGithubAutomationSchedulerNextWakeAtMs(), dueAt);
+  assert.equal(clock.pendingCount(), 1);
+
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("HNR-TIMER-03: 5s retry survives 2s early tick and re-leases at due", async () => {
+  await resetSchedulerJobs();
+  const cfg = await writeEnabledConfig({ enabled: true, paused: false });
+  await configMod.writeGithubAutomationConfig(cfg);
+
+  const clock = createFakeSchedulerClock(20_000_000);
+  scheduler._testSetGithubAutomationSchedulerClock(clock);
+  scheduler._testSetGithubAutomationSchedulerAuto(true);
+
+  let handlerCalls = 0;
+  /** @type {number[]} */
+  const callAt = [];
+  scheduler.setGithubAutomationJobHandler(async (job) => {
+    handlerCalls += 1;
+    callAt.push(clock.now());
+    if (handlerCalls === 1) {
+      const nextRetryAt = new Date(clock.now() + 5_000).toISOString();
+      const updated = {
+        ...job,
+        status: "retry_due",
+        reasonCode: "infra_retry",
+        nextRetryAt,
+        updatedAt: new Date(clock.now()).toISOString(),
+      };
+      await store.writeGithubAutomationJob(updated);
+      return {
+        job: updated,
+        disposition: {
+          kind: "retry_due",
+          reasonCode: "infra_retry",
+          nextRetryAt,
+          retryClass: "infra",
+        },
+      };
+    }
+    const completed = {
+      ...job,
+      status: "completed",
+      phase: "completed",
+      updatedAt: new Date(clock.now()).toISOString(),
+    };
+    await store.writeGithubAutomationJob(completed);
+    return {
+      job: completed,
+      disposition: { kind: "terminal", status: "completed" },
+    };
+  });
+
+  const created = await store.createQueuedGithubAutomationJob({
+    repositoryId: REPO_ID,
+    repositoryFullName: "acme/gia07",
+    issueNumber: 906,
+    installationId: INSTALL_ID,
+    deliveryId: "d-timer-5s",
+    issueTitlePreview: "timer 5s",
+  });
+  const jobId = created.jobId;
+
+  const first = await scheduler.tickGithubAutomationScheduler();
+  assert.equal(first.started, 1);
+
+  await waitFor(
+    async () =>
+      handlerCalls >= 1 &&
+      scheduler._testGetGithubAutomationSchedulerState().inFlight.size === 0,
+  );
+  assert.equal(handlerCalls, 1);
+
+  // Settlement rescan must arm the durable nextRetryAt (not a fixed poll).
+  const after = await store.readGithubAutomationJob(jobId);
+  assert.ok(after?.nextRetryAt);
+  const dueAt = Date.parse(after.nextRetryAt);
+  assert.ok(Number.isFinite(dueAt));
+  await waitFor(async () => {
+    const wake = scheduler._testGetGithubAutomationSchedulerNextWakeAtMs();
+    return wake === dueAt;
+  });
+  assert.equal(scheduler._testGetGithubAutomationSchedulerNextWakeAtMs(), dueAt);
+
+  // Historical bug path: a shorter 2s schedule after disposition.
+  // Earliest-deadline may pull forward, but the early tick must re-arm remaining.
+  scheduler.scheduleGithubAutomationScheduler(2_000);
+  assert.equal(
+    scheduler._testGetGithubAutomationSchedulerNextWakeAtMs(),
+    clock.now() + 2_000,
+  );
+
+  await clock.advanceAndFlush(2_000, async () => {
+    await waitFor(async () => {
+      const wake = scheduler._testGetGithubAutomationSchedulerNextWakeAtMs();
+      return handlerCalls >= 2 || wake === dueAt;
+    });
+  });
+  assert.equal(handlerCalls, 1, "must not lease before nextRetryAt");
+  assert.equal(scheduler._testGetGithubAutomationSchedulerNextWakeAtMs(), dueAt);
+
+  // Advance remaining time to the durable deadline without external wake.
+  const remaining = dueAt - clock.now();
+  assert.ok(remaining > 0);
+  await clock.advanceAndFlush(remaining, async () => {
+    await waitFor(async () => {
+      const j = await store.readGithubAutomationJob(jobId);
+      return j && j.status === "completed" && handlerCalls >= 2;
+    });
+  });
+  assert.equal(handlerCalls, 2);
+  assert.ok(callAt[1] - callAt[0] >= 5_000);
+
+  const finalJob = await store.readGithubAutomationJob(jobId);
+  assert.ok(finalJob);
+  assert.equal(finalJob.status, "completed");
+  assert.equal(finalJob.attempt, 2);
+
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("HNR-NOSPIN-09: no-progress backoff stays retry_due and does not immediate re-lease", async () => {
+  await resetSchedulerJobs();
+  const cfg = await writeEnabledConfig({ enabled: true, paused: false });
+  await configMod.writeGithubAutomationConfig(cfg);
+
+  scheduler._testSetGithubAutomationSchedulerAuto(false);
+
+  let handlerCalls = 0;
+  scheduler.setGithubAutomationJobHandler(async (job) => {
+    handlerCalls += 1;
+    // Leave status running without progress → scheduler applies no-progress backoff.
+    return {
+      job: {
+        ...job,
+        status: "running",
+        updatedAt: new Date().toISOString(),
+      },
+      wakeAgain: false,
+    };
+  });
+
+  const created = await store.createQueuedGithubAutomationJob({
+    repositoryId: REPO_ID,
+    repositoryFullName: "acme/gia07",
+    issueNumber: 907,
+    installationId: INSTALL_ID,
+    deliveryId: "d-nospin",
+    issueTitlePreview: "nospin",
+  });
+
+  const tick1 = await scheduler.tickGithubAutomationScheduler();
+  assert.equal(tick1.started, 1);
+  await waitFor(async () => {
+    const j = await store.readGithubAutomationJob(created.jobId);
+    return j && j.status === "retry_due" && j.reasonCode === "runner_no_progress";
+  });
+
+  const after = await store.readGithubAutomationJob(created.jobId);
+  assert.ok(after);
+  assert.equal(after.status, "retry_due");
+  assert.equal(after.reasonCode, "runner_no_progress");
+  assert.ok(after.nextRetryAt);
+  assert.equal(after.attempt, 1);
+  assert.equal(handlerCalls, 1);
+
+  // Immediate second tick must not re-lease before nextRetryAt.
+  const tick2 = await scheduler.tickGithubAutomationScheduler();
+  assert.equal(tick2.started, 0);
+  assert.equal(handlerCalls, 1);
+  assert.ok(tick2.nextWakeAtMs != null);
+
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("HNR-START-06: ensure recovers overdue retry_due without webhook", async () => {
+  await resetSchedulerJobs();
+  const cfg = await writeEnabledConfig({ enabled: true, paused: false });
+  await configMod.writeGithubAutomationConfig(cfg);
+
+  const clock = createFakeSchedulerClock(30_000_000);
+  scheduler._testSetGithubAutomationSchedulerClock(clock);
+  scheduler._testSetGithubAutomationSchedulerAuto(true);
+
+  let handlerCalls = 0;
+  scheduler.setGithubAutomationJobHandler(async (job) => {
+    handlerCalls += 1;
+    const completed = {
+      ...job,
+      status: "completed",
+      phase: "completed",
+      updatedAt: new Date(clock.now()).toISOString(),
+    };
+    await store.writeGithubAutomationJob(completed);
+    return {
+      job: completed,
+      disposition: { kind: "terminal", status: "completed" },
+    };
+  });
+
+  const created = await store.createQueuedGithubAutomationJob({
+    repositoryId: REPO_ID,
+    repositoryFullName: "acme/gia07",
+    issueNumber: 908,
+    installationId: INSTALL_ID,
+    deliveryId: "d-start-overdue",
+    issueTitlePreview: "startup overdue",
+  });
+  // Overdue durable retry_due (nextRetryAt in the past) — no webhook, no Retry.
+  const pastRetryAt = new Date(clock.now() - 60_000).toISOString();
+  await store.writeGithubAutomationJob({
+    ...created,
+    status: "retry_due",
+    reasonCode: "handler_not_ready",
+    nextRetryAt: pastRetryAt,
+    attempt: 1,
+    updatedAt: new Date(clock.now() - 60_000).toISOString(),
+  });
+
+  // Cold process: ensure (startup reconcile) must arm and run without external wake.
+  scheduler.ensureGithubAutomationScheduler();
+  await waitFor(async () => {
+    const wake = scheduler._testGetGithubAutomationSchedulerNextWakeAtMs();
+    return wake != null && wake <= clock.now();
+  });
+  // Fire the due timer (fake clock does not auto-run delay-0 callbacks).
+  await clock.advanceAndFlush(0, async () => {
+    await waitFor(async () => {
+      const j = await store.readGithubAutomationJob(created.jobId);
+      return j && j.status === "completed" && handlerCalls >= 1;
+    });
+  });
+
+  const finalJob = await store.readGithubAutomationJob(created.jobId);
+  assert.ok(finalJob);
+  assert.equal(finalJob.status, "completed");
+  assert.equal(finalJob.attempt, 2);
+  assert.equal(handlerCalls, 1);
+
+  // After terminal, no pending jobs → timer stops (no busy poll).
+  await waitFor(async () => {
+    return (
+      scheduler._testGetGithubAutomationSchedulerState().inFlight.size === 0 &&
+      scheduler._testGetGithubAutomationSchedulerNextWakeAtMs() == null
+    );
+  });
+
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+function spawnHnrStart07Worker(env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        "--loader",
+        "./scripts/ts-extension-loader.mjs",
+        "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+        thisScript,
+        "--hnr-start-07-worker",
+      ],
+      {
+        cwd: root,
+        env: { ...process.env, ...env },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) {
+        resolve({ code, stdout, stderr });
+        return;
+      }
+      reject(
+        new Error(
+          `HNR-START-07 worker exit ${code}: ${stderr.replace(/\n/g, " ").slice(0, 400)}`,
+        ),
+      );
+    });
+  });
+}
+
+await test("HNR-START-07: multi-process owners share lease/fence; single handler side effect", async () => {
+  await resetSchedulerJobs();
+  const cfg = await writeEnabledConfig({ enabled: true, paused: false });
+  await configMod.writeGithubAutomationConfig(cfg);
+  await store.ensureGithubAutomationStoreLayout();
+
+  const created = await store.createQueuedGithubAutomationJob({
+    repositoryId: REPO_ID,
+    repositoryFullName: "acme/gia07",
+    issueNumber: 909,
+    installationId: INSTALL_ID,
+    deliveryId: "d-start-dual",
+    issueTitlePreview: "dual multi-process",
+  });
+  const pastRetryAt = new Date(Date.now() - 30_000).toISOString();
+  await store.writeGithubAutomationJob({
+    ...created,
+    status: "retry_due",
+    reasonCode: "infra_retry",
+    nextRetryAt: pastRetryAt,
+    attempt: 1,
+    updatedAt: pastRetryAt,
+  });
+
+  // Shared side channel on the durable agentDir (not process memory).
+  const sideDir = join(agentDir, "hnr-start07-side");
+  rmSync(sideDir, { recursive: true, force: true });
+  mkdirSync(join(sideDir, "entered"), { recursive: true, mode: 0o700 });
+  mkdirSync(join(sideDir, "done"), { recursive: true, mode: 0o700 });
+
+  const workerEnv = {
+    PI_CODING_AGENT_DIR: agentDir,
+    HNR_START07_SIDE_DIR: sideDir,
+    HNR_START07_JOB_ID: created.jobId,
+  };
+
+  // Two independent Node processes = two scheduler owners racing one job.
+  // Process-local inFlight cannot serialize them; only filesystem lease/fence can.
+  const workerA = spawnHnrStart07Worker(workerEnv);
+  const workerB = spawnHnrStart07Worker(workerEnv);
+
+  // Wait until the first process enters the real handler under lease.
+  await waitFor(
+    async () => readdirSync(join(sideDir, "entered")).length >= 1,
+    { attempts: 200, delayMs: 25 },
+  );
+
+  // Hold window: give the peer process time to contend for the same job lease.
+  await new Promise((r) => setTimeout(r, 250));
+  assert.equal(
+    readdirSync(join(sideDir, "entered")).length,
+    1,
+    "two processes must not both enter the handler while one holds the lease",
+  );
+
+  // Release the lease holder; peer may acquire lock but must observe terminal job.
+  writeFileSync(join(sideDir, "release"), "1\n", "utf8");
+
+  const [resultA, resultB] = await Promise.all([workerA, workerB]);
+  assert.equal(resultA.code, 0);
+  assert.equal(resultB.code, 0);
+
+  await waitFor(
+    async () => readdirSync(join(sideDir, "done")).length >= 2,
+    { attempts: 80, delayMs: 25 },
+  );
+
+  const entered = readdirSync(join(sideDir, "entered"));
+  assert.equal(
+    entered.length,
+    1,
+    `handler side effect must run once across processes, got markers=${entered.join(",")}`,
+  );
+  const winnerMeta = JSON.parse(
+    readFileSync(join(sideDir, "entered", entered[0], "meta.json"), "utf8"),
+  );
+  assert.equal(winnerMeta.jobId, created.jobId);
+  assert.ok(winnerMeta.ownerId, "winner must record lease ownerId");
+  assert.ok(winnerMeta.fencingToken, "winner must record fencing token");
+
+  const doneMetas = readdirSync(join(sideDir, "done")).map((name) =>
+    JSON.parse(readFileSync(join(sideDir, "done", name), "utf8")),
+  );
+  assert.equal(doneMetas.length, 2);
+  const ownerIds = new Set(doneMetas.map((m) => m.ownerId));
+  assert.equal(
+    ownerIds.size,
+    2,
+    "workers must be independent scheduler owners (distinct ownerId)",
+  );
+  // Both may report process-local started=1; that is expected and proves the
+  // serialization is NOT process-local inFlight. Side-effect markers remain 1.
+  const startedSum = doneMetas.reduce(
+    (sum, m) => sum + (m.tick?.started ?? 0),
+    0,
+  );
+  assert.ok(
+    startedSum >= 1,
+    "at least one worker must start the job under its local tick",
+  );
+
+  const finalJob = await store.readGithubAutomationJob(created.jobId);
+  assert.ok(finalJob);
+  assert.equal(finalJob.status, "completed");
+  assert.equal(finalJob.attempt, 2, "exactly one real lease-run increments attempt");
+  assert.equal(finalJob.phase, "completed");
+
+  // Parent process must not have started a third owner path.
+  const parentTick = await scheduler.tickGithubAutomationScheduler();
+  assert.equal(parentTick.started, 0);
+  assert.equal(readdirSync(join(sideDir, "entered")).length, 1);
+
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("HNR-PAUSE-08: paused pending has zero lease; unpause resumes in bounded time", async () => {
+  await resetSchedulerJobs();
+  let cfg = await writeEnabledConfig({ enabled: true, paused: true });
+  await configMod.writeGithubAutomationConfig(cfg);
+
+  const clock = createFakeSchedulerClock(40_000_000);
+  scheduler._testSetGithubAutomationSchedulerClock(clock);
+  scheduler._testSetGithubAutomationSchedulerAuto(true);
+  scheduler._testSetGithubAutomationSchedulerConfigRecheckIntervalMs(1_000);
+
+  let handlerCalls = 0;
+  scheduler.setGithubAutomationJobHandler(async (job) => {
+    handlerCalls += 1;
+    const completed = {
+      ...job,
+      status: "completed",
+      phase: "completed",
+      updatedAt: new Date(clock.now()).toISOString(),
+    };
+    await store.writeGithubAutomationJob(completed);
+    return {
+      job: completed,
+      disposition: { kind: "terminal", status: "completed" },
+    };
+  });
+
+  const created = await store.createQueuedGithubAutomationJob({
+    repositoryId: REPO_ID,
+    repositoryFullName: "acme/gia07",
+    issueNumber: 910,
+    installationId: INSTALL_ID,
+    deliveryId: "d-pause-pending",
+    issueTitlePreview: "paused pending",
+  });
+  const pastRetryAt = new Date(clock.now() - 10_000).toISOString();
+  await store.writeGithubAutomationJob({
+    ...created,
+    status: "retry_due",
+    reasonCode: "infra_retry",
+    nextRetryAt: pastRetryAt,
+    attempt: 1,
+    updatedAt: pastRetryAt,
+  });
+
+  // Ensure while paused: arms config recheck only — zero business lease.
+  scheduler.ensureGithubAutomationScheduler();
+  await waitFor(async () => {
+    const wake = scheduler._testGetGithubAutomationSchedulerNextWakeAtMs();
+    return wake != null && wake === clock.now() + 1_000;
+  });
+  assert.equal(handlerCalls, 0);
+
+  // Advance recheck while still paused: still zero lease, timer re-armed.
+  await clock.advanceAndFlush(1_000, async () => {
+    await waitFor(async () => {
+      const wake = scheduler._testGetGithubAutomationSchedulerNextWakeAtMs();
+      return wake === clock.now() + 1_000;
+    });
+  });
+  assert.equal(handlerCalls, 0);
+  const mid = await store.readGithubAutomationJob(created.jobId);
+  assert.ok(mid);
+  assert.equal(mid.status, "retry_due");
+  assert.equal(mid.attempt, 1);
+
+  // Operator recovers config (no webhook / status wake). Next recheck resumes.
+  cfg = await writeEnabledConfig({ enabled: true, paused: false });
+  await configMod.writeGithubAutomationConfig(cfg);
+
+  await clock.advanceAndFlush(1_000, async () => {
+    await waitFor(async () => {
+      const j = await store.readGithubAutomationJob(created.jobId);
+      return j && j.status === "completed" && handlerCalls >= 1;
+    });
+  });
+  assert.equal(handlerCalls, 1);
+
+  const finalJob = await store.readGithubAutomationJob(created.jobId);
+  assert.ok(finalJob);
+  assert.equal(finalJob.status, "completed");
+  assert.equal(finalJob.attempt, 2);
+
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("HNR-START-instrumentation: Node-only register; edge/build does not ensure", async () => {
+  await resetSchedulerJobs();
+
+  // Contract on the root instrumentation entry (HNR-03).
+  const src = readFileSync(join(root, "instrumentation.ts"), "utf8");
+  assert.match(src, /NEXT_RUNTIME/);
+  assert.match(src, /nodejs/);
+  assert.match(src, /ensureGithubAutomationScheduler/);
+  assert.match(src, /github-automation-scheduler/);
+  // Must not eagerly import the scheduler at module top-level (edge/build safety).
+  assert.equal(/^\s*import\s+.*github-automation-scheduler/m.test(src), false);
+
+  const prevRuntime = process.env.NEXT_RUNTIME;
+  const instrumentation = jiti(join(root, "instrumentation.ts"));
+
+  // Edge: register is a no-op and must not start the test scheduler instance.
+  process.env.NEXT_RUNTIME = "edge";
+  await instrumentation.register();
+  assert.equal(scheduler.getGithubAutomationSchedulerSnapshot().started, false);
+  assert.equal(scheduler._testGetGithubAutomationSchedulerNextWakeAtMs(), null);
+
+  // Unset runtime (build/unknown): also a no-op.
+  delete process.env.NEXT_RUNTIME;
+  await instrumentation.register();
+  assert.equal(scheduler.getGithubAutomationSchedulerSnapshot().started, false);
+
+  // Node recovery path is covered by HNR-START-06 via ensureGithubAutomationScheduler()
+  // (jiti dynamic import of instrumentation would not share the test module instance).
+
+  if (prevRuntime === undefined) delete process.env.NEXT_RUNTIME;
+  else process.env.NEXT_RUNTIME = prevRuntime;
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("HNR-READ-11: status/verify projection paths do not ensure or wake scheduler", async () => {
+  await resetSchedulerJobs();
+  const cfg = await writeEnabledConfig({ enabled: true, paused: false });
+  await configMod.writeGithubAutomationConfig(cfg);
+
+  const created = await store.createQueuedGithubAutomationJob({
+    repositoryId: REPO_ID,
+    repositoryFullName: "acme/gia07",
+    issueNumber: 912,
+    installationId: INSTALL_ID,
+    deliveryId: "d-readonly",
+    issueTitlePreview: "readonly",
+  });
+  await store.writeGithubAutomationJob({
+    ...created,
+    status: "retry_due",
+    reasonCode: "infra_retry",
+    nextRetryAt: new Date(Date.now() - 1_000).toISOString(),
+    attempt: 1,
+    updatedAt: new Date().toISOString(),
+  });
+
+  // Projection/status builders must remain read-only (no ensure side effect).
+  const status = await projection.buildGithubAutomationStatusProjection();
+  assert.ok(status);
+  assert.equal(scheduler.getGithubAutomationSchedulerSnapshot().started, false);
+  assert.equal(scheduler._testGetGithubAutomationSchedulerNextWakeAtMs(), null);
+
+  const after = await store.readGithubAutomationJob(created.jobId);
+  assert.ok(after);
+  assert.equal(after.status, "retry_due");
+  assert.equal(after.attempt, 1);
+
+  scheduler._testResetGithubAutomationScheduler();
 });
 
 // Cleanup

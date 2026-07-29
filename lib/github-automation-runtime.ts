@@ -65,9 +65,9 @@ export function _testResetGithubIssueTriageHandlerRegistration(): void {
 }
 
 /**
- * Test helper: disable production handler auto-register for isolated ingress tests.
- * Analysis handler registration is lazy on scheduler wake; this keeps default handler
- * available when tests intentionally disable auto-register.
+ * Test helper: disable production analysis handler readiness for isolated ingress tests.
+ * When disabled, scheduler ticks refuse business leases (zero attempt / no job_started).
+ * Production always statically binds the analysis handler; this flag is test-only.
  */
 export function _testSetGithubIssueTriageAutoRegisterDisabled(
   disabled: boolean,

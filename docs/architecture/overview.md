@@ -546,7 +546,11 @@ First read of schema v1 migrates under the config lock: fixed non-secret retirem
 
 ### Durable job / scheduler
 
-- Scheduler hard-requires `schemaVersion=2` and `kind=issue_analysis`. It invokes the single analysis handler directly (no dynamic handler registry / default handler for production planning).
+- Scheduler hard-requires `schemaVersion=2` and `kind=issue_analysis`.
+- **Production handler binding (HNR):** the scheduler statically imports and invokes the single `githubIssueAnalysisJobHandler` before any business lease. There is no production-reachable synchronous `require` of the runner, no cold-load registry guess, and no ordinary-tick path through a parking `default` handler / `handler_not_ready` disposition. Explicit handler injection exists only for focused tests.
+- **Readiness before lease:** if production readiness is disabled (test isolation only) or the static analysis handler cannot be selected, the tick takes **zero** job leases, writes no `job_started`, and does not increment `attempt`.
+- **Deadline-driven timers:** internal `nextWakeAtMs` is recomputed from durable queue truth after every tick and job settlement (queued now, `retry_due.nextRetryAt`, stale-running). Later schedule requests never overwrite an earlier deadline; an early tick that finds only future work re-arms the remaining deadline instead of going idle. There is no competing “disposition timer + finally poll timer” pair.
+- **Node startup reconcile:** root `instrumentation.ts` (Node runtime only, fire-and-forget) calls `ensureGithubAutomationScheduler()` so overdue `queued` / `retry_due` / stale-running v2 analysis jobs resume without a second webhook, status/verify GET, or manual Retry. Multi-process de-duplication remains filesystem lease + fencing. Edge/build paths do not start the scheduler. `paused=true` / `enabled=false` take zero leases; pending jobs may arm a low-frequency config recheck only.
 - Phases: `received → analyzing → result_ready → commenting → [closing] → completed`.
 - Status: `queued` / `running` / `retry_due` / `blocked` / `completed` with outcomes including `completed_open`, `completed_closed`, `inconclusive`.
 - Each lease returns explicit disposition: `progressed` | `waiting` | `retry_due` | `blocked` | `terminal`. No-progress uses bounded backoff then stable block — never immediate runnable queued spin.
@@ -605,7 +609,15 @@ Subscribe to **Issues** (installation lifecycle optional). Do not require Issue 
 npm run test:github-automation
 ```
 
-Offline temp `PI_CODING_AGENT_DIR` + mocked GitHub/model only. Covers ingress matrix, evidence containment/budgets, model downgrade, comment/close idempotency, v1 migration/retirement, privacy forbidden-key scans, and no-spin dispositions. Live test-App UAT for comment `updated_at` / close behavior is a release gate and is **not** replaced by mock green.
+Offline temp `PI_CODING_AGENT_DIR` + mocked GitHub/model only. Covers ingress matrix, evidence containment/budgets, model downgrade, comment/close idempotency, v1 migration/retirement, privacy forbidden-key scans, fake-clock durable timer/startup recovery, and no-spin dispositions. Live test-App UAT for comment `updated_at` / close behavior is a release gate and is **not** replaced by mock green.
+
+**Production-bundle smoke (HNR release gate):** after `npm run build` (never bare `next build`), run:
+
+```bash
+npm run test:github-automation-production-runtime
+```
+
+This loads the real `.next` jobs Retry route under a temp `PI_CODING_AGENT_DIR`, seeds an overdue `retry_due` v2 job with a deterministic pre-network `malformed_full_name` fixture, and asserts the first production lease is the real analysis handler (not `handler_not_ready` / `default_handler_defensive_fallback`), with zero real network and zero operator agentDir writes. Source jiti green or static bundle string search is **not** a substitute.
 
 Historical closed-loop modules (claim/Owner command/unattended runner/session/worktree/publisher/handler-runtime/30142 harness) are **removed** from the product graph. Operators may still manually handle leftover historical automation PRs via `pr-review-handle` (self-contained historical closing rules).
 

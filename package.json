@@ -138,7 +138,8 @@
     "test:models-config-races": "node --loader ./scripts/ts-extension-loader.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-models-config-races.mjs",
     "prepublishOnly": "npm run lint && tsc --noEmit && npm run build",
     "release:patch": "npm version patch && npm publish --access public",
-    "release": "npm run release:patch"
+    "release": "npm run release:patch",
+    "test:github-automation-production-runtime": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-github-automation-production-runtime.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.80.10",

@@ -39,10 +39,6 @@ import {
   YPI_LABEL_TYPE_OTHER,
   type YpiTriageTypeLabel,
 } from "./github-automation-labels";
-import type {
-  GithubAutomationJobHandler,
-  GithubAutomationJobHandlerResult,
-} from "./github-automation-scheduler";
 import {
   appendGithubAutomationSafeEvent,
   createGithubAutomationResultId,
@@ -58,6 +54,8 @@ import {
 import type {
   GithubAutomationConfigV2,
   GithubAutomationJobDisposition,
+  GithubAutomationJobHandler,
+  GithubAutomationJobHandlerResult,
   GithubIssueAnalysisCategory,
   GithubIssueAnalysisConfidence,
   GithubIssueAnalysisTruthVerdict,
@@ -1459,43 +1457,17 @@ export async function handleGithubIssueAnalysisJob(
   };
 }
 
-/** Typed handler export for direct scheduler wiring. */
+/**
+ * Typed handler export for direct scheduler wiring.
+ * Scheduler statically imports this binding; do not re-introduce reverse
+ * registration helpers that create a production runtime cycle.
+ */
 export const githubIssueAnalysisJobHandler: GithubAutomationJobHandler = (
   job,
   context,
 ) =>
-  handleGithubIssueAnalysisJob(job, {
-    config: context.config as GithubAutomationConfigV2,
+  handleGithubIssueAnalysisJob(job as unknown as GithubAutomationJobRecord, {
+    config: context.config as unknown as GithubAutomationConfigV2,
     ownerId: context.ownerId,
     lease: context.lease,
   });
-
-/**
- * Convenience re-export: register via scheduler (avoids circular static import).
- */
-export function registerGithubIssueAnalysisJobHandler(): void {
-  // Dynamic require keeps this module free of a static scheduler cycle at load.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const scheduler = require("./github-automation-scheduler") as {
-      registerGithubIssueAnalysisJobHandler?: (
-        handler?: GithubAutomationJobHandler,
-      ) => void;
-      setGithubAutomationJobHandler?: (
-        handler: GithubAutomationJobHandler | null,
-        options?: { kind?: "custom" | "default" },
-      ) => void;
-    };
-    if (typeof scheduler.registerGithubIssueAnalysisJobHandler === "function") {
-      scheduler.registerGithubIssueAnalysisJobHandler(
-        githubIssueAnalysisJobHandler,
-      );
-      return;
-    }
-    scheduler.setGithubAutomationJobHandler?.(githubIssueAnalysisJobHandler, {
-      kind: "custom",
-    });
-  } catch {
-    // Caller / scheduler prewarm will retry.
-  }
-}

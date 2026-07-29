@@ -1,7 +1,35 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-29T03:05:51.026Z",
+  "updatedAt": "2026-07-29T10:03:13.968Z",
   "entries": [
+    {
+      "id": "20260729-180313-排查-github-议题自动分析-handler_not_ready-重试等待异常",
+      "title": "排查 GitHub 议题自动分析 handler_not_ready 重试等待异常",
+      "taskId": "20260729-124623-排查-github-议题自动分析-handler_not_ready-重试等待异常",
+      "taskKey": "archived:2026-07:20260729-124623-排查-github-议题自动分析-handler_not_ready-重试等待异常",
+      "workflowId": "feature-dev",
+      "summary": "已修复 GitHub 议题自动分析 `handler_not_ready` 与 retry_due 卡住问题：production handler 直接绑定、durable retry deadline/timer 重构、Node startup reconcile、真实 `.next` production smoke 与文档更新均完成。全部 focused tests、lint、tsc、build、production smoke、diff-check 通过。未提交代码，未部署，未对真实 Issue #25 执行 Retry/comment/close。",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-07/20260729-124623-排查-github-议题自动分析-handler_not_ready-重试等待异常",
+      "knowledgePath": ".ypi/knowledge/20260729-180313-排查-github-议题自动分析-handler_not_ready-重试等待异常.md",
+      "createdAt": "2026-07-29T10:03:13.968Z",
+      "archivedAt": "2026-07-29T10:03:13.968Z",
+      "sourceArtifacts": [
+        "summary.md",
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260729-103343-深度排查-chat-模型与-settings-加载缓慢问题",
       "title": "深度排查 Chat 模型与 Settings 加载缓慢问题",

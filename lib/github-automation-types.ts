@@ -565,6 +565,94 @@ export type GithubAutomationRetryability =
   | "operator"
   | "none";
 
+// ─── Scheduler handler contract (leaf; no runtime imports) ───────────────────
+
+/**
+ * Structural job snapshot accepted by the scheduler handler boundary.
+ * Concrete durable records live in `github-automation-store`; this leaf shape
+ * keeps the runner free of a runtime import cycle with the scheduler.
+ *
+ * Extra durable fields are allowed by structural typing (no index signature),
+ * so store `GithubAutomationJobRecord` remains assignable here.
+ */
+export type GithubAutomationSchedulableJob = {
+  jobId: string;
+  schemaVersion?: number;
+  kind?: string;
+  status: string;
+  phase: string;
+  attempt: number;
+  repositoryId: number;
+  issueNumber: number;
+  deliveryId?: string | null;
+  traceId?: string | null;
+  reasonCode?: string | null;
+  nextRetryAt?: string | null;
+  updatedAt?: string;
+  createdAt?: string;
+  checkpoint?: string | null;
+  progressRevision?: number;
+  leaseOwner?: string | null;
+  leaseFencingToken?: string | null;
+};
+
+/**
+ * Result returned by one durable scheduler lease-run of the analysis handler.
+ * `job` is intentionally structural so store records assign without cycles.
+ */
+export type GithubAutomationJobHandlerResult = {
+  job: GithubAutomationSchedulableJob;
+  /**
+   * When true, scheduler will re-check queue soon (e.g. more work available).
+   * Default false. singleStep may set this only after real checkpoint progress.
+   */
+  wakeAgain?: boolean;
+  /**
+   * Explicit lease disposition (GHA-CLOSE-02). When absent, scheduler derives a
+   * conservative disposition from job status/progressRevision change.
+   */
+  disposition?: GithubAutomationJobDisposition;
+};
+
+/**
+ * Minimal config surface passed into the analysis job handler.
+ * Production handlers cast to the live config type as needed.
+ */
+export type GithubAutomationHandlerConfig = {
+  enabled: boolean;
+  paused: boolean;
+  analysis?: { maxConcurrency?: number };
+  repositories?: ReadonlyArray<unknown>;
+  schemaVersion?: number;
+  revision?: string;
+  updatedAt?: string;
+};
+
+/**
+ * Lease handle surface available to long-running handlers for heartbeat / fence.
+ * Matches the durable store lease handle without importing the store module.
+ */
+export type GithubAutomationHandlerLease = {
+  ownerId: string;
+  fencingToken: string;
+  heartbeat: () => Promise<boolean>;
+  isHeld?: () => Promise<boolean>;
+  release?: () => Promise<void>;
+};
+
+/**
+ * Job handler runs under job lease. Production always uses the single-purpose
+ * issue analysis handler; focused tests may inject an explicit override.
+ */
+export type GithubAutomationJobHandler = (
+  job: GithubAutomationSchedulableJob,
+  context: {
+    config: GithubAutomationHandlerConfig;
+    ownerId: string;
+    lease?: GithubAutomationHandlerLease;
+  },
+) => Promise<GithubAutomationJobHandlerResult>;
+
 // ─── IMP2-01 implementer terminal disposition / notification contract ───────
 
 /** Server-normalized implementer result. Child status/output is never authority. */
