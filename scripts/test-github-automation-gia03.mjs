@@ -645,10 +645,42 @@ await test("scheduler statically binds production analysis handler without rever
   assert.equal(reg.handler, runner.githubIssueAnalysisJobHandler);
 });
 
+await test("foreign production handler reference is ready but not selected for execution", () => {
+  scheduler._testResetGithubAutomationHandlerRegistry();
+  // Simulate another Next entry bundle that registered production with a distinct
+  // function object identity while sharing globalThis registry state.
+  const foreignProductionHandler = async (job) => ({
+    job,
+    wakeAgain: false,
+    disposition: { kind: "terminal", status: "failed", reasonCode: "foreign_bundle" },
+  });
+  assert.notEqual(foreignProductionHandler, runner.githubIssueAnalysisJobHandler);
+
+  // Force registry init, then overwrite handler identity only (kind stays production).
+  assert.equal(scheduler.isGithubAutomationProductionHandlerReady(), true);
+  const shared = globalThis.__piGithubAutomationHandlerRegistry;
+  assert.ok(shared);
+  shared.registration = {
+    kind: "production",
+    generation: shared.generationCounter + 1,
+    handler: foreignProductionHandler,
+  };
+  shared.generationCounter = shared.registration.generation;
+
+  assert.equal(scheduler.isGithubAutomationProductionHandlerReady(), true);
+  const selected = scheduler.getGithubAutomationJobHandler();
+  assert.equal(selected, runner.githubIssueAnalysisJobHandler);
+  assert.notEqual(selected, foreignProductionHandler);
+  const reg = scheduler.getGithubAutomationJobHandlerRegistration();
+  assert.equal(reg.kind, "production");
+  assert.equal(reg.handler, foreignProductionHandler);
+});
+
 await test("explicit test override still works; reset restores production handler", () => {
   scheduler._testResetGithubAutomationHandlerRegistry();
   const stub = async (job) => ({ job, wakeAgain: false });
   scheduler.setGithubAutomationJobHandler(stub);
+  assert.equal(scheduler.isGithubAutomationProductionHandlerReady(), true);
   assert.equal(scheduler.getGithubAutomationJobHandler(), stub);
   assert.equal(
     scheduler.getGithubAutomationJobHandlerRegistration().kind,
@@ -660,6 +692,31 @@ await test("explicit test override still works; reset restores production handle
   assert.equal(
     scheduler.getGithubAutomationJobHandler(),
     runner.githubIssueAnalysisJobHandler,
+  );
+});
+
+await test("non-callable custom registration is not ready and does not fall back to local production", () => {
+  scheduler._testResetGithubAutomationHandlerRegistry();
+  // Force a corrupted custom registration (runtime-only; public setters reject non-functions).
+  assert.equal(scheduler.isGithubAutomationProductionHandlerReady(), true);
+  const shared = globalThis.__piGithubAutomationHandlerRegistry;
+  assert.ok(shared);
+  shared.registration = {
+    kind: "custom",
+    generation: shared.generationCounter + 1,
+    handler: null,
+  };
+  shared.generationCounter = shared.registration.generation;
+
+  assert.equal(scheduler.isGithubAutomationProductionHandlerReady(), false);
+  // Selection must not treat non-callable custom as production-ready local handler.
+  // getGithubAutomationJobHandler still fail-closes to local static, but readiness
+  // stays false so ticks refuse lease/attempt/job_started before execution.
+  const selected = scheduler.getGithubAutomationJobHandler();
+  assert.equal(selected, runner.githubIssueAnalysisJobHandler);
+  assert.equal(
+    scheduler.getGithubAutomationJobHandlerRegistration().kind,
+    "custom",
   );
 });
 

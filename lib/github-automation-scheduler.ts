@@ -114,10 +114,9 @@ function getHandlerRegistry(): HandlerRegistryState {
   return globalThis.__piGithubAutomationHandlerRegistry;
 }
 
-function isProductionAnalysisHandler(
-  handler: GithubAutomationJobHandler | null | undefined,
-): boolean {
-  return typeof handler === "function" && handler === githubIssueAnalysisJobHandler;
+/** True when this bundle's statically imported analysis handler is callable. */
+function isLocalStaticAnalysisHandlerAvailable(): boolean {
+  return typeof githubIssueAnalysisJobHandler === "function";
 }
 
 /** Live registry snapshot (authoritative for readiness / test override state). */
@@ -126,22 +125,33 @@ export function getGithubAutomationJobHandlerRegistration(): GithubAutomationHan
 }
 
 /**
- * Production readiness: real analysis handler is statically bound and isolation
- * tests have not disabled it. Explicit custom overrides count as ready for tests.
+ * Production readiness across Next multi-entry bundles.
+ *
+ * Next may compile instrumentation and route entries into separate scheduler
+ * modules that share `globalThis` registry state but hold distinct function
+ * object identities for the same source handler. Readiness therefore uses the
+ * stable registration `kind` plus this bundle's statically imported handler
+ * availability — never strict equality against `registration.handler`.
+ *
+ * Execution still selects the current bundle's static analysis handler via
+ * {@link getGithubAutomationJobHandler}; registry production handler references
+ * are mode metadata only (custom overrides remain the sole shared callables).
  */
 export function isGithubAutomationProductionHandlerReady(): boolean {
   const registry = getHandlerRegistry();
   if (registry.productionReadinessDisabled) return false;
   const reg = registry.registration;
-  if (reg.kind === "custom" && typeof reg.handler === "function") return true;
-  if (reg.kind === "production" && isProductionAnalysisHandler(reg.handler)) {
-    return true;
+  // custom is an explicit shared override: ready only when the override is callable.
+  // Do not fall through to the local static production handler when kind is custom.
+  if (reg.kind === "custom") {
+    return typeof reg.handler === "function";
   }
-  // After registry reset / null restore, production default is still ready unless disabled.
-  if (reg.kind === "none" || reg.kind === "default") {
-    return isProductionAnalysisHandler(githubIssueAnalysisJobHandler);
+  // production / default / none: mode token is cross-bundle stable; do not
+  // compare registry.handler identity to this module's static import.
+  if (reg.kind === "production" || reg.kind === "none" || reg.kind === "default") {
+    return isLocalStaticAnalysisHandlerAvailable();
   }
-  return isProductionAnalysisHandler(reg.handler);
+  return false;
 }
 
 /**

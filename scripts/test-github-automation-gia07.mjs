@@ -31,13 +31,15 @@ import { createJiti } from "jiti";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const thisScript = fileURLToPath(import.meta.url);
 const WORKER_MODE = process.argv.includes("--hnr-start-07-worker");
+const DEAD_LEASE_WORKER_MODE = process.argv.includes("--hnr-dead-lease-worker");
 const jiti = createJiti(join(root, "package.json"), { interopDefault: true });
 // Workers must share the parent durable store; never create a fresh agentDir.
-const agentDir = WORKER_MODE
-  ? process.env.PI_CODING_AGENT_DIR
-  : await mkdtemp(join(tmpdir(), "ypi-gia07-"));
+const agentDir =
+  WORKER_MODE || DEAD_LEASE_WORKER_MODE
+    ? process.env.PI_CODING_AGENT_DIR
+    : await mkdtemp(join(tmpdir(), "ypi-gia07-"));
 if (!agentDir) {
-  throw new Error("HNR-START-07 worker missing PI_CODING_AGENT_DIR");
+  throw new Error("GIA-07 worker missing PI_CODING_AGENT_DIR");
 }
 process.env.PI_CODING_AGENT_DIR = agentDir;
 
@@ -157,9 +159,60 @@ async function runHnrStart07Worker() {
   );
 }
 
+/**
+ * LEASE-02 / dead-owner fixture worker: acquire a real job directory lease and
+ * exit without release so the parent can exercise stale-running + fencing recovery.
+ * Uses only the temporary PI_CODING_AGENT_DIR shared by the parent suite.
+ */
+async function runHnrDeadLeaseWorker() {
+  const sideDir = process.env.HNR_DEAD_LEASE_SIDE_DIR;
+  const jobId = process.env.HNR_DEAD_LEASE_JOB_ID;
+  if (!sideDir || !jobId) {
+    throw new Error("HNR-DEAD-LEASE worker missing sideDir/jobId env");
+  }
+
+  await store.ensureGithubAutomationStoreLayout();
+  await store.withGithubAutomationJobLease(
+    jobId,
+    async (lease) => {
+      await mkdir(sideDir, { recursive: true, mode: 0o700 });
+      await writeFile(
+        join(sideDir, "owner.json"),
+        JSON.stringify(
+          {
+            ownerId: lease.ownerId,
+            fencingToken: lease.fencingToken,
+            pid: lease.pid,
+            lockDir: lease.lockDir,
+            processEpoch: lease.processEpoch,
+            createdAt: lease.createdAt,
+          },
+          null,
+          2,
+        ) + "\n",
+        "utf8",
+      );
+      // Intentionally leave the filesystem lease behind (do not release).
+      // process.exit skips withGithubAutomationJobLease's finally release path.
+      process.exit(0);
+    },
+    { maxWaitMs: 5_000 },
+  );
+}
+
 if (WORKER_MODE) {
   try {
     await runHnrStart07Worker();
+    process.exit(0);
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
+}
+
+if (DEAD_LEASE_WORKER_MODE) {
+  try {
+    await runHnrDeadLeaseWorker();
     process.exit(0);
   } catch (err) {
     console.error(err);
@@ -2217,6 +2270,71 @@ function spawnHnrStart07Worker(env) {
   });
 }
 
+function spawnHnrDeadLeaseWorker(env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        "--loader",
+        "./scripts/ts-extension-loader.mjs",
+        "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+        thisScript,
+        "--hnr-dead-lease-worker",
+      ],
+      {
+        cwd: root,
+        env: { ...process.env, ...env },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) {
+        resolve({ code, stdout, stderr, pid: child.pid });
+        return;
+      }
+      reject(
+        new Error(
+          `HNR-DEAD-LEASE worker exit ${code}: ${stderr.replace(/\n/g, " ").slice(0, 400)}`,
+        ),
+      );
+    });
+  });
+}
+
+async function collectGithubAutomationEventBlob() {
+  const eventsRoot = join(agentDir, "github-automation", "events");
+  let eventBlob = "";
+  try {
+    const days = readdirSync(eventsRoot);
+    for (const day of days) {
+      if (!day.endsWith(".jsonl")) continue;
+      eventBlob += readFileSync(join(eventsRoot, day), "utf8");
+    }
+  } catch {
+    eventBlob = "";
+  }
+  return eventBlob;
+}
+
+function isPidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 await test("HNR-START-07: multi-process owners share lease/fence; single handler side effect", async () => {
   await resetSchedulerJobs();
   const cfg = await writeEnabledConfig({ enabled: true, paused: false });
@@ -2328,6 +2446,229 @@ await test("HNR-START-07: multi-process owners share lease/fence; single handler
   const parentTick = await scheduler.tickGithubAutomationScheduler();
   assert.equal(parentTick.started, 0);
   assert.equal(readdirSync(join(sideDir, "entered")).length, 1);
+
+  scheduler._testResetGithubAutomationScheduler();
+});
+
+await test("HNR-DEAD-LEASE-02: dead owner stays protected until stale gates; then reconciles with new fence", async () => {
+  await resetSchedulerJobs();
+  const cfg = await writeEnabledConfig({ enabled: true, paused: false });
+  await configMod.writeGithubAutomationConfig(cfg);
+  await store.ensureGithubAutomationStoreLayout();
+
+  // Temporary fixture only — never touch a real production job / #26.
+  const created = await store.createQueuedGithubAutomationJob({
+    repositoryId: REPO_ID,
+    repositoryFullName: "acme/gia07",
+    issueNumber: 926,
+    installationId: INSTALL_ID,
+    deliveryId: "d-dead-lease-02",
+    issueTitlePreview: "dead owner lease recovery",
+  });
+  const jobId = created.jobId;
+  const lockDir = store.getGithubAutomationJobLockDir(jobId);
+
+  const sideDir = join(agentDir, "hnr-dead-lease-side");
+  rmSync(sideDir, { recursive: true, force: true });
+  mkdirSync(sideDir, { recursive: true, mode: 0o700 });
+
+  // Child acquires a real job lease and exits without release (dead PID owner).
+  await spawnHnrDeadLeaseWorker({
+    PI_CODING_AGENT_DIR: agentDir,
+    HNR_DEAD_LEASE_SIDE_DIR: sideDir,
+    HNR_DEAD_LEASE_JOB_ID: jobId,
+  });
+
+  const ownerMetaPath = join(sideDir, "owner.json");
+  await waitFor(async () => existsSync(ownerMetaPath), {
+    attempts: 80,
+    delayMs: 25,
+  });
+  const deadOwner = JSON.parse(readFileSync(ownerMetaPath, "utf8"));
+  assert.ok(deadOwner.ownerId, "dead owner must record ownerId");
+  assert.ok(deadOwner.fencingToken, "dead owner must record fencing token");
+  assert.equal(deadOwner.lockDir, lockDir);
+  assert.equal(
+    isPidAlive(deadOwner.pid),
+    false,
+    "fixture owner PID must be dead after child exit",
+  );
+
+  const freshOwner = await store._testReadGithubAutomationLeaseOwner(lockDir);
+  assert.ok(freshOwner, "fresh dead-owner lease must remain on disk");
+  assert.equal(freshOwner.fencingToken, deadOwner.fencingToken);
+  assert.equal(freshOwner.ownerId, deadOwner.ownerId);
+
+  // 1) Fresh heartbeat: acquisition must fail even though the PID is dead.
+  // Do not force-remove the lock to make this assertion pass.
+  let freshAcquireError = null;
+  try {
+    await store.withGithubAutomationJobLease(
+      jobId,
+      async () => {
+        throw new Error("fresh dead-owner lease must not be stolen");
+      },
+      { maxWaitMs: 400 },
+    );
+  } catch (err) {
+    freshAcquireError = err;
+  }
+  assert.ok(freshAcquireError, "fresh heartbeat must reject bounded acquisition");
+  assert.equal(
+    freshAcquireError instanceof errors.GithubAutomationError,
+    true,
+    "fresh acquisition must fail closed via GithubAutomationError",
+  );
+  assert.equal(freshAcquireError.details?.reason, "lease_timeout");
+  const stillHeld = await store._testReadGithubAutomationLeaseOwner(lockDir);
+  assert.ok(stillHeld, "fresh dead-owner lock must still exist after failed steal");
+  assert.equal(stillHeld.fencingToken, deadOwner.fencingToken);
+
+  // 2) Age only the temporary lease heartbeat + mark job running/attempt=1 stale.
+  // Job stale gate is STALE_RUNNING_MS (5m); lock heartbeat gate is LOCK_STALE_MS (60s).
+  const aged = await store._testAgeGithubAutomationLeaseHeartbeat(
+    lockDir,
+    70_000,
+  );
+  assert.equal(aged, true, "test helper must age temporary lease heartbeat");
+  const agedOwner = await store._testReadGithubAutomationLeaseOwner(lockDir);
+  assert.ok(agedOwner);
+  assert.equal(agedOwner.fencingToken, deadOwner.fencingToken);
+  assert.ok(
+    Date.now() - agedOwner.heartbeatAt >= 60_000,
+    "heartbeat must be older than LOCK_STALE_MS",
+  );
+
+  const staleUpdatedAt = new Date(Date.now() - 6 * 60_000).toISOString();
+  await store.writeGithubAutomationJob({
+    ...created,
+    status: "running",
+    phase: "analyzing",
+    attempt: 1,
+    leaseOwner: deadOwner.ownerId,
+    leaseFencingToken: deadOwner.fencingToken,
+    leaseHeartbeatAt: new Date(agedOwner.heartbeatAt).toISOString(),
+    leaseExpiresAt: staleUpdatedAt,
+    updatedAt: staleUpdatedAt,
+    reasonCode: null,
+  });
+
+  let recoveryHandlerCalls = 0;
+  let recoveryFence = null;
+  let recoveryOwnerId = null;
+  scheduler.setGithubAutomationJobHandler(async (job, ctx) => {
+    recoveryHandlerCalls += 1;
+    recoveryFence = ctx?.lease?.fencingToken ?? null;
+    recoveryOwnerId = ctx?.lease?.ownerId ?? null;
+    assert.ok(recoveryFence, "recovery run must hold a new lease fence");
+    assert.notEqual(
+      recoveryFence,
+      deadOwner.fencingToken,
+      "recovery fence must differ from the dead owner's fence",
+    );
+    const completed = {
+      ...job,
+      status: "completed",
+      phase: "completed",
+      updatedAt: new Date().toISOString(),
+      reasonCode: null,
+    };
+    await store.writeGithubAutomationJobWithFencing(completed, {
+      fencingToken: recoveryFence,
+      ownerId: recoveryOwnerId,
+    });
+    return {
+      job: completed,
+      disposition: { kind: "terminal", status: "completed" },
+    };
+  });
+
+  // 3) Scheduler tick reconciles stale-running then takes exactly one new lease-run.
+  scheduler._testSetGithubAutomationSchedulerAuto(false);
+  const tick = await scheduler.tickGithubAutomationScheduler();
+  assert.equal(tick.started, 1, "exactly one recovery lease-run must start");
+
+  await waitFor(
+    async () => {
+      const j = await store.readGithubAutomationJob(jobId);
+      return (
+        j &&
+        j.status === "completed" &&
+        j.attempt === 2 &&
+        recoveryHandlerCalls >= 1
+      );
+    },
+    { attempts: 200, delayMs: 25 },
+  );
+
+  assert.equal(recoveryHandlerCalls, 1, "recovery handler must run exactly once");
+  assert.ok(recoveryFence);
+  assert.notEqual(recoveryFence, deadOwner.fencingToken);
+
+  const finalJob = await store.readGithubAutomationJob(jobId);
+  assert.ok(finalJob);
+  assert.equal(finalJob.status, "completed");
+  assert.equal(finalJob.phase, "completed");
+  assert.equal(finalJob.attempt, 2, "attempt must advance 1 → 2 on recovery lease");
+  assert.equal(
+    finalJob.reasonCode === null || finalJob.reasonCode === undefined,
+    true,
+  );
+
+  const eventBlob = await collectGithubAutomationEventBlob();
+  assert.equal(
+    eventBlob.includes("job_stale_reconcile"),
+    true,
+    "events must include job_stale_reconcile",
+  );
+  assert.equal(
+    eventBlob.includes("job_started"),
+    true,
+    "events must include job_started after recovery",
+  );
+  assert.equal(
+    eventBlob.includes(jobId),
+    true,
+    "events must reference the temporary job id",
+  );
+  assert.equal(
+    eventBlob.includes("_testForceRemoveLeaseDir"),
+    false,
+  );
+
+  // 4) Old fencing token must not write after ownership changed.
+  let oldFenceError = null;
+  try {
+    await store.writeGithubAutomationJobWithFencing(
+      {
+        ...finalJob,
+        status: "running",
+        phase: "analyzing",
+        reasonCode: "should_not_write",
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        fencingToken: deadOwner.fencingToken,
+        ownerId: deadOwner.ownerId,
+      },
+    );
+  } catch (err) {
+    oldFenceError = err;
+  }
+  assert.ok(oldFenceError, "old fencing token write must be rejected");
+  assert.equal(oldFenceError instanceof errors.GithubAutomationError, true);
+  assert.equal(oldFenceError.details?.reason, "lease_fencing_mismatch");
+
+  const afterOldWrite = await store.readGithubAutomationJob(jobId);
+  assert.ok(afterOldWrite);
+  assert.equal(afterOldWrite.status, "completed");
+  assert.notEqual(afterOldWrite.reasonCode, "should_not_write");
+  assert.equal(afterOldWrite.attempt, 2);
+
+  // Second tick must not re-lease a terminal job.
+  const secondTick = await scheduler.tickGithubAutomationScheduler();
+  assert.equal(secondTick.started, 0);
+  assert.equal(recoveryHandlerCalls, 1);
 
   scheduler._testResetGithubAutomationScheduler();
 });

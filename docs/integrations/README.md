@@ -402,7 +402,7 @@ Repository Issue analysis is a **separate domain** from Links OAuth connections 
 - **Analysis**: Project Registry `projectId` → server `projectRoot`; controller-owned list/find/grep/read with path/symlink/secret/binary/budget gates; `ModelRuntime.completeSimple` strict JSON rounds; ledger-validated category/verdict; “grep miss ≠ not_exists”.
 - **Comment / close**: v3 marker `kind=issue_analysis + repositoryId + issueNumber`; semantic no-op PATCH; unknown write read-back; close only for `bug` + `not_exists` + `high` + complete evidence + comment confirmed + content hash stable + fence + enabled/not paused. Pre-close `updated_at` baseline is taken after comment effects. Residual TOCTOU and local-checkout freshness risks are documented honestly.
 - **Config v2**: `enabled`/`paused`/`repositories`/`analysis.maxConcurrency` only; v1 migrates disabled with retirement backup; unknown schema fail closed.
-- **Scheduler**: leases only schema-v2 `issue_analysis`; v1 non-terminal jobs get `legacy_pipeline_retired` sidecars and zero business lease; explicit dispositions prevent spin.
+- **Scheduler**: leases only schema-v2 `issue_analysis`; v1 non-terminal jobs get `legacy_pipeline_retired` sidecars and zero business lease; explicit dispositions prevent spin. Production readiness is a **cross-bundle mode token** (`registration.kind === "production"` + local static handler available), not function-object identity: Next may duplicate scheduler modules for `instrumentation` vs webhook/route entries while they share `globalThis` registry/state. Each bundle still **executes its own** statically imported `githubIssueAnalysisJobHandler`; registry production handler refs are not call targets. Readiness remains before lease/`job_started`/`attempt`. Stale-running reconcile (job gate currently 5 minutes) plus store lease heartbeat/PID/`processEpoch`/fencing (lock heartbeat gate currently 60 seconds) recover dead owners without operator job/lock mutation.
 
 ### Configuration
 
@@ -434,7 +434,16 @@ Allowlist is user-managed by immutable GitHub `repositoryId`, bound to Project R
 npm run test:github-automation
 ```
 
-Temporary `PI_CODING_AGENT_DIR`, temp repos, fake ModelRuntime, mocked GitHub HTTP — never real operator credentials or live GitHub/provider network. Covers ingress matrix, evidence containment, model downgrade, comment/close idempotency, migration/retirement, privacy scans, and no-spin. **Live test-App UAT** remains a release blocker for real comment/close behavior; mock green does not replace it.
+Temporary `PI_CODING_AGENT_DIR`, temp repos, fake ModelRuntime, mocked GitHub HTTP — never real operator credentials or live GitHub/provider network. Covers ingress matrix, evidence containment, model downgrade, comment/close idempotency, migration/retirement, privacy scans, no-spin, foreign production-function readiness (ready but local static handler selected), custom/disabled zero-lease isolation, and temp-only dead-owner stale-running/fencing recovery (fresh heartbeat not stolen; after gates: `job_stale_reconcile` → new `job_started`/fence; old fence rejected). **Live test-App UAT** remains a release blocker for real comment/close behavior; mock green does not replace it.
+
+**Production-bundle gate** (release / multi-entry readiness):
+
+```bash
+npm run build
+npm run test:github-automation-production-runtime
+```
+
+Must load built `.next/server/instrumentation.js` (Node `register`) **before** the built webhook route, then HMAC-POST a human `issues.opened` fixture under temp HOME/`PI_CODING_AGENT_DIR`. Assert `202 enqueued`, bounded `attempt`/`job_started`, real-handler pre-network terminal (e.g. `malformed_full_name`), no `analysis_handler_initialization_failed` / `handler_not_ready` / default fallback, zero network, and no operator-dir writes. Never use bare `next build`, source jiti, chunk/module-id hardcoding, or a jobs Retry-only load as a substitute.
 
 ### Rollback / stop-bleed
 

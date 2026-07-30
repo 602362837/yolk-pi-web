@@ -652,21 +652,25 @@ Settings job **retry** only resumes the first unconfirmed checkpoint (result/com
 
 **Pre-HNR (0.8.10) root cause:** production Webpack wrapped the analysis runner as an async module; the scheduler cold-loaded it with a synchronous `require`, fell through to a parking default handler, wrote `received/retry_due/handler_not_ready` after consuming `attempt`, then a later fixed poll timer cleared the 5s retry deadline so the job sat overdue forever. Server startup also did not ensure the scheduler, so restarts did not self-heal.
 
-**Post-HNR expected behavior:**
+**Cross-bundle readiness (0.8.11-class) root cause:** Next may compile `instrumentation` and the webhook route into **separate** scheduler/analysis-handler modules that still share `globalThis` registry/state. If production readiness compared `registry.handler === localStaticHandler`, a webhook `wake` that re-armed the shared timer from the route bundle would permanently fail readiness (`analysis_handler_initialization_failed`) **before** job scan/lease, so a delivery could stay `queued / attempt=0 / leaseOwner=null` with no `job_started` even though instrumentation had registered production mode.
 
-1. Production scheduler **statically binds** `githubIssueAnalysisJobHandler` — ordinary ticks never select the parking default / `handler_not_ready` path.
-2. Handler readiness is resolved **before** business lease: bootstrap isolation failures do not write `job_started` or increment `attempt`.
-3. Timers follow durable `nextRetryAt` / queue deadlines; early ticks re-arm future work instead of going idle.
-4. Node `instrumentation.ts` fire-and-forget `ensureGithubAutomationScheduler()` on server start recovers overdue `queued` / `retry_due` / stale-running v2 jobs without a second webhook or manual Retry.
-5. `GET /status` and `POST /verify` remain non-waking; page polling cannot substitute for the durable scheduler.
+**Post-fix expected behavior:**
+
+1. Production scheduler **statically binds** the **current bundle's** `githubIssueAnalysisJobHandler` — ordinary ticks never select the parking default / `handler_not_ready` path and never execute a foreign registry production function reference.
+2. Production readiness uses the stable shared-registry `kind=production` mode token plus local static handler availability — **not** cross-bundle function identity equality.
+3. Handler readiness is resolved **before** business lease: isolation failures do not write `job_started` or increment `attempt`.
+4. Timers follow durable `nextRetryAt` / queue deadlines; early ticks re-arm future work instead of going idle. Webhook enqueue may take over the shared process timer from a route bundle; kind-stable readiness must still allow scan/lease afterward.
+5. Node `instrumentation.ts` fire-and-forget `ensureGithubAutomationScheduler()` on server start recovers overdue `queued` / `retry_due` / stale-running v2 jobs without a second webhook or manual Retry.
+6. `GET /status` and `POST /verify` remain non-waking; page polling cannot substitute for the durable scheduler.
 
 **Operator checklist when a job looks stuck:**
 
-1. Confirm package/build includes the HNR scheduler + root `instrumentation.ts` (not an old 0.8.10 binary without those fixes).
-2. Read the job file under `~/.pi/agent/github-automation/jobs/` (or `PI_CODING_AGENT_DIR`): note `status`, `reasonCode`, `attempt`, `nextRetryAt`, `updatedAt`.
+1. Confirm package/build includes the HNR scheduler, kind-stable readiness, and root `instrumentation.ts` (not an old 0.8.10 / broken 0.8.11 identity-compare binary).
+2. Read the job file under `~/.pi/agent/github-automation/jobs/` (or `PI_CODING_AGENT_DIR`): note `status`, `reasonCode`, `attempt`, `nextRetryAt`, `updatedAt`, and safe lease owner metadata (pid/heartbeat age only — never full fencing tokens, secrets, Issue body, or absolute credential paths).
 3. If `reasonCode=handler_not_ready` and `updatedAt` is frozen past `nextRetryAt` on an old binary: upgrade, then let **startup reconcile** continue the job — do **not** hand-edit the job JSON. Optional: set `paused=true` before upgrade if you must prevent an immediate remote comment.
-4. If still stuck on a new binary: check `enabled`/`paused`, allowlist/`installationId`, model readiness, and events JSONL for `job_started` vs `analysis_handler_initialization_failed` (fixed safe codes only).
-5. Manual Settings **Retry** remains valid for first-unconfirmed-checkpoint resume; it is no longer required solely to re-arm a lost timer after HNR.
+4. If `delivery_enqueued` but the job stays `queued/attempt=0` with scheduler/events showing `analysis_handler_initialization_failed` on a multi-entry production binary: treat as the cross-bundle readiness bug class — upgrade to a build with kind-stable readiness, restart, and confirm a new webhook still leases after the route bundle has loaded. Do **not** force-unlock or rewrite attempt/status.
+5. If still stuck on a fixed binary: check `enabled`/`paused`, allowlist/`installationId`, model readiness, and events JSONL for `job_started` vs fixed safe codes only.
+6. Manual Settings **Retry** remains valid for first-unconfirmed-checkpoint resume; it is no longer required solely to re-arm a lost timer after HNR.
 
 **Release verification:**
 
@@ -676,7 +680,47 @@ npm run build
 npm run test:github-automation-production-runtime
 ```
 
-The production smoke must load the real `.next` jobs route under a temp agentDir; jiti source green alone does not prove the Webpack cold-load fix.
+The production smoke must load built instrumentation (`register`) **then** the built webhook route under a temp agentDir, HMAC-POST a human `issues.opened`, and assert lease/`job_started` without `analysis_handler_initialization_failed`. jiti source green, jobs Retry-only load, or chunk/module-id string search alone does not prove the multi-entry fix.
+
+### `delivery_enqueued` but job stays `queued / attempt=0` (no lease / no `job_started`)
+
+**Symptoms:** webhook audit shows enqueued delivery; job JSON remains `queued`, `attempt=0`, `leaseOwner=null`; events lack `job_started`; scheduler state may show `analysis_handler_initialization_failed` while a timer keeps arming.
+
+**Likely causes:**
+
+1. Pre-fix multi-entry production readiness (function identity across instrumentation vs webhook bundles).
+2. `enabled=false` / `paused=true` after enqueue (new leases stop; historical delivery remains).
+3. Process died before durable ensure/wake completed — restart with fixed binary should startup-reconcile queued work.
+
+**Safe recovery:**
+
+1. Confirm the running package/BUILD_ID includes kind-stable readiness (not the 0.8.11 identity-compare regression).
+2. Confirm `enabled=true`, `paused=false` without writing config solely to manufacture a wake during diagnosis if policy forbids it.
+3. Restart the fixed binary so Node instrumentation ensure arms the scheduler.
+4. Wait for ordinary poll/ensure windows; expect `job_started` and `attempt >= 1` without operator file surgery.
+5. After recovery, create **two** controlled test Issues in sequence: the second proves webhook-route timer takeover still schedules.
+
+**Forbidden:** delete real job/lock/event/delivery files; hand-edit `attempt`/`status`/`leaseFencingToken`/`phase`; forge events; force-remove lock dirs; roll back to a known broken identity-compare binary as a “fix”.
+
+### `running` job with a dead lease owner PID (stale-running)
+
+**Symptoms:** job `status=running`, `attempt>=1`, phase mid-analysis; lease owner PID is not alive; heartbeat/`updatedAt` aging; no new `job_started`.
+
+**Expected automatic path (do not short-circuit):**
+
+1. Job stale-running gate (scheduler, currently **5 minutes** on `updatedAt`) emits `stale_running_reconcile` / `job_stale_reconcile`, moves the job to `retry_due`, and clears durable lease fields on the job record.
+2. Lock reclaim still waits store rules: heartbeat stale (currently **60 seconds**), live-PID / `processEpoch` fail-closed checks. A **fresh** heartbeat must not be stolen solely because the PID is already dead (PID reuse is intentionally conservative).
+3. A later tick acquires a **new** fencing token, writes `job_started`, and advances `attempt`. Old fencing tokens must fail subsequent writes.
+4. Final disposition may be completed/blocked/retry_due under normal analysis rules; scheduler recovery success is `job_stale_reconcile` + new lease/`job_started`, not a forced `completed`.
+
+**Operator checklist:**
+
+1. Read-only: package/BUILD_ID, `enabled`/`paused`, job `status`/`attempt`/`phase`/`reasonCode`/`updatedAt`, owner pid liveness, heartbeat age. Do not print secrets, Issue body, absolute credential paths, or full fencing tokens.
+2. Restart only a fixed binary if the process itself is gone or still on a broken readiness build.
+3. Wait **both** stale gates plus a reasonable ensure/poll window.
+4. If gates elapsed and no new lease appears, record safe diagnostics and escalate as a blocker — still **do not** delete the lock or rewrite the job.
+
+**Forbidden:** `_testForceRemoveLeaseDir`-style force unlocks in production, hand-editing job/lock JSON, manufacturing a second analysis by cloning the job, or treating a temporary instrumentation-only restart on a broken readiness binary as a durable fix.
 
 ### Model readiness false
 
@@ -713,14 +757,14 @@ npm run test:github-automation
 
 Uses temporary `PI_CODING_AGENT_DIR` and mocks only — never real operator agent dir or live GitHub/provider network. Mock green does **not** replace dedicated test-App UAT for live comment `updated_at` / close behavior.
 
-After a production build (release / HNR gate):
+After a production build (release / HNR multi-entry gate):
 
 ```bash
 npm run build
 npm run test:github-automation-production-runtime
 ```
 
-Loads the built `.next` jobs Retry route with a deterministic pre-network fixture and asserts no `handler_not_ready` / default fallback on the first production lease.
+Loads built `.next` **instrumentation** (Node `register`) then the built **webhook** route under a temp agentDir, HMAC-POSTs a human `issues.opened` fixture, and asserts bounded lease/`job_started` with a real-handler pre-network terminal (e.g. `malformed_full_name`) and no `analysis_handler_initialization_failed` / `handler_not_ready` / default fallback. Zero network and no operator-dir writes. Do not accept jobs Retry-only, source jiti, or chunk/module-id assumptions as substitutes.
 
 ## Memory Diagnostic Snapshots
 
