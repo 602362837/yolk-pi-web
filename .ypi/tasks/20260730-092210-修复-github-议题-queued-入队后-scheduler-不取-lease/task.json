@@ -3,15 +3,15 @@
   "id": "20260730-092210-修复-github-议题-queued-入队后-scheduler-不取-lease",
   "title": "修复 GitHub 议题 queued 入队后 scheduler 不取 lease",
   "workflowId": "feature-dev",
-  "status": "checking",
+  "status": "review",
   "cwd": "/Volumes/01/ExternalStorage/Projects/gitProjects/pi-agnet-web",
   "createdAt": "2026-07-30T01:22:10.074Z",
-  "updatedAt": "2026-07-30T02:07:18.475Z",
+  "updatedAt": "2026-07-30T02:29:22.000Z",
   "completedAt": null,
   "contextIds": [
     "pi_019fac30-b073-743b-9e3d-70edcc0ce764"
   ],
-  "currentMember": "checker",
+  "currentMember": "main",
   "artifacts": {
     "plan-review": "plan-review.md",
     "brief": "brief.md",
@@ -1209,6 +1209,7 @@
       "member": "checker",
       "status": "failed",
       "startedAt": "2026-07-30T02:02:50.868Z",
+      "finishedAt": "2026-07-30T02:07:18.474Z",
       "runner": "sdk",
       "childSessionId": "019fb0c2-992a-7097-bdda-fd27c3f9990d",
       "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-30T02-02-51-050Z_019fb0c2-992a-7097-bdda-fd27c3f9990d.jsonl",
@@ -1317,7 +1318,8 @@
           "previewTruncated": false,
           "finalOutputTruncated": false,
           "transcriptItemTruncated": false,
-          "transcriptCaptureLimited": false
+          "transcriptCaptureLimited": false,
+          "apiProjectionLimited": false
         },
         "terminationReason": "check_command_rejected"
       },
@@ -1332,6 +1334,7 @@
         "pathLabel": ".ypi/.runtime/studio-subagents/20260730-092210-_-github-_-queued-_-scheduler-_-lease/checker-a22af7612969e04146bbe626.jsonl",
         "status": "failed",
         "startedAt": "2026-07-30T02:02:50.868Z",
+        "finishedAt": "2026-07-30T02:07:18.471Z",
         "updatedAt": "2026-07-30T02:07:18.471Z",
         "itemCount": 121,
         "messageCount": 1,
@@ -1339,16 +1342,16 @@
         "stderrBytes": 0,
         "bytes": 33833,
         "truncated": false,
-        "truncation": {
-          "bytesLimit": 5242880,
-          "itemBytesLimit": 16384
-        },
         "runner": "sdk",
         "childSessionId": "019fb0c2-992a-7097-bdda-fd27c3f9990d",
         "childSessionFile": "/Users/zyj/.pi/agent/sessions/--Volumes-01-ExternalStorage-Projects-gitProjects-pi-agnet-web--/2026-07-30T02-02-51-050Z_019fb0c2-992a-7097-bdda-fd27c3f9990d.jsonl",
-        "finishedAt": "2026-07-30T02:07:18.471Z"
-      },
-      "finishedAt": "2026-07-30T02:07:18.474Z"
+        "truncation": {
+          "itemTruncated": false,
+          "captureLimited": false,
+          "bytesLimit": 5242880,
+          "itemBytesLimit": 16384
+        }
+      }
     }
   ],
   "meta": {
@@ -1591,7 +1594,7 @@
   },
   "implementationProgress": {
     "schemaVersion": 2,
-    "updatedAt": "2026-07-30T02:07:18.475Z",
+    "updatedAt": "2026-07-30T02:29:21.999Z",
     "activeSubtaskIds": [],
     "queuedSubtaskIds": [],
     "counts": {

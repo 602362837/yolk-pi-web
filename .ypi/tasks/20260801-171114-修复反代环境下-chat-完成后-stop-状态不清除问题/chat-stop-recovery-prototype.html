@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chat Stop 状态恢复原型</title>
+<style>
+:root{color-scheme:dark;font:14px system-ui,sans-serif;background:#111827;color:#e5e7eb}body{margin:0;padding:24px;background:#111827}.shell{max-width:880px;margin:auto}.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.controls button,.send{border:1px solid #4b5563;background:#1f2937;color:#e5e7eb;border-radius:7px;padding:7px 10px;cursor:pointer}.controls button[aria-pressed=true]{border-color:#60a5fa;color:#bfdbfe}.chat{min-height:390px;border:1px solid #374151;border-radius:10px;background:#172033;padding:18px;display:flex;flex-direction:column}.messages{flex:1}.bubble{max-width:70%;padding:10px 12px;border-radius:10px;margin:8px 0;line-height:1.45}.assistant{background:#243047}.user{background:#2563eb;margin-left:auto}.input{display:flex;gap:8px;align-items:center;border-top:1px solid #374151;padding-top:14px}.input textarea{flex:1;resize:none;min-height:38px;border:1px solid #4b5563;border-radius:7px;background:#111827;color:#e5e7eb;padding:9px}.send.stop{background:#7f1d1d;border-color:#ef4444}.hint{color:#9ca3af;font-size:12px;margin-top:10px}
+</style>
+</head>
+<body><main class="shell">
+<h1>Chat Stop / Send 状态时序原型</h1>
+<div class="controls" aria-label="原型状态">
+<button data-state="idle" aria-pressed="true">Idle</button><button data-state="running">Running</button><button data-state="reconnect">Reconnecting + active</button><button data-state="recovered">Recovered idle</button><button data-state="studio">Studio children</button>
+</div>
+<section class="chat" aria-label="Chat 输入区原型"><div class="messages"><div class="bubble user">请处理这个问题</div><div class="bubble assistant" id="reply">好的，我正在处理……</div></div><div class="input"><textarea aria-label="消息" placeholder="输入消息…"></textarea><button class="send" id="action">发送</button></div><div class="hint" id="hint">空闲状态：保持现有发送控件。</div></section>
+<p class="hint">本原型只验证状态时序，不新增恢复按钮、重连提示、Toast 或布局；Stop/Send 控件样式沿用现有 Chat。</p>
+</main>
+<script>
+const copy={idle:['发送','空闲状态：保持现有发送控件。'],running:['停止','运行中：保持现有 Stop 控件。'],reconnect:['停止','连接恢复中但服务端仍运行：保持 Stop，不闪回发送。'],recovered:['发送','服务端状态已确认空闲：自动恢复现有发送控件。'],studio:['停止','Studio 子任务仍运行：保持后台运行语义，不恢复发送。']};
+const action=document.querySelector('#action'),hint=document.querySelector('#hint'),reply=document.querySelector('#reply');
+document.querySelectorAll('[data-state]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-state]').forEach(x=>x.setAttribute('aria-pressed',x===b));const [label,text]=copy[b.dataset.state];action.textContent=label;action.classList.toggle('stop',label==='停止');hint.textContent=text;reply.textContent=b.dataset.state==='recovered'?'回复已完成。':b.dataset.state==='studio'?'主回复已完成，Studio 子任务仍在后台运行……':'好的，我正在处理……';});
+</script></body></html>
