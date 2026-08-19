@@ -1180,7 +1180,19 @@ export class AgentSessionWrapper {
 
       case "set_model": {
         const { provider, modelId } = command as { provider: string; modelId: string };
-        const model = this.inner.modelRuntime.getModel(provider, modelId);
+        let model = this.inner.modelRuntime.getModel(provider, modelId);
+        if (!model) {
+          // One exact self-heal: models.json may have committed after this live
+          // session runtime was built. Reload config once and retry the same
+          // provider/id only — never fuzzy, never fallback, never loop.
+          try {
+            await this.inner.modelRuntime.reloadConfig();
+            reconcileLiveModelDescriptor(this);
+          } catch {
+            // Fall through to the original Model-not-found error below.
+          }
+          model = this.inner.modelRuntime.getModel(provider, modelId);
+        }
         if (!model) throw new Error(`Model not found: ${provider}/${modelId}`);
         // Session-scoped Chat switch (IMP-002 plan A / MODEL-PIN-3):
         // SDK setModel still updates runtime model + JSONL model_change (and may
@@ -1464,6 +1476,82 @@ export function getActiveRpcSessionIds(): string[] {
   return ids;
 }
 
+export type LiveModelReloadSummary = {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+};
+
+/**
+ * Replace the live in-memory model descriptor for the same provider/id only.
+ * Never calls setModel(), never writes model_change / settings defaults, and
+ * never invents a replacement when the current model was deleted.
+ */
+function reconcileLiveModelDescriptor(
+  wrapper: AgentSessionWrapper,
+): void {
+  const currentModel = wrapper.inner.model as
+    | { id?: string; provider?: string; [key: string]: unknown }
+    | undefined;
+  const provider = currentModel?.provider;
+  const modelId = currentModel?.id;
+  if (!provider || !modelId || !currentModel) return;
+
+  try {
+    const refreshed = wrapper.inner.modelRuntime.getModel(provider, modelId) as
+      | { id?: string; provider?: string; [key: string]: unknown }
+      | undefined;
+    if (
+      refreshed
+      && refreshed.provider === provider
+      && refreshed.id === modelId
+      && refreshed !== currentModel
+    ) {
+      const agentState = (
+        wrapper.inner as unknown as {
+          agent?: { state?: { model?: unknown } };
+        }
+      ).agent?.state;
+      if (agentState) agentState.model = refreshed;
+    }
+  } catch {
+    // Descriptor refresh is best-effort; runtime refresh/reload already ran.
+  }
+}
+
+async function reloadLiveWrappers(
+  reloadOne: (wrapper: AgentSessionWrapper) => Promise<void>,
+): Promise<LiveModelReloadSummary> {
+  const wrappers = [...getRegistry().values()].filter((wrapper) => wrapper.isAlive());
+  const results = await Promise.all(
+    wrappers.map(async (wrapper) => {
+      try {
+        await reloadOne(wrapper);
+        return true;
+      } catch {
+        return false;
+      }
+    }),
+  );
+
+  const succeeded = results.reduce<number>((sum, ok) => sum + (ok ? 1 : 0), 0);
+  const failed = results.length - succeeded;
+
+  try {
+    // OpenAI Codex keeps reusable WebSockets keyed by session id. After account
+    // or models.json changes, old sessions must reconnect so headers/baseUrl apply.
+    cleanupSessionResources();
+  } catch {
+    // Reload should remain best-effort; stale resources expire on their own.
+  }
+
+  return {
+    attempted: results.length,
+    succeeded,
+    failed,
+  };
+}
+
 /**
  * Offline-refresh every live wrapper's ModelRuntime so the next request uses
  * the current Active credential / model descriptors.
@@ -1488,66 +1576,26 @@ export async function reloadRpcAuthState(): Promise<number> {
     // Catalog invalidation must not block live auth reload.
   }
 
-  const wrappers = [...getRegistry().values()].filter((wrapper) => wrapper.isAlive());
-  const results = await Promise.all(
-    wrappers.map(async (wrapper) => {
-      try {
-        const currentModel = wrapper.inner.model as
-          | { id?: string; provider?: string; [key: string]: unknown }
-          | undefined;
-        const provider = currentModel?.provider;
-        const modelId = currentModel?.id;
-        const runtime = wrapper.inner.modelRuntime;
+  const summary = await reloadLiveWrappers(async (wrapper) => {
+    await wrapper.inner.modelRuntime.refresh({ allowNetwork: false });
+    reconcileLiveModelDescriptor(wrapper);
+  });
 
-        await runtime.refresh({ allowNetwork: false });
+  return summary.succeeded;
+}
 
-        // After offline refresh, dynamic model descriptors may carry updated
-        // baseUrl/headers. Replace the live in-memory model object for the same
-        // provider/id identity without calling setModel() so we do not persist a
-        // model_change entry or alter user defaults.
-        if (provider && modelId && currentModel) {
-          try {
-            const refreshed = runtime.getModel(provider, modelId) as
-              | { id?: string; provider?: string; [key: string]: unknown }
-              | undefined;
-            if (
-              refreshed
-              && refreshed.provider === provider
-              && refreshed.id === modelId
-              && refreshed !== currentModel
-            ) {
-              const agentState = (
-                wrapper.inner as unknown as {
-                  agent?: { state?: { model?: unknown } };
-                }
-              ).agent?.state;
-              if (agentState) agentState.model = refreshed;
-            }
-          } catch {
-            // Descriptor refresh is best-effort; runtime refresh already ran.
-          }
-        }
-
-        return 1;
-      } catch {
-        // Keep account activation best-effort for live wrappers; new sessions
-        // still construct a fresh ModelRuntime against the updated auth.json.
-        return 0;
-      }
-    }),
-  );
-
-  const count = results.reduce<number>((sum, value) => sum + value, 0);
-
-  try {
-    // OpenAI Codex keeps reusable WebSockets keyed by session id. After account
-    // activation, old sessions must reconnect so the new token/account headers apply.
-    cleanupSessionResources();
-  } catch {
-    // Auth reload should remain best-effort; stale resources expire on their own.
-  }
-
-  return count;
+/**
+ * Reread models.json on every live wrapper after a durable models-config commit.
+ *
+ * Uses public `ModelRuntime.reloadConfig()` (not refresh) so newly appended
+ * models / whole custom providers become exact-resolvable. Auth-only mutations
+ * must keep using `reloadRpcAuthState()` instead.
+ */
+export async function reloadRpcModelsConfigState(): Promise<LiveModelReloadSummary> {
+  return reloadLiveWrappers(async (wrapper) => {
+    await wrapper.inner.modelRuntime.reloadConfig();
+    reconcileLiveModelDescriptor(wrapper);
+  });
 }
 
 export function destroyRpcSessionsForCwd(cwd: string): string[] {

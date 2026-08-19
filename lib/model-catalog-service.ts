@@ -12,6 +12,9 @@
  * - Projection uses `getAvailableSnapshot()` after the admin offline refresh;
  *   it never calls `getAvailable()`, which would force another availability
  *   scan.
+ * - After offline refresh, a non-empty `runtime.getError()` fails the build
+ *   (path-free) so `/api/models` can map it to 500 `model_catalog_unavailable`
+ *   and the browser retains last-good instead of accepting a 200 partial/empty.
  * - Does not load cwd project extensions; model list identity is canonical
  *   agentDir (not request cwd). Cache / pending / burst slots are isolated by
  *   that key so concurrent explicit agentDir callers never share a wrong
@@ -27,7 +30,20 @@ import {
   measureModelCatalogAsync,
   recordModelCatalogCount,
 } from "./model-catalog-metrics";
-import { getWebModelRuntime } from "./web-model-runtime";
+import {
+  getWebModelRuntime,
+  invalidateWebModelRuntimeConfig,
+} from "./web-model-runtime";
+
+/** Internal build failure; route maps to fixed 500 model_catalog_unavailable. */
+export class ModelCatalogUnavailableError extends Error {
+  readonly code = "model_catalog_unavailable" as const;
+
+  constructor() {
+    super("model catalog unavailable");
+    this.name = "ModelCatalogUnavailableError";
+  }
+}
 
 export type WebModelCatalogModelListItem = {
   id: string;
@@ -203,6 +219,18 @@ function projectCatalogBase(runtime: {
   };
 }
 
+function assertAdminRuntimeCatalogHealthy(runtime: {
+  getError?: () => string | null | undefined;
+}): void {
+  const error =
+    typeof runtime.getError === "function" ? runtime.getError() : undefined;
+  if (typeof error === "string" && error.trim().length > 0) {
+    // Do not include SDK text, paths, or config in the thrown error — the
+    // route already returns a fixed safe body.
+    throw new ModelCatalogUnavailableError();
+  }
+}
+
 async function buildCatalogBase(agentDir: string): Promise<CatalogBaseSnapshot> {
   return measureModelCatalogAsync("catalog.build", async () => {
     // Administrative fixed-provider runtime: offline refresh single-flight is
@@ -211,6 +239,7 @@ async function buildCatalogBase(agentDir: string): Promise<CatalogBaseSnapshot> 
       agentDir,
       allowModelNetwork: false,
     });
+    assertAdminRuntimeCatalogHealthy(runtime);
     return projectCatalogBase(runtime);
   });
 }
@@ -319,14 +348,53 @@ export async function getWebModelCatalogSnapshot(options?: {
   });
 }
 
+function shouldInvalidateAdminRuntimeConfig(
+  reason: ModelCatalogInvalidationReason,
+): boolean {
+  switch (reason) {
+    case "models_config":
+    case "models_config_sync":
+    case "model_prices":
+    case "anyrouter_config":
+      // Structural models.json / provider composition changes require a fresh
+      // admin runtime (refresh() does not reread modelsPath).
+      return true;
+    case "auth_mutation":
+    case "account_mutation":
+    case "settings_default":
+    case "manual":
+    case "test":
+      // Auth/account/default/test epoch bumps keep the warm admin runtime and
+      // rely on offline refresh / availability projection only.
+      return false;
+    default: {
+      const _exhaustive: never = reason;
+      void _exhaustive;
+      return false;
+    }
+  }
+}
+
 /**
  * Advance the catalog epoch so the next snapshot rebuilds from admin runtime.
  * Call only after a successful models/auth/account/default mutation commits.
  * Failures/cancels must not call this.
+ *
+ * For models.json structural writers (`models_config`, `models_config_sync`,
+ * `model_prices`, `anyrouter_config`), also evict the default admin runtime
+ * config generation so the next catalog build rereads models.json. Auth-only
+ * reasons leave the warm admin runtime in place.
  */
 export function invalidateWebModelCatalog(
-  _reason: ModelCatalogInvalidationReason = "manual",
+  reason: ModelCatalogInvalidationReason = "manual",
+  options?: { agentDir?: string; modelsPath?: string },
 ): void {
+  if (shouldInvalidateAdminRuntimeConfig(reason)) {
+    invalidateWebModelRuntimeConfig({
+      agentDir: options?.agentDir,
+      modelsPath: options?.modelsPath,
+    });
+  }
   catalogEpoch += 1;
   // Drop every agentDir burst slot. Leave in-flight builds alone; their finally
   // clears per-key pending, and publish is gated on matching epoch so a late

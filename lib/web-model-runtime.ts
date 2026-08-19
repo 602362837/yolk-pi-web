@@ -16,6 +16,9 @@
  *   extensions must use `createWebAgentSessionServices` instead so providers
  *   cannot leak across cwd boundaries.
  * - Temporary modelsPath never enters the admin cache.
+ * - Successful models.json commits call `invalidateWebModelRuntimeConfig` so
+ *   the next admin read creates a fresh fixed-provider runtime instead of
+ *   relying on `refresh()` (which does not reread modelsPath).
  */
 
 import { join, resolve } from "node:path";
@@ -26,6 +29,7 @@ import type {
   InlineExtension,
   ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
   createWebCredentialStore,
   getWebCredentialStore,
@@ -89,7 +93,14 @@ const adminRuntimeCache = new Map<string, AdminRuntimeCacheEntry>();
 // provider registration or make another caller wait on a network refresh.
 const adminRuntimePending = new Map<string, Promise<AdminRuntimeCacheEntry>>();
 const adminRuntimeRefreshPending = new Map<string, Promise<void>>();
+/** Test-reset salt so in-flight work from a previous suite cannot refill. */
 let adminRuntimeCacheGeneration = 0;
+/**
+ * Production per-canonical-key config generation. Successful models.json
+ * commits bump the matching key so late init/refresh settlements cannot
+ * republish a pre-commit runtime into the new generation.
+ */
+const adminRuntimeConfigGeneration = new Map<string, number>();
 
 type AdminRuntimeTestHooks = {
   createEntry?: (
@@ -101,10 +112,33 @@ type AdminRuntimeTestHooks = {
 };
 let adminRuntimeTestHooks: AdminRuntimeTestHooks | undefined;
 
-async function resolveAgentDir(agentDir?: string): Promise<string> {
+function resolveAgentDir(agentDir?: string): string {
   if (agentDir && agentDir.length > 0) return resolve(agentDir);
-  const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
   return resolve(getAgentDir());
+}
+
+function getAdminConfigGeneration(key: string): number {
+  return adminRuntimeConfigGeneration.get(key) ?? 0;
+}
+
+function bumpAdminConfigGeneration(key: string): number {
+  const next = getAdminConfigGeneration(key) + 1;
+  adminRuntimeConfigGeneration.set(key, next);
+  return next;
+}
+
+function resolveAdminRuntimeTarget(options?: {
+  agentDir?: string;
+  modelsPath?: string;
+}): { agentDir: string; modelsPath: string; key: string } {
+  const agentDir = resolveAgentDir(options?.agentDir);
+  const modelsPath =
+    options?.modelsPath === undefined ? join(agentDir, "models.json") : resolve(options.modelsPath);
+  return {
+    agentDir,
+    modelsPath,
+    key: adminCacheKey(agentDir, modelsPath),
+  };
 }
 
 function isWebCredentialStore(store: CredentialStore): store is WebCredentialStore {
@@ -127,7 +161,7 @@ export async function createWebModelRuntime(
   options: CreateWebModelRuntimeOptions = {},
 ): Promise<ModelRuntime> {
   const { ModelRuntime } = await import("@earendil-works/pi-coding-agent");
-  const agentDir = await resolveAgentDir(options.agentDir);
+  const agentDir = resolveAgentDir(options.agentDir);
   const authPath =
     options.authPath && options.authPath.length > 0
       ? resolve(options.authPath)
@@ -179,7 +213,7 @@ export async function createWebModelRuntime(
 export async function getWebModelRuntime(
   options: GetWebModelRuntimeOptions = {},
 ): Promise<ModelRuntime> {
-  const agentDir = await resolveAgentDir(options.agentDir);
+  const agentDir = resolveAgentDir(options.agentDir);
   const modelsPath =
     options.modelsPath === undefined ? join(agentDir, "models.json") : options.modelsPath;
   const key = adminCacheKey(agentDir, modelsPath);
@@ -202,31 +236,56 @@ async function getOrCreateAdminRuntimeEntry(
   agentDir: string,
   modelsPath: string | null | undefined,
 ): Promise<AdminRuntimeCacheEntry> {
-  const cached = adminRuntimeCache.get(key);
-  if (cached) return cached;
+  for (;;) {
+    const cached = adminRuntimeCache.get(key);
+    if (cached) return cached;
 
-  let pending = adminRuntimePending.get(key);
-  if (!pending) {
-    const generation = adminRuntimeCacheGeneration;
-    pending = (async () => {
-      const entry = adminRuntimeTestHooks?.createEntry
-        ? await adminRuntimeTestHooks.createEntry(agentDir, modelsPath, false)
-        : await createAdminRuntimeEntry(agentDir, modelsPath);
-      // A test reset must not let an old pending initialization repopulate the
-      // resolved cache after it has been cleared.
-      if (generation === adminRuntimeCacheGeneration) {
-        adminRuntimeCache.set(key, entry);
+    let pending = adminRuntimePending.get(key);
+    if (!pending) {
+      const suiteGeneration = adminRuntimeCacheGeneration;
+      const configGeneration = getAdminConfigGeneration(key);
+      pending = (async () => {
+        const entry = adminRuntimeTestHooks?.createEntry
+          ? await adminRuntimeTestHooks.createEntry(agentDir, modelsPath, false)
+          : await createAdminRuntimeEntry(agentDir, modelsPath);
+        // Test reset or a successful models.json commit must not let an older
+        // pending initialization repopulate the resolved cache.
+        if (
+          suiteGeneration === adminRuntimeCacheGeneration &&
+          configGeneration === getAdminConfigGeneration(key)
+        ) {
+          adminRuntimeCache.set(key, entry);
+        }
+        return entry;
+      })();
+      adminRuntimePending.set(key, pending);
+      // Invalidate may have raced between create and set. Drop ownership so a
+      // post-commit caller never joins this old flight, then retry as a fresh
+      // generation request.
+      if (
+        suiteGeneration !== adminRuntimeCacheGeneration ||
+        configGeneration !== getAdminConfigGeneration(key)
+      ) {
+        if (adminRuntimePending.get(key) === pending) {
+          adminRuntimePending.delete(key);
+        }
+        continue;
       }
-      return entry;
-    })();
-    adminRuntimePending.set(key, pending);
-    void pending.finally(() => {
-      if (adminRuntimePending.get(key) === pending) {
-        adminRuntimePending.delete(key);
-      }
-    }).catch(() => undefined);
+      void pending
+        .finally(() => {
+          if (adminRuntimePending.get(key) === pending) {
+            adminRuntimePending.delete(key);
+          }
+        })
+        .catch(() => undefined);
+    }
+
+    // Original waiters of an invalidated flight may still receive that entry;
+    // they must not auto-upgrade into a newer generation (catalog epoch
+    // waiters rely on keeping their own build). New callers never join an old
+    // flight because invalidate deletes the pending slot first.
+    return pending;
   }
-  return pending;
 }
 
 async function refreshAdminRuntimeOffline(
@@ -235,7 +294,17 @@ async function refreshAdminRuntimeOffline(
 ): Promise<void> {
   let pending = adminRuntimeRefreshPending.get(key);
   if (!pending) {
+    const suiteGeneration = adminRuntimeCacheGeneration;
+    const configGeneration = getAdminConfigGeneration(key);
     pending = measureModelCatalogAsync("runtime.admin_refresh", async () => {
+      // A config commit / test reset during flight must not refresh (and keep
+      // alive) an already-evicted generation's runtime.
+      if (
+        suiteGeneration !== adminRuntimeCacheGeneration ||
+        configGeneration !== getAdminConfigGeneration(key)
+      ) {
+        return;
+      }
       if (adminRuntimeTestHooks?.refreshOffline) {
         await adminRuntimeTestHooks.refreshOffline(entry);
         return;
@@ -243,13 +312,38 @@ async function refreshAdminRuntimeOffline(
       await entry.runtime.refresh({ allowNetwork: false });
     });
     adminRuntimeRefreshPending.set(key, pending);
-    void pending.finally(() => {
-      if (adminRuntimeRefreshPending.get(key) === pending) {
-        adminRuntimeRefreshPending.delete(key);
-      }
-    }).catch(() => undefined);
+    void pending
+      .finally(() => {
+        // Only clear our own pending slot. A newer generation may already own
+        // a different pending promise for this key.
+        if (adminRuntimeRefreshPending.get(key) === pending) {
+          adminRuntimeRefreshPending.delete(key);
+        }
+      })
+      .catch(() => undefined);
   }
   await pending;
+}
+
+/**
+ * Evict the fixed-provider administrative runtime for a models.json commit.
+ *
+ * Advances the per-canonical-key config generation, drops the resolved entry
+ * and any matching init/refresh pending slots, and prevents late settlements
+ * from that generation from refilling the cache. Distinct agentDir/modelsPath
+ * keys are isolated. Auth-only mutations must not call this — they continue to
+ * use offline `refresh()` / catalog epoch invalidation.
+ */
+export function invalidateWebModelRuntimeConfig(options?: {
+  agentDir?: string;
+  modelsPath?: string;
+}): void {
+  const { key } = resolveAdminRuntimeTarget(options);
+  bumpAdminConfigGeneration(key);
+  adminRuntimeCache.delete(key);
+  adminRuntimePending.delete(key);
+  adminRuntimeRefreshPending.delete(key);
+  recordModelCatalogCount("runtime.config_invalidate");
 }
 
 /**
@@ -387,11 +481,14 @@ export async function createTemporaryWebModelRuntimeServices(options: {
   modelsPath: string;
   credentials?: CredentialStore;
 }): Promise<AgentSessionServices> {
-  const agentDir = await resolveAgentDir(options.agentDir);
+  const agentDir = resolveAgentDir(options.agentDir);
+  // Candidate / price paths must never hit model endpoints. Force offline
+  // initial load regardless of PI_OFFLINE or ambient network policy.
   const modelRuntime = await createWebModelRuntime({
     agentDir,
     credentials: options.credentials,
     modelsPath: options.modelsPath,
+    allowModelNetwork: false,
   });
   return createWebAgentSessionServices({
     cwd: options.cwd,
@@ -415,5 +512,6 @@ export function __resetWebModelRuntimeCacheForTests(): void {
   adminRuntimeCache.clear();
   adminRuntimePending.clear();
   adminRuntimeRefreshPending.clear();
+  adminRuntimeConfigGeneration.clear();
   adminRuntimeTestHooks = undefined;
 }

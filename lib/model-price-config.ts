@@ -639,6 +639,15 @@ export interface ApplyPricePatchResult {
  */
 export async function applyPricePatch(
   request: ModelPricePatchRequest,
+  options: {
+    /**
+     * Injected for tests; defaults to notifyModelsConfigCommitted.
+     * Only invoked after a verified durable write (`outcome.written`).
+     */
+    notifyCommitted?: (args: {
+      reason: "model_prices";
+    }) => Promise<unknown>;
+  } = {},
 ): Promise<ApplyPricePatchResult> {
   // Compute explicit free model changes outside the models.json lock.
   // pi-web.json updates remain best-effort after a successful models write.
@@ -703,17 +712,21 @@ export async function applyPricePatch(
     };
   }
 
-  // models.json price patch committed. Invalidate shared catalog before success
-  // so availability/thinking projections rebuild on the next GET /api/models.
-  // 422/409/500 paths above never reach here; skip/no-write outcomes return earlier.
+  // models.json price patch committed. Notify admin config generation + catalog
+  // epoch + best-effort live reload before success. 422/409/500 paths above
+  // never reach here; skip/no-write outcomes return earlier.
   if (outcome.written) {
     try {
-      const { invalidateWebModelCatalog } = await import(
-        "./model-catalog-service"
-      );
-      invalidateWebModelCatalog("model_prices");
+      if (options.notifyCommitted) {
+        await options.notifyCommitted({ reason: "model_prices" });
+      } else {
+        const { notifyModelsConfigCommitted } = await import(
+          "./models-config-commit"
+        );
+        await notifyModelsConfigCommitted({ reason: "model_prices" });
+      }
     } catch {
-      // Catalog invalidation must not roll back a committed price write.
+      // Commit notification must not roll back a committed price write.
     }
   }
 

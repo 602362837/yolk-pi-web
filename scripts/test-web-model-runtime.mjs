@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
- * Focused tests for provider-aware ModelRuntime foundation (SDK-01).
+ * Focused tests for provider-aware ModelRuntime foundation (SDK-01) and
+ * MCR-01 custom provider/model SDK contracts:
+ * - refresh() stays stale for new models/providers; reloadConfig/fresh reread
+ * - fixed extension registrations survive same-runtime reloadConfig
+ * - no-auth / missing-env are loaded-but-unavailable (expected auth gate)
  *
  * Run: npm run test:web-model-runtime
  */
@@ -274,6 +278,289 @@ async function main() {
       assert.equal(defaultAfter, defaultRuntime);
       // Temp model should not appear on the default admin runtime.
       assert.equal(defaultAfter.getModel("test-temp", "temp-model"), undefined);
+    });
+
+    await test("MCR-01 SDK: refresh stays stale; reloadConfig and fresh runtime reread modelsPath", async () => {
+      process.env.PI_OFFLINE = "1";
+      const localDir = await mkdtemp(join(tmpdir(), "ypi-web-runtime-reload-"));
+      try {
+        await writeFile(
+          join(localDir, "auth.json"),
+          `${JSON.stringify(
+            {
+              alpha: { type: "api_key", key: "fake-alpha-key" },
+              beta: { type: "api_key", key: "fake-beta-key" },
+            },
+            null,
+            2,
+          )}\n`,
+          { mode: 0o600 },
+        );
+        await writeFile(
+          join(localDir, "models.json"),
+          `${JSON.stringify(
+            {
+              providers: {
+                alpha: {
+                  baseUrl: "http://127.0.0.1:9",
+                  api: "openai-completions",
+                  apiKey: "fake-alpha-key",
+                  models: [
+                    {
+                      id: "model-a",
+                      name: "Alpha A",
+                      reasoning: false,
+                      input: ["text"],
+                    },
+                  ],
+                },
+              },
+            },
+            null,
+            2,
+          )}\n`,
+          { mode: 0o600 },
+        );
+        await writeFile(
+          join(localDir, "anyrouter.json"),
+          `${JSON.stringify({ models: [] }, null, 2)}\n`,
+          { mode: 0o600 },
+        );
+
+        const warm = await createWebModelRuntime({
+          agentDir: localDir,
+          allowModelNetwork: false,
+        });
+        await warm.refresh({ allowNetwork: false });
+        assert.ok(warm.getModel("alpha", "model-a"));
+        assert.equal(warm.getModel("beta", "beta-model"), undefined);
+
+        await writeFile(
+          join(localDir, "models.json"),
+          `${JSON.stringify(
+            {
+              providers: {
+                alpha: {
+                  baseUrl: "http://127.0.0.1:9",
+                  api: "openai-completions",
+                  apiKey: "fake-alpha-key",
+                  models: [
+                    {
+                      id: "model-a",
+                      name: "Alpha A",
+                      reasoning: false,
+                      input: ["text"],
+                    },
+                    {
+                      id: "model-b",
+                      name: "Alpha B",
+                      reasoning: false,
+                      input: ["text"],
+                    },
+                  ],
+                },
+                beta: {
+                  baseUrl: "http://127.0.0.1:9",
+                  api: "openai-completions",
+                  apiKey: "fake-beta-key",
+                  models: [
+                    {
+                      id: "beta-model",
+                      name: "Beta Model",
+                      reasoning: false,
+                      input: ["text"],
+                    },
+                  ],
+                },
+              },
+            },
+            null,
+            2,
+          )}\n`,
+          { mode: 0o600 },
+        );
+
+        await warm.refresh({ allowNetwork: false });
+        assert.equal(
+          warm.getModel("alpha", "model-b"),
+          undefined,
+          "Pi 0.80.10 refresh() must not reread modelsPath",
+        );
+        assert.equal(
+          warm.getModel("beta", "beta-model"),
+          undefined,
+          "Pi 0.80.10 refresh() must not discover a new provider",
+        );
+
+        await warm.reloadConfig();
+        assert.ok(warm.getModel("alpha", "model-b"), "reloadConfig must load appended model");
+        assert.ok(warm.getModel("beta", "beta-model"), "reloadConfig must load whole new provider");
+        assert.ok(
+          warm
+            .getAvailableSnapshot()
+            .some((m) => m.provider === "beta" && m.id === "beta-model"),
+          "reloadConfig available snapshot must include beta",
+        );
+
+        const fresh = await createWebModelRuntime({
+          agentDir: localDir,
+          allowModelNetwork: false,
+        });
+        await fresh.refresh({ allowNetwork: false });
+        assert.ok(fresh.getModel("beta", "beta-model"));
+        assert.ok(
+          fresh
+            .getAvailableSnapshot()
+            .some((m) => m.provider === "beta" && m.id === "beta-model"),
+        );
+      } finally {
+        await rm(localDir, { recursive: true, force: true });
+      }
+    });
+
+    await test("MCR-01 SDK: fixed extension registrations survive same-runtime reloadConfig", async () => {
+      process.env.PI_OFFLINE = "1";
+      const localDir = await mkdtemp(join(tmpdir(), "ypi-web-runtime-ext-"));
+      try {
+        await writeFile(join(localDir, "auth.json"), "{}\n", { mode: 0o600 });
+        await writeFile(
+          join(localDir, "models.json"),
+          `${JSON.stringify({ providers: {} }, null, 2)}\n`,
+          { mode: 0o600 },
+        );
+        await writeFile(
+          join(localDir, "anyrouter.json"),
+          `${JSON.stringify({ models: [] }, null, 2)}\n`,
+          { mode: 0o600 },
+        );
+
+        const services = await createWebAgentSessionServices({
+          cwd: localDir,
+          agentDir: localDir,
+          fixedProvidersOnly: true,
+        });
+        const runtime = services.modelRuntime;
+        const beforeIds = new Set(runtime.getRegisteredProviderIds?.() ?? []);
+        for (const id of ["grok-cli", "kiro", "google-antigravity"]) {
+          assert.ok(
+            beforeIds.has(id) || runtime.getProvider(id),
+            `${id} must be registered before reloadConfig`,
+          );
+        }
+        assert.ok((runtime.getModels("kiro")?.length ?? 0) > 0);
+
+        await runtime.reloadConfig();
+
+        const afterIds = new Set(runtime.getRegisteredProviderIds?.() ?? []);
+        for (const id of ["grok-cli", "kiro", "google-antigravity"]) {
+          assert.ok(
+            afterIds.has(id) || runtime.getProvider(id),
+            `${id} must survive reloadConfig without re-registerProvider`,
+          );
+        }
+        assert.ok(
+          (runtime.getModels("kiro")?.length ?? 0) > 0,
+          "kiro models must remain after reloadConfig",
+        );
+      } finally {
+        await rm(localDir, { recursive: true, force: true });
+      }
+    });
+
+    await test("MCR-01 expected: no-auth/missing-env are loaded-but-unavailable; literal/stored are available", async () => {
+      process.env.PI_OFFLINE = "1";
+      const cases = [
+        {
+          label: "nokey",
+          providers: {
+            nokey: {
+              baseUrl: "http://127.0.0.1:9",
+              api: "openai-completions",
+              models: [{ id: "m", name: "M", reasoning: false, input: ["text"] }],
+            },
+          },
+          auth: {},
+          expectAvailable: false,
+        },
+        {
+          label: "missingEnv",
+          providers: {
+            missingEnv: {
+              baseUrl: "http://127.0.0.1:9",
+              api: "openai-completions",
+              apiKey: "${MISSING_YPI_ENV_KEY_FOR_MCR01}",
+              models: [{ id: "m", name: "M", reasoning: false, input: ["text"] }],
+            },
+          },
+          auth: {},
+          expectAvailable: false,
+        },
+        {
+          label: "literal",
+          providers: {
+            literal: {
+              baseUrl: "http://127.0.0.1:9",
+              api: "openai-completions",
+              apiKey: "literal-fake-key",
+              models: [{ id: "m", name: "M", reasoning: false, input: ["text"] }],
+            },
+          },
+          auth: {},
+          expectAvailable: true,
+        },
+        {
+          label: "stored",
+          providers: {
+            stored: {
+              baseUrl: "http://127.0.0.1:9",
+              api: "openai-completions",
+              models: [{ id: "m", name: "M", reasoning: false, input: ["text"] }],
+            },
+          },
+          auth: { stored: { type: "api_key", key: "stored-fake-key" } },
+          expectAvailable: true,
+        },
+      ];
+
+      for (const fixture of cases) {
+        const localDir = await mkdtemp(join(tmpdir(), `ypi-web-runtime-auth-${fixture.label}-`));
+        try {
+          await writeFile(
+            join(localDir, "auth.json"),
+            `${JSON.stringify(fixture.auth, null, 2)}\n`,
+            { mode: 0o600 },
+          );
+          await writeFile(
+            join(localDir, "models.json"),
+            `${JSON.stringify({ providers: fixture.providers }, null, 2)}\n`,
+            { mode: 0o600 },
+          );
+          const providerId = Object.keys(fixture.providers)[0];
+          const runtime = await createWebModelRuntime({
+            agentDir: localDir,
+            allowModelNetwork: false,
+          });
+          await runtime.refresh({ allowNetwork: false });
+          assert.ok(
+            runtime.getProvider(providerId),
+            `${fixture.label}: provider must load even without selector availability`,
+          );
+          assert.ok(
+            runtime.getModel(providerId, "m"),
+            `${fixture.label}: model must load (getModel) even when unavailable`,
+          );
+          assert.equal(
+            runtime
+              .getAvailableSnapshot()
+              .some((m) => m.provider === providerId && m.id === "m"),
+            fixture.expectAvailable,
+            `${fixture.label}: available=${fixture.expectAvailable} is expected Pi auth gate, not a reload bug`,
+          );
+          assert.equal(runtime.getError(), undefined, `${fixture.label}: must not be a composition error`);
+        } finally {
+          await rm(localDir, { recursive: true, force: true });
+        }
+      }
     });
   } finally {
     __resetWebModelRuntimeCacheForTests();

@@ -80,18 +80,29 @@ console.log("\n=== live reload / global Active ===");
 
 test("reloadRpcAuthState refreshes same-identity model descriptor without setModel", () => {
   assertIncludes(rpc, "export async function reloadRpcAuthState", "async export");
-  assertIncludes(rpc, "runtime.refresh({ allowNetwork: false })", "offline runtime refresh");
-  assertIncludes(rpc, "runtime.getModel(provider, modelId)", "same-id model lookup");
+  assertIncludes(rpc, "modelRuntime.refresh({ allowNetwork: false })", "offline runtime refresh");
+  assertIncludes(rpc, "reconcileLiveModelDescriptor", "same-id descriptor reconcile");
   assertIncludes(rpc, "cleanupSessionResources", "cleanup");
   assertIncludes(rpc, "agentState.model = refreshed", "in-memory replace");
-  // Ensure we do not call setModel inside reload (comments may mention setModel).
-  const reloadStart = rpc.indexOf("export async function reloadRpcAuthState");
-  const reloadEnd = rpc.indexOf("export function destroyRpcSessionsForCwd");
-  const body = rpc.slice(reloadStart, reloadEnd > 0 ? reloadEnd : reloadStart + 4000);
-  const codeOnly = body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  assert.ok(!/\bsetModel\s*\(/.test(codeOnly), "no setModel call in reload body");
-  assert.ok(!/model_change/.test(codeOnly), "no model_change in reload code");
-  assert.ok(!/modelRegistry/.test(codeOnly), "no modelRegistry in reload body");
+  // Ensure we do not call setModel inside auth/config reload helpers.
+  const authStart = rpc.indexOf("export async function reloadRpcAuthState");
+  const authEnd = rpc.indexOf("export async function reloadRpcModelsConfigState");
+  const authBody = rpc.slice(authStart, authEnd > 0 ? authEnd : authStart + 2500);
+  const authCode = authBody.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(!/\bsetModel\s*\(/.test(authCode), "no setModel call in auth reload body");
+  assert.ok(!/model_change/.test(authCode), "no model_change in auth reload code");
+  assert.ok(!/modelRegistry/.test(authCode), "no modelRegistry in auth reload body");
+
+  const configStart = rpc.indexOf("export async function reloadRpcModelsConfigState");
+  const configEnd = rpc.indexOf("export function destroyRpcSessionsForCwd");
+  const configBody = rpc.slice(
+    configStart,
+    configEnd > 0 ? configEnd : configStart + 2000,
+  );
+  const configCode = configBody.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  assert.ok(configStart >= 0, "config reload export exists");
+  assert.ok(/reloadConfig\(\)/.test(configCode), "config path uses reloadConfig");
+  assert.ok(!/\bsetModel\s*\(/.test(configCode), "no setModel call in config reload body");
 });
 
 test("Models UI describes global Active, not session pin", () => {

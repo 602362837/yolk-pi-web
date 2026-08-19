@@ -1289,19 +1289,10 @@ export async function applyModelsConfigSync(
     }
   }
 
-  // Persist + verify succeeded (or no verifier). Advance catalog epoch even when
-  // the subsequent live-wrapper reload is only best-effort / partial.
-  if (outcome.written) {
-    try {
-      const { invalidateWebModelCatalog } = await import(
-        "@/lib/model-catalog-service"
-      );
-      invalidateWebModelCatalog("models_config_sync");
-    } catch {
-      // Catalog invalidation must not fail the verified models.json write.
-    }
-  }
-
+  // Persist + verify succeeded (or no verifier). Catalog/live notification is
+  // owned by applyModelsConfigSyncWithVerification / notifyModelsConfigCommitted
+  // so this low-level apply stays free of duplicate epoch owners. Callers that
+  // inject a custom runtimeReload still receive it on the response wire.
   deleteModelsSyncPreview(previewId);
 
   const response: ModelsConfigSyncApplyResponse = {
@@ -1378,32 +1369,73 @@ export async function verifyModelsConfigSyncWrite(args: {
 }
 
 /**
- * Best-effort live ModelRuntime refresh after a verified models.json write.
+ * Map a live reload summary / injected ok|partial status into the sync wire.
  * Partial failures never roll back disk and never project paths/secrets.
+ */
+function modelsConfigSyncReloadFromLive(failed: number): ModelsConfigSyncRuntimeReload {
+  return failed === 0 ? "ok" : "partial";
+}
+
+/** Live summary returned by the unified models.json commit notifier. */
+export type ModelsConfigSyncCommitLiveSummary = {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+};
+
+/**
+ * Injected commit-notifier contract for sync apply.
+ * Success means admin config generation + catalog epoch already ran; the live
+ * summary alone is not freshness proof.
+ */
+export type ModelsConfigSyncCommitNotifier = (args: {
+  reason: "models_config_sync";
+  reloadLive?: () => Promise<ModelsConfigSyncCommitLiveSummary>;
+}) => Promise<{ live: ModelsConfigSyncCommitLiveSummary }>;
+
+async function defaultNotifyModelsConfigCommitted(
+  args: {
+    reason: "models_config_sync";
+    reloadLive?: () => Promise<ModelsConfigSyncCommitLiveSummary>;
+  },
+): Promise<{ live: ModelsConfigSyncCommitLiveSummary }> {
+  const { notifyModelsConfigCommitted } = await import(
+    "@/lib/models-config-commit"
+  );
+  return notifyModelsConfigCommitted(args);
+}
+
+function modelsConfigSyncReloadLiveFromStatus(
+  reloadLiveRuntimes: () => Promise<ModelsConfigSyncRuntimeReload>,
+): () => Promise<ModelsConfigSyncCommitLiveSummary> {
+  return async () => {
+    try {
+      const status = await reloadLiveRuntimes();
+      return status === "ok"
+        ? { attempted: 0, succeeded: 0, failed: 0 }
+        : { attempted: 1, succeeded: 0, failed: 1 };
+    } catch {
+      return { attempted: 1, succeeded: 0, failed: 1 };
+    }
+  };
+}
+
+/**
+ * Success-only commit notification + live models-config reload for sync apply.
+ * Prefer `applyModelsConfigSyncWithVerification`. This helper remains for
+ * direct callers and always requires the unified notifier to complete.
  */
 export async function reloadLiveModelRuntimesAfterModelsSync(): Promise<
   ModelsConfigSyncRuntimeReload
 > {
-  let adminOk = false;
-  let sessionsOk = false;
-
   try {
-    const { getWebModelRuntime } = await import("@/lib/web-model-runtime");
-    await getWebModelRuntime({ allowModelNetwork: false });
-    adminOk = true;
+    const { live } = await defaultNotifyModelsConfigCommitted({
+      reason: "models_config_sync",
+    });
+    return modelsConfigSyncReloadFromLive(live.failed);
   } catch {
-    adminOk = false;
+    return "partial";
   }
-
-  try {
-    const { reloadRpcAuthState } = await import("@/lib/rpc-manager");
-    await Promise.resolve(reloadRpcAuthState());
-    sessionsOk = true;
-  } catch {
-    sessionsOk = false;
-  }
-
-  return adminOk && sessionsOk ? "ok" : "partial";
 }
 
 /**
@@ -1528,6 +1560,8 @@ export async function handleModelsConfigSyncRequest(
     fetchImpl?: ModelsSyncFetch;
     verifyWrittenConfig?: ApplyModelsConfigSyncOptions["verifyWrittenConfig"];
     reloadLiveRuntimes?: () => Promise<ModelsConfigSyncRuntimeReload>;
+    /** Injected for tests; defaults to notifyModelsConfigCommitted. */
+    notifyCommitted?: ModelsConfigSyncCommitNotifier;
   } = {},
 ): Promise<
   | ModelsConfigSyncPreviewResponse
@@ -1552,6 +1586,7 @@ export async function handleModelsConfigSyncRequest(
       now: options.now,
       verifyWrittenConfig: options.verifyWrittenConfig,
       reloadLiveRuntimes: options.reloadLiveRuntimes,
+      notifyCommitted: options.notifyCommitted,
     },
   );
 }
@@ -1567,8 +1602,16 @@ export async function applyModelsConfigSyncWithVerification(
     now?: () => number;
     /** Injected for tests; defaults to verifyModelsConfigSyncWrite. */
     verifyWrittenConfig?: ApplyModelsConfigSyncOptions["verifyWrittenConfig"];
-    /** Injected for tests; defaults to reloadLiveModelRuntimesAfterModelsSync. */
+    /**
+     * Injected live-reload stub consumed only inside a successful commit
+     * notifier. It is never independent freshness proof for runtimeReload ok.
+     */
     reloadLiveRuntimes?: () => Promise<ModelsConfigSyncRuntimeReload>;
+    /**
+     * Injected for tests; defaults to the unified notifyModelsConfigCommitted
+     * owner (admin generation + catalog epoch + best-effort live reload).
+     */
+    notifyCommitted?: ModelsConfigSyncCommitNotifier;
   } = {},
 ): Promise<ModelsConfigSyncApplyResponse> {
   const verify =
@@ -1581,6 +1624,7 @@ export async function applyModelsConfigSyncWithVerification(
     });
 
   // First apply without runtimeReload so we can set it after best-effort reload.
+  // Catalog/live notification happens only after verified write below.
   const applied = await applyModelsConfigSync(input, {
     now: options.now,
     verifyWrittenConfig: verify,
@@ -1588,15 +1632,26 @@ export async function applyModelsConfigSyncWithVerification(
     runtimeReload: "ok",
   });
 
-  // Skip-only apply (no disk write) still returns success; live reload optional.
+  // Skip-only apply (no disk write) still returns success; do not notify.
   if (applied.addedIds.length === 0) {
     return applied;
   }
 
-  const reloadFn = options.reloadLiveRuntimes ?? reloadLiveModelRuntimesAfterModelsSync;
-  let runtimeReload: ModelsConfigSyncRuntimeReload = "ok";
+  // runtimeReload ok requires the unified commit notifier to complete
+  // (admin generation + catalog epoch) with live.failed === 0. Import/execution
+  // failure keeps the durable write but must stay partial; a live-only stub
+  // never proves freshness on its own.
+  let runtimeReload: ModelsConfigSyncRuntimeReload = "partial";
   try {
-    runtimeReload = await reloadFn();
+    const notify =
+      options.notifyCommitted ?? defaultNotifyModelsConfigCommitted;
+    const { live } = await notify({
+      reason: "models_config_sync",
+      reloadLive: options.reloadLiveRuntimes
+        ? modelsConfigSyncReloadLiveFromStatus(options.reloadLiveRuntimes)
+        : undefined,
+    });
+    runtimeReload = modelsConfigSyncReloadFromLive(live.failed);
   } catch {
     runtimeReload = "partial";
   }

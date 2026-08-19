@@ -127,6 +127,8 @@ export interface AgentSessionLike {
   readonly modelRuntime: {
     getModel: (provider: string, modelId: string) => ModelLike | undefined;
     refresh: (options?: { allowNetwork?: boolean }) => Promise<unknown> | unknown;
+    /** Public Pi API: reread modelsPath and rebuild providers (keeps extensionProviders). */
+    reloadConfig: () => Promise<unknown> | unknown;
   };
   readonly sessionManager: SessionManager;
   readonly settingsManager: SettingsManager;

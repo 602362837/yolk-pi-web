@@ -888,6 +888,7 @@ test("apply with verification success + partial live reload warning", async () =
   });
 
   let verified = false;
+  let notifyCalls = 0;
   const result = await applyModelsConfigSyncWithVerification(
     {
       providerId: "local-openai",
@@ -901,10 +902,19 @@ test("apply with verification success + partial live reload warning", async () =
         assert.deepEqual(addedIds, ["added-1"]);
       },
       reloadLiveRuntimes: async () => "partial",
+      notifyCommitted: async ({ reason, reloadLive }) => {
+        notifyCalls += 1;
+        assert.equal(reason, "models_config_sync");
+        const live = reloadLive
+          ? await reloadLive()
+          : { attempted: 0, succeeded: 0, failed: 0 };
+        return { live };
+      },
     },
   );
 
   assert.equal(verified, true);
+  assert.equal(notifyCalls, 1);
   assert.deepEqual(result.addedIds, ["added-1"]);
   assert.equal(result.runtimeReload, "partial");
   assert.equal(result.warning, MODELS_CONFIG_SYNC_PARTIAL_RELOAD_WARNING);
@@ -1044,6 +1054,7 @@ test("handleModelsConfigSyncRequest apply merges with injected verify/reload", a
     );
     assert.equal(preview.kind, "models_config_sync_preview");
 
+    let notifyCalls = 0;
     const apply = await handleModelsConfigSyncRequest(
       {
         action: "apply",
@@ -1055,12 +1066,21 @@ test("handleModelsConfigSyncRequest apply merges with injected verify/reload", a
       {
         verifyWrittenConfig: async () => {},
         reloadLiveRuntimes: async () => "ok",
+        notifyCommitted: async ({ reason, reloadLive }) => {
+          notifyCalls += 1;
+          assert.equal(reason, "models_config_sync");
+          const live = reloadLive
+            ? await reloadLive()
+            : { attempted: 0, succeeded: 0, failed: 0 };
+          return { live };
+        },
       },
     );
 
     assert.equal(apply.kind, "models_config_sync_apply");
     assert.deepEqual(apply.addedIds, ["new-from-api"]);
     assert.deepEqual(apply.skippedExistingIds, ["exists"]);
+    assert.equal(notifyCalls, 1);
     assert.equal(apply.runtimeReload, "ok");
     assert.equal(JSON.stringify(apply).includes(secretKey), false);
     assert.equal(JSON.stringify(apply).includes(baseUrl), false);
@@ -1583,6 +1603,353 @@ test("ModelsConfigSyncError stores code and default message", () => {
   assert.equal(e.message, modelsSyncErrorMessage("stale_revision"));
   const e2 = new ModelsConfigSyncError("auth_failed", "Custom");
   assert.equal(e2.message, "Custom");
+});
+
+test("MCR-01: sync-style epoch-only invalidate must surface newly written custom model in shared catalog", async () => {
+  // Current production sync path advances catalog epoch after verified write, but
+  // the shared admin ModelRuntime only refresh()es. Desired post-fix contract:
+  // the next warm catalog read must include the exact new model without test
+  // runtime reset. This is the shared-catalog half of R1/R11 for sync writers.
+  // Use an isolated agentDir so earlier sync fixtures cannot pollute the warm catalog.
+  process.env.PI_OFFLINE = "1";
+  const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const localDir = await mkdtemp(pathJoin(tmpdir(), "ypi-mcs-mcr01-"));
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = localDir;
+
+  try {
+    await writeFile(pathJoin(localDir, "auth.json"), "{}\n", { mode: 0o600 });
+    await writeFile(
+      pathJoin(localDir, "anyrouter.json"),
+      `${JSON.stringify({ models: [] }, null, 2)}\n`,
+      { mode: 0o600 },
+    );
+    await mkdir(pathJoin(localDir, "auth-api-key-accounts", "anyrouter"), {
+      recursive: true,
+      mode: 0o700,
+    });
+
+    const { createJiti } = await import("jiti");
+    const jiti = createJiti(pathJoin(process.cwd(), "package.json"), {
+      interopDefault: true,
+      alias: { "@": process.cwd() },
+    });
+    const runtimeMod = await jiti.import(pathJoin(process.cwd(), "lib/web-model-runtime.ts"));
+    const catalogMod = await jiti.import(pathJoin(process.cwd(), "lib/model-catalog-service.ts"));
+    const storeMod = await jiti.import(pathJoin(process.cwd(), "lib/models-config-store.ts"));
+    const {
+      createWebModelRuntime,
+      __resetWebModelRuntimeCacheForTests,
+    } = runtimeMod;
+    const {
+      getWebModelCatalogSnapshot,
+      invalidateWebModelCatalog,
+      __resetWebModelCatalogForTests,
+    } = catalogMod;
+    const { writeModelsJsonAtomic, serializeModelsJson } = storeMod;
+
+    __resetWebModelCatalogForTests();
+    __resetWebModelRuntimeCacheForTests();
+
+    writeModelsJsonAtomic(
+      serializeModelsJson({
+        providers: {
+          "sync-alpha": {
+            api: "openai-completions",
+            baseUrl: "http://127.0.0.1:9",
+            apiKey: "sync-alpha-fake-key",
+            models: [
+              {
+                id: "model-a",
+                name: "Sync Alpha A",
+                reasoning: false,
+                input: ["text"],
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const warm = await getWebModelCatalogSnapshot({
+      cwd: localDir,
+      agentDir: localDir,
+    });
+    assert.ok(
+      warm.modelList.some((m) => m.provider === "sync-alpha" && m.id === "model-a"),
+      "warm baseline must include sync-alpha/model-a",
+    );
+    assert.ok(!warm.modelList.some((m) => m.id === "model-b"));
+
+    writeModelsJsonAtomic(
+      serializeModelsJson({
+        providers: {
+          "sync-alpha": {
+            api: "openai-completions",
+            baseUrl: "http://127.0.0.1:9",
+            apiKey: "sync-alpha-fake-key",
+            models: [
+              {
+                id: "model-a",
+                name: "Sync Alpha A",
+                reasoning: false,
+                input: ["text"],
+              },
+              {
+                id: "model-b",
+                name: "Sync Alpha B",
+                reasoning: false,
+                input: ["text"],
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    // Mirror production sync success notify's admin+catalog side effects:
+    // models_config_sync now also evicts admin runtime config generation.
+    // Avoid importing models-config-runtime here (pulls rpc-manager under the
+    // strip-only Node loader). Live reload is covered by rpc-manager contracts.
+    invalidateWebModelCatalog("models_config_sync");
+
+    const fresh = await createWebModelRuntime({
+      agentDir: localDir,
+      allowModelNetwork: false,
+    });
+    await fresh.refresh({ allowNetwork: false });
+    assert.ok(
+      fresh.getModel("sync-alpha", "model-b"),
+      "fresh runtime must see sync-written model-b",
+    );
+
+    const shared = await getWebModelCatalogSnapshot({
+      cwd: localDir,
+      agentDir: localDir,
+    });
+    assert.ok(
+      shared.modelList.some((m) => m.provider === "sync-alpha" && m.id === "model-b"),
+      "shared admin catalog must include sync-written model after production epoch invalidate",
+    );
+  } finally {
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+    await rm(localDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+async function seedVerifiedSyncApplyPreview(previewId, modelId = "added-commit") {
+  __resetModelsConfigSyncPreviewCacheForTests();
+  const before = writeModelsConfig({
+    providers: {
+      "local-openai": {
+        api: "openai-completions",
+        baseUrl: "https://example.local/v1",
+        apiKey: "k",
+        models: [],
+      },
+    },
+  });
+  const eligibility = assessModelsSyncProviderEligibility(
+    "local-openai",
+    before.parsed.providers["local-openai"],
+  );
+  storeModelsSyncPreview({
+    previewId,
+    providerId: "local-openai",
+    revision: before.revision,
+    fingerprint: computeModelsSyncProviderFingerprint(eligibility.provider),
+    remoteIds: [modelId],
+    existingIds: [],
+    expiresAt: Date.now() + MODELS_CONFIG_SYNC_PREVIEW_TTL_MS,
+    createdAt: Date.now(),
+  });
+  return { before, modelId };
+}
+
+test("sync notifier import/reject stays partial even when live stub says ok", async () => {
+  const { before, modelId } = await seedVerifiedSyncApplyPreview("preview-notify-reject");
+  let liveStubCalls = 0;
+
+  const result = await applyModelsConfigSyncWithVerification(
+    {
+      providerId: "local-openai",
+      previewId: "preview-notify-reject",
+      revision: before.revision,
+      modelIds: [modelId],
+    },
+    {
+      verifyWrittenConfig: async () => {},
+      reloadLiveRuntimes: async () => {
+        liveStubCalls += 1;
+        return "ok";
+      },
+      notifyCommitted: async () => {
+        throw new Error("simulated notify import/execution failure");
+      },
+    },
+  );
+
+  assert.deepEqual(result.addedIds, [modelId]);
+  assert.equal(result.runtimeReload, "partial");
+  assert.equal(result.warning, MODELS_CONFIG_SYNC_PARTIAL_RELOAD_WARNING);
+  assert.equal(
+    liveStubCalls,
+    0,
+    "live-only stub must not run when the commit notifier itself fails",
+  );
+  const after = readModelsJsonRaw();
+  assert.equal(after.parsed.providers["local-openai"].models[0].id, modelId);
+});
+
+test("sync notifier success with live.failed===0 reports runtimeReload ok", async () => {
+  const { before, modelId } = await seedVerifiedSyncApplyPreview("preview-notify-ok");
+  let notifyCalls = 0;
+  let liveStubCalls = 0;
+
+  const result = await applyModelsConfigSyncWithVerification(
+    {
+      providerId: "local-openai",
+      previewId: "preview-notify-ok",
+      revision: before.revision,
+      modelIds: [modelId],
+    },
+    {
+      verifyWrittenConfig: async () => {},
+      reloadLiveRuntimes: async () => {
+        liveStubCalls += 1;
+        return "ok";
+      },
+      notifyCommitted: async ({ reason, reloadLive }) => {
+        notifyCalls += 1;
+        assert.equal(reason, "models_config_sync");
+        const live = reloadLive
+          ? await reloadLive()
+          : { attempted: 1, succeeded: 1, failed: 0 };
+        return { live };
+      },
+    },
+  );
+
+  assert.equal(notifyCalls, 1);
+  assert.equal(liveStubCalls, 1);
+  assert.deepEqual(result.addedIds, [modelId]);
+  assert.equal(result.runtimeReload, "ok");
+  assert.equal(result.warning, undefined);
+});
+
+test("sync notifier success with live.failed>0 reports partial", async () => {
+  const { before, modelId } = await seedVerifiedSyncApplyPreview("preview-notify-live-fail");
+
+  const result = await applyModelsConfigSyncWithVerification(
+    {
+      providerId: "local-openai",
+      previewId: "preview-notify-live-fail",
+      revision: before.revision,
+      modelIds: [modelId],
+    },
+    {
+      verifyWrittenConfig: async () => {},
+      reloadLiveRuntimes: async () => "partial",
+      notifyCommitted: async ({ reloadLive }) => {
+        const live = reloadLive
+          ? await reloadLive()
+          : { attempted: 1, succeeded: 0, failed: 1 };
+        return { live };
+      },
+    },
+  );
+
+  assert.deepEqual(result.addedIds, [modelId]);
+  assert.equal(result.runtimeReload, "partial");
+  assert.equal(result.warning, MODELS_CONFIG_SYNC_PARTIAL_RELOAD_WARNING);
+});
+
+test("sync notifier throw after durable write reports partial", async () => {
+  const { before, modelId } = await seedVerifiedSyncApplyPreview("preview-notify-throw");
+
+  const result = await applyModelsConfigSyncWithVerification(
+    {
+      providerId: "local-openai",
+      previewId: "preview-notify-throw",
+      revision: before.revision,
+      modelIds: [modelId],
+    },
+    {
+      verifyWrittenConfig: async () => {},
+      notifyCommitted: async () => {
+        throw new TypeError("notify threw");
+      },
+    },
+  );
+
+  assert.deepEqual(result.addedIds, [modelId]);
+  assert.equal(result.runtimeReload, "partial");
+  assert.equal(result.warning, MODELS_CONFIG_SYNC_PARTIAL_RELOAD_WARNING);
+  const after = readModelsJsonRaw();
+  assert.equal(after.parsed.providers["local-openai"].models[0].id, modelId);
+});
+
+test("sync skip/no-write does not call commit notifier", async () => {
+  __resetModelsConfigSyncPreviewCacheForTests();
+  const before = writeModelsConfig({
+    providers: {
+      "local-openai": {
+        api: "openai-completions",
+        baseUrl: "https://example.local/v1",
+        apiKey: "k",
+        models: [{ id: "already" }],
+      },
+    },
+  });
+  const eligibility = assessModelsSyncProviderEligibility(
+    "local-openai",
+    before.parsed.providers["local-openai"],
+  );
+  storeModelsSyncPreview({
+    previewId: "preview-skip-notify",
+    providerId: "local-openai",
+    revision: before.revision,
+    fingerprint: computeModelsSyncProviderFingerprint(eligibility.provider),
+    remoteIds: ["already"],
+    existingIds: ["already"],
+    expiresAt: Date.now() + MODELS_CONFIG_SYNC_PREVIEW_TTL_MS,
+    createdAt: Date.now(),
+  });
+
+  let notifyCalls = 0;
+  let verifyCalls = 0;
+  const result = await applyModelsConfigSyncWithVerification(
+    {
+      providerId: "local-openai",
+      previewId: "preview-skip-notify",
+      revision: before.revision,
+      modelIds: ["already"],
+    },
+    {
+      verifyWrittenConfig: async () => {
+        verifyCalls += 1;
+      },
+      reloadLiveRuntimes: async () => "ok",
+      notifyCommitted: async () => {
+        notifyCalls += 1;
+        return { live: { attempted: 0, succeeded: 0, failed: 0 } };
+      },
+    },
+  );
+
+  assert.deepEqual(result.addedIds, []);
+  assert.deepEqual(result.skippedExistingIds, ["already"]);
+  assert.equal(notifyCalls, 0);
+  assert.equal(verifyCalls, 0);
+  assert.equal(result.runtimeReload, "ok");
+  assert.equal(result.warning, undefined);
+  const after = readModelsJsonRaw();
+  assert.equal(after.revision, before.revision);
+  assert.deepEqual(after.parsed.providers["local-openai"].models, [
+    { id: "already" },
+  ]);
 });
 
 test("mergeNewModelIdsIntoModelsConfig throws for missing provider", () => {

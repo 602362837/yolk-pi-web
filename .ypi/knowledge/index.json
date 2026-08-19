@@ -1,7 +1,34 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-29T10:03:13.968Z",
+  "updatedAt": "2026-08-19T06:53:38.050Z",
   "entries": [
+    {
+      "id": "20260819-145338-排查-openai-协议自定义提供商新增模型未出现在模型选择中",
+      "title": "排查 OpenAI 协议自定义提供商新增模型未出现在模型选择中",
+      "taskId": "20260819-101347-排查-openai-协议自定义提供商新增模型未出现在模型选择中",
+      "taskKey": "archived:2026-08:20260819-101347-排查-openai-协议自定义提供商新增模型未出现在模型选择中",
+      "workflowId": "feature-dev",
+      "summary": "## Status - **MCR-01…09 全部完成**；当前子任务 **MCR-09 done**。 - Checker 两个 blocker 均有行为级证据（非源码正则替代）。 - 无 UI / 前端生产逻辑改动。 - 未 `commit` / `push` / `merge`。 - 未派发其他 Studio member / subagent。 ## Blocker closure ### Blocker 1 — R9/R10 existing-session 行为（MCR-07） `scripts/test-session-model-pin.mjs` 通过 runtime-jiti 实际加载 `AgentSessionWrapper` / `reloadRpcModelsConfigState`： | Case | Evidence | | --- | --- | | same-id descriptor replace | `reloadConfig=1`, `setModel=0`, `model_change=0`, defaults=0 | | deleted current | no fallback / no `setModel` | | failure isolation | summary `attempted/succeeded/failed` accurate | | exact miss → hit | `reloadConfig=1`, same provider/id retry once, `setModel=1`, SDK `model_change=1` only | | unknown second miss | keeps `Model not found`; `reloadConfig=1`; `setModel=0`; no loop/fuzzy | Registry/`globalThis.__piSessions` 在 finally 中恢复；wrapper destroy。 ### Blocker 2 — R…",
+      "tags": [
+        "studio",
+        "feature-dev"
+      ],
+      "sourceTaskPath": ".ypi/tasks/archive/2026-08/20260819-101347-排查-openai-协议自定义提供商新增模型未出现在模型选择中",
+      "knowledgePath": ".ypi/knowledge/20260819-145338-排查-openai-协议自定义提供商新增模型未出现在模型选择中.md",
+      "createdAt": "2026-08-19T06:53:38.050Z",
+      "archivedAt": "2026-08-19T06:53:38.050Z",
+      "sourceArtifacts": [
+        "handoff.md",
+        "review.md",
+        "checks.md",
+        "design.md",
+        "implement.md",
+        "prd.md",
+        "brief.md",
+        "ui.md",
+        "plan-review.md"
+      ]
+    },
     {
       "id": "20260729-180313-排查-github-议题自动分析-handler_not_ready-重试等待异常",
       "title": "排查 GitHub 议题自动分析 handler_not_ready 重试等待异常",

@@ -487,6 +487,106 @@ test("successful apply returns 200 and new revision", async () => {
 });
 
 // ---------------------------------------------------------------------------
+// MCR-09: success-only commit notification gating
+// ---------------------------------------------------------------------------
+
+console.log("\napplyPricePatch commit notification");
+
+test("successful written patch notifies model_prices once", async () => {
+  writeModelsJsonAtomic(JSON.stringify({ providers: {} }, null, 2) + "\n");
+  const current = readModelsJsonRaw();
+  const calls = [];
+
+  const result = await applyPricePatch(
+    {
+      revision: current.revision,
+      changes: [{ provider: "openai", model: "gpt-price-ok", prices: { input: 3, output: 9 } }],
+    },
+    {
+      notifyCommitted: async (args) => {
+        calls.push(args);
+      },
+    },
+  );
+
+  assert.equal(result.status, 200);
+  assert.equal(result.success, true);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], { reason: "model_prices" });
+});
+
+test("409 stale revision does not notify", async () => {
+  writeModelsJsonAtomic(JSON.stringify({ providers: {} }, null, 2) + "\n");
+  const calls = [];
+
+  const result = await applyPricePatch(
+    {
+      revision: "0000000000000000",
+      changes: [{ provider: "openai", model: "gpt-price-stale", prices: { input: 1 } }],
+    },
+    {
+      notifyCommitted: async (args) => {
+        calls.push(args);
+      },
+    },
+  );
+
+  assert.equal(result.status, 409);
+  assert.equal(result.success, false);
+  assert.equal(calls.length, 0);
+});
+
+test("422 invalid / no-write batch does not notify", async () => {
+  writeModelsJsonAtomic(JSON.stringify({ providers: {} }, null, 2) + "\n");
+  const current = readModelsJsonRaw();
+  const before = readFileSync(getModelsJsonPath(), "utf8");
+  const calls = [];
+
+  const result = await applyPricePatch(
+    {
+      revision: current.revision,
+      changes: [{ provider: "openai", model: "gpt-price-bad", prices: { input: -1 } }],
+    },
+    {
+      notifyCommitted: async (args) => {
+        calls.push(args);
+      },
+    },
+  );
+
+  assert.equal(result.status, 422);
+  assert.equal(result.success, false);
+  assert.equal(calls.length, 0);
+  assert.equal(readFileSync(getModelsJsonPath(), "utf8"), before);
+});
+
+test("notify failure after durable write still returns 200", async () => {
+  writeModelsJsonAtomic(JSON.stringify({ providers: {} }, null, 2) + "\n");
+  const current = readModelsJsonRaw();
+
+  const result = await applyPricePatch(
+    {
+      revision: current.revision,
+      changes: [{ provider: "openai", model: "gpt-price-notify-fail", prices: { input: 2, output: 4 } }],
+    },
+    {
+      notifyCommitted: async () => {
+        throw new Error("notify boom");
+      },
+    },
+  );
+
+  assert.equal(result.status, 200);
+  assert.equal(result.success, true);
+  const finalRaw = readModelsJsonRaw();
+  const cost =
+    finalRaw.parsed.providers?.openai?.modelOverrides?.["gpt-price-notify-fail"]?.cost;
+  assert.ok(cost, "durable write must remain after notify failure");
+  assert.equal(cost.input, 2);
+  assert.equal(cost.output, 4);
+});
+
+// ---------------------------------------------------------------------------
 // Tests: validation helpers (model-price-types)
 // ---------------------------------------------------------------------------
 

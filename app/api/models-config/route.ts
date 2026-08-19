@@ -11,7 +11,12 @@
  */
 
 import { NextResponse } from "next/server";
-import { invalidateWebModelCatalog } from "@/lib/model-catalog-service";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { notifyModelsConfigCommitted } from "@/lib/models-config-commit";
+import {
+  ModelsConfigCandidateInvalidError,
+  verifyWebModelsConfigCandidate,
+} from "@/lib/models-config-runtime";
 import {
   mutateModelsJsonUnderLock,
   readModelsJsonRaw,
@@ -124,6 +129,27 @@ export async function PUT(req: Request) {
     const expectedRevision = parseIfMatchRevision(req.headers.get("if-match"));
     const normalized = normalizeModelsJsonForWrite(body);
 
+    // Semantic preflight before any durable write / revision / backup / invalidate.
+    // Auth availability is intentionally not required: no-auth providers may save.
+    try {
+      await verifyWebModelsConfigCandidate({
+        candidate: normalized,
+        agentDir: getAgentDir(),
+      });
+    } catch (error) {
+      if (error instanceof ModelsConfigCandidateInvalidError) {
+        const current = readModelsJsonRaw();
+        return NextResponse.json(
+          {
+            error: "Model configuration is invalid",
+            code: "models_config_invalid",
+          },
+          { status: 422, headers: revisionHeaders(current.revision) },
+        );
+      }
+      throw error;
+    }
+
     const outcome = await mutateModelsJsonUnderLock({
       expectedRevision,
       backup: true,
@@ -167,11 +193,11 @@ export async function PUT(req: Request) {
       );
     }
 
-    // models.json committed. Advance catalog epoch before the success response
-    // so Chat/Settings rebuild the offline catalog (not the burst cache).
-    // Failed/stale outcomes above never reach here.
+    // models.json committed. Notify admin config generation + catalog epoch +
+    // best-effort live reload before the success response. Failed/stale
+    // outcomes above never reach here.
     if (outcome.written) {
-      invalidateWebModelCatalog("models_config");
+      await notifyModelsConfigCommitted({ reason: "models_config" });
     }
 
     // Additive revision field; success remains true for legacy clients.
@@ -179,9 +205,10 @@ export async function PUT(req: Request) {
       { success: true, revision: outcome.revision },
       { headers: revisionHeaders(outcome.revision) },
     );
-  } catch (error) {
+  } catch {
+    // Never project SDK / stack / path / config text to the client.
     return NextResponse.json(
-      { error: String(error) },
+      { error: "Failed to save models.json", code: "write_failed" },
       { status: 500, headers: NO_STORE },
     );
   }
